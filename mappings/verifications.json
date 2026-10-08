@@ -387,6 +387,138 @@
       "by": "user",
       "at": "2026-10-08",
       "note": "M2 review pick 5 (largest Spanish vs English duration difference); source work/mcc/reports/a10_review_picks.md"
+    },
+    {
+      "id": "v-000012",
+      "subject": "mcc:es:A10_080_cryotech#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_080_cryotech",
+      "checks": [
+        "subtitle_key_link"
+      ],
+      "languages": [
+        "latam_spanish",
+        "spanish"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "subtitle_table": {
+          "name": "SU_Halo1",
+          "sha256": "247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0",
+          "key": "0xE0874E33",
+          "entry_index": 2946
+        },
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
+        },
+        "samples": {
+          "spanish": {
+            "index": 9,
+            "name_in_bank": "A10_080_cryotech",
+            "data_sha256": "698e1816cb23ce523d5c70fb17201ac7ece4f084efb94fc120d032299ca9598e"
+          }
+        },
+        "graphics_modes": [
+          "classic",
+          "anniversary"
+        ],
+        "language_settings": {
+          "primary": "Spanish (Latin America)",
+          "fallback": "Spanish (Spain)",
+          "subtitles": "on"
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "B1 PoC step 1 baseline (docs/subtitle-research.md B.12), unmodified game: SU_Halo1 text displayed in Classic and Anniversary; Spain Spanish audio in both. Speaker names not shown even with the option on (out of scope, original behaviour preserved). languages = subtitle table (latam_spanish) and audio (spanish)."
+    },
+    {
+      "id": "v-000013",
+      "subject": "mcc:es:A10_130_cryotech#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_130_cryotech",
+      "checks": [
+        "subtitle_key_link"
+      ],
+      "languages": [
+        "latam_spanish",
+        "spanish"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "subtitle_table": {
+          "name": "SU_Halo1",
+          "sha256": "247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0",
+          "key": "0x3A6657C5",
+          "entry_index": 761
+        },
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
+        },
+        "samples": {
+          "spanish": {
+            "index": 12,
+            "name_in_bank": "A10_130_cryotech",
+            "data_sha256": "ccb3805a908cb5fdc13c5f60e1e1d0087ed0cba9e95bb3b5e81402ca3c1293d5"
+          }
+        },
+        "graphics_modes": [
+          "classic",
+          "anniversary"
+        ],
+        "language_settings": {
+          "primary": "Spanish (Latin America)",
+          "fallback": "Spanish (Spain)",
+          "subtitles": "on"
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "B1 PoC step 1 baseline (docs/subtitle-research.md B.12), unmodified game: SU_Halo1 text displayed in Classic and Anniversary; Spain Spanish audio in both. Speaker names not shown even with the option on (out of scope, original behaviour preserved). languages = subtitle table (latam_spanish) and audio (spanish)."
+    },
+    {
+      "id": "v-000014",
+      "subject": "mcc:es:A10_150_cryotech#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_150_cryotech",
+      "checks": [
+        "subtitle_key_link"
+      ],
+      "languages": [
+        "latam_spanish",
+        "spanish"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "subtitle_table": {
+          "name": "SU_Halo1",
+          "sha256": "247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0",
+          "key": "0x260F7CCF",
+          "entry_index": 482
+        },
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
+        },
+        "samples": {
+          "spanish": {
+            "index": 14,
+            "name_in_bank": "A10_150_cryotech",
+            "data_sha256": "470b2188c1bcef177d86937427e73b087db27d385a042a597f32dd845f87e9fc"
+          }
+        },
+        "graphics_modes": [
+          "classic",
+          "anniversary"
+        ],
+        "language_settings": {
+          "primary": "Spanish (Latin America)",
+          "fallback": "Spanish (Spain)",
+          "subtitles": "on"
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "B1 PoC step 1 baseline (docs/subtitle-research.md B.12), unmodified game: SU_Halo1 text displayed in Classic and Anniversary; Spain Spanish audio in both. Speaker names not shown even with the option on (out of scope, original behaviour preserved). languages = subtitle table (latam_spanish) and audio (spanish)."
     }
   ]
 }

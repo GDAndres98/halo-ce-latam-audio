@@ -34,7 +34,7 @@ shared.
   metadata are preserved (design §6). **Not implemented and no effect
   chosen yet.**
 
-### Language configuration (USER-REPORTED, 2026-10-08)
+### Language configuration (USER-VERIFIED, 2026-10-08)
 
 Owner's setting: primary **Spanish (Latin America)**, fallback
 **Spanish (Spain)**.
@@ -44,9 +44,14 @@ Owner's setting: primary **Spanish (Latin America)**, fallback
 | Subtitles | LATAM (`SU`) | the approved text, written to `SU` (and the same text to `SP`) |
 | Audio | Spain Spanish | CE es-MX through the **Spain audio slot** |
 
-The owner reported this behaviour from normal play. It is not yet
-observed per line or verified; the B1 PoC baseline (subtitle-research.md
-B.12 step 1) records it for one line.
+First reported by the owner from normal play, then **verified** by the
+owner in the B1 baseline (subtitle-research.md B.12 step 1): `SU` text
+and Spain audio in both Classic and Anniversary. Recorded as
+`v-000012`–`v-000014`.
+
+Speaker names do not appear in Spanish, even with the speaker-name
+option on. That is **out of scope**, and the original behaviour is
+preserved.
 
 ### Distribution target (owner requirement, 2026-10-08)
 
@@ -567,22 +572,25 @@ Excluded without new approval:
 
 **B1 revision (owner decision, 2026-10-08)** — subtitle-research.md
 B.11–B.12:
-- **Language behaviour:** primary LATAM + fallback Spain gives LATAM
-  subtitles and Spain audio. This is **USER-REPORTED**, not yet
-  verified.
+- **Language behaviour:** primary LATAM + fallback Spain gives `SU`
+  subtitles and Spain audio. **Owner-verified** in the baseline, in both
+  graphics modes. Speaker names are out of scope.
 - **Strategy:** S1 is applied to **both** `SU_Halo1.bin` and
   `SP_Halo1.bin`.
   - One canonical approved subtitle mapping is written to both tables.
   - All unmatched entries are preserved.
   - Keys are validated independently in each table.
   - Audio and subtitle mappings stay independent.
-- **Revised PoC (B.12), not executed; each step needs approval:**
+- **Revised PoC (B.12); each step needs approval:**
   0. Pre-flight: hash and pin the installed `SU`/`SP`, read-only. ✅
      Done; all match.
   1. **Baseline first:** observe the unmodified game on three
-     cryo-opening discriminator lines and `a10_350_captkeyes`.
+     cryo-opening discriminator lines and `a10_350_captkeyes`. ✅ Done:
+     `SU` text and Spain audio in both modes (`v-000012`–`v-000014`).
   2. Two **one-entry**, same-length, ASCII-marker candidates (`[B1-SU]`,
-     `[B1-SP]`) are built **offline** in `work/`.
+     `[B1-SP]`) are built **offline** in `work/`. ✅ Done: 16/16 checks
+     per table, deterministic. Candidate SHA-256: `SU` `de8cc7ee…d9be`,
+     `SP` `9856cfde…b63f`. Install/rollback commands are prepared.
   3. In-game tests, **one table at a time** (3a `SU`, 3b `SP`, optional
      3c both). They use MCC's anti-cheat-disabled launch mode, with a
      hash-verified backup and restore.
@@ -674,8 +682,9 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B1 two-table strategy (`SU` + `SP`, one canonical mapping) | ✅ **approved** by the owner 2026-10-08 |
 | Check names `subtitle_key_link`, `subtitle_load`; structural vs representative verification, no per-key in-game test | ✅ **approved** by the owner 2026-10-08 |
 | B1 PoC step 0 (read-only pre-flight) | ✅ done 2026-10-08: build `19905945`, `SU`/`SP` installed = copies = pins, keys found once per table |
-| B1 PoC step 1 (baseline, owner in game) | approved; **in progress (owner)** |
-| B1 PoC step 2, 3a/3b/3c | not approved; each needs separate approval |
+| B1 PoC step 1 (baseline, owner in game) | ✅ done 2026-10-08: `SU` text + Spain audio, Classic and Anniversary (`v-000012`–`v-000014`) |
+| B1 PoC step 2 (offline one-entry candidates) | ✅ done 2026-10-08: `SU`/`SP` candidates 16/16 checks, deterministic; install/rollback prepared |
+| B1 PoC step 3a / 3b / 3c (in-game, install change) | **not approved**; each needs separate explicit approval |
 | `manual-mappings` key-verification change (B.11.2) | planned; needs approval |
 | B2 R7–R9 | approved, not started |
 | WC (Workshop compatibility checkpoint, inside B2) | planned; not approved |

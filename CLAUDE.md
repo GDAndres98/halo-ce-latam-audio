@@ -271,10 +271,12 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     to B2). Selective extraction is in `work/hceek/`.
 - **B1 revision (owner, 2026-10-08)**, see subtitle-research.md
   B.11–B.12:
-  - **Language behaviour (USER-REPORTED, not verified):** with primary
+  - **Language behaviour (USER-VERIFIED, B.12 step 1):** with primary
     Spanish (Latin America) and fallback Spanish (Spain), the game shows
-    LATAM (`SU`) subtitles and plays Spain audio. Call it
-    "user-reported" until the B.12 baseline records it.
+    `SU` subtitles and plays Spain audio, in both Classic and Anniversary
+    (`v-000012`–`v-000014`). Speaker names don't appear in Spanish. That
+    is **out of scope**: preserve the original behaviour and never touch
+    speaker labels.
   - **Target:** LATAM audio through the Spain audio slot, plus matching
     subtitles.
   - **Approved strategy (plan only):** patch **both** `SU_Halo1.bin` and
@@ -303,9 +305,20 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     (read-only). Build `19905945`; installed `SU`/`SP` match the copies
     and the pins. `a10_350`'s SU/SP texts differ only in case, so the
     baseline uses discriminator lines `a10_080/130/150_cryotech`.
-    `--match "<text>"` classifies typed on-screen text. Step 1 (owner
-    baseline) is in progress.
-- Not started: B2, WC, M4 matching UI, M8, the B1 PoC (needs approval). Audio processing (resample,
+    `--match "<text>"` classifies typed on-screen text. Step 1 is done
+    (owner baseline).
+  - **Step 2 done (2026-10-08):**
+    `python scripts/discovery/b1_build_poc_candidates.py`, using the
+    patcher `scripts/common/mcc_loc_patch.py` (same-length one-entry
+    only). It writes `work/mcc/loc/poc/{SU,SP}_Halo1.bin` with markers
+    `[B1-SU]`/`[B1-SP] a10_350` padded with `.`, at 16/16 checks each.
+    Candidate SHA-256: `SU` `de8cc7ee…d9be`, `SP` `9856cfde…b63f`.
+    Report: `work/mcc/reports/b1_poc_candidates.json`. Owner-run
+    commands: `b1_poc_install_rollback.md`.
+  - **Step 3 (3a `SU`, 3b `SP`, 3c both) is NOT approved.** Never copy
+    a candidate into the install or launch MCC; the owner runs step 3
+    by hand after approving it.
+- Not started: B2, WC, M4 matching UI, M8, B1 PoC step 3 (needs approval). Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

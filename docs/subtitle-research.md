@@ -288,8 +288,10 @@ Reproduce with `python scripts/discovery/b1_subtitle_research.py`
   English or the Spain FSB under LATAM is **UNKNOWN** (needs R4).
   **Update (2026-10-08):** the owner reports that with primary
   language Spanish (Latin America) and fallback Spanish (Spain), the
-  game shows LATAM subtitles and plays Spain audio. That is
-  **USER-REPORTED**, not yet observed per line; see B.11.
+  game shows LATAM subtitles and plays Spain audio. **Owner-verified
+  in the B.12 baseline** (three lines, both graphics modes;
+  `v-000012`–`v-000014`); see B.11.1. The engine mechanism (fallback vs
+  `AudioTrack` value) is still not known, and isn't needed.
 - The override XML and `Data/ui/config/fontdefinition.xml` list
   `Spanish` and `Iberian-Spanish` as distinct languages. The XML's
   `Iberian-Spanish` values match `SP_Global` best (93 vs 89), and
@@ -414,12 +416,14 @@ the Saber store renders in some mode.
    each in-game step needs its own approval.
 2. **Which store renders:** `.bin` vs Saber `.s3dpak`, per mode. The
    same PoC answers this, because it edits only the `.bin` store.
-3. **Language routing:** the owner reports that LATAM primary + Spain
-   fallback gives LATAM subtitles and Spain audio (B.11.1). That is
-   **USER-REPORTED**. The B.12 baseline observes it for one line.
-4. **Speaker labels:** `SP`/`SU` strings have no `&id` speaker label
-   (EN does). If the subtitle UI shows a speaker in Spanish, it comes
-   from elsewhere. UNKNOWN.
+3. ~~**Language routing.**~~ **Closed (owner baseline, 2026-10-08):**
+   LATAM primary + Spain fallback shows `SU` text and plays Spain audio
+   in Classic and Anniversary (B.11.1).
+4. ~~**Speaker labels.**~~ **Out of scope (owner, 2026-10-08):** in the
+   baseline, no speaker names appear in Spanish, even with the
+   speaker-name option on. That matches `SP`/`SU` having no `&id`
+   labels. Original behaviour is preserved: no tool adds, removes or
+   edits speaker labels.
 5. **Update overwrite:** any MCC update may restore the tables, so the
    pins and hashes in the PoC procedure are mandatory.
 6. Policy, unchanged: CE es-MX text in an MCC file stays personal and
@@ -427,7 +431,7 @@ the Saber store renders in some mode.
 
 ### B.11 Language configuration and the two-table strategy (owner decision, 2026-10-08)
 
-#### B.11.1 Language behaviour — USER-REPORTED
+#### B.11.1 Language behaviour — USER-VERIFIED (B.12 baseline, 2026-10-08)
 
 | Setting | Value |
 |---|---|
@@ -439,14 +443,16 @@ the Saber store renders in some mode.
 | Subtitles | LATAM text (expected from `SU_Halo1.bin`) | the approved subtitle per line; MCC's original text where none is approved |
 | Audio | Spain Spanish (expected from `sounds_dialogs_spanish.fsb`) | CE es-MX audio through the **Spain audio slot**; Spain audio where none is approved |
 
-- **Evidence level:** this is the owner's report of normal play. Nobody
-  has yet checked one specific line against the `SP` and `SU` texts, or
-  confirmed which FSB is playing. It is consistent with B.5:
-  `AudioTrack_latam_spanish = 00` in `game.cfg`, plus a Spain fallback
-  for audio. The fallback mechanism itself is **not verified**.
-- The B.12 baseline (step 1) turns the report into a recorded
-  observation for one line. Until then, docs and tools say
-  "user-reported", not "verified".
+- **Evidence level: user-verified.** First it was the owner's report of
+  normal play. The B.12 baseline then confirmed it on the unmodified
+  game (B.12 step 1, `v-000012`–`v-000014`):
+  - **Classic:** `SU` subtitles and Spain Spanish audio.
+  - **Anniversary:** `SU` subtitles and Spain Spanish audio.
+  - **Speaker names:** they don't appear, even with the option on. This
+    is out of scope, and the original behaviour is preserved.
+
+  The engine mechanism (fallback vs `game.cfg` `AudioTrack`) is still
+  unknown. It doesn't affect the design.
 - Consequence: the v1.0 audio target is unchanged (the Spain FSB
   slot). The subtitle target is **`SU`** for the primary configuration.
   `SP` is patched as well (B.11.2), so the Spain-fallback and
@@ -586,7 +592,33 @@ Original plan:
   `0x26FA1B53`, so the owner can compare on screen. (Writing this helper
   is part of the approval for step 1.)
 
-#### Step 1 — Baseline observation (no modification; R4)
+#### Step 1 — Baseline observation (no modification; R4) — ✅ DONE, owner-verified 2026-10-08
+
+**Result:** in primary LATAM + fallback Spain, with subtitles on and the
+game unmodified:
+
+| Mode | Subtitles | Audio | Speaker name |
+|---|---|---|---|
+| Classic | `SU` text | Spain Spanish | not shown (option on) |
+| Anniversary | `SU` text | Spain Spanish | not shown (option on) |
+
+- **Recorded** as `v-000012` (`es:A10_080_cryotech#0`), `v-000013`
+  (`A10_130`) and `v-000014` (`A10_150`).
+  - Check: `subtitle_key_link`, `pass`.
+  - The fingerprint holds the `SU_Halo1` name, SHA-256, key and entry,
+    plus the Spanish sample, both graphics modes and the language
+    settings.
+- These are the first **representative runtime** verifications for
+  `SU`. Together with the structural check, they support the B.6 key
+  rule for `SU`.
+- **Not recorded:**
+  - `a10_350`, whose `SU`/`SP` texts differ only in case, so the table
+    can't be attributed. Step 3a's marker will settle it.
+  - Any `SP` key link: `SP` wasn't displayed, and the optional
+    Spain-primary run wasn't done.
+- **Gate passed:** the result matches B.11.1, so step 2 may proceed.
+
+Plan as written:
 
 The owner plays the `a10` opening through the three discriminator lines
 and up to `a10_350`, in the **user-reported configuration** (primary LATAM, fallback Spain), in **classic** and
@@ -611,7 +643,56 @@ and the language settings. Record the audio observation in the note.
 audio under LATAM primary), **stop** and re-plan with the owner before
 step 2.
 
-#### Step 2 — Build two one-entry candidates offline (copies only)
+#### Step 2 — Build two one-entry candidates offline (copies only) — ✅ DONE 2026-10-08
+
+**Run:** `python scripts/discovery/b1_build_poc_candidates.py` (about 1 s).
+- **Patcher:** `scripts/common/mcc_loc_patch.py`, pure functions.
+  - It does same-byte-length one-entry replacement only.
+  - It cross-checks the splice against a full re-serialisation from the
+    parsed model.
+- **Inputs:** the pinned copies only. The installed tables were hashed
+  and never written.
+- **Outputs (git-ignored):**
+  - `work/mcc/loc/poc/{SU,SP}_Halo1.bin`;
+  - `work/mcc/reports/b1_poc_candidates.json`;
+  - `work/mcc/reports/b1_poc_install_rollback.md`.
+
+| | `SU_Halo1.bin` | `SP_Halo1.bin` |
+|---|---|---|
+| Original SHA-256 (copy = install = pin) | `247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0` | `794deac326d401a1fb6f5de50f8979f921159a412b095a368ef5424ed4342dda` |
+| **Candidate SHA-256** | `de8cc7ee68c5e575ce117146ca9bebb14a7f96d35cfbca186aca3912fa2ad9be` | `9856cfdea74e00e864f1cf9596e7d0431d7a58ca434f3fd0aa6690295c11b63f` |
+| Size (unchanged) | 203,848 B | 204,128 B |
+| Key / entry (own lookup) | `0x26FA1B53` / #497 of 3,400 | `0x26FA1B53` / #497 of 3,400 |
+| Entry span | `0x9FB9`, 91 B | `0xA009`, 91 B |
+| Replacement (ASCII) | `[B1-SU] a10_350` + 76 `.` | `[B1-SP] a10_350` + 76 `.` |
+| Bytes differing | 89, all inside the entry | 89, all inside the entry |
+| Checks | 16/16 | 16/16 |
+
+The 16 checks run per table:
+- Rebuilding the unmodified and the patched file from the model gives
+  byte-identical output.
+- The size and all header fields are identical. Header checks pass, and
+  the table name and name hash are unchanged.
+- The keys are identical. The key is found once, at the same index.
+- The target holds exactly the marker, and every other entry and span
+  is byte-identical.
+- The diff lies inside the target entry, and the target is valid UTF-8.
+- The build is deterministic: it runs twice in memory, and a second
+  script run gives the same file hashes.
+- The installed file equals the original.
+
+**Tests:** 10 synthetic tests are in `tests/test_mcc_loc_patch.py`. They
+cover:
+- the key rule;
+- identity rebuilds with several filler sizes;
+- variable-length size recomputation (model only, not used);
+- a one-entry patch, determinism, and per-table names;
+- refusal of a wrong length, NUL, a missing key, unsorted/duplicate
+  keys, and invalid UTF-8;
+- marker padding;
+- collateral-change detection.
+
+Plan as written:
 
 | Candidate | Source | Change |
 |---|---|---|
@@ -643,7 +724,27 @@ step 2.
 - Synthetic-byte tests cover the patch function (one entry, same length,
   key lookup per table) before it touches a real copy.
 
-#### Step 3 — In-game tests, one table at a time (separate approval for each sub-step)
+#### Step 3 — In-game tests, one table at a time (separate approval for each sub-step) — NOT APPROVED, not started
+
+**Prepared (2026-10-08):** step 2 writes the exact commands for this
+machine to `work/mcc/reports/b1_poc_install_rollback.md`. That file is
+git-ignored because it holds local paths. It covers 3a (`SU` only) and
+3b (`SP` only) separately. Each sub-step has these PowerShell blocks,
+and every block stops on any hash mismatch:
+1. Pre-check that the installed file equals the original.
+2. Back up to `work/mcc/loc/backup/19905945/` and verify the backup.
+3. Verify the candidate hash, place the candidate, and verify the
+   placed hash.
+4. Roll back: restore the original and verify its hash. This runs
+   always, even after a hang or failure.
+
+| Table | Original SHA-256 (pre-check and rollback target) | Candidate SHA-256 (placed-file check) |
+|---|---|---|
+| `SU_Halo1.bin` | `247d2529…44d0` | `de8cc7ee…d9be` |
+| `SP_Halo1.bin` | `794deac3…2dda` | `9856cfde…b63f` |
+
+The owner runs every command by hand. Tools never copy into the install
+and never launch MCC. In 3a/3b, only one table is replaced at a time.
 
 **Common procedure:**
 1. Close MCC.
