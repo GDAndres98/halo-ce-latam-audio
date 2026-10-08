@@ -1,7 +1,8 @@
 """Inspect COPIES of MCC Halo 1 string tables (EN vs SP) and report structure.
 
 Read-only on the inputs; writes a stats-only JSON report under work/mcc/.
-Never pairs keys with strings (that association is unresolved).
+Stats only: key i <-> string i is verified (docs/subtitle-research.md B.4), but
+this report never emits text and never links a subtitle to an audio tag.
 
 Example:
     python scripts/discovery/inspect_mcc_subtitles.py \
@@ -73,7 +74,7 @@ def main():
         "inputs": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (args.en, args.sp)},
         "en": summarize(en), "sp": summarize(sp),
         "keys": {"shared": len(ek & sk), "en_only": len(ek - sk), "sp_only": len(sk - ek)},
-        "key_to_string": "unresolved: segment count != key count; no offset table identified",
+        "key_to_string": "verified: string i belongs to key i (docs/subtitle-research.md B.4)",
     }
     if args.lst:
         names = read_lst_names(args.lst)

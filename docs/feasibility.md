@@ -268,6 +268,14 @@ bakes into the mission's `.map`.
 
 ### 4.2 Key finding: campaign dialogue tags are withheld from the kit
 
+> **Correction 2026-10-08 (B1 research):** this finding concerned only the
+> unextracted kit root (`bin\!public_tags.txt`). The full `HCEEK.7z`
+> (listed read-only with the built-in Windows `tar`) **does contain
+> 1,920 `tags/sound/dialog/…` tags, including `tags/sound/dialog/a10/*.sound`**.
+> The `a10_350_captkeyes` tag holds the permutation name and Vorbis
+> source audio, with no subtitle field. Relevant to B2; not pursued
+> here. See subtitle-research.md B.8.
+
 `bin\!public_tags.txt` enumerates every tag path the official kit
 exposes as editable source (11,538 lines). Grepping it for
 `sound\dialog` or any `levels\a10\...sound...` entry returns **zero

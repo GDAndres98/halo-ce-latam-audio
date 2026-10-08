@@ -16,7 +16,7 @@ from common.binreader import Reader  # noqa: E402
 from common.env import load_env  # noqa: E402
 from common.iostore import TOC_MAGIC, parse_header  # noqa: E402
 from common.locres import LOCRES_MAGIC, parse_locres  # noqa: E402
-from common.mcc_loc import MAGIC as MCC_MAGIC, parse_mcc_loc, split_speaker  # noqa: E402
+from common.mcc_loc import MAGIC as MCC_MAGIC, crc32_mpeg2, loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.pak import FOOTER_SIZE, PAK_MAGIC, decode_entry, parse_footer  # noqa: E402
 from common.usmap import PROPERTY_TYPES, Usmap  # noqa: E402
 from common.zen import ZenPackage  # noqa: E402
@@ -217,27 +217,47 @@ class WwiseIdTests(unittest.TestCase):
 
 
 class MccLocTests(unittest.TestCase):
-    def build(self, keys, strings, name=b"EN_Halo1"):
-        b = bytearray(0x7C)
-        struct.pack_into("<I", b, 0, MCC_MAGIC)
+    """Synthetic tables in the layout verified 2026-10-08 (docs/subtitle-research.md B.4)."""
+
+    def build(self, keys, strings, name=b"EN_Halo1", inner_pad=3, tail_pad=2):
+        data = b"".join(s.encode("utf-8") + b"\0" for s in strings) + b"\0" * inner_pad
+        body = struct.pack(f"<{len(keys)}I", *keys) + data + b"\0" * tail_pad
+        b = bytearray(0x80)
+        size = 0x80 + len(body)
+        struct.pack_into("<III", b, 0, MCC_MAGIC, size - 16, size - 16)
+        struct.pack_into("<I", b, 0x28, crc32_mpeg2(name.upper()))
         struct.pack_into("<I", b, 0x40, MCC_MAGIC)
         b[0x44:0x44 + len(name)] = name
+        struct.pack_into("<I", b, 0x68, 8 + 4 * len(keys) + len(data))
         struct.pack_into("<I", b, 0x70, 8)
-        struct.pack_into("<I", b, 0x78, 4 * (len(keys) - 1))
-        b += struct.pack(f"<{len(keys)}I", *keys)
-        b += b"".join(s.encode("utf-8") + b"\0" for s in strings)
-        return bytes(b)
+        struct.pack_into("<II", b, 0x78, 4 * len(keys), len(data))
+        return bytes(b) + body
 
-    def test_keys_and_pool_are_parsed_separately(self):
+    def test_string_i_belongs_to_key_i_and_header_fields(self):
         t = parse_mcc_loc(self.build([5, 9, 0xFFFFFFF0], ["MENU", "cor&idCORTANA\ue900Hola", ""]))
         self.assertEqual(t["name"], "EN_Halo1")
         self.assertEqual(t["keys"], [5, 9, 0xFFFFFFF0])
         self.assertEqual(t["strings"], ["MENU", "cor&idCORTANA\ue900Hola", ""])
-        self.assertEqual(t["pool_offset"], 0x7C + 12)
+        self.assertEqual(t["entries"][9], "cor&idCORTANA\ue900Hola")
+        self.assertEqual(t["pool_offset"], 0x80 + 12)
+        self.assertTrue(t["name_hash_matches"] and t["size_fields_match"] and t["payload_size_matches"])
+        self.assertTrue(t["filler_is_zero"])
+        self.assertEqual(t["filler_bytes"], 5)
 
-    def test_non_ascending_keys_rejected(self):
+    def test_non_ascending_keys_rejected_unless_allowed(self):
+        data = self.build([9, 5], ["a", "b"])
         with self.assertRaises(ValueError):
-            parse_mcc_loc(self.build([9, 5], ["a"]))
+            parse_mcc_loc(data)
+        self.assertFalse(parse_mcc_loc(data, allow_unsorted=True)["keys_ascending"])
+
+    def test_too_few_strings_rejected(self):
+        with self.assertRaises(ValueError):
+            parse_mcc_loc(self.build([1, 2, 3], ["only one"], inner_pad=0, tail_pad=0))
+
+    def test_key_hash_is_crc32_mpeg2_of_uppercase_label(self):
+        self.assertEqual(crc32_mpeg2(b"123456789"), 0x0376E6E7)  # published CRC-32/MPEG-2 check value
+        self.assertEqual(loc_key("sound\\dialog\\z10\\z10_010_test"), loc_key("SOUND\\DIALOG\\Z10\\Z10_010_TEST"))
+        self.assertEqual(loc_key("abc"), crc32_mpeg2(b"ABC"))
 
     def test_split_speaker(self):
         self.assertEqual(split_speaker("cor&idCORTANA\ue900Hola"), ("cor", "CORTANA", "Hola"))

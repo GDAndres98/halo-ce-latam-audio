@@ -43,7 +43,7 @@ Personal, local-only project, no distribution (owner decision,
 | MCC FSB5 parsing + CELT decode | ✅ 5 `a10` EN/ES pairs decoded, durations cross-checked | feasibility §14 |
 | CE audio ↔ subtitle link | ✅ 1 line, all hops explicit, **manually verified by the user (2026-10-08)** | poc-ce-line-link.md |
 | CE containers | ✅ unencrypted; Oodle + usmap reading works | remake-audio-research.md |
-| MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: key↔string and tag↔subtitle unresolved | subtitle-research.md B.2 |
+| MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: format + key hash solved; tag→key derived (a10 101/101); **load behaviour unverified** (PoC proposed) | subtitle-research.md B.4–B.11 |
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
@@ -347,6 +347,31 @@ Excluded without new approval:
 - reading process memory;
 - writing any file in the MCC install.
 
+**B1 research results (2026-10-08)** — details in
+[`subtitle-research.md`](subtitle-research.md) B.4–B.11. Reproduce with
+`python scripts/discovery/b1_subtitle_research.py`.
+- **(a) SOLVED, VERIFIED:** keys start at `0x80`, and string *i*
+  belongs to key *i*. All 20 tables rebuild byte-exactly from the
+  model. (R1, R2)
+- **(b) SOLVED, DERIVED:** key = CRC-32/MPEG-2(UPPER(label)); verified
+  on 9,098/9,098 debug labels. For Halo 1 dialogue the label is the
+  tag path: **101/101 `a10` tags** have a key. Catalog subtitles stay
+  `unresolved` until the owner confirms one line in game. (R3)
+- **New, VERIFIED:** `SP_Halo1` = Spain Spanish, **`SU_Halo1` = Latin
+  American Spanish**. MCC already ships LATAM subtitles for Halo CE.
+  There is a second, identical store in `initial_textures.s3dpak`
+  (`strings_spanish`, `strings_latam_spanish`).
+- **(c) OPEN:** load behaviour. No official localization override is
+  documented. The community replaces the `.bin` with EAC off. A
+  shipped `localized_string_overrides.xml` exists, but it holds Global
+  keys only.
+- R4 (owner observation) is still to do; it is step 1 of the PoC. R5
+  and R6 are done: `HCEEK.7z` was listed and selectively extracted, and
+  the sound tags have no subtitle field.
+- **Next (needs approval):** the reversible one-subtitle PoC in
+  subtitle-research.md B.11. Recommended strategy: S1, rewrite one
+  `*_Halo1.bin`.
+
 ### B2 — FSB5 rebuild + game acceptance
 
 Unknowns:
@@ -390,5 +415,5 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
 | M2 (MCC a10 catalog from existing copies) | ✅ done; 5 samples verified (`v-000007`–`v-000011`) |
 | M3 (schemas, validators, protected store) — approved 2026-10-08 | ✅ done and approved |
-| B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
+| B1 R1–R4, `HCEEK.7z` extraction | ✅ research done (R4 = PoC step 1, owner); PoC needs approval |
 | B2 R7–R9 | approved, not started |

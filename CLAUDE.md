@@ -22,7 +22,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - **v1.1 (potential):** non-destructive radio-effect repair. Preserve
   originals and recipe metadata. **Do not implement effects yet.**
 - **v1.0 blockers:**
-  - **B1:** MCC subtitle replacement is unresolved.
+  - **B1:** MCC subtitle replacement. Format and key hash are solved,
+    but whether MCC loads an edited table is unverified (PoC proposed in
+    `docs/subtitle-research.md` B.11; needs approval).
   - **B2:** FSB5 rebuild and game acceptance are unverified.
 
   Research options are in roadmap §6. Neither may be attempted with
@@ -75,7 +77,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   contains **zero** campaign dialogue (`sound\dialog`) tags for any
   singleplayer level, including `a10` (*The Pillar of Autumn*). Campaign
   VO is not shipped as moddable source in the kit — only compiled into
-  the retail `.map` cache files.
+  the retail `.map` cache files. **Corrected 2026-10-08:** that list
+  covers only the unextracted kit root. `HCEEK.7z` itself contains 1,920
+  `tags/sound/dialog/…` tags, including `a10` (feasibility §4.2 note).
 - 343 Industries' MCC modding FAQ: *"Only the assets contained within the
   retail version of MCC are allowed for use in modding efforts"* — this
   reads as prohibiting reuse of *Halo: Campaign Evolved* (a different,
@@ -130,9 +134,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     `Tags/sound/...-sound`. CE numbering is unrelated to MCC's
     `a10_NNN` — matching is manual only.
   - MCC Halo CE subtitles: `Data/ui/localization/<LANG>_Halo1.bin`
-    (`SP_` = Spain). Keys are 32-bit hashes of an unknown string; EN/SP
-    share 3,399 keys; key→string alignment and tag→subtitle link are
-    **unresolved**.
+    (`SP_` = Spain, `SU_` = Latin America). *Superseded by the B1
+    research below:* key↔string and the key hash are now solved.
   - User's tools: FModel portable at
     `%USERPROFILE%\Downloads\858461d19e29803479555059acb59a03a0986de8\`
     (exports under `Output\Exports`, audio only, no JSON yet; `.usmap`
@@ -158,10 +161,10 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     Audio/scripted/VO_SCR_M01PILLAROFAUTUMN/VO_SCR_M01_00460_CryoTech
     --vgmstream-cli D:/Tools/vgmstream-r2117/vgmstream-cli.exe`
     (output in `work/ce/`). Tests: `python -m unittest discover -s tests`.
-  - MCC `SP_Halo1.bin`: structure partly decoded
-    (`scripts/common/mcc_loc.py`), but key↔string and tag↔subtitle are
-    **unresolved**; investigation **stopped** at the "undocumented
-    reverse engineering" line. Don't resume without approval.
+  - MCC `*_Halo1.bin`: fully decoded in the B1 research
+    (`scripts/common/mcc_loc.py`, read-only). Editing or placing a
+    modified table needs explicit approval (PoC in subtitle-research.md
+    B.11).
   - Script layout: `scripts/common/` (parsers), `scripts/catalog/`
     (catalog builders), `scripts/discovery/`
     (inspectors/PoC), `scripts/extraction/` (FSB decode). All outputs go
@@ -239,7 +242,25 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     `--accept-id-changes` on your own initiative:** the owner reviews
     `<level>_id_changes.json` and decides (owner rule, 2026-10-08).
     Design §5.5.
-- Not started: B2, M4 matching UI. Audio processing (resample,
+- **B1 research done (2026-10-08)**, see `docs/subtitle-research.md`
+  B.4–B.11 and `scripts/discovery/b1_subtitle_research.py`:
+  - **Format:** `<LANG>_Halo1.bin` keys start at `0x80`; string i ↔ key i
+    (VERIFIED, byte-exact rebuild). `0x7C` is the string-data length,
+    not a key.
+  - **Key:** key = CRC-32/MPEG-2(UPPER(label)). The Halo 1 dialogue
+    label is the tag path (a10: 101/101), which is
+    `derived:mcc_loc_key_crc32_tag_path`. Catalog subtitles stay
+    `unresolved` until owner in-game confirmation.
+  - **Languages:** **`SP` = Spain, `SU` = Latin American Spanish**
+    (VERIFIED via Saber `strings_spanish` / `strings_latam_spanish` in
+    `halo1/prebuild/paks/initial_textures.s3dpak`, a second identical
+    store).
+  - **Loading:** no official localization modding exists. The community
+    replaces the `.bin` with EAC off (MCCLocalizationEditor, not
+    installed). Load behaviour is unverified.
+  - **Kit:** `HCEEK.7z` contains `tags/sound/dialog/a10/*.sound` (relevant
+    to B2). Selective extraction is in `work/hceek/`.
+- Not started: B2, M4 matching UI, the B1 PoC (needs approval). Audio processing (resample,
   trims, FX), FSB repacking, map changes and subtitle patching are
   still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
