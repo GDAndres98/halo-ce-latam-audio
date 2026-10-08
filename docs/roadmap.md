@@ -46,7 +46,8 @@ Personal, local-only project, no distribution (owner decision,
 | MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: key↔string and tag↔subtitle unresolved | subtitle-research.md B.2 |
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
-| MCC catalog / mapping / UI | design only | dialogue-catalog-design.md |
+| MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
+| Mapping / UI | design only | dialogue-catalog-design.md |
 
 ## 3. Milestones and acceptance criteria
 
@@ -90,9 +91,9 @@ Acceptance:
   `null`.
 - [x] Output is deterministic (two runs → identical hashes) and carries
   schema + source build identifiers.
-- [ ] The user spot-checks ≥ 5 records (listening + reading). The checks
-  are recorded in `verifications.json` once M3 creates it. Five
-  varied picks are in `work/ce/reports/m01_review_picks.md` (M1b).
+- [x] The user spot-checks ≥ 5 records (listening + reading). → All 5
+  M1b picks **passed** (owner, 2026-10-08), recorded as
+  `v-000002`–`v-000006` in `mappings/verifications.json`.
 
 ### M1b — Decode M01 es-MX + en media ✅ BUILT (2026-10-08), user listening pending
 Run: `python scripts/extraction/export_ce_audio.py --mission M01`
@@ -125,25 +126,43 @@ Results: remake-audio-research.md §10.
   hashes, including every WAV sha256).
 - [x] The cross-family Mendoza line is kept in `manual_review`.
 - [x] Synthetic-fixture tests pass → 40 tests total.
-- [ ] The user listens to and reads the five review picks.
+- [x] The user listens to and reads the five review picks. → All passed
+  (2026-10-08): correct dialogue, complete audio, matching subtitles.
+  `00941` has no subtitle by design, so no subtitle check was recorded.
 
-### M2 — MCC catalog for level a10 (copies only)
-Plan in §4.2. Acceptance:
-- [ ] All 101 `sound\dialog\a10\…` tags from `.lst.bin` are present,
+### M2 — MCC catalog for level a10 (copies only) ✅ BUILT (2026-10-08), user listening pending
+Plan in §4.2. Run: `python scripts/catalog/build_mcc_catalog.py --level a10`
+(about 8 s). Results and outputs: [`mcc-a10-catalog.md`](mcc-a10-catalog.md).
+Acceptance:
+- [x] All 101 `sound\dialog\a10\…` tags from `.lst.bin` are present,
   with their EN and ES samples taken from each bank's own name table.
-- [ ] Slot identity is verified: Spanish `name_in_bank` uniqueness and
-  permutation naming are confirmed, or the documented fallback
-  `slot_id` is used (design §4).
-- [ ] Count mismatches (EN vs ES samples per tag) are reported per tag.
-- [ ] `work/mcc/build.json` pins the bank SHA-256 values. Runs reuse
-  the existing copies in `reference-audio/stage1/`.
-- [ ] Subtitle fields stay `unresolved` (B1).
+  → 101/101 in both languages, resolved independently per bank. The
+  `.lst.bin` ranges agree for 101/101.
+- [x] Slot identity is verified. → `a10` names are unique in the
+  Spanish bank, and no tag has permutations. The bank-wide repeated
+  names (765) led to `slot_id = es:<name>#<occurrence>` for every level
+  (design §4.1).
+- [x] Count mismatches (EN vs ES samples per tag) are reported per tag.
+  → none in `a10`.
+- [x] `work/mcc/build.json` pins the bank SHA-256 values. Runs reuse
+  the existing copies in `reference-audio/stage1/`. → The copies are
+  verified against the pins, and the install still matches them (Steam
+  build 19905945).
+- [x] Subtitle fields stay `unresolved` (B1). → 101/101.
+- [x] a10 WAVs are decoded in both languages. → 202/202 OK, with WAV
+  frames == header sample count for every sample.
+- [x] The JSONL catalog, manifest and reports are deterministic.
+  Missing, duplicate and failed samples are reported (→ none).
+- [x] Synthetic tests pass → 52 tests total.
+- [ ] The owner listens to the five review picks
+  (`work/mcc/reports/a10_review_picks.md`).
 
 ### M3 — User-owned files, schemas, validators (no UI)
 - [ ] `schemas/*.json` for the CE record, MCC record, mappings,
   local file and verifications.
-- [ ] `mappings/verifications.json` is created with the M0 verification
-  (design §5.3).
+- [x] `mappings/verifications.json` is created with the M0 verification
+  (design §5.3). → Created early, 2026-10-08, at the owner's request,
+  with `v-000001`–`v-000006`. Its schema and validator are still M3.
 - [ ] A read-only validator flags unknown IDs, schema errors and
   fingerprint drift (written to `work/reports/drift.json`).
 - [ ] Tests prove that a write path **cannot** change an `approved`
@@ -334,6 +353,6 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 |---|---|
 | M1 | ✅ built; awaiting owner review + spot-check |
 | M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
-| M2 (MCC a10 catalog from existing copies) | approved, not started |
+| M2 (MCC a10 catalog from existing copies) | ✅ built; awaiting owner review + listening |
 | B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
 | B2 R7–R9 | approved, not started |

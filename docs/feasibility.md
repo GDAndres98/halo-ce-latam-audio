@@ -718,11 +718,17 @@ reading, to compute hashes and to make the copies.
 Computed in place, before any copying:
 
 ```
-8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4b  sounds_dialogs.fsb
-ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef  sounds_dialogs_spanish.fsb
-566235e5b844f6e859b454fa732f9dec8f316cdeb56eb49602c3b7226174619  sounds_dialogs.lst.bin
-d5324861186f079c8d436f598b0adcafba259259eaa56be57d987df68cdaffc  sounds_dialogs_spanish.lst.bin
+8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb  sounds_dialogs.fsb
+ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6  sounds_dialogs_spanish.fsb
+566235e5b844f6e859b454fa732f9dec8f316cdeb56eb49602c3b7226174619f  sounds_dialogs.lst.bin
+d5324861186f079c8d436f598b0adcafba259259eaa56be57d987df68cdaffc3  sounds_dialogs_spanish.lst.bin
 ```
+
+> **Corrected 2026-10-08 (M2):** the hashes above originally lost
+> their final hex digit (63 characters). They are now the full
+> 64-character values, re-computed from both the copies and the
+> install (identical). `scripts/catalog/build_mcc_catalog.py` pins
+> them.
 
 ### 11.3 Working copies — **VERIFIED**
 
@@ -789,6 +795,12 @@ splits the first record from the rest, not re-derived further). The
 `.lst.bin` record-level field meaning is therefore marked **unresolved**
 rather than asserted. It doesn't block anything: the FSB5 name table in
 §11.5 already gives a clean, direct answer.
+
+> **Resolved 2026-10-08 (M2), see [`mcc-a10-catalog.md`](mcc-a10-catalog.md) §2:**
+> a `.lst.bin` record is `{u32 len, tag path, u32 first_sample_index,
+> u32 sample_count}` after an 8-byte header. The ad-hoc parser above
+> was misaligned by one field. That misalignment caused the
+> off-by-1,902. The corrected counts sum exactly to 6,093 / 5,696.
 
 ### 11.7 Inspecting the sample — codec, duration, rate, channels, metadata — **VERIFIED (metadata); NOT decoded**
 

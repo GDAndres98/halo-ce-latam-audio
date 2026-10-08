@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "verifications": [
+    {
+      "id": "v-000001",
+      "subject": "ce:vo_scr_m01_00460_cryotech#0",
+      "checks": [
+        "audio_matches_subtitle"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)",
+        "Spanish(Spain)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 132700376,
+            "wem_sha256": "42b21129c08aabe3c4d22681143531499923462c934183cf0d344656a58a3849"
+          },
+          "English(US)": {
+            "media_id": 932939327,
+            "wem_sha256": "26892d0a3c43f2e1f2434a17f9642412c5ccd5f7e54cec3325c0905e488a1f06"
+          },
+          "Spanish(Spain)": {
+            "media_id": 518750516,
+            "wem_sha256": "fbf065aa1743334ebfeabff6a76dee2943dba141ea786fa0378ba1078d6d8eb1"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "Phase 2B PoC, docs/poc-ce-line-link.md (subtitle cultures es-MX, en, es-ES)"
+    },
+    {
+      "id": "v-000002",
+      "subject": "ce:vo_cin_m01_cin01_sc02_bridge_00150_keyes#0",
+      "checks": [
+        "correct_dialogue",
+        "audio_complete",
+        "audio_matches_subtitle"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 310346391,
+            "wem_sha256": "89ea1b1d8b5a79cd7a62c9c266cf5235522e87e207782d330099311cfbcfe13f",
+            "wav_sha256": "59f341c509e377408d6b8c6601a1a2f1266a26b58a05d7cbc337459bfdb4463b"
+          },
+          "English(US)": {
+            "media_id": 544999259,
+            "wem_sha256": "9704e8b0e17759f56ff5018ea82c93f74bada822be296a850f91e738cffb70f1",
+            "wav_sha256": "ad064c71aa06856683c7664641a28914c8118535aa3de5533d601a26c6af7fe5"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M1b review pick 1 (cinematic, median length); source work/ce/reports/m01_review_picks.md"
+    },
+    {
+      "id": "v-000003",
+      "subject": "ce:vo_scr_m01_00990_bisenti#0",
+      "checks": [
+        "correct_dialogue",
+        "audio_complete",
+        "audio_matches_subtitle"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 184734637,
+            "wem_sha256": "b3749c4554bd15fa644953aeab00e9f458b5a7859155d971830d751bc16c8b95",
+            "wav_sha256": "167a0527cfd81ad9054cad5841abacd8c98cebd6e97f601e4f41e578ad4b92e2"
+          },
+          "English(US)": {
+            "media_id": 975034753,
+            "wem_sha256": "648f3815660d8882d4fed3ae5cca1193adbbd43073ed75c41bb53ff5ea4fad3b",
+            "wav_sha256": "1efea5bd807f7455ee4b7c3113448fadb5cd6f1c83fa74b1f633561a031b1f63"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M1b review pick 2 (scripted, different speaker); source work/ce/reports/m01_review_picks.md"
+    },
+    {
+      "id": "v-000004",
+      "subject": "ce:vo_cin_m01_cin01_sc03_sarge_00341_mendoza#0",
+      "checks": [
+        "correct_dialogue",
+        "audio_complete",
+        "audio_matches_subtitle"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 176437339,
+            "wem_sha256": "ea857911b6c571dd21d391e52dd0d819128c042a9148c7c4ebb1f1c957ed482e",
+            "wav_sha256": "789737417cebb0167d01b43632f56719dc40f0c0f053f49ed5bb2103a3f6a803"
+          },
+          "English(US)": {
+            "media_id": 954540880,
+            "wem_sha256": "95a26bf339fd81030fb0637ec6499db8032019b368837a7aa0f9946bc1918e3a",
+            "wav_sha256": "1230f586f95ea6c8d01c322e877071e7b2f4a34ed01889999ea5ed2ce090144e"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M1b review pick 3; cross-family subtitle relationship (VO_SYS_Mendoza) confirmed by listening; the relationship itself stays flagged for manual mapping review; source work/ce/reports/m01_review_picks.md"
+    },
+    {
+      "id": "v-000005",
+      "subject": "ce:vo_scr_m01_00941_cortana#0",
+      "checks": [
+        "correct_dialogue",
+        "audio_complete"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 957782744,
+            "wem_sha256": "25ce64714cdfa2ff0d1f220b7df17678fbbdcd805634af634140de0f300ede00",
+            "wav_sha256": "dd4f91aa489a9e874d8a23f99217341a15add793513a6f1a84ff517907c4ff12"
+          },
+          "English(US)": {
+            "media_id": 669138088,
+            "wem_sha256": "dbc5563cd9369f698215d990fd39b8cd96a6179d45341dc534a7f2f3a78a3a86",
+            "wav_sha256": "9d6c44079e2b4c6c044a080e3288f0cb18976b41692badb654247f9e42f8e9a7"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M1b review pick 4; deduplicated reference, plays the same media as vo_scr_m01_00940_cortana#0. Catalog has no subtitle reference for this asset (no_transcription), so a subtitle check is not applicable and none is recorded; source work/ce/reports/m01_review_picks.md"
+    },
+    {
+      "id": "v-000006",
+      "subject": "ce:vo_scr_m01_00600_cryotech#0",
+      "checks": [
+        "correct_dialogue",
+        "audio_complete",
+        "audio_matches_subtitle"
+      ],
+      "languages": [
+        "Spanish(Mexico)",
+        "English(US)"
+      ],
+      "fingerprint": {
+        "build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+        "media": {
+          "Spanish(Mexico)": {
+            "media_id": 314115320,
+            "wem_sha256": "89846c2ae6f3f443e629766ee134207619ea314837f033a5c290caf06f7655fd",
+            "wav_sha256": "d85a2a7e97e5dab1d032f22b31c456f0abd4d69dcd14ba6dd61c5d1b1f087ff0"
+          },
+          "English(US)": {
+            "media_id": 461515945,
+            "wem_sha256": "93e9f0cbc7a3a9d3b5c367b4f860e2abdb7da4ce8334d92cdc3f030a1b439508",
+            "wav_sha256": "acdf50c1376dc20156846bd949c834f4eb47d6e9f3f1ff44cb59a7d2b6fd3471"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M1b review pick 5 (largest es-MX vs en duration ratio); source work/ce/reports/m01_review_picks.md"
+    }
+  ]
+}

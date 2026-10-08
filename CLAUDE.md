@@ -205,9 +205,20 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   `m01_review_picks.*`. One WAV is written per (language, media_id),
   and `test_event` records are excluded, not failed. Findings are in
   remake-audio-research.md §10.
-- Not started: M2, B1, B2. Matching UI, audio processing (resample,
-  trims, FX), FSB repacking and subtitle patching are still not
-  approved.
+- **M2 done (2026-10-08), awaiting owner review + listening:**
+  `python scripts/catalog/build_mcc_catalog.py --level a10` reads only
+  the pinned copies in `reference-audio/stage1/` and writes
+  `work/mcc/catalog/a10.jsonl` (`mcc-dialogue-tag/3`), `work/mcc/build.json`,
+  `work/mcc/audio/a10/` (202 WAVs + manifest) and `work/mcc/reports/a10_*`.
+  `slot_id = es:<name_in_spanish_bank>#<occurrence>`. The `.lst.bin`
+  layout is now resolved (`{len, tag, first_sample_index,
+  sample_count}`). See `docs/mcc-a10-catalog.md`.
+- `mappings/verifications.json` exists (committed, IDs only):
+  `v-000001`–`v-000006`, all passed. It is append-only; never rewrite
+  entries.
+- Not started: B1, B2, M3 (schemas/validators), matching UI. Audio
+  processing (resample, trims, FX), FSB repacking, map changes and
+  subtitle patching are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
   decided this is a personal, local-only project with no distribution.

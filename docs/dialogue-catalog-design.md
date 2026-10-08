@@ -62,7 +62,9 @@ work/ce/reports/<mission>_*.json|md      (ignored)    coverage / unresolved / su
 work/ce/media/<wwise_language>/<id>.wem  (ignored)    byte-identical media copies (M1b)
 work/ce/audio/<mission>/<wwise_language>/<record_id>__<n>.wav   (ignored)  decoded WAV, one per media (M1b)
 work/ce/audio/<mission>/manifest.json    (ignored)    export manifest, ce-audio-export/1 (§6.1)
-work/mcc/catalog/<level>.jsonl           (ignored)    MCC records (§4)
+work/mcc/catalog/<level>.jsonl           (ignored)    MCC records (§4.1)
+work/mcc/audio/<level>/<language>/…      (ignored)    decoded samples + manifest.json (M2)
+work/mcc/reports/<level>_*               (ignored)    coverage / issues / summary / review picks (M2)
 work/mcc/subtitles.jsonl                 (ignored)    MCC string pool, unlinked (until B1)
 work/mcc/build.json                      (ignored)
 work/derived/<sha256>/                   (ignored)    converted/processed audio + recipe.json (§6)
@@ -211,6 +213,40 @@ Two things M2 must verify. If either fails, the fallback
 `work/mcc/subtitles.jsonl` is kept separately and is never joined to
 tags until blocker B1 produces an explicit link.
 
+### 4.1 As implemented: `mcc-dialogue-tag/3` (M2, 2026-10-08)
+
+Details and results: [`mcc-a10-catalog.md`](mcc-a10-catalog.md).
+Changes from the sketch above:
+
+- **`slot_id = "es:<name_in_spanish_bank>#<occurrence>"`.** Name
+  uniqueness fails bank-wide (765 repeated Spanish names, none in
+  `a10`), so the occurrence suffix is always present. That keeps one ID
+  scheme for every level rather than switching to the
+  `mcc_tag#ordinal` fallback. Every `a10` slot ends in `#0`.
+- Samples are keyed by bank language (`spanish`, `english`). Each
+  sample adds `subsong` (= index + 1 for vgmstream),
+  `name_occurrence_in_bank`, `ordinal_in_tag`, `codec_mode`,
+  `data_offset`, `data_bytes`, `data_sha256` (compressed bytes, hashed
+  only), `metadata_chunks` and `duration_source: "fsb5_header"`.
+- `lst.<language>`: `{first_sample_index, sample_count,
+  agrees_with_name_table, evidence: "derived:lst_record_layout"}`. It is
+  a cross-check only; identity stays with the name table (`explicit`).
+- `kind` ∈ `scripted | flavor | insert | other`, `level`, `sequence`
+  and `speaker_from_name` are all `derived:tag_name`.
+- Flags: `missing:<lang>`, `permutations`,
+  `sample_count_differs_between_languages`,
+  `index_differs_between_languages`,
+  `name_case_differs_between_languages`, `identical_data_es_en`,
+  `name_repeats_in_bank:<lang>`, `lst_disagrees_with_names:<lang>`.
+- Level issues: `lst_tag_lists_differ`, `bank_samples_without_tag`,
+  `duplicate_sample_data`, `slot_id_collision`,
+  `lst_layout_check_failed`.
+- `subtitle` is always `{key_hash: null, evidence: unresolved, reason}`
+  until B1.
+- The export manifest is `mcc-audio-export/1`. It has one unit per
+  (language, bank index), named `<language>/<tag_name>__<k>.wav`, with
+  WAV facts plus `frames_match_header`.
+
 ## 5. User-owned files
 
 ### 5.1 `mappings/manual_mappings.json` (committed, IDs only)
@@ -289,8 +325,12 @@ game text.
      "note": "Phase 2B PoC, docs/poc-ce-line-link.md"} ] }
 ```
 
-The first entry above is the actual PoC verification. It'll be written
-to the file once M3 creates it.
+The first entry above is the actual PoC verification. **The file was
+created on 2026-10-08 at the owner's request, ahead of M3.** It holds
+`v-000001`, plus `v-000002`–`v-000006` for the five M1b review picks.
+The fingerprint gained `build` and per-language `media_id`,
+`wem_sha256` and (for decoded checks) `wav_sha256`. M3 still owns its
+JSON Schema and validator.
 
 ### 5.4 Safety rules (enforced by every tool)
 
