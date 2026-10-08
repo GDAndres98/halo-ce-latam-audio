@@ -280,7 +280,7 @@ Changes from the sketch above:
         "source": "ce_locres",                  // ce_locres | custom | keep_original | none
         "ce_locres": {"culture": "es-MX", "namespace": "…", "key": "…"},
         "custom_ref": null,                     // key into manual_mappings.local.json when source=custom
-        "mcc_key_hash": null,                   // target row in SP_Halo1.bin -- unresolved until B1
+        "mcc_key_hash": null,                   // key of the row in BOTH SU_Halo1.bin and SP_Halo1.bin -- unresolved until B1
         "approved_at": null, "revision": 1
       },
       "notes": ""
@@ -301,6 +301,12 @@ Changes from the sketch above:
   tooling in v1.0.
 - **Concatenation:** `ce_concat` uses `ce_line_refs` in order, with an
   optional `gap_s`.
+- **Two subtitle tables, one decision (owner, 2026-10-08):** the single
+  `subtitle` object is the canonical choice for the slot. A build writes
+  it to both `SU_Halo1.bin` (LATAM, the user's primary language) and
+  `SP_Halo1.bin` (Spain, fallback). The key is checked independently in
+  each table, and unapproved entries keep their original text. There
+  are no per-table subtitle objects. See subtitle-research.md B.11.
 
 ### 5.2 `mappings/manual_mappings.local.json` (git-ignored)
 
@@ -385,7 +391,13 @@ full validator can also check them.
 - `subtitle.mcc_key_hash` must stay `null` unless
   `mcc_key_verification` names a passing `subtitle_key_link`
   verification for that slot (blocker B1). Hashed keys are never
-  guessed.
+  guessed. *Planned, not implemented:* accept the key when it passes a
+  **structural** check (exactly one hit in each target table, `SU_Halo1`
+  and `SP_Halo1`). It also needs **representative** runtime
+  verifications per table (`subtitle_key_link`, `subtitle_load`), not an
+  in-game test for every key (owner decision, 2026-10-08). That
+  schema/validator change needs owner approval (subtitle-research.md
+  B.11.2).
 - `approved` requires `approved_at` and `fingerprint`. Fingerprints come
   from `project_validation.audio_fingerprint` and
   `subtitle_fingerprint`:

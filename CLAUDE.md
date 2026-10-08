@@ -23,8 +23,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   originals and recipe metadata. **Do not implement effects yet.**
 - **v1.0 blockers:**
   - **B1:** MCC subtitle replacement. Format and key hash are solved,
-    but whether MCC loads an edited table is unverified (PoC proposed in
-    `docs/subtitle-research.md` B.11; needs approval).
+    but whether MCC loads an edited table is unverified **for each of
+    `SU` and `SP`**. The revised PoC is planned in
+    `docs/subtitle-research.md` B.12, and each step needs approval.
   - **B2:** FSB5 rebuild and game acceptance are unverified.
 
   Research options are in roadmap §6. Neither may be attempted with
@@ -243,7 +244,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     `<level>_id_changes.json` and decides (owner rule, 2026-10-08).
     Design §5.5.
 - **B1 research done (2026-10-08)**, see `docs/subtitle-research.md`
-  B.4–B.11 and `scripts/discovery/b1_subtitle_research.py`:
+  B.4–B.12 and `scripts/discovery/b1_subtitle_research.py`:
   - **Format:** `<LANG>_Halo1.bin` keys start at `0x80`; string i ↔ key i
     (VERIFIED, byte-exact rebuild). `0x7C` is the string-data length,
     not a key.
@@ -260,9 +261,45 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     installed). Load behaviour is unverified.
   - **Kit:** `HCEEK.7z` contains `tags/sound/dialog/a10/*.sound` (relevant
     to B2). Selective extraction is in `work/hceek/`.
+- **B1 revision (owner, 2026-10-08)**, see subtitle-research.md
+  B.11–B.12:
+  - **Language behaviour (USER-REPORTED, not verified):** with primary
+    Spanish (Latin America) and fallback Spanish (Spain), the game shows
+    LATAM (`SU`) subtitles and plays Spain audio. Call it
+    "user-reported" until the B.12 baseline records it.
+  - **Target:** LATAM audio through the Spain audio slot, plus matching
+    subtitles.
+  - **Approved strategy (plan only):** patch **both** `SU_Halo1.bin` and
+    `SP_Halo1.bin` from **one canonical** approved `subtitle` per slot.
+    - Unmatched entries keep their original bytes.
+    - Keys are looked up independently in each table; never reuse an
+      index across tables.
+    - Audio and subtitle mappings stay independent.
+  - **Revised PoC (B.12, not executed):**
+    0. pre-flight hashes;
+    1. baseline observation first;
+    2. two one-entry, same-length ASCII-marker candidates (`[B1-SU]` /
+       `[B1-SP]`) built offline in `work/`;
+    3. in-game tests one table at a time (3a `SU`, 3b `SP`), using MCC's
+       anti-cheat-disabled mode with hash-verified backup and restore.
+
+    **Each step needs separate owner approval.**
+  - **Approved (owner, 2026-10-08):** the SU+SP strategy; the check
+    names `subtitle_key_link` and `subtitle_load`.
+    - **Structural** key verification is done by tools, for every key
+      in every table.
+    - **Representative** runtime verification is done by the owner,
+      with a few lines per table.
+    - There is no in-game test for every key.
+  - **Step 0 done:** `python scripts/discovery/b1_baseline.py`
+    (read-only). Build `19905945`; installed `SU`/`SP` match the copies
+    and the pins. `a10_350`'s SU/SP texts differ only in case, so the
+    baseline uses discriminator lines `a10_080/130/150_cryotech`.
+    `--match "<text>"` classifies typed on-screen text. Step 1 (owner
+    baseline) is in progress.
 - Not started: B2, M4 matching UI, the B1 PoC (needs approval). Audio processing (resample,
-  trims, FX), FSB repacking, map changes and subtitle patching are
-  still not approved.
+  trims, FX), FSB repacking, map changes, bulk subtitle editing and any
+  install change are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
   decided this is a personal, local-only project with no distribution.

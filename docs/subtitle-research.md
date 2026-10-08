@@ -196,7 +196,7 @@ below.
   reverse engineering of how `halo1.dll`/the MCC shell indexes this
   pool. No file was modified or repacked.
 
-### B.3 Consequence for the mod (original; see B.9–B.11 for the current view)
+### B.3 Consequence for the mod (original; see B.9–B.12 for the current view)
 
 - **Audio side** of MCC is well understood (FSB5 name table,
   `feasibility.md` §11–14).
@@ -286,6 +286,10 @@ Reproduce with `python scripts/discovery/b1_subtitle_research.py`
   while `AudioTrack_spanish = 04`. That is consistent with MCC's
   "LATAM = text only" support. Whether the classic engine plays the
   English or the Spain FSB under LATAM is **UNKNOWN** (needs R4).
+  **Update (2026-10-08):** the owner reports that with primary
+  language Spanish (Latin America) and fallback Spanish (Spain), the
+  game shows LATAM subtitles and plays Spain audio. That is
+  **USER-REPORTED**, not yet observed per line; see B.11.
 - The override XML and `Data/ui/config/fontdefinition.xml` list
   `Spanish` and `Iberian-Spanish` as distinct languages. The XML's
   `Iberian-Spanish` values match `SP_Global` best (93 vs 89), and
@@ -318,8 +322,8 @@ Reproduce with `python scripts/discovery/b1_subtitle_research.py`
   a reference field read from a tag. Per the owner rule ("keep MCC
   subtitle links unresolved unless verified"), **catalog `subtitle`
   fields stay `unresolved`**. The rule is a candidate for a new
-  evidence value once the owner confirms one line in game (B.11
-  step 1).
+  evidence value once the owner confirms one line in game (B.12
+  step 1), per table.
 - 358 dialogue keys are not explained by any `.lst.bin` path, most
   likely generic barks (permutation-level). HUD messages (`a10`
   `hud_message_text` names) hash to none of the six path forms tried.
@@ -340,7 +344,7 @@ Reproduce with `python scripts/discovery/b1_subtitle_research.py`
   subtitled. [^ocsub]
 - **Which store renders the subtitle** (classic vs Anniversary graphics,
   pause/replay screens) is **UNKNOWN**. Their content is identical, so
-  observing unmodified play can't tell them apart (B.11).
+  observing unmodified play can't tell them apart (B.12).
 
 ### B.8 Official and community support, and how MCC loads changes
 
@@ -393,24 +397,26 @@ Reproduce with `python scripts/discovery/b1_subtitle_research.py`
 | S4 | Steam Workshop mod (`ModInfo.json`) | none in the install | Unknown | lowest | **no documented support for localization/data overrides** |
 
 **Recommendation:** S1 for v1.0, since its format is fully verified and
-a byte-exact rebuild was demonstrated. Choose the target table by an
-owner decision:
-- `SP`, which matches the replaced Spain FSB audio slot; or
-- `SU`, if LATAM selection turns out to use the Spain FSB.
+a byte-exact rebuild was demonstrated. ~~Choose `SP` or `SU` as the
+target table by an owner decision.~~ **Superseded (owner decision,
+2026-10-08): S1 is applied to both `SU_Halo1.bin` and `SP_Halo1.bin`**
+from one canonical subtitle mapping. See B.11.
 
 Run S2 and S4 only as cheap side checks. Keep S3 in reserve, in case
 the Saber store renders in some mode.
 
-### B.10 Remaining blockers (B1)
+### B.10 Remaining blockers (B1) — revised 2026-10-08
 
-1. **(c) Load behaviour:** does MCC display an edited `SP_Halo1.bin`
-   string, and in which graphics modes, with EAC off? This can only be
-   answered by the B.11 PoC, which needs approval to place a file in
-   the install.
-2. **Which store renders:** `.bin` vs Saber `.s3dpak`, per mode. This
-   is answered by the same PoC (edit one store only).
-3. **LATAM audio routing:** which FSB plays when LATAM Spanish is
-   selected. Owner observation, no modification (R4).
+1. **(c) Load behaviour, per table:** does MCC display an edited
+   `SU_Halo1.bin` string? Separately, does it display an edited
+   `SP_Halo1.bin` string? In which graphics modes, with EAC off? Only
+   the B.12 PoC can answer this. Each table is tested on its own, and
+   each in-game step needs its own approval.
+2. **Which store renders:** `.bin` vs Saber `.s3dpak`, per mode. The
+   same PoC answers this, because it edits only the `.bin` store.
+3. **Language routing:** the owner reports that LATAM primary + Spain
+   fallback gives LATAM subtitles and Spain audio (B.11.1). That is
+   **USER-REPORTED**. The B.12 baseline observes it for one line.
 4. **Speaker labels:** `SP`/`SU` strings have no `&id` speaker label
    (EN does). If the subtitle UI shows a speaker in Spanish, it comes
    from elsewhere. UNKNOWN.
@@ -419,54 +425,284 @@ the Saber store renders in some mode.
 6. Policy, unchanged: CE es-MX text in an MCC file stays personal and
    local-only (feasibility §7).
 
-### B.11 Proposed reversible one-subtitle PoC (NOT executed; needs explicit approval)
+### B.11 Language configuration and the two-table strategy (owner decision, 2026-10-08)
 
-Target: `sound\dialog\a10\a10_350_captkeyes`, key `0x26FA1B53`, entry
-#497 of 3,400 in `SP_Halo1.bin`. `SP` and `SU` texts differ for this
-line, so the two tables can be told apart.
+#### B.11.1 Language behaviour — USER-REPORTED
 
-1. **Observe, with no modification (R4):** the owner plays the `a10`
-   opening with Spanish (Spain) selected, then Spanish (Latin America),
-   in classic and Anniversary graphics. For this line they note:
-   - the subtitle shown, compared against the `SP` and `SU` texts that
-     a local, git-ignored helper will print;
-   - the audio language.
-   This settles blocker 3 and confirms the B.6 tag → key rule for one
-   line (a future `verifications.json` `subtitle_key_link` entry).
-2. **Build the candidate offline:** write `work/mcc/loc/poc/SP_Halo1.bin`
-   from the verified copy, changing **only** entry #497 to an ASCII
-   marker (e.g. `[PoC-B1] a10_350`). Recompute `0x04`/`0x08`/`0x68`/`0x7C`
-   and keep the name hash, then check:
-   - an unmodified rebuild is byte-identical to the original;
-   - the candidate re-parses, all other 3,399 entries are unchanged,
-     and every header check passes.
-   This needs approval to write a modified *copy* in `work/`; it never
-   touches the install.
-3. **In-game test** (explicit approval required; MCC closed, launched
-   **with EAC disabled**):
-   - record the SHA-256 of the installed `SP_Halo1.bin` (must equal
-     `794deac3…`);
-   - copy the original to `work/mcc/loc/backup/`, verify it, then place
-     the candidate;
-   - play `a10` in Spanish (Spain) and look for the marker, in both
-     graphics modes;
-   - **restore** the original and verify its SHA-256 equals the
-     recorded value.
-   A Steam "Verify integrity of game files" run is a second safety net.
-4. **Record the outcome** in `subtitle-research.md` and
-   `verifications.json`: marker shown or not, in which mode, and any
-   hang or EAC message. If it isn't shown in some mode, repeat with the
-   Saber store only (S3) or the XML (S2), each as a separate approval.
+| Setting | Value |
+|---|---|
+| Primary language | **Spanish (Latin America)** |
+| Fallback language | **Spanish (Spain)** |
 
-Nothing in this plan writes CE text. The marker is ASCII. Real
-replacements wait for M4/M6.
+| | Current (unmodified game) | v1.0 target |
+|---|---|---|
+| Subtitles | LATAM text (expected from `SU_Halo1.bin`) | the approved subtitle per line; MCC's original text where none is approved |
+| Audio | Spain Spanish (expected from `sounds_dialogs_spanish.fsb`) | CE es-MX audio through the **Spain audio slot**; Spain audio where none is approved |
+
+- **Evidence level:** this is the owner's report of normal play. Nobody
+  has yet checked one specific line against the `SP` and `SU` texts, or
+  confirmed which FSB is playing. It is consistent with B.5:
+  `AudioTrack_latam_spanish = 00` in `game.cfg`, plus a Spain fallback
+  for audio. The fallback mechanism itself is **not verified**.
+- The B.12 baseline (step 1) turns the report into a recorded
+  observation for one line. Until then, docs and tools say
+  "user-reported", not "verified".
+- Consequence: the v1.0 audio target is unchanged (the Spain FSB
+  slot). The subtitle target is **`SU`** for the primary configuration.
+  `SP` is patched as well (B.11.2), so the Spain-fallback and
+  Spain-primary paths show the same approved text.
+
+#### B.11.2 Approved strategy: one canonical mapping, two tables
+
+- **Both tables are planned targets:** `SU_Halo1.bin` (LATAM, primary)
+  and `SP_Halo1.bin` (Spain, fallback).
+- **One canonical subtitle decision per slot.** The `subtitle` object
+  in `manual_mappings.json` stays the only place a subtitle is chosen
+  and approved. There are no per-table subtitle mappings. The text
+  comes from CE `es-MX` or from the user's custom text.
+- **The same approved text goes to both tables.** A build writes that
+  text into the `SU` entry and the `SP` entry for the slot's key.
+- **Unmatched entries are preserved.** Every entry without an approved
+  subtitle keeps its original bytes in each table, so `SU` keeps MCC's
+  LATAM text and `SP` keeps MCC's Spain text. UI strings and other
+  levels' entries are never touched.
+- **Keys are validated independently in each table.** The key rule
+  (B.6) is table-independent. Even so, a build looks the key up in each
+  table separately. It requires exactly one hit per table and never
+  carries an entry index from one table to the other. A miss in either
+  table stops that slot from being written to either table, and it is
+  reported. Today both tables hold 3,400 keys, and `0x26FA1B53` is
+  entry #497 in each. Each was found independently on the copies, but
+  that is a fact about this build, not an assumption to rely on.
+- **Audio and subtitle stay independent.** The subtitle written for a
+  slot does not depend on its `audio` decision (CE, kept Spain audio, or
+  none), and vice versa (design §5.1).
+- **Two kinds of verification (owner decision, 2026-10-08).** An
+  in-game test is **not** required for every key.
+  - **Structural key verification (tool, every key, every table):** a
+    build proves for each approved slot, in each target table, that the
+    key `CRC-32/MPEG-2(UPPER(tag path))` occurs exactly once and the
+    table parses and passes its header checks. It also proves that only
+    the intended entries change. This is a machine check recorded in
+    build reports, not in `verifications.json`.
+  - **Representative runtime verification (owner, a few lines per
+    table):** in-game observations that a table is actually used, and
+    that the key rule picks the line that is played. They are recorded
+    in `verifications.json` with the approved check names:
+    - **`subtitle_key_link`**: the on-screen text for a played line
+      equals that table's entry for the line's key;
+    - **`subtitle_load`**: an edited entry in that table is displayed
+      (B.12 step 3).
+
+    Each fingerprint names the table and its SHA-256. A `pass` for `SU`
+    says nothing about `SP`. The `verifications/1` schema already
+    allows both check names. They were approved by the owner on
+    2026-10-08.
+- **Not approved by this decision:** bulk editing, generating complete
+  tables, writing CE text into any table, FSB repacking, and any change
+  to the installed game. The strategy describes what M6 will do *after*
+  B1 and B2 close. The next executable step is the B.12 PoC, and each of
+  its steps needs approval.
+- **Data-model follow-up (planned, not implemented):** the
+  `subtitle.mcc_key_hash` comment in design §5.1 ("target row in
+  `SP_Halo1.bin`") becomes "the key in every target table". Under the
+  split above, the validator rule changes:
+  - **From:** "a passing `subtitle_key_link` for this slot".
+  - **To:** the key is accepted when two things hold:
+    1. a **structural** check finds it exactly once in each target
+       table;
+    2. **representative** `subtitle_key_link` passes exist for each
+       target table (not necessarily for this slot).
+  This is a `manual-mappings` schema/validator change and needs owner
+  approval before it is made.
+
+### B.12 Revised B1 PoC — one entry, each table independently (NOT executed; each step needs explicit approval)
+
+**Target line:** `sound\dialog\a10\a10_350_captkeyes`, slot
+`es:A10_350_captkeyes#0`, key `0x26FA1B53`. In the hash-verified copies
+under `work/mcc/loc/copies/`, it is entry #497 of 3,400 in both tables,
+found independently in each:
+
+| Table | Copy SHA-256 | Size |
+|---|---|---|
+| `SU_Halo1.bin` | `247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0` | 203,848 B |
+| `SP_Halo1.bin` | `794deac326d401a1fb6f5de50f8979f921159a412b095a368ef5424ed4342dda` | 204,128 B |
+
+~~`SP` and `SU` texts differ for this line, so either table can be
+recognised on screen.~~ **Corrected by step 0:** they differ only in the
+case of two letters, which is too weak to tell the tables apart on
+screen. The baseline therefore adds three cryo-opening
+**discriminator lines** whose `SU`/`SP` texts differ by 3 words each.
+`a10_350_captkeyes` stays the PoC target for steps 2–3, where the
+distinct markers tell the tables apart.
+
+| Line | Key | Entry (SU / SP) | Word differences SU vs SP | Purpose |
+|---|---|---|---|---|
+| `a10_350_captkeyes` | `0x26FA1B53` | 497 / 497 | 0 (case only) | PoC target |
+| `a10_080_cryotech` | `0xE0874E33` | 2946 / 2946 | 3 | baseline discriminator |
+| `a10_130_cryotech` | `0x3A6657C5` | 761 / 761 | 3 | baseline discriminator |
+| `a10_150_cryotech` | `0x260F7CCF` | 482 / 482 | 3 | baseline discriminator |
+
+Each entry was found independently in each table. Across all of `a10`,
+46 of 101 lines differ in words between `SU` and `SP`.
+
+**Safety rules for every step:**
+- Nothing under `HALO_MCC_FOLDER` is modified before step 3, and step 3
+  needs a separate approval for each sub-step.
+- Tests use only MCC's own **anti-cheat-disabled launch mode** (the
+  mode Halo Support documents for playing mods [^modinfo]). EAC is not
+  bypassed or tampered with.
+- Before any change: back up the original outside the install, and
+  verify its SHA-256 both before and after copying.
+- Backups, candidates and reports stay in git-ignored `work/`. No table
+  copy, candidate or subtitle text is committed.
+- Only one entry is changed, in one table, per candidate. There is no
+  bulk editing and no FSB work.
+
+#### Step 0 — Pre-flight (read-only) — ✅ DONE 2026-10-08
+
+Run: `python scripts/discovery/b1_baseline.py` (read-only; it writes only
+git-ignored `work/mcc/reports/b1_step0_preflight.json` and
+`b1_baseline_sheet.md`). Results:
+- Steam app `976730`, build **`19905945`** (from `appmanifest_976730.acf`)
+  = expected.
+- Installed `SU_Halo1.bin` SHA-256 `247d2529…44d0` and `SP_Halo1.bin`
+  `794deac3…2dda` both **equal the copies and the pins**. Both parse,
+  pass every header check, and hold 3,400 keys.
+- All four baseline tags are in `sounds_dialogs.lst.bin`. Each key is
+  found **exactly once in each table**, looked up independently.
+- The helper's `--match "<text>"` mode compares typed on-screen text
+  with the `SU` and `SP` entries. It returns `inconclusive` for
+  case-only differences, by design. Synthetic tests are in
+  `tests/test_b1_baseline.py`.
+
+Original plan:
+
+- Hash the installed `SU_Halo1.bin` and `SP_Halo1.bin`. They must equal
+  the copy hashes above. Also record the MCC Steam build ID; it must be
+  `19905945`. If anything differs, **stop**: the copies are stale and
+  B.4–B.6 must be re-run first.
+- A local, git-ignored helper prints the `SU` and `SP` text for key
+  `0x26FA1B53`, so the owner can compare on screen. (Writing this helper
+  is part of the approval for step 1.)
+
+#### Step 1 — Baseline observation (no modification; R4)
+
+The owner plays the `a10` opening through the three discriminator lines
+and up to `a10_350`, in the **user-reported configuration** (primary LATAM, fallback Spain), in **classic** and
+**Anniversary** graphics. For each mode, they record:
+- which text appears: `SU`, `SP`, or neither;
+- the audio language: Spain, English, or other.
+
+*Optional:* repeat once with Spanish (Spain) as the primary language.
+This is a settings change, not a file change. It gives the baseline for
+step 3b. Afterwards, set the configuration back to primary LATAM.
+
+**Record:** append verifications to `mappings/verifications.json` with
+subject `mcc:es:A10_350_captkeyes#0`:
+- `subtitle_key_link` for `SU_Halo1`, if `SU` text was shown;
+- `subtitle_key_link` for `SP_Halo1`, if the optional run showed `SP`
+  text.
+
+Each fingerprint names the table and its SHA-256, the graphics mode,
+and the language settings. Record the audio observation in the note.
+
+**Gate:** if the baseline contradicts B.11.1 (e.g. `SP` text or English
+audio under LATAM primary), **stop** and re-plan with the owner before
+step 2.
+
+#### Step 2 — Build two one-entry candidates offline (copies only)
+
+| Candidate | Source | Change |
+|---|---|---|
+| `work/mcc/loc/poc/SU_Halo1.bin` | verified `SU` copy | entry for `0x26FA1B53` → `[B1-SU] a10_350` |
+| `work/mcc/loc/poc/SP_Halo1.bin` | verified `SP` copy | entry for `0x26FA1B53` → `[B1-SP] a10_350` |
+
+- **Distinct markers** say which table rendered. The markers are ASCII
+  only, with no CE text and no subtitle text.
+- **Same byte length (recommended first variant):** pad each marker with
+  `.` to the original entry's UTF-8 byte length. Then the file size and
+  every header field stay identical, and the only bytes that differ are
+  inside that one entry. A variable-length edit (needed later for real
+  text) is a separate follow-up after this PoC. It recomputes
+  `0x04/0x08/0x68/0x7C` (B.4).
+- **Per-table checks:** each table is checked on its own, and a failed
+  check stops that candidate.
+  1. The key is found by lookup in *this* table, exactly once. The index
+     is not taken from the other table.
+  2. Rebuilding the untouched copy with `mcc_loc` gives a byte-identical
+     file.
+  3. The candidate parses, and its table name and name hash (`0x28`)
+     are unchanged and match its own name.
+  4. The other 3,399 entries are byte-identical, and the byte diff lies
+     entirely inside the target entry's span.
+  5. The keys are unchanged and ascending, and the filler is zero.
+- **Report:** `work/mcc/reports/b1_poc_candidates.json` records the
+  source and candidate SHA-256, key, index, entry span and check
+  results for each table.
+- Synthetic-byte tests cover the patch function (one entry, same length,
+  key lookup per table) before it touches a real copy.
+
+#### Step 3 — In-game tests, one table at a time (separate approval for each sub-step)
+
+**Common procedure:**
+1. Close MCC.
+2. Hash the installed file. It must match step 0.
+3. Copy it to `work/mcc/loc/backup/19905945/` and verify the copy's
+   hash.
+4. Place the candidate, then verify that the installed hash equals the
+   candidate hash.
+5. Launch with anti-cheat disabled and play to the line in both graphics
+   modes.
+6. Close MCC, restore the original, and verify that the installed hash
+   equals the recorded original.
+
+Steam's "Verify integrity of game files" is the second safety net.
+Never have more than one table replaced at a time in 3a/3b.
+
+| Sub-step | File placed | Settings | Expected if the `.bin` drives subtitles | What it answers |
+|---|---|---|---|---|
+| **3a** | `SU` candidate only (`SP` original) | primary LATAM, fallback Spain | `[B1-SU] …` shown | Does the primary path load an edited `SU`? |
+| **3b** | `SP` candidate only (`SU` original) | primary LATAM, fallback Spain; then primary Spain | LATAM: original `SU` text (no marker). Spain: `[B1-SP] …` | Does MCC load an edited `SP`? Does the fallback ever read `SP` for subtitles? |
+| 3c *(optional, later)* | both candidates | primary LATAM | `[B1-SU] …` only | That the combined two-table deployment loads cleanly |
+
+**Outcomes and next actions:**
+
+| Observation | Meaning | Next |
+|---|---|---|
+| Marker shown in both modes | `.bin` store drives subtitles for that table | record `pass`; B1(c) closed for that table |
+| Original text shown in a mode | another store renders there (likely Saber `strings_*`, B.7) | record; S3 for that mode, as a separate approval |
+| Hang, crash, or EAC message | integrity check or format error | restore immediately, verify hash, stop, report |
+| `[B1-SP]` shown under LATAM primary | fallback reads `SP` for subtitles | record; contradicts B.11.1, so re-plan with owner |
+
+#### Step 4 — Record
+
+- Write the outcomes into this section and the roadmap.
+- Append one verification **per table and per test** (`subtitle_load`
+  with result `pass`/`fail`, a fingerprint with the table, candidate
+  hash, graphics mode and settings).
+- Catalog `subtitle` fields stay `unresolved` until the owner approves
+  promoting `derived:mcc_loc_key_crc32_tag_path` for verified tables.
+
+**After the PoC (not part of it, each a separate approval):**
+- a variable-length one-entry test;
+- the data-model follow-up in B.11.2;
+- then M6's generator, which writes the approved text into both
+  tables.
+
+#### Superseded: single-table PoC (original B.11, 2026-10-08)
+
+The first plan patched only `SP_Halo1.bin` with one marker and treated
+the target table as an open owner decision. It is replaced by B.12:
+both tables are targets (B.11.2), each is tested independently with its
+own marker, and the user-reported configuration is the baseline.
 
 | | Campaign Evolved | MCC Halo CE |
 |---|---|---|
 | Container | `.locres` in Oodle-compressed `.pak` | plain `.bin` in `Data/ui/localization` |
-| LATAM culture | **`es-MX`** (separate from `es-ES`) | **`SU`** (LATAM text; `SP` = Spain) — B.5 |
+| LATAM culture | **`es-MX`** (separate from `es-ES`) | **`SU`** (LATAM text; `SP` = Spain) — B.5; v1.0 patches both (B.11) |
 | Key type | UE namespace + key strings | CRC-32/MPEG-2 of upper-cased label (B.6) |
-| Line↔subtitle link | **explicit**: voice asset → `HaloAudioTranscriptionLine{StringTable, LineKey}` (VERIFIED 2026-10-08) | **derived**: key = hash of the dialogue tag path (101/101 `a10`); in-game confirmation pending (B.11 step 1) |
+| Line↔subtitle link | **explicit**: voice asset → `HaloAudioTranscriptionLine{StringTable, LineKey}` (VERIFIED 2026-10-08) | **derived**: key = hash of the dialogue tag path (101/101 `a10`); in-game confirmation pending, per table (B.12 step 1) |
 | Speaker label | expected in data (colour tables exist) | inline `&id` prefix (EN only) |
 | Readable now? | needs FModel JSON or Oodle | yes (structure partly decoded) |
 

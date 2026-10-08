@@ -13,7 +13,10 @@ Personal, local-only project, no distribution (owner decision,
    (Spain) language slot** with Campaign Evolved **Spanish(Mexico)**
    recordings.
 2. Replace MCC's **Spanish Halo CE subtitles** with CE **es-MX**
-   subtitles **or the user's custom text**.
+   subtitles **or the user's custom text**. One canonical approved
+   subtitle per slot is written to **both** `SU_Halo1.bin` (LATAM) and
+   `SP_Halo1.bin` (Spain). Every unmatched entry keeps its original
+   text (owner decision, 2026-10-08; subtitle-research.md B.11).
 3. Audio and subtitle choices are **independent per line**.
 4. **All cross-game matching is manual**, by the user.
 5. **Approved mappings are never overwritten** by any tool.
@@ -27,6 +30,20 @@ Personal, local-only project, no distribution (owner decision,
   expects, via **non-destructive** processing. Originals and processing
   metadata are preserved (design §6). **Not implemented and no effect
   chosen yet.**
+
+### Language configuration (USER-REPORTED, 2026-10-08)
+
+Owner's setting: primary **Spanish (Latin America)**, fallback
+**Spanish (Spain)**.
+
+| | Current behaviour | v1.0 target |
+|---|---|---|
+| Subtitles | LATAM (`SU`) | the approved text, written to `SU` (and the same text to `SP`) |
+| Audio | Spain Spanish | CE es-MX through the **Spain audio slot** |
+
+The owner reported this behaviour from normal play. It is not yet
+observed per line or verified; the B1 PoC baseline (subtitle-research.md
+B.12 step 1) records it for one line.
 
 ### Out of scope
 
@@ -43,7 +60,7 @@ Personal, local-only project, no distribution (owner decision,
 | MCC FSB5 parsing + CELT decode | ✅ 5 `a10` EN/ES pairs decoded, durations cross-checked | feasibility §14 |
 | CE audio ↔ subtitle link | ✅ 1 line, all hops explicit, **manually verified by the user (2026-10-08)** | poc-ce-line-link.md |
 | CE containers | ✅ unencrypted; Oodle + usmap reading works | remake-audio-research.md |
-| MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: format + key hash solved; tag→key derived (a10 101/101); **load behaviour unverified** (PoC proposed) | subtitle-research.md B.4–B.11 |
+| MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: format + key hash solved; tag→key derived (a10 101/101); targets `SU` + `SP`; **load behaviour unverified for each table** (revised PoC planned) | subtitle-research.md B.4–B.12 |
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
@@ -227,14 +244,27 @@ findings and no drift.
 - [ ] The Spanish bank is rebuilt **as a new file in `work/`**. Every
   untouched sample stays byte-identical, and the result parses with
   `fsb5_lib` and vgmstream.
-- [ ] Subtitle output follows whatever B1 establishes.
+- [ ] Subtitle output (once B1 closes): one generator writes each
+  approved `subtitle` into **both** `SU_Halo1.bin` and `SP_Halo1.bin`,
+  as new files in `work/`.
+  - The key is looked up independently in each table, and a miss in
+    either table skips the slot and reports it.
+  - Unapproved entries stay byte-identical.
+  - The output does not depend on the slot's `audio` decision.
+  - Bulk generation needs its own approval, after the PoC.
 
 ### M7 — Install / rollback + in-game test on a10 (gated, explicit approval)
 - [ ] There is a documented backup → install → verify → restore
   procedure using hashes.
 - [ ] Restore is proven byte-identical (feasibility §11.2 hashes).
-- [ ] The user confirms in game: replaced a10 lines play, unmatched
-  lines play Spain audio, and subtitles are as chosen.
+- [ ] The user confirms in game, in the configuration primary LATAM +
+  fallback Spain:
+  - replaced a10 lines play;
+  - unmatched lines play Spain audio;
+  - subtitles are as chosen;
+  - unmatched subtitles show MCC's original LATAM text.
+- [ ] Backup and restore cover **both** subtitle tables and the Spanish
+  FSB, each with its own hash.
 
 ### v1.0 — repeat M1–M7 for all levels
 (a30, a50, b30, b40, c10, c20, c40, d20, d40, plus generic/systemic barks)
@@ -348,7 +378,7 @@ Excluded without new approval:
 - writing any file in the MCC install.
 
 **B1 research results (2026-10-08)** — details in
-[`subtitle-research.md`](subtitle-research.md) B.4–B.11. Reproduce with
+[`subtitle-research.md`](subtitle-research.md) B.4–B.12. Reproduce with
 `python scripts/discovery/b1_subtitle_research.py`.
 - **(a) SOLVED, VERIFIED:** keys start at `0x80`, and string *i*
   belongs to key *i*. All 20 tables rebuild byte-exactly from the
@@ -368,9 +398,34 @@ Excluded without new approval:
 - R4 (owner observation) is still to do; it is step 1 of the PoC. R5
   and R6 are done: `HCEEK.7z` was listed and selectively extracted, and
   the sound tags have no subtitle field.
-- **Next (needs approval):** the reversible one-subtitle PoC in
+- ~~**Next (needs approval):** the reversible one-subtitle PoC in
   subtitle-research.md B.11. Recommended strategy: S1, rewrite one
-  `*_Halo1.bin`.
+  `*_Halo1.bin`.~~ Superseded by the revision below.
+
+**B1 revision (owner decision, 2026-10-08)** — subtitle-research.md
+B.11–B.12:
+- **Language behaviour:** primary LATAM + fallback Spain gives LATAM
+  subtitles and Spain audio. This is **USER-REPORTED**, not yet
+  verified.
+- **Strategy:** S1 is applied to **both** `SU_Halo1.bin` and
+  `SP_Halo1.bin`.
+  - One canonical approved subtitle mapping is written to both tables.
+  - All unmatched entries are preserved.
+  - Keys are validated independently in each table.
+  - Audio and subtitle mappings stay independent.
+- **Revised PoC (B.12), not executed; each step needs approval:**
+  0. Pre-flight: hash and pin the installed `SU`/`SP`, read-only. ✅
+     Done; all match.
+  1. **Baseline first:** observe the unmodified game on three
+     cryo-opening discriminator lines and `a10_350_captkeyes`.
+  2. Two **one-entry**, same-length, ASCII-marker candidates (`[B1-SU]`,
+     `[B1-SP]`) are built **offline** in `work/`.
+  3. In-game tests, **one table at a time** (3a `SU`, 3b `SP`, optional
+     3c both). They use MCC's anti-cheat-disabled launch mode, with a
+     hash-verified backup and restore.
+  4. Record the results per table in `verifications.json`.
+- **Still excluded:** bulk table editing, CE text in any table, FSB
+  repacking, and any install change without explicit approval.
 
 ### B2 — FSB5 rebuild + game acceptance
 
@@ -396,6 +451,8 @@ so resampling is a v1.0 requirement, independent of v1.1 effects.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | B1 unresolvable without RE | v1.0 subtitles blocked | R1–R6. If all fail, the owner decides whether to approve deeper research or defer subtitles |
+| Language routing differs from the user report (e.g. fallback reads `SP`, or the Saber store renders) | wrong table patched, or the patch is invisible | baseline first (B.12 step 1); patch both tables; test each table alone |
+| `SU`/`SP` key sets diverge after an MCC update | a slot is patched in one table only | per-table key lookup; a miss in either table skips the slot and reports it |
 | B2 encoder or acceptance fails | v1.0 audio blocked | R7–R9 before any rebuild |
 | Duration mismatch (CE es-MX ≠ MCC Spain sample length; cinematics time-locked) | lines cut off or overlap | durations + delta in UI, trims recorded |
 | Game patches (CE or MCC) | stale IDs | pins + drift reports; approvals never auto-edited |
@@ -415,5 +472,11 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
 | M2 (MCC a10 catalog from existing copies) | ✅ done; 5 samples verified (`v-000007`–`v-000011`) |
 | M3 (schemas, validators, protected store) — approved 2026-10-08 | ✅ done and approved |
-| B1 R1–R4, `HCEEK.7z` extraction | ✅ research done (R4 = PoC step 1, owner); PoC needs approval |
+| B1 R1–R4, `HCEEK.7z` extraction | ✅ research done |
+| B1 two-table strategy (`SU` + `SP`, one canonical mapping) | ✅ **approved** by the owner 2026-10-08 |
+| Check names `subtitle_key_link`, `subtitle_load`; structural vs representative verification, no per-key in-game test | ✅ **approved** by the owner 2026-10-08 |
+| B1 PoC step 0 (read-only pre-flight) | ✅ done 2026-10-08: build `19905945`, `SU`/`SP` installed = copies = pins, keys found once per table |
+| B1 PoC step 1 (baseline, owner in game) | approved; **in progress (owner)** |
+| B1 PoC step 2, 3a/3b/3c | not approved; each needs separate approval |
+| `manual-mappings` key-verification change (B.11.2) | planned; needs approval |
 | B2 R7–R9 | approved, not started |
