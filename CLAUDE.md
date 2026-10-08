@@ -27,7 +27,26 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     hash-verified. Residuals (variable-length text, an `SP` runtime
     sample, per-mode coverage) move to M7. See
     `docs/subtitle-research.md` B.12 step 3 result.
-  - **B2:** FSB5 rebuild and game acceptance are unverified.
+  - **B2:** FSB5 rebuild and game acceptance are unverified. Research
+    is done (`docs/b2-audio-research.md`):
+    - The runtime is FMOD Ex 4.44.27, which plays FSB5 CELT 0.11 and
+      IMA ADPCM. The codec is per bank.
+    - No public CELT encoder exists. HCEEK `tool.exe` embeds FSBankEx
+      but lacks `celt_encoder.dll`.
+    - Recommended: the **S-A CELT splice** (untouched samples
+      byte-identical).
+    - **E0 done (2026-10-08):** `python
+      scripts/discovery/b2_e0_identity_rebuild.py`, with the writer in
+      `scripts/common/fsb5_writer.py` (`decompose`/`build`).
+      - The Spanish and English bank copies rebuild **byte-identically**:
+        0 differing ranges, SHA-256 equal to the pins.
+      - Metadata, payload hashes and vgmstream output are identical.
+      - Outputs are in `work/b2/e0/` (631 MB). There are 9 synthetic
+        tests in `tests/test_fsb5_writer.py`.
+    - **Next (proposed, not approved): E1**, the English
+      `a10_350` CELT stream in Spanish slot #30. It has the same length,
+      so only that sample's bytes change (b2-audio-research.md §5.2). E1
+      offline and E1-game each need approval.
 
   Research options are in roadmap §6. Neither may be attempted with
   binary edits or repacking without explicit approval.
@@ -326,7 +345,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - No `verifications.json` entry yet. `v-000015` (`subtitle_load`)
       waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 experiments, WC, M4 matching UI, M8. Audio processing (resample,
+- Not started: B2 E1+ experiments, WC, M4 matching UI, M8. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

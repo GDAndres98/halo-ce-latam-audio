@@ -268,7 +268,10 @@ findings and no drift.
   recipes (design §6).
 - [ ] The Spanish bank is rebuilt **as a new file in `work/`**. Every
   untouched sample stays byte-identical, and the result parses with
-  `fsb5_lib` and vgmstream.
+  `fsb5_lib` and vgmstream. The method is the B2 strategy S-A (CELT
+  0.11 splice, `b2-audio-research.md` §3) unless E2 forces a
+  fallback. The sample count, order, names and `.lst.bin` stay
+  unchanged.
 - [ ] Subtitle output (once B1 closes): one generator writes each
   approved `subtitle` into **both** `SU_Halo1.bin` and `SP_Halo1.bin`,
   as new files in `work/`.
@@ -663,6 +666,56 @@ WC never packages, uploads or modifies the install.
 Also note: CE media decode at 48 kHz while MCC slots are 44.1 kHz CELT,
 so resampling is a v1.0 requirement, independent of v1.1 effects.
 
+**B2 research results (2026-10-08)** — full report:
+[`b2-audio-research.md`](b2-audio-research.md). Reproduce with
+`python scripts/discovery/b2_bank_inventory.py` (read-only).
+- **R7:** the runtime is **FMOD Ex 4.44.27** (`halo1/fmodex64.dll`), and
+  it loads FSB5. The banks shipped in the install prove it decodes
+  **CELT** (the dialogue, music, stream and debug banks) and
+  **IMA ADPCM** (`sounds_adpcm.fsb`). PCM, Vorbis and FADPCM are
+  untested.
+- **R8, the Spanish bank's invariants:**
+  - FSB5 v1, CELT **0.11.0** (flags `0x80000010`).
+  - 5,696 samples, all at 44.1 kHz; 5,656 mono and 40 stereo.
+  - CBR frames: 370 B mono / 464 B stereo, 512 samples each.
+  - 32-byte-aligned ascending offsets.
+  - LOOP = `0, n−2` on 5,648 samples.
+  - The `.lst.bin` is a **per-language** index into the bank's sample
+    positions, so a rebuild must keep the count, order and names.
+- **The codec is per bank**, so samples cannot mix codecs. **No public
+  tool writes FMOD-compatible CELT today.** HCEEK `tool.exe` embeds
+  FMOD FSBankEx 4.x (including an FSB5 writer), but its CELT path needs
+  a `celt_encoder.dll` that the kit doesn't ship. Its
+  `export-sounds-to-fsb` builds only the SFX ADPCM bank.
+- **R9 / WC-1 (docs only):** Excession documents map packages only.
+  There is no documented way for a Workshop mod to override
+  `halo1/sound/pc/*.fsb` or `Data/ui/localization/*.bin`. WC outcome B
+  or C is likely; this still needs WC-2/3.
+- **Recommended strategy, S-A "CELT splice":** our own FSB5 writer
+  copies every untouched stream byte-for-byte and inserts CELT 0.11
+  encodes only for approved slots. Fallbacks:
+  - **S-B**, a PCM16 whole bank;
+  - **S-C**, an IMA ADPCM whole bank.
+
+**B2 experiment ladder.** Each step needs approval. In-game steps are
+done by the owner, by hand, with a hash-verified backup and restore.
+
+| Step | Acceptance criteria |
+|---|---|
+| **E0** writer + identity rebuild (offline, no new tools) — ✅ **PASS 2026-10-08** | [x] Re-serialising the Spanish and English bank copies gives **byte-identical** files (0 differing ranges; SHA-256 = pins). [x] Synthetic tests for the writer (offsets, alignment, chunks, name table, size equation): 9 tests, mutation-checked. [x] Deterministic. [x] Re-parse, per-sample metadata and payload hashes identical; mono and stereo covered; vgmstream WAV and `-m` output identical on 7 subsongs per bank. See `b2-audio-research.md` §5.1. |
+| **E1** same-length transplant (offline; MCC retail content only) | [ ] The candidate puts the English CELT stream of `a10_350_captkeyes` into `es:A10_350_captkeyes#0`. [ ] It passes every offline check in report §5: vgmstream decodes all 5,696 subsongs; untouched streams are byte-identical; names and order are identical; LOOP, flags and the hash field are as specified; `.lst.bin` is unchanged; the build is deterministic. |
+| E1-game (owner) | [ ] Keyes speaks English at `a10_350`, and the neighbouring lines play Spain Spanish, in Classic and Anniversary. [ ] No hang or crash. [ ] The original bank is restored and its hash `ed0ff3ec…` verified. [ ] Recorded in `verifications.json`. |
+| **E1b** different-length transplant | [ ] As E1, for a line whose EN and ES lengths differ (`a10_682_cortana`). [ ] In game, the whole line plays, and scripted timing is noted (B2-R3). |
+| **E2** CELT 0.11 encoder qualification (offline; **tool approval needed**) | [ ] Encodes are CBR 370 B, 512-sample frames. [ ] vgmstream decodes them. [ ] The sample count is exact. [ ] SNR against the source meets an agreed threshold on 10 decoded MCC samples. |
+| **E3** one CE es-MX line (owner-named pairing) | [ ] A resample recipe is recorded. [ ] The CELT splice passes the offline checks. [ ] In game, the LATAM line plays in the slot. |
+| **E4** multi-sample (5–10 `a10` slots, owner-approved mappings) | [ ] Includes longer and shorter lines, and at least one `keep_original`. [ ] All checks pass. [ ] An owner playthrough of the `a10` opening confirms that replaced lines play and unmatched lines stay Spain. |
+| **E5** batch generator (= M6 audio) | [ ] Built only from approved `audio` objects. [ ] Deterministic, with untouched samples byte-identical. [ ] Drift-gated, with a per-slot report. |
+
+If E2 fails, or no encoder is approved: run E1-style acceptance tests
+first for **S-B** (PCM16) and then **S-C** (IMA ADPCM, using a stdlib
+encoder of our own). The owner decides whether a transcoded bank is
+acceptable.
+
 ## 7. Risks (carried forward)
 
 | Risk | Impact | Mitigation |
@@ -701,7 +754,11 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B1 PoC step 2 (offline one-entry candidates) | ✅ done 2026-10-08: `SU`/`SP` candidates 16/16 checks, deterministic; install/rollback prepared |
 | B1 PoC step 3 (in-game, owner by hand) | ✅ done: "custom subtitles work" (user-reported). Table/text/modes not reported; `SU` backup present, no `SP` backup; originals restored and verified. `v-000015` pending owner details |
 | `manual-mappings` key-verification change (B.11.2) | planned; needs approval |
-| B2 R7–R9 | approved, not started |
+| B2 R7–R9 | ✅ research done 2026-10-08 (`b2-audio-research.md`); WC-1 docs part answered (no documented FSB/loc override) |
+| B2 E0 (writer + identity rebuild, offline) | ✅ approved and done 2026-10-08: both banks byte-identical (`scripts/common/fsb5_writer.py`, `b2_e0_identity_rebuild.py`) |
+| B2 E1 / E1b (MCC-only transplant, offline + owner in-game) | **proposed next** (`b2-audio-research.md` §5.2); not approved. E1 offline and E1-game need separate approvals |
+| B2 E2 (CELT 0.11 encoder, a new tool) | not approved; the encoder source must be chosen by the owner |
+| B2 E3–E5 | not approved |
 | WC (Workshop compatibility checkpoint, inside B2) | planned; not approved |
 | M8 (Steam Workshop packaging and publishing), each sub-step M8.1–M8.7 | planned; not approved |
 | Any upload (private test or public) | **not approved**; public publishing needs explicit owner approval |
