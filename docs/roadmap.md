@@ -163,7 +163,7 @@ Acceptance:
   follows Spanish bank order. ID changes must be detected and never
   silently renumbered (guard implemented in M3).
 
-### M3 — User-owned files, schemas, validators (no UI) ✅ BUILT (2026-10-08), awaiting owner review
+### M3 — User-owned files, schemas, validators (no UI) ✅ DONE (2026-10-08), approved by the owner
 Design: [`dialogue-catalog-design.md`](dialogue-catalog-design.md) §5.5. Run:
 `python scripts/validate/validate_project.py`. On the current project
 it reports 220 CE + 101 MCC records, 0 mappings, 11 verifications, no
@@ -195,7 +195,14 @@ findings and no drift.
 - [x] Empty templates: `manual_mappings.json`, `mission_map.json`,
   `manual_mappings.local.example.json`.
 - [x] Slot-ID change guard in `build_mcc_catalog.py`
-  (`--accept-id-changes` to override) → `a10`: no changes.
+  (`--accept-id-changes` to override) → `a10`: no changes. **Owner
+  rule:** ID changes are never accepted automatically. Only the owner
+  passes the override, after reviewing the report.
+- [x] Owner decisions (2026-10-08):
+  - the `manual-mappings/2` changes are approved;
+  - `a10 ↔ M01` is entered in `mission_map.json`;
+  - pins are populated from the verified builds, written through
+    `mapping_store`.
 
 ### M4 — Local matching UI
 - [ ] It runs on 127.0.0.1 and uses the stdlib only (no install
@@ -382,6 +389,6 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | M1 | ✅ built; awaiting owner review + spot-check |
 | M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
 | M2 (MCC a10 catalog from existing copies) | ✅ done; 5 samples verified (`v-000007`–`v-000011`) |
-| M3 (schemas, validators, protected store) — approved 2026-10-08 | ✅ built; awaiting owner review |
+| M3 (schemas, validators, protected store) — approved 2026-10-08 | ✅ done and approved |
 | B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
 | B2 R7–R9 | approved, not started |

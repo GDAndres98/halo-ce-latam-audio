@@ -218,7 +218,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - `mappings/verifications.json` exists (committed, IDs only):
   `v-000001`–`v-000011`, all passed (`ce:` = CE line refs, `mcc:` =
   Spanish slots). It is append-only; never rewrite entries.
-- **M3 done (2026-10-08), awaiting owner review:**
+- **M3 done and approved (2026-10-08)**, including the `manual-mappings/2`
+  changes:
   - **Schemas:** six versioned schemas in `schemas/`, checked by
     `scripts/common/jsonschema_lite.py`, a stdlib subset that refuses
     unknown keywords.
@@ -228,12 +229,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   - **Store:** `scripts/common/mapping_store.py` is the **only** allowed
     writer of `manual_mappings.json`. Tools never approve, and approved
     objects change only via a user `needs_rework` action (revision + 1).
-  - **Files:** `manual_mappings.json` and `mission_map.json` are empty
-    templates. Custom text and recording paths go only in the
-    git-ignored `manual_mappings.local.json`. `build_mcc_catalog.py`
-    refuses slot-ID changes unless `--accept-id-changes` is given.
+  - **Files:** `manual_mappings.json` has no slots yet, and its pins
+    are set from the verified builds (CE exe FileVersion, MCC Steam
+    build `19905945`, Spanish FSB SHA-256). `mission_map.json` holds the
+    owner's `a10 ↔ M01`. Custom text and recording paths go only in the
+    git-ignored `manual_mappings.local.json`.
+  - **ID changes:** `build_mcc_catalog.py` refuses slot-ID changes
+    unless `--accept-id-changes` is given. **Never pass
+    `--accept-id-changes` on your own initiative:** the owner reviews
+    `<level>_id_changes.json` and decides (owner rule, 2026-10-08).
     Design §5.5.
-- Not started: B1, B2, M4 matching UI. Audio processing (resample,
+- Not started: B2, M4 matching UI. Audio processing (resample,
   trims, FX), FSB repacking, map changes and subtitle patching are
   still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

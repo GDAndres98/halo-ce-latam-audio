@@ -1,9 +1,9 @@
 {
   "schema": "manual-mappings/2",
   "pins": {
-    "ce_build": null,
-    "mcc_steam_buildid": null,
-    "mcc_spanish_fsb_sha256": null
+    "ce_build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
+    "mcc_steam_buildid": "19905945",
+    "mcc_spanish_fsb_sha256": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
   },
   "slots": []
 }

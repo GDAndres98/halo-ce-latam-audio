@@ -1,4 +1,13 @@
 {
   "schema": "mission-map/1",
-  "entries": []
+  "entries": [
+    {
+      "mcc_level": "a10",
+      "ce_missions": [
+        "M01"
+      ],
+      "decided_at": "2026-10-08",
+      "note": "Owner decision: MCC a10 (The Pillar of Autumn) <-> Campaign Evolved M01. Search scoping only; no line is matched by this entry."
+    }
+  ]
 }
