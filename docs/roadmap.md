@@ -163,17 +163,39 @@ Acceptance:
   follows Spanish bank order. ID changes must be detected and never
   silently renumbered (guard implemented in M3).
 
-### M3 — User-owned files, schemas, validators (no UI)
-- [ ] `schemas/*.json` for the CE record, MCC record, mappings,
-  local file and verifications.
+### M3 — User-owned files, schemas, validators (no UI) ✅ BUILT (2026-10-08), awaiting owner review
+Design: [`dialogue-catalog-design.md`](dialogue-catalog-design.md) §5.5. Run:
+`python scripts/validate/validate_project.py`. On the current project
+it reports 220 CE + 101 MCC records, 0 mappings, 11 verifications, no
+findings and no drift.
+- [x] `schemas/*.json` for the CE record, MCC record, mappings,
+  local file and verifications. → Six versioned schemas, including
+  `mission-map/1`. The CE and MCC catalog schemas are separate and
+  reject each other's records.
 - [x] `mappings/verifications.json` is created with the M0 verification
-  (design §5.3). → Created early, 2026-10-08, at the owner's request,
-  with `v-000001`–`v-000006`. Its schema and validator are still M3.
-- [ ] A read-only validator flags unknown IDs, schema errors and
-  fingerprint drift (written to `work/reports/drift.json`).
-- [ ] Tests prove that a write path **cannot** change an `approved`
+  (design §5.3). → Created early, 2026-10-08, at the owner's request.
+  It now holds `v-000001`–`v-000011`.
+- [x] A read-only validator flags unknown IDs, schema errors and
+  fingerprint drift (written to `work/reports/drift.json`). It also
+  checks:
+  - duplicates and conflicting decisions, and reference resolution;
+  - provenance against `build.json`;
+  - append-only verifications and approved-object protection against
+    `git HEAD`;
+  - pins, local-file ignore status, and that no proprietary files are
+    tracked.
+- [x] Tests prove that a write path **cannot** change an `approved`
   `audio` or `subtitle` object, that backups are made before every
-  save, and that a stale-hash save is refused.
+  save, and that a stale-hash save is refused. → `mapping_store.py`
+  plus 20 tests in `tests/test_m3_validation.py`. Disabling either
+  protection makes tests fail; this was checked once.
+- [x] Independent audio/subtitle decisions, multiple audio sources
+  (`ce`, `ce_concat`, `user_recording`, `composite`), custom text via
+  the git-ignored local file.
+- [x] Empty templates: `manual_mappings.json`, `mission_map.json`,
+  `manual_mappings.local.example.json`.
+- [x] Slot-ID change guard in `build_mcc_catalog.py`
+  (`--accept-id-changes` to override) → `a10`: no changes.
 
 ### M4 — Local matching UI
 - [ ] It runs on 127.0.0.1 and uses the stdlib only (no install
@@ -359,6 +381,7 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 |---|---|
 | M1 | ✅ built; awaiting owner review + spot-check |
 | M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
-| M2 (MCC a10 catalog from existing copies) | ✅ built; awaiting owner review + listening |
+| M2 (MCC a10 catalog from existing copies) | ✅ done; 5 samples verified (`v-000007`–`v-000011`) |
+| M3 (schemas, validators, protected store) — approved 2026-10-08 | ✅ built; awaiting owner review |
 | B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
 | B2 R7–R9 | approved, not started |

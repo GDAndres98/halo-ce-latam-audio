@@ -218,9 +218,24 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - `mappings/verifications.json` exists (committed, IDs only):
   `v-000001`–`v-000011`, all passed (`ce:` = CE line refs, `mcc:` =
   Spanish slots). It is append-only; never rewrite entries.
-- Not started: B1, B2, M3 (schemas/validators), matching UI. Audio
-  processing (resample, trims, FX), FSB repacking, map changes and
-  subtitle patching are still not approved.
+- **M3 done (2026-10-08), awaiting owner review:**
+  - **Schemas:** six versioned schemas in `schemas/`, checked by
+    `scripts/common/jsonschema_lite.py`, a stdlib subset that refuses
+    unknown keywords.
+  - **Validator:** `python scripts/validate/validate_project.py` is
+    read-only and writes only `work/reports/{validation,drift}.json`.
+    Run it before every commit that touches `mappings/`.
+  - **Store:** `scripts/common/mapping_store.py` is the **only** allowed
+    writer of `manual_mappings.json`. Tools never approve, and approved
+    objects change only via a user `needs_rework` action (revision + 1).
+  - **Files:** `manual_mappings.json` and `mission_map.json` are empty
+    templates. Custom text and recording paths go only in the
+    git-ignored `manual_mappings.local.json`. `build_mcc_catalog.py`
+    refuses slot-ID changes unless `--accept-id-changes` is given.
+    Design §5.5.
+- Not started: B1, B2, M4 matching UI. Audio processing (resample,
+  trims, FX), FSB repacking, map changes and subtitle patching are
+  still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
   decided this is a personal, local-only project with no distribution.

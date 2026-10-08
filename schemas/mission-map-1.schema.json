@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mission-map/1",
+  "title": "User-defined MCC level <-> Campaign Evolved mission table (mappings/mission_map.json, committed)",
+  "description": "Search scoping only; written by the user, never inferred by a tool. It does not match any line.",
+  "type": "object",
+  "required": ["schema", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "mission-map/1"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mcc_level", "ce_missions", "decided_at", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "mcc_level": {"type": "string", "pattern": "^[a-d][0-9]{2}$"},
+          "ce_missions": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^M[0-9]{2}$"}},
+          "decided_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  }
+}

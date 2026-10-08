@@ -1,0 +1,374 @@
+"""Read-only semantic validation of catalogs and user-owned files (milestone M3).
+
+Pure functions over already-loaded JSON. The CLI
+(scripts/validate/validate_project.py) does the I/O. Nothing here writes,
+fixes or deletes anything: problems become findings, and fingerprint
+mismatches become drift entries. Approved decisions are never touched.
+
+Finding: {"severity": "error"|"warning"|"info", "code", "file", "where", "message"}.
+"""
+import hashlib
+import json
+import re
+
+from .jsonschema_lite import validate as schema_validate
+
+ABS_PATH = re.compile(r"(^|[\s\"'(])([A-Za-z]:[\\/]|/(home|Users|mnt|media)/|\\\\)")
+TEST_EVENT_FLAG = "test_event"
+
+
+def finding(severity, code, file, where, message):
+    return {"severity": severity, "code": code, "file": file, "where": where, "message": message}
+
+
+def sha256_text(s):
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+# --------------------------------------------------------------------------- catalog indexes
+def build_ce_index(records):
+    """ce_line_ref -> facts needed by validators and fingerprints."""
+    idx = {}
+    for r in records:
+        for e in r["entries"]:
+            media = {}
+            for lang, v in e["media"].items():
+                media[lang] = {"evidence": v.get("evidence"),
+                               "media": [{"media_id": m["media_id"], "wem_sha256": m.get("wem_sha256")}
+                                         for m in v.get("media", [])]}
+            subs = {c: {k: v.get(k) for k in ("evidence", "namespace", "key", "source_hash")}
+                    for c, v in e["subtitles"].items()}
+            idx[e["ce_line_ref"]] = {"record_id": r["record_id"], "mission": r.get("mission"),
+                                     "flags": r["flags"], "media": media, "subtitles": subs,
+                                     "source_build": r["source_build"].get("exe_file_version")}
+    return idx
+
+
+def build_mcc_index(records):
+    """slot_id -> facts; also '#tags' -> {mcc_tag: record summary} for English look-ups."""
+    slots, tags = {}, {}
+    for r in records:
+        tags[r["mcc_tag"]] = {"level": r["level"], "english": [
+            {"index": s["index"], "data_sha256": s["data_sha256"]} for s in r["samples"]["english"]]}
+        for s in r["samples"]["spanish"]:
+            slots[s["slot_id"]] = {"mcc_tag": r["mcc_tag"], "level": r["level"], "index": s["index"],
+                                   "name_in_bank": s["name_in_bank"], "data_sha256": s["data_sha256"],
+                                   "spanish_fsb_sha256": r["source"]["spanish_fsb_sha256"]}
+    return {"slots": slots, "tags": tags}
+
+
+# --------------------------------------------------------------------------- fingerprints
+def mcc_fingerprint(slot_id, mcc):
+    s = mcc["slots"].get(slot_id)
+    return None if not s else {"slot_id": slot_id, "index": s["index"], "data_sha256": s["data_sha256"]}
+
+
+def audio_fingerprint(slot, ce, mcc, local=None):
+    """Current fingerprint of an audio decision (what an approval pins)."""
+    out = {"mcc": mcc_fingerprint(slot["slot_id"], mcc), "sources": []}
+    for src in slot["audio"]["sources"]:
+        if src["kind"] == "ce":
+            m = (ce.get(src["ce_line_ref"]) or {}).get("media", {}).get(src["language"], {})
+            out["sources"].append({"kind": "ce", "ce_line_ref": src["ce_line_ref"], "language": src["language"],
+                                   "media": m.get("media", [])})
+        else:
+            rec = ((local or {}).get("user_recordings") or {}).get(src["ref"]) or {}
+            out["sources"].append({"kind": "user_recording", "ref": src["ref"], "sha256": rec.get("sha256")})
+    return out
+
+
+def subtitle_fingerprint(slot, ce, mcc, local=None):
+    sub = slot["subtitle"]
+    out = {"mcc": mcc_fingerprint(slot["slot_id"], mcc), "source": sub["source"]}
+    if sub["source"] == "ce_locres" and sub["ce_locres"]:
+        s = (ce.get(sub["ce_locres"]["ce_line_ref"]) or {}).get("subtitles", {}).get(sub["ce_locres"]["culture"], {})
+        out["ce_locres"] = {**sub["ce_locres"], "namespace": s.get("namespace"), "key": s.get("key"),
+                            "source_hash": s.get("source_hash")}
+    if sub["source"] == "custom" and sub["custom_ref"]:
+        t = (((local or {}).get("custom_subtitles") or {}).get(sub["custom_ref"]) or {}).get("text")
+        out["custom"] = {"custom_ref": sub["custom_ref"], "text_sha256": sha256_text(t) if t is not None else None}
+    return out
+
+
+# --------------------------------------------------------------------------- catalogs
+def validate_catalog(name, records, schema, expected_schema_id, build=None, file_sha256=None):
+    """Schema, separation, uniqueness and provenance of one generated catalog."""
+    out, seen = [], {}
+    for i, r in enumerate(records):
+        if r.get("schema") != expected_schema_id:
+            out.append(finding("error", "catalog_separation", name, f"line {i + 1}",
+                               f"record schema {r.get('schema')!r} does not belong in this catalog "
+                               f"(expected {expected_schema_id})"))
+            continue
+        for e in schema_validate(r, schema)[:5]:
+            out.append(finding("error", "schema", name, f"line {i + 1}", e))
+        keys = ([e["ce_line_ref"] for e in r.get("entries", [])] if expected_schema_id.startswith("ce-")
+                else r.get("slot_ids", []))
+        for k in keys:
+            if k in seen:
+                out.append(finding("error", "duplicate_id", name, f"line {i + 1}", f"{k} also on line {seen[k]}"))
+            seen[k] = i + 1
+    if build is not None:
+        cat = next((c for c in (build.get("catalogs") or {}).values() if c.get("path", "").endswith(name)), None)
+        if not cat:
+            out.append(finding("warning", "provenance_missing", name, "build.json", "catalog not listed in build.json"))
+        elif file_sha256 and cat.get("sha256") != file_sha256:
+            out.append(finding("error", "catalog_changed_since_build", name, "build.json",
+                               "file sha256 differs from build.json; rebuild instead of editing catalogs"))
+        if expected_schema_id.startswith("ce-"):
+            want = (build.get("source_build") or {}).get("exe_file_version")
+            bad = sum(1 for r in records if r.get("source_build", {}).get("exe_file_version") != want)
+        else:
+            want = ((build.get("files") or {}).get("spanish.fsb") or {}).get("sha256")
+            bad = sum(1 for r in records if r.get("source", {}).get("spanish_fsb_sha256") != want)
+        if bad:
+            out.append(finding("error", "provenance_mismatch", name, "records",
+                               f"{bad} records were built from a different source than build.json"))
+    return out
+
+
+def compare_slot_identity(old_records, new_records):
+    """ID-change guard for MCC rebuilds: slot ids must never be silently renumbered.
+
+    -> list of {"change": removed|added|moved|renamed, ...}. 'moved' = same slot_id, different sample;
+    'renamed' = same sample bytes now under another slot_id.
+    """
+    def table(records):
+        return {s["slot_id"]: (s["index"], s["data_sha256"], r["mcc_tag"])
+                for r in records for s in r["samples"]["spanish"]}
+    old, new = table(old_records), table(new_records)
+    by_data_new = {}
+    for sid, (_i, d, _t) in new.items():
+        by_data_new.setdefault(d, []).append(sid)
+    changes = []
+    for sid in sorted(old):
+        if sid not in new:
+            moved_to = sorted(x for x in by_data_new.get(old[sid][1], []) if x not in old)
+            changes.append({"change": "renamed" if moved_to else "removed", "slot_id": sid, "new_slot_ids": moved_to,
+                            "mcc_tag": old[sid][2]})
+        elif new[sid][:2] != old[sid][:2]:
+            changes.append({"change": "moved", "slot_id": sid, "old": list(old[sid][:2]), "new": list(new[sid][:2]),
+                            "mcc_tag": old[sid][2]})
+    renamed_targets = {x for c in changes for x in c.get("new_slot_ids", [])}
+    for sid in sorted(set(new) - set(old) - renamed_targets):
+        changes.append({"change": "added", "slot_id": sid, "mcc_tag": new[sid][2]})
+    return changes
+
+
+# --------------------------------------------------------------------------- mappings
+def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pins, file="manual_mappings.json"):
+    """-> (findings, drift). ce/mcc are indexes; local may be None; current_pins may hold None values."""
+    out, drift = [], []
+    errs = schema_validate(doc, schema)
+    out += [finding("error", "schema", file, e.split(":")[0], e) for e in errs]
+    if errs:
+        return out, drift
+    have_ce, have_mcc = bool(ce), bool(mcc["slots"])
+    ver_ids = {v["id"]: v for v in (verifications or {}).get("verifications", [])}
+
+    for k, cur in current_pins.items():
+        pin = doc["pins"].get(k)
+        if pin is None and doc["slots"]:
+            out.append(finding("warning", "pin_unset", file, f"/pins/{k}", f"pin not set (current: {cur})"))
+        elif pin is not None and cur is not None and pin != cur:
+            out.append(finding("warning", "pin_mismatch", file, f"/pins/{k}", f"pinned {pin}, current {cur}"))
+            drift.append({"kind": "pin", "pin": k, "pinned": pin, "current": cur})
+
+    ids, slots_seen = {}, {}
+    for i, s in enumerate(doc["slots"]):
+        w = f"/slots/{i} ({s['mapping_id']})"
+        if s["mapping_id"] in ids:
+            out.append(finding("error", "duplicate_mapping_id", file, w, f"also at /slots/{ids[s['mapping_id']]}"))
+        ids.setdefault(s["mapping_id"], i)
+        if s["slot_id"] in slots_seen:
+            out.append(finding("error", "conflicting_slot_decisions", file, w,
+                               f"{s['slot_id']} is also mapped by {slots_seen[s['slot_id']]}"))
+        slots_seen.setdefault(s["slot_id"], s["mapping_id"])
+        if ABS_PATH.search(s["notes"]):
+            out.append(finding("error", "local_path_in_committed_file", file, w + "/notes",
+                               "absolute paths belong in manual_mappings.local.json"))
+
+        slot = mcc["slots"].get(s["slot_id"])
+        if not slot:
+            out.append(finding("error" if have_mcc else "warning", "unknown_slot_id", file, w,
+                               f"{s['slot_id']} not in any loaded MCC catalog"))
+        elif slot["mcc_tag"] != s["mcc_tag"]:
+            out.append(finding("error", "mcc_tag_mismatch", file, w, f"catalog says {slot['mcc_tag']}"))
+
+        m, a, sub = s["match"], s["audio"], s["subtitle"]
+        for ref in m["ce_line_refs"]:
+            if ref not in ce:
+                out.append(finding("error" if have_ce else "warning", "unknown_ce_line_ref", file, w + "/match", ref))
+        # --- audio decision ---------------------------------------------------------
+        ce_srcs = [x for x in a["sources"] if x["kind"] == "ce"]
+        if ce_srcs and m["status"] != "matched":
+            out.append(finding("error", "audio_conflicts_with_match", file, w + "/audio",
+                               f"CE audio sources while match.status={m['status']}"))
+        for x in ce_srcs:
+            ref = x["ce_line_ref"]
+            if ref not in m["ce_line_refs"]:
+                out.append(finding("error", "audio_source_not_in_match", file, w + "/audio", ref))
+            info = ce.get(ref)
+            if not info:
+                if ref not in m["ce_line_refs"]:
+                    out.append(finding("error" if have_ce else "warning", "unknown_ce_line_ref", file,
+                                       w + "/audio", ref))
+                continue
+            if TEST_EVENT_FLAG in info["flags"]:
+                out.append(finding("error", "test_event_audio_source", file, w + "/audio",
+                                   f"{ref} plays a test event with no dialogue media"))
+            if info["media"].get(x["language"], {}).get("evidence") != "explicit":
+                out.append(finding("error" if a["status"] == "approved" else "warning", "audio_source_unresolved",
+                                   file, w + "/audio", f"{ref} has no resolved {x['language']} media"))
+        for x in a["sources"]:
+            if x["kind"] == "user_recording":
+                if local is None:
+                    out.append(finding("error", "local_file_missing", file, w + "/audio",
+                                       f"{x['ref']} needs manual_mappings.local.json"))
+                elif x["ref"] not in local["user_recordings"]:
+                    out.append(finding("error", "unknown_user_recording", file, w + "/audio", x["ref"]))
+        # --- subtitle decision (independent of audio) -------------------------------
+        if sub["source"] == "ce_locres":
+            ref, cul = sub["ce_locres"]["ce_line_ref"], sub["ce_locres"]["culture"]
+            if ref not in ce:
+                out.append(finding("error" if have_ce else "warning", "unknown_ce_line_ref", file,
+                                   w + "/subtitle", ref))
+            elif ce[ref]["subtitles"].get(cul, {}).get("evidence") != "explicit":
+                out.append(finding("error" if sub["status"] == "approved" else "warning", "subtitle_unresolved",
+                                   file, w + "/subtitle", f"{ref} has no resolved {cul} subtitle"))
+            if ref not in m["ce_line_refs"]:
+                out.append(finding("warning", "subtitle_source_not_in_match", file, w + "/subtitle", ref))
+        if sub["source"] == "custom":
+            if local is None:
+                out.append(finding("error", "local_file_missing", file, w + "/subtitle",
+                                   f"{sub['custom_ref']} needs manual_mappings.local.json"))
+            elif sub["custom_ref"] not in local["custom_subtitles"]:
+                out.append(finding("error", "unknown_custom_ref", file, w + "/subtitle", sub["custom_ref"]))
+        if sub["mcc_key_hash"] is not None:
+            v = ver_ids.get(sub["mcc_key_verification"])
+            if not v or v["subject"] != f"mcc:{s['slot_id']}" or "subtitle_key_link" not in v["checks"] \
+                    or v["result"] != "pass":
+                out.append(finding("error", "unverified_subtitle_key", file, w + "/subtitle",
+                                   "mcc_key_hash needs a passing 'subtitle_key_link' verification for this slot "
+                                   "(blocker B1); never guess hashed keys"))
+        # --- approvals pin fingerprints; mismatches are drift, never edits ----------
+        for field, fn in (("audio", audio_fingerprint), ("subtitle", subtitle_fingerprint)):
+            obj = s[field]
+            if obj["status"] != "approved":
+                continue
+            cur = fn(s, ce, mcc, local)
+            needs_ce = bool(ce_srcs) if field == "audio" else sub["source"] == "ce_locres"
+            if have_mcc and (have_ce or not needs_ce) and obj["fingerprint"] != cur:
+                out.append(finding("warning", "approved_fingerprint_drift", file, f"{w}/{field}",
+                                   "approved decision no longer matches current catalogs; see drift report"))
+                drift.append({"kind": "approved_mapping", "mapping_id": s["mapping_id"], "field": field,
+                              "slot_id": s["slot_id"], "approved": obj["fingerprint"], "current": cur})
+
+    if local is not None:
+        used_c = {s["subtitle"]["custom_ref"] for s in doc["slots"] if s["subtitle"]["custom_ref"]}
+        used_r = {x["ref"] for s in doc["slots"] for x in s["audio"]["sources"] if x["kind"] == "user_recording"}
+        for c in sorted(set(local["custom_subtitles"]) - used_c):
+            out.append(finding("info", "unused_custom_subtitle", "manual_mappings.local.json", c, "not referenced"))
+        for r in sorted(set(local["user_recordings"]) - used_r):
+            out.append(finding("info", "unused_user_recording", "manual_mappings.local.json", r, "not referenced"))
+    return out, drift
+
+
+def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
+    """Approved objects committed at HEAD must survive unchanged, unless moved to needs_rework with revision+1."""
+    out = []
+    if not head_doc:
+        return out
+    cur = {s["mapping_id"]: s for s in doc.get("slots", [])}
+    for hs in head_doc.get("slots", []):
+        approved = [f for f in ("audio", "subtitle") if hs[f]["status"] == "approved"]
+        if not approved:
+            continue
+        s = cur.get(hs["mapping_id"])
+        if s is None:
+            out.append(finding("error", "approved_mapping_removed", file, hs["mapping_id"],
+                               "a mapping with an approved decision was deleted"))
+            continue
+        if s["slot_id"] != hs["slot_id"]:
+            out.append(finding("error", "approved_mapping_retargeted", file, hs["mapping_id"],
+                               f"slot_id changed {hs['slot_id']} -> {s['slot_id']}"))
+        for f in approved:
+            if s[f] == hs[f]:
+                continue
+            if s[f]["status"] == "needs_rework" and s[f]["revision"] == hs[f]["revision"] + 1:
+                continue
+            out.append(finding("error", "approved_object_modified", file, f"{hs['mapping_id']}/{f}",
+                               "approved decisions are immutable; only a user move to needs_rework "
+                               "(revision + 1) is allowed"))
+    return out
+
+
+# --------------------------------------------------------------------------- verifications
+def validate_verifications(doc, schema, *, ce, mcc, head_doc=None, file="verifications.json"):
+    out, drift = [], []
+    errs = schema_validate(doc, schema)
+    out += [finding("error", "schema", file, e.split(":")[0], e) for e in errs]
+    if errs:
+        return out, drift
+    vs = doc["verifications"]
+    for n, v in enumerate(vs, 1):
+        if v["id"] != f"v-{n:06d}":
+            out.append(finding("error", "verification_id_sequence", file, v["id"], f"expected v-{n:06d}"))
+    if head_doc:
+        hv = head_doc.get("verifications", [])
+        if vs[:len(hv)] != hv:
+            out.append(finding("error", "verifications_not_append_only", file, "/verifications",
+                               "entries committed at HEAD were changed, reordered or removed"))
+    for v in vs:
+        kind, ident = v["subject"].split(":", 1)
+        fp = v["fingerprint"]
+        if kind == "ce":
+            info = ce.get(ident)
+            if not info:
+                out.append(finding("error" if ce else "info", "unknown_subject", file, v["id"], v["subject"]))
+                continue
+            for lang, want in (fp.get("media") or {}).items():
+                cur = info["media"].get(lang, {}).get("media", [])
+                cur0 = cur[0] if cur else {}
+                if (cur0.get("media_id"), cur0.get("wem_sha256")) != (want.get("media_id"), want.get("wem_sha256")):
+                    drift.append({"kind": "verification", "id": v["id"], "subject": v["subject"], "language": lang,
+                                  "verified": want, "current": cur0})
+        else:
+            slot = mcc["slots"].get(ident)
+            if not slot:
+                out.append(finding("error" if mcc["slots"] else "info", "unknown_subject", file, v["id"],
+                                   v["subject"]))
+                continue
+            es = (fp.get("samples") or {}).get("spanish") or {}
+            if (es.get("index"), es.get("data_sha256")) != (slot["index"], slot["data_sha256"]):
+                drift.append({"kind": "verification", "id": v["id"], "subject": v["subject"],
+                              "language": "spanish", "verified": es,
+                              "current": {"index": slot["index"], "data_sha256": slot["data_sha256"]},
+                              "note": "slot_id now points to a different sample (ID change)"})
+            if v.get("mcc_tag") and v["mcc_tag"] != slot["mcc_tag"]:
+                out.append(finding("error", "mcc_tag_mismatch", file, v["id"], f"catalog says {slot['mcc_tag']}"))
+    for d in drift:
+        out.append(finding("warning", "verification_fingerprint_drift", file, d["id"],
+                           f"{d['subject']} {d['language']}: verified media differs from current catalog"))
+    return out, drift
+
+
+def validate_mission_map(doc, schema, *, ce_missions, mcc_levels, file="mission_map.json"):
+    out = [finding("error", "schema", file, e.split(":")[0], e) for e in schema_validate(doc, schema)]
+    if out:
+        return out
+    seen = set()
+    for e in doc["entries"]:
+        if e["mcc_level"] in seen:
+            out.append(finding("error", "duplicate_level", file, e["mcc_level"], "level listed twice"))
+        seen.add(e["mcc_level"])
+        if mcc_levels and e["mcc_level"] not in mcc_levels:
+            out.append(finding("info", "level_catalog_missing", file, e["mcc_level"], "no MCC catalog built yet"))
+        for m in e["ce_missions"]:
+            if ce_missions and m not in ce_missions:
+                out.append(finding("info", "mission_catalog_missing", file, m, "no CE catalog built yet"))
+    return out
+
+
+def dumps(obj):
+    return json.dumps(obj, sort_keys=True, ensure_ascii=False, indent=2) + "\n"

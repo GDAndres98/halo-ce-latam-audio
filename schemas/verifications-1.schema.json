@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verifications/1",
+  "title": "Human listening/reading checks (mappings/verifications.json, committed, append-only)",
+  "description": "IDs and fingerprints only. Subjects are prefixed: 'ce:<ce_line_ref>' (Campaign Evolved) or 'mcc:<slot_id>' (MCC Spanish slot). Not an evidence level. See docs/dialogue-catalog-design.md §5.3.",
+  "type": "object",
+  "required": ["schema_version", "verifications"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "verifications": {"type": "array", "items": {"$ref": "#/$defs/verification"}}
+  },
+  "$defs": {
+    "verification": {
+      "type": "object",
+      "required": ["id", "subject", "checks", "languages", "fingerprint", "result", "by", "at", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^v-[0-9]{6}$"},
+        "subject": {"type": "string", "pattern": "^(ce:[a-z0-9_]+(/[a-z0-9_]+)?#[0-9]+|mcc:es:[^#\\s]+#[0-9]+)$"},
+        "mcc_tag": {"type": "string", "pattern": "^sound\\\\dialog\\\\"},
+        "checks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z_]+$"}},
+        "languages": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "fingerprint": {"type": "object"},
+        "result": {"enum": ["pass", "fail"]},
+        "by": {"type": "string", "minLength": 1},
+        "at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+        "note": {"type": "string"}
+      }
+    }
+  }
+}

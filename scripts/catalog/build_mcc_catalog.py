@@ -33,6 +33,7 @@ from common.fsb5_lib import FsbBank  # noqa: E402
 from common.mcc_catalog import (  # noqa: E402
     LANGUAGES, RECORD_SCHEMA, BankIndex, build_level, coverage, export_plan, export_units, recommend)
 from common.mcc_lst import check_ranges, parse_lst  # noqa: E402
+from common.project_validation import compare_slot_identity  # noqa: E402
 
 COPIES = REPO_ROOT / "reference-audio" / "stage1"
 WORK = REPO_ROOT / "work" / "mcc"
@@ -133,6 +134,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--level", default="a10")
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
+    ap.add_argument("--accept-id-changes", action="store_true",
+                    help="overwrite even if slot IDs were removed, moved or renamed (see <level>_id_changes.json)")
     args = ap.parse_args()
     level = args.level.lower()
     if not args.vgmstream_cli.is_file():
@@ -166,6 +169,21 @@ def main():
                       sorted(records, key=lambda r: (min([s["index"] for s in r["samples"]["spanish"]] or [10**9]),
                                                      r["tag_name"])))
     cat_path = cat_dir / f"{level}.jsonl"
+    # ID-change guard: slot IDs are never silently renumbered (owner decision 2026-10-08).
+    rep = WORK / "reports"
+    rep.mkdir(parents=True, exist_ok=True)
+    changes = []
+    if cat_path.exists():
+        old_records = [json.loads(x) for x in cat_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        changes = compare_slot_identity(old_records, records)
+    (rep / f"{level}_id_changes.json").write_text(
+        dumps_json({"schema": "mcc-id-changes/1", "level": level, "changes": changes}), encoding="utf-8",
+        newline="\n")
+    blocking = [c for c in changes if c["change"] != "added"]
+    if blocking and not args.accept_id_changes:
+        raise SystemExit(f"{len(blocking)} slot ID change(s) vs the existing catalog (removed/moved/renamed); "
+                         f"nothing overwritten. Review work/mcc/reports/{level}_id_changes.json and re-run with "
+                         "--accept-id-changes only if intended. Mappings and verifications are never rewritten.")
     cat_path.write_text(catalog, encoding="utf-8", newline="\n")
 
     out_root = WORK / "audio" / level
@@ -198,8 +216,6 @@ def main():
     cov["problem_units"] = [{"key": u["key"], "status": u["status"], "reason": u.get("reason"),
                              "mcc_tag": u["mcc_tag"]} for u in units
                             if u["status"] != "ok" or not u["frames_match_header"]]
-    rep = WORK / "reports"
-    rep.mkdir(parents=True, exist_ok=True)
     (rep / f"{level}_coverage.json").write_text(dumps_json(cov), encoding="utf-8", newline="\n")
     (rep / f"{level}_issues.json").write_text(dumps_json({"schema": "mcc-issues-report/1", "level": level,
                                                           "issues": issues,

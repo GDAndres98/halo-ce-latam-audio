@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manual-mappings-local/1",
+  "title": "Local-only companion to the mappings (mappings/manual_mappings.local.json, git-ignored)",
+  "description": "Holds what must never be committed: custom subtitle text and local file paths of user recordings. Referenced from manual_mappings.json by c-NNNNNN / r-NNNNNN ids.",
+  "type": "object",
+  "required": ["schema", "custom_subtitles", "user_recordings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "manual-mappings-local/1"},
+    "custom_subtitles": {
+      "type": "object",
+      "propertyNames": {"pattern": "^c-[0-9]{6}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["text", "updated_at"],
+        "additionalProperties": false,
+        "properties": {
+          "text": {"type": "string", "minLength": 1},
+          "updated_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"}
+        }
+      }
+    },
+    "user_recordings": {
+      "type": "object",
+      "propertyNames": {"pattern": "^r-[0-9]{6}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

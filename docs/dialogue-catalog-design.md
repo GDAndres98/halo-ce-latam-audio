@@ -347,6 +347,103 @@ JSON Schema and validator.
 5. Verifications are append-only.
 6. Git history is the second safety net.
 
+### 5.5 As implemented: schemas, store, validator (M3, 2026-10-08)
+
+**Schemas** (`schemas/`, committed, JSON Schema draft 2020-12):
+
+| File | `$id` | Validates |
+|---|---|---|
+| `ce-voice-asset-3.schema.json` | `ce-voice-asset/3` | Campaign Evolved catalog records (remake only) |
+| `mcc-dialogue-tag-3.schema.json` | `mcc-dialogue-tag/3` | MCC catalog records (MCC only; `subtitle.key_hash` must be `null` while unresolved) |
+| `manual-mappings-2.schema.json` | `manual-mappings/2` | `mappings/manual_mappings.json` |
+| `manual-mappings-local-1.schema.json` | `manual-mappings-local/1` | `mappings/manual_mappings.local.json` (git-ignored) |
+| `verifications-1.schema.json` | `verifications/1` | `mappings/verifications.json` |
+| `mission-map-1.schema.json` | `mission-map/1` | `mappings/mission_map.json` |
+
+Validation uses `scripts/common/jsonschema_lite.py`, a stdlib subset,
+because no package may be installed without approval. It **refuses any
+keyword it doesn't implement**, so a schema can't silently claim a
+check that isn't enforced. The files are standard JSON Schema, so any
+full validator can also check them.
+
+**`manual-mappings/2` as implemented** (changes from the §5.1 sketch):
+- The top level is `{"schema": "manual-mappings/2", "pins":
+  {ce_build, mcc_steam_buildid, mcc_spanish_fsb_sha256}, "slots": []}`.
+  `schema` replaces `schema_version`.
+- **Multiple audio sources:** `audio.sources` is an ordered list of
+  `{kind: "ce", ce_line_ref, language}` or
+  `{kind: "user_recording", ref: "r-NNNNNN"}`. `audio.source` constrains
+  it:
+  - `keep_original`: 0 sources;
+  - `ce`: exactly 1 CE source;
+  - `ce_concat`: ≥ 2 CE sources;
+  - `user_recording`: exactly 1 user source;
+  - `composite`: ≥ 2 sources of any kind.
+- **Custom text:** `subtitle.custom_ref = "c-NNNNNN"` points into the
+  local file, so text never enters the committed file. `ce_locres` and
+  `custom_ref` are mutually exclusive by `subtitle.source`.
+- `subtitle.mcc_key_hash` must stay `null` unless
+  `mcc_key_verification` names a passing `subtitle_key_link`
+  verification for that slot (blocker B1). Hashed keys are never
+  guessed.
+- `approved` requires `approved_at` and `fingerprint`. Fingerprints come
+  from `project_validation.audio_fingerprint` and
+  `subtitle_fingerprint`:
+  - the MCC slot index and data hash;
+  - each CE source's media IDs and `.wem` hashes;
+  - the `.locres` namespace, key and source hash;
+  - the SHA-256 of the custom text;
+  - the SHA-256 of each user recording.
+- `match.status`: `matched` needs ≥ 1 ref; `unreviewed` and
+  `no_equivalent` need none; any CE audio source requires `matched`, and
+  must be listed in `match.ce_line_refs`.
+
+**Protection:**
+- **Writes:** `scripts/common/mapping_store.py` is the only sanctioned
+  write path (M4 will use it). It refuses stale saves (content hash),
+  tool-made approvals (only `UserAction("approve")` can approve), and
+  any change to an approved object other than
+  `UserAction("needs_rework")` with `revision + 1`. It also refuses to
+  delete or retarget approved mappings. It schema-checks the new
+  document, backs up to `mappings/.history/`, and writes atomically.
+- **Committed state:** the validator compares the file to `git HEAD`
+  and reports any approved object that was edited without that
+  transition.
+
+**Read-only validator:** `python scripts/validate/validate_project.py`
+(`--no-git`, `--no-write`) checks:
+- catalog schema, CE/MCC separation, duplicate IDs (within and across
+  catalogs), and provenance against `build.json`, including the
+  catalog SHA-256;
+- mapping IDs and references, conflicting decisions for one slot,
+  test-event or unresolved sources, local references, absolute paths
+  in notes, pins, and approved-fingerprint drift;
+- that the local file is git-ignored, and that no game assets, `work/`,
+  `reference-audio/`, `.env` or `*.local.json` are tracked;
+- that verifications are append-only and sequential, that their
+  subjects exist, and their drift;
+- the mission map.
+
+It writes only `work/reports/validation.json` and `drift.json` and
+exits 1 on any error. It never edits a mapping, verification, catalog
+or game file.
+
+**ID-change guard:** `build_mcc_catalog.py` compares slot IDs with the
+existing catalog before overwriting it
+(`project_validation.compare_slot_identity`). Changes are classified
+`removed`, `moved` (same ID, different sample), `renamed` (same bytes,
+new ID) or `added`. They are written to
+`work/mcc/reports/<level>_id_changes.json`. Anything but `added` stops
+the build unless `--accept-id-changes` is given. Mappings and
+verifications are never renumbered; the validator reports their
+fingerprints as drift instead.
+
+**Templates** (committed, empty):
+- `mappings/manual_mappings.json` (no slots, null pins);
+- `mappings/mission_map.json` (no entries; the user writes `a10 ↔ M01`);
+- `mappings/manual_mappings.local.example.json`. Copy it to the
+  git-ignored `manual_mappings.local.json` when needed.
+
 ## 6. Derived audio (v1.0 conversion, v1.1 effects) — plan only
 
 v1.0 needs **format conversion** regardless of effects. CE media decode

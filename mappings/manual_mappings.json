@@ -1,0 +1,9 @@
+{
+  "schema": "manual-mappings/2",
+  "pins": {
+    "ce_build": null,
+    "mcc_steam_buildid": null,
+    "mcc_spanish_fsb_sha256": null
+  },
+  "slots": []
+}
