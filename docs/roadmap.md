@@ -154,8 +154,14 @@ Acceptance:
 - [x] The JSONL catalog, manifest and reports are deterministic.
   Missing, duplicate and failed samples are reported (→ none).
 - [x] Synthetic tests pass → 52 tests total.
-- [ ] The owner listens to the five review picks
-  (`work/mcc/reports/a10_review_picks.md`).
+- [x] The owner listens to the five review picks
+  (`work/mcc/reports/a10_review_picks.md`). → All passed (2026-10-08):
+  correct audio, complete recordings, expected dialogue. Recorded as
+  `v-000007`–`v-000011`.
+- [x] Owner decision (2026-10-08): `slot_id =
+  es:<spanish_sample_name>#<occurrence>` is **approved**. Occurrence
+  follows Spanish bank order. ID changes must be detected and never
+  silently renumbered (guard implemented in M3).
 
 ### M3 — User-owned files, schemas, validators (no UI)
 - [ ] `schemas/*.json` for the CE record, MCC record, mappings,

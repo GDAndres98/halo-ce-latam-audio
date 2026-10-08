@@ -62,7 +62,11 @@ feasibility §10.2: the second field is a sample count (permutations),
 and the first is a start index. M2 uses `.lst.bin` only as a
 cross-check of the name table.
 
-**Spanish slot ID:** `slot_id = "es:<name_in_spanish_bank>#<occurrence>"`.
+**Spanish slot ID (approved by the owner, 2026-10-08):**
+`slot_id = "es:<name_in_spanish_bank>#<occurrence>"`. The name keeps
+the bank's exact casing (e.g. `es:A10_710_CORTANA#0`,
+`es:a10_682_cortana#0`). IDs must never be silently renumbered: see
+the M3 ID-change guard.
 `<occurrence>` is the 0-based rank of that index among the Spanish
 samples with the same name (case-insensitive). The suffix exists
 because names are **not** unique bank-wide: 765 Spanish and 117

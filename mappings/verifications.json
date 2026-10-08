@@ -192,6 +192,201 @@
       "by": "user",
       "at": "2026-10-08",
       "note": "M1b review pick 5 (largest es-MX vs en duration ratio); source work/ce/reports/m01_review_picks.md"
+    },
+    {
+      "id": "v-000007",
+      "subject": "mcc:es:A10_170_cryoassist#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_170_cryoassist",
+      "checks": [
+        "correct_audio",
+        "audio_complete",
+        "expected_dialogue"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 16,
+            "name_in_bank": "A10_170_cryoassist",
+            "data_sha256": "1f2f93c690f970be8e945dd723d78c6fe7a5045aaac946272a68c58523f74583",
+            "wav_sha256": "805bc3e3958574ea2e06d3c5fe13d0bce5ae076a3e47c5710d39ac3026dbd012"
+          },
+          "english": {
+            "index": 16,
+            "name_in_bank": "A10_170_CryoAssist",
+            "data_sha256": "bdf774c36f46538ec6f9ea382eb4a717bb460a077881cdbae9e75565a829c2b5",
+            "wav_sha256": "d276537ecfb1ff20f6369a9de1f05d7d71e24f68786550ed53035d07a296ed1c"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M2 review pick 1 (scripted cryo-bay line, median length); source work/mcc/reports/a10_review_picks.md"
+    },
+    {
+      "id": "v-000008",
+      "subject": "mcc:es:A10_710_CORTANA#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_710_cortana",
+      "checks": [
+        "correct_audio",
+        "audio_complete",
+        "expected_dialogue"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 62,
+            "name_in_bank": "A10_710_CORTANA",
+            "data_sha256": "845aecf1a94b275130e176680590b420c1d7f70e2c9ea18b496be8e4e1d9988c",
+            "wav_sha256": "eb649cdfabb4600c1d9af417ef0870fc92f40c415bad2bc1b84421f544f31d48"
+          },
+          "english": {
+            "index": 62,
+            "name_in_bank": "A10_710_Cortana",
+            "data_sha256": "57b31901c845c68c476baea0205463d5427dbe254b7a21a18906f61cb59b814d",
+            "wav_sha256": "b57b2e98499880911aeae14fe15816ad27e0c61bc815b71fc78b21d5ddd54272"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M2 review pick 2 (scripted Cortana line, median length); source work/mcc/reports/a10_review_picks.md"
+    },
+    {
+      "id": "v-000009",
+      "subject": "mcc:es:A10_flavor_150_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_flavor_150_captkeyes",
+      "checks": [
+        "correct_audio",
+        "audio_complete",
+        "expected_dialogue"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 87,
+            "name_in_bank": "A10_flavor_150_captkeyes",
+            "data_sha256": "eddcc679e9eb222a5217026178eff60332c374b9472f611a004397dcf6c26faa",
+            "wav_sha256": "5c4231a49eaefb091be35e714c2e557cc75415c4e71282b878b2a3abbc8c1eae"
+          },
+          "english": {
+            "index": 87,
+            "name_in_bank": "A10_flavor_150_CaptKeyes",
+            "data_sha256": "8872e86d9872122c232024128f948929e8dd3e59db65e3a51d8d6bfdb4da5cba",
+            "wav_sha256": "53acfe681715d01d1dceb85688e06cdae464292843c13fb8123d3ddc87ceb020"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M2 review pick 3 (flavor (ambient) line, median length); source work/mcc/reports/a10_review_picks.md"
+    },
+    {
+      "id": "v-000010",
+      "subject": "mcc:es:A10_670_bisenti#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_670_bisenti",
+      "checks": [
+        "correct_audio",
+        "audio_complete",
+        "expected_dialogue"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 56,
+            "name_in_bank": "A10_670_bisenti",
+            "data_sha256": "5631a4b9d8c14ce8aa4022d569f16c21def0a907842172b57eb332bdb0aa952f",
+            "wav_sha256": "4182ab154a39864463b91000e3a5f45043765430bdb68aaea53569af50ead12b"
+          },
+          "english": {
+            "index": 56,
+            "name_in_bank": "A10_670_Bisenti",
+            "data_sha256": "55e0d02752a0b595e18f1baa77ed180807ee52757da158a440a3bf20fa6de00a",
+            "wav_sha256": "e684e071fdfc2474d62309f73009e4694637d62957a7e8d787ce9e9e7bb8dd79"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M2 review pick 4 (scripted line from another speaker, median length); source work/mcc/reports/a10_review_picks.md"
+    },
+    {
+      "id": "v-000011",
+      "subject": "mcc:es:a10_682_cortana#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_682_cortana",
+      "checks": [
+        "correct_audio",
+        "audio_complete",
+        "expected_dialogue"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 59,
+            "name_in_bank": "a10_682_cortana",
+            "data_sha256": "d339aa028aa2a4be1fed9f3fcabd8413dd1b75eda495368b3a66d49a5fa43720",
+            "wav_sha256": "dcba5891bbe9715d41602f1c9e02c58216fb15db51f87e8aa75c4d66bda78398"
+          },
+          "english": {
+            "index": 59,
+            "name_in_bank": "A10_682_Cortana",
+            "data_sha256": "effeab12639de4eaa644feb40a9aea0fddbfdd35ed0e8833627082913fc21488",
+            "wav_sha256": "c37a9aa063731f0d04e766119dd0fc921d854cb3e5d5f6fdf2a03d0df734b897"
+          }
+        }
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "M2 review pick 5 (largest Spanish vs English duration difference); source work/mcc/reports/a10_review_picks.md"
     }
   ]
 }

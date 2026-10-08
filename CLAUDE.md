@@ -205,17 +205,19 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   `m01_review_picks.*`. One WAV is written per (language, media_id),
   and `test_event` records are excluded, not failed. Findings are in
   remake-audio-research.md §10.
-- **M2 done (2026-10-08), awaiting owner review + listening:**
+- **M2 done and reviewed (2026-10-08):**
   `python scripts/catalog/build_mcc_catalog.py --level a10` reads only
   the pinned copies in `reference-audio/stage1/` and writes
   `work/mcc/catalog/a10.jsonl` (`mcc-dialogue-tag/3`), `work/mcc/build.json`,
   `work/mcc/audio/a10/` (202 WAVs + manifest) and `work/mcc/reports/a10_*`.
-  `slot_id = es:<name_in_spanish_bank>#<occurrence>`. The `.lst.bin`
-  layout is now resolved (`{len, tag, first_sample_index,
-  sample_count}`). See `docs/mcc-a10-catalog.md`.
+  **Approved ID (owner):** `slot_id = es:<spanish_sample_name>#<occurrence>`.
+  The name keeps the bank's exact casing, and occurrence follows
+  Spanish bank order. ID changes must be detected, never silently
+  renumbered. The `.lst.bin` layout is resolved (`{len, tag,
+  first_sample_index, sample_count}`). See `docs/mcc-a10-catalog.md`.
 - `mappings/verifications.json` exists (committed, IDs only):
-  `v-000001`–`v-000006`, all passed. It is append-only; never rewrite
-  entries.
+  `v-000001`–`v-000011`, all passed (`ce:` = CE line refs, `mcc:` =
+  Spanish slots). It is append-only; never rewrite entries.
 - Not started: B1, B2, M3 (schemas/validators), matching UI. Audio
   processing (resample, trims, FX), FSB repacking, map changes and
   subtitle patching are still not approved.
