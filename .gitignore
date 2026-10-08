@@ -1,0 +1,24 @@
+# Local environment / machine-specific paths
+.env
+
+# Game installs, mod tools, and extracted archives must never enter the repo
+# (paths from .env, kept local-only; see CLAUDE.md "Rules")
+*.map
+*.pak
+*.ucas
+*.utoc
+*.fsb
+*.wav
+*.ogg
+*.bnk
+*.wem
+*.7z
+
+# Scratch space for any local extraction/inspection work
+/scratch/
+/reference-audio/
+/extracted/
+
+# Python artifacts
+__pycache__/
+*.pyc
