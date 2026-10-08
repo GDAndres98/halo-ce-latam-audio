@@ -60,6 +60,7 @@ class CEContext:
         g = IoStore(self.paks / "global.utoc")
         self.script_objects = load_script_objects(g.read_chunk(0, self.oodle))
         self._stores = None
+        self._index = None
         self._paks = {}
 
     @property
@@ -76,13 +77,25 @@ class CEContext:
         return self._paks[name]
 
     def find_package(self, vfs_path):
-        """Locate a package by its VFS path ('Meteorite/Content/...uasset'), case-insensitive."""
-        want = vfs_path.lower()
-        for s in self.stores:
-            for p, idx in s.files.items():
-                if p.lower() == want:
-                    return s, p, idx
-        return None
+        """Locate a package by its VFS path ('Meteorite/Content/...uasset'), case-insensitive.
+        The first container (sorted by name) holding the path wins."""
+        hits = self.package_locations(vfs_path)
+        return hits[0] if hits else None
+
+    def package_locations(self, vfs_path):
+        """Every (store, path, toc_index) holding this VFS path, in container order."""
+        if self._index is None:
+            self._index = {}
+            for s in self.stores:
+                for p, idx in s.files.items():
+                    self._index.setdefault(p.lower(), []).append((s, p, idx))
+        return self._index.get(vfs_path.lower(), [])
+
+    def list_packages(self, prefix):
+        """All package paths under a VFS folder prefix (case-insensitive), sorted."""
+        self.package_locations("")
+        want = prefix.lower()
+        return sorted(hits[0][1] for key, hits in self._index.items() if key.startswith(want))
 
     @staticmethod
     def game_path_to_vfs(game_path):

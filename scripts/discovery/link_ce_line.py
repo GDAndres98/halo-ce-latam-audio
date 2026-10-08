@@ -23,62 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common.asset_metadata import (  # noqa: E402
     EXPLICIT, EXPLICIT_INDEX, UNRESOLVED, WWISE_TO_CULTURE, CEContext, derived, fnv1_32, hop,
     sha256_bytes)
-from common.binreader import Reader  # noqa: E402
+from common.ce_assets import (  # noqa: E402
+    import_target, read_event_cooked_data, read_string_table, soft_path, unwrap)
 from common.env import REPO_ROOT  # noqa: E402
 from common.locres import parse_locres  # noqa: E402
 from common.zen import UnsupportedProperty  # noqa: E402
 
 WORK = REPO_ROOT / "work" / "ce"
-
-
-def unwrap(v):
-    """Strip parser wrappers: {'name': x} -> x, {'_default': True} -> None."""
-    if isinstance(v, dict):
-        if v.get("_default"):
-            return None
-        if set(v) == {"name"}:
-            return v["name"]
-    return v
-
-
-def import_target(ref):
-    """ObjectProperty value -> imported package path (explicit, from the import map)."""
-    r = (ref or {}).get("ref") or {}
-    t = r.get("target")
-    return t.get("package") if isinstance(t, dict) else None
-
-
-def read_string_table(ctx, game_path):
-    pkg_info = ctx.load_package(ctx.game_path_to_vfs(game_path))
-    if not pkg_info:
-        return None
-    pkg = pkg_info["package"]
-    if pkg.exports[0]["class"] != "StringTable":
-        return {"vfs_path": pkg_info["vfs_path"], "class": pkg.exports[0]["class"]}
-    _props, r = pkg.read_export_properties(0)
-    rr = Reader(r.data, r.pos)
-    rr.i32()  # UObject HasGuid flag
-    namespace = rr.fstring()
-    keys = []
-    for _ in range(rr.i32()):
-        keys.append(rr.fstring())
-        rr.fstring()  # source string (English) -- not stored here
-    return {"vfs_path": pkg_info["vfs_path"], "container": pkg_info["container"],
-            "class": "StringTable", "namespace": namespace, "keys": keys}
-
-
-def read_event_cooked_data(ctx, game_path):
-    pkg_info = ctx.load_package(ctx.game_path_to_vfs(game_path))
-    if not pkg_info:
-        return None, None
-    pkg = pkg_info["package"]
-    _props, r = pkg.read_export_properties(0)
-    rr = Reader(r.data, r.pos)
-    rr.i32()  # UObject HasGuid flag precedes the Wwise cooked-data struct
-    cooked = pkg.read_struct(rr, "WwiseLocalizedEventCookedData")
-    pkg_info["trailing_bytes"] = len(r.data) - rr.pos
-    pkg_info["class"] = pkg.exports[0]["class"]
-    return pkg_info, cooked
 
 
 def decode_wem(vgmstream, wem_path, wav_path):
@@ -208,8 +159,7 @@ def build(ctx, voice_asset, languages, vgmstream=None):
                 hops.append(hop(f"locres[{culture}] (namespace, key)", EXPLICIT if hit else UNRESOLVED))
 
         # --- lip-sync ----------------------------------------------------------------
-        lips = unwrap(ve.get("LipSync"))
-        lip_path = lips.get("soft_path") if isinstance(lips, dict) else None
+        lip_path = soft_path(ve.get("LipSync"))
         entry["lipsync"] = {"soft_path": lip_path, "evidence": EXPLICIT if lip_path else UNRESOLVED}
         if lip_path:
             base_vfs = ctx.game_path_to_vfs(lip_path)

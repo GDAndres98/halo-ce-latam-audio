@@ -87,7 +87,12 @@ namespace and the entry key. [^ue-st] Both values were read directly:
 - The Blam `-sound` tag's relationship is name-only, so it isn't trusted.
 - Only `HaloAudioVoiceVariations` (and the `HaloAudioSound` shape, which
   is handled but untested) have been exercised. Cinematic and systemic
-  lines may use other shapes.
+  lines may use other shapes. **M1 update:** all 220 M01 scripted and
+  cinematic assets use `HaloAudioVoiceVariations`. A null `LipSync` is
+  serialized as `None.None`, which is now read as "no lip-sync"
+  (`ce_assets.soft_path`). The M1 catalog record for this line matches
+  the PoC exactly (media IDs, wem SHA-256, EventId, all three subtitle
+  texts).
 
 ## 5. Tooling built (all stdlib + approved Oodle DLL)
 
@@ -100,7 +105,9 @@ namespace and the entry key. [^ue-st] Both values were read directly:
 | `scripts/common/zen.py` | UE5.5 zen package + unversioned properties |
 | `scripts/common/locres.py` | `.locres` v0–3 |
 | `scripts/common/mcc_loc.py` | MCC `<LANG>_Halo1.bin` structure (keys and pool kept separate) |
-| `scripts/common/asset_metadata.py` | `.env` context, evidence vocabulary, FNV-1 |
+| `scripts/common/asset_metadata.py` | `.env` context (cached case-insensitive package index), evidence vocabulary, FNV-1 |
+| `scripts/common/ce_assets.py` | *(M1)* the chain's readers (event cooked data, StringTable, soft paths), shared by this PoC and the M1 catalog |
+| `scripts/common/ce_catalog.py`, `scripts/catalog/build_ce_catalog.py` | *(M1)* the same chain applied to every voice asset of a mission, see `dialogue-catalog-design.md` §3.1 |
 | `scripts/discovery/link_ce_line.py` | this PoC |
 | `scripts/discovery/inspect_iostore.py` / `inspect_localization.py` / `inspect_mcc_subtitles.py` | small inspectors |
 | `tests/test_parsers.py` | 15 tests on synthetic bytes |

@@ -162,7 +162,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     (`scripts/common/mcc_loc.py`), but key↔string and tag↔subtitle are
     **unresolved**; investigation **stopped** at the "undocumented
     reverse engineering" line. Don't resume without approval.
-  - Script layout: `scripts/common/` (parsers), `scripts/discovery/`
+  - Script layout: `scripts/common/` (parsers), `scripts/catalog/`
+    (catalog builders), `scripts/discovery/`
     (inspectors/PoC), `scripts/extraction/` (FSB decode). All outputs go
     to git-ignored `work/`.
 
@@ -184,9 +185,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - Derived audio (resample to 44.1 kHz, trims, v1.1 FX) is always a new
   file under `work/derived/<sha256>/` with a `recipe.json`. Originals
   are never edited.
-- Current phase: **planning complete, awaiting approval for M1/M2**
-  (roadmap §8). No bulk extraction, matching UI, audio processing, FSB
-  repacking or subtitle patching until approved.
+- **Approvals (owner, 2026-10-08):** M1, M1b, M2, B1 R1–R4, `HCEEK.7z`
+  extraction, B2 R7–R9. These run **sequentially, with owner review
+  between tasks**. Start only the task the owner names.
+- **M1 done (2026-10-08), awaiting owner review:**
+  `python scripts/catalog/build_ce_catalog.py --mission M01` writes
+  `work/ce/catalog/m01.jsonl` (`ce-voice-asset/3`, deterministic),
+  `work/ce/build.json` and `work/ce/reports/m01_*`. It produces 220
+  records and 0 skipped. Findings are in remake-audio-research.md §9.
+  `ce_line_ref` is now `<record_id>#<n>` (design §3.1).
+- Not started: M1b, M2, B1, B2. Matching UI, audio processing, FSB
+  repacking and subtitle patching are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
   decided this is a personal, local-only project with no distribution.

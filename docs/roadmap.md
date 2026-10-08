@@ -45,7 +45,8 @@ Personal, local-only project, no distribution (owner decision,
 | CE containers | ✅ unencrypted; Oodle + usmap reading works | remake-audio-research.md |
 | MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: key↔string and tag↔subtitle unresolved | subtitle-research.md B.2 |
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
-| Catalogs / mapping / UI | design v2 only | dialogue-catalog-design.md |
+| CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
+| MCC catalog / mapping / UI | design only | dialogue-catalog-design.md |
 
 ## 3. Milestones and acceptance criteria
 
@@ -58,25 +59,38 @@ M1–M5 writes outside `work/` or `mappings/`, or modifies a game file.
 - [x] User listened to en / es-MX / es-ES and confirmed that audio
   matches subtitles.
 
-### M1 — CE catalog for mission M01 (metadata only)
-Plan in §4.1. Acceptance:
-- [ ] Every voice asset under the M01 scripted and cinematic folders is
+### M1 — CE catalog for mission M01 (metadata only) ✅ BUILT (2026-10-08), user spot-check pending
+Plan in §4.1. Run: `python scripts/catalog/build_ce_catalog.py --mission M01`
+(≈ 3 s). Outputs (all git-ignored): `work/ce/catalog/m01.jsonl`,
+`work/ce/build.json`, `work/ce/reports/m01_{coverage,unresolved}.json`,
+`work/ce/reports/m01_summary.md`. Results: remake-audio-research.md §9.
+Acceptance:
+- [x] Every voice asset under the M01 scripted and cinematic folders is
   either present in `work/ce/catalog/m01.jsonl`, or listed in a
-  `skipped` report with a reason. **No silent drops.**
-- [ ] Every record's es-MX media and es-MX subtitle carry an evidence
+  `skipped` report with a reason. **No silent drops.** → 220 files,
+  220 records, 0 skipped (`accounted_for: true`).
+- [x] Every record's es-MX media and es-MX subtitle carry an evidence
   value. Missing items are `unresolved` with a reason and are **never**
-  filled from another culture.
-- [ ] A coverage report lists counts by evidence level and by voice-asset
+  filled from another culture. → 207 explicit / 13 unresolved each.
+- [x] A coverage report lists counts by evidence level and by voice-asset
   class. Classes other than `HaloAudioVoiceVariations` are reported, not
-  guessed.
-- [ ] Every M01 StringTable key is accounted for: referenced by a voice
-  asset, or listed as orphaned.
-- [ ] New parser paths have synthetic-byte tests, and the whole test
-  suite passes.
-- [ ] No decoding in M1 unless separately approved (decoding ≈ 200 lines
-  × 2 languages is listed as option M1b).
+  guessed. → all 220 are `HaloAudioVoiceVariations` with one
+  `VoiceEvents` entry.
+- [x] Every M01 StringTable key is accounted for: referenced by a voice
+  asset, or listed as orphaned. → SCR 101/101 referenced; CIN 92/95
+  (3 orphans); 1 cinematic asset uses `VO_SYS_Mendoza`.
+- [x] New parser paths have synthetic-byte tests, and the whole test
+  suite passes. → 27 tests (`tests/test_ce_catalog.py` +
+  `tests/test_parsers.py`).
+- [x] No decoding in M1 unless separately approved (decoding ≈ 200 lines
+  × 2 languages is listed as option M1b). → `.wem` bytes are hashed
+  (sha256) for fingerprints, never decoded or written; `duration_s` is
+  `null`.
+- [x] Output is deterministic (two runs → identical hashes) and carries
+  schema + source build identifiers.
 - [ ] The user spot-checks ≥ 5 records (listening + reading). The checks
-  are recorded in `verifications.json` once M3 creates it.
+  are recorded in `verifications.json` once M3 creates it. Listening
+  needs M1b (or the PoC linker per line).
 
 ### M2 — MCC catalog for level a10 (copies only)
 Plan in §4.2. Acceptance:
@@ -170,6 +184,12 @@ Steps:
 Expected anomalies to report, not fix: 114 voice packages vs 101
 subtitle keys; possible duplicate lines in the `_lipsync` folder;
 temporary mocap assets.
+
+**Outcome (M1):** the 114 vs 101 gap is 13 `…1`-suffixed assets that
+replay their `…0` sibling's event and media and carry no transcription.
+The 13 `_lipsync` assets reuse real line keys but play a muted test
+event. There are no temp-mocap assets in M01. Details in
+remake-audio-research.md §9.
 
 ### 4.2 MCC side — level a10 (copies only)
 
@@ -269,11 +289,16 @@ so resampling is a v1.0 requirement, independent of v1.1 effects.
 | Spanish bank has fewer samples than English | slot confusion | slots keyed on Spanish samples (design §4) |
 | Local copies of game data (work/, reference-audio/) | accidental commit | `.gitignore`; review `git status` before every commit |
 
-## 8. Approvals needed for the next step
+## 8. Approvals
 
-1. **M1** (CE M01 catalog, metadata only). Optionally **M1b** (decode
-   M01 es-MX + en media into `work/`).
-2. **M2** (MCC a10 catalog from existing copies).
-3. **B1 research R1–R4** (read-only copies + your in-game observation).
-   Separately, whether to extract `HCEEK.7z` for R5/R6.
-4. **B2 research R7–R9** (documentation + read-only analysis).
+Granted by the owner on 2026-10-08, to be executed **sequentially with
+review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
+`HCEEK.7z` (for R5/R6), and B2 research R7–R9.
+
+| Task | Status |
+|---|---|
+| M1 | ✅ built; awaiting owner review + spot-check |
+| M1b (decode M01 es-MX + en media into `work/`) | approved, not started |
+| M2 (MCC a10 catalog from existing copies) | approved, not started |
+| B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
+| B2 R7–R9 | approved, not started |

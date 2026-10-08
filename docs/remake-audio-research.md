@@ -280,6 +280,83 @@ line key to its es-MX recording.
 
 ---
 
+## 9. Mission M01 catalog (M1, 2026-10-08): VERIFIED from asset properties
+
+Built by `scripts/catalog/build_ce_catalog.py --mission M01`. All
+values below come from the generated (git-ignored) reports in
+`work/ce/reports/`, and every relationship was read from a reference
+field unless it is marked derived.
+
+**Source build:** `HaloCampaignEvolved.exe` FileVersion
+`2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4`, read from its PE
+version resource. Steam app `2806050`, `buildid 24670874`, read from
+`appmanifest_2806050.acf`. These match the usmap build string
+`…Meteorite-2607-CU4-c838a8ac`. Container pins (utoc SHA-256, pak index
+SHA-256, sizes) and `.locres` SHA-256 values are in `work/ce/build.json`.
+
+| Folder | Assets | Class |
+|---|---|---|
+| `Audio/scripted/VO_SCR_M01PILLAROFAUTUMN` | 114 | `HaloAudioVoiceVariations` ×114 |
+| `Audio/scripted/vo_scr_m01pillarofautumn_lipsync` | 13 | `HaloAudioVoiceVariations` ×13 |
+| `Audio/cinematic/vo_cin_m01pillarofautumn` | 93 | `HaloAudioVoiceVariations` ×93 |
+
+Every asset has exactly **one** `VoiceEvents` entry. Nothing was
+skipped, and no other class or `temp_mocap` asset occurs in M01.
+
+**Resolved (explicit):** 207 of 220 assets link to a real event with one
+streamed media file in each of es-MX / en-US / es-ES, and to an es-MX /
+en / es-ES subtitle. Every one of the 220 EventIds equals FNV-1 of the
+event name. Every event has the same 16 uninterpreted trailing bytes.
+The bank is `VO_SCR_M01` (114), `VO_CIN_M01` (92) or `VO_SYS_Mendoza`
+(1).
+
+**Anomalies (reported, not fixed):**
+
+1. **13 `…1` duplicate scripted assets** (`00941`, `00961`, `01011`,
+   `01051` Cortana; `01441`, `01451`, `01471`, `01481`, `01491`,
+   `01531`, `01561`, `01581`, `01671` Keyes). Each has its own event
+   *package* folder (`…/vo_scr_m01_00941_cortana/`), but the export
+   inside is the `…0` sibling's event (`Play_VO_SCR_M01_00940_Cortana`).
+   It has the same EventId and the **same media IDs in every language**,
+   and the voice asset has **no `LineKey`** (no subtitle). This explains
+   the roadmap's "114 packages vs 101 keys": 101 + 13 = 114. Flags:
+   `no_transcription`, `event_package_folder_mismatch`. Ambiguities:
+   `shared_event_id`, `shared_media_id`. Their purpose (e.g. a
+   subtitle-less replay) is **UNKNOWN**.
+2. **13 `_lipsync` assets** (all CryoAssistant lines) reuse the real
+   line's `LineKey`, but their `VoiceEvent` is
+   `/Game/WwiseAudio/Events/Meteorite/Test/Play_TEST_Vignette_Audio_Muted`,
+   which only has an `SFX` language. So es-MX/en/es-ES media are
+   `unresolved` ("language not in EventLanguageMap"). Flags: `test_event`,
+   `lipsync_variant_folder`. Ambiguities: `duplicate_ce_line_key`,
+   `duplicate_subtitle_reference`, `shared_event`. These look like
+   animation drivers, not dialogue (HYPOTHESIS).
+3. **Cross-family reuse:** `vo_cin_m01_cin01_sc03_sarge_00341_mendoza`
+   plays `Play_VO_SYS_default_02combat_flee_00040_Mendoza` and takes its
+   subtitle from the **systemic** `VO_SYS_Mendoza` StringTable
+   (`foreign_string_table`).
+4. **Orphaned cinematic keys:** the `VO_CIN_M01PILLAROFAUTUMN` table has
+   95 keys. 92 are referenced, and `…sarge_00320_Marine1`,
+   `…00330_Marine2` and `…00340_Mendoza` have no voice asset (cf. item
+   3). `VO_SCR_M01PILLAROFAUTUMN`: 101/101 referenced. For every
+   referenced table, each key is present in the en, es-MX and es-ES
+   `.locres`, with no extra keys in those namespaces.
+5. **Lip-sync:** all 93 cinematic and 44 scripted assets have a null
+   `LipSync` (`None.None`). The PoC linker would have mis-read that
+   value; this is now fixed in `ce_assets.soft_path`. The 70 scripted
+   lip-syncs are `AnimSequence`, and 40 of them have es-MX and es-ES
+   `L10N` copies (derived).
+6. Event inventory: the 207 event packages under the M01 event folders
+   are all referenced, so there are no orphan events.
+
+**Consequence for matching (no action taken):** the CE side of M01
+offers **207 distinct playable lines** with es-MX audio, but only 194
+distinct recordings (207 − 13 duplicates). Of these, 194 have
+subtitles (101 SCR + 92 CIN + 1 SYS). The 13 `_lipsync` records have
+no playable dialogue media.
+
+---
+
 ## Sources
 
 [^wwise-ue]: Audiokinetic Q&A on the Wwise–Unreal workflow and event-based packaging: ["what's the loading strategy that events and banks use in EBP"](https://blog.audiokinetic.com/qa/10607/whats-the-loading-strategy-that-events-and-banks-use-in-ebp), ["localised defined soundbanks / SetCurrentAudioCultureAsync"](https://blog.audiokinetic.com/qa/13912/localised-defined-soundbanks-setcurrentaudiocultureasync), ["best practice multiple languages, external sources, Unreal"](https://audiokinetic.com/qa/9192/best-practice-multiple-languages-external-sources-unreal). The exact field names in §5.3 are **not** confirmed by these sources and must be checked against a real export.

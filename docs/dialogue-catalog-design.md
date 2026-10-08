@@ -1,8 +1,8 @@
 # Dialogue Catalog & Manual Mapping — Design v2
 
-**Status:** schema v2, planning only, 2026-10-08. Nothing in §3–§6 is
-implemented yet except the single-line CE record produced by
-`scripts/discovery/link_ce_line.py` (the source of the §3 shape).
+**Status:** schema v2, 2026-10-08. **§3 is implemented** as
+`ce-voice-asset/3` by `scripts/catalog/build_ce_catalog.py` (M1, see
+§3.1 for the deltas from the v2 sketch). §4–§6 are still planning only.
 Milestones and acceptance criteria: [`roadmap.md`](roadmap.md).
 Inputs: [`feasibility.md`](feasibility.md),
 [`remake-audio-research.md`](remake-audio-research.md),
@@ -57,7 +57,8 @@ mappings/mission_map.json                (committed)  user-defined level ↔ mis
 mappings/manual_mappings.local.json      (ignored)    custom subtitle text, local file paths
 mappings/.history/                       (ignored)    timestamped backups before every save
 work/ce/catalog/<mission>.jsonl          (ignored)    CE records (§3)
-work/ce/build.json                       (ignored)    CE build pins
+work/ce/build.json                       (ignored)    CE build pins (ce-build/1)
+work/ce/reports/<mission>_*.json|md      (ignored)    coverage / unresolved / summary (M1)
 work/ce/audio/<wwise_language>/…         (ignored)    decoded media (on demand)
 work/mcc/catalog/<level>.jsonl           (ignored)    MCC records (§4)
 work/mcc/subtitles.jsonl                 (ignored)    MCC string pool, unlinked (until B1)
@@ -110,6 +111,68 @@ The shape follows the implemented PoC record (see `poc-ce-line-link.md`
   It never falls back to another culture.
 - `temp_mocap_VO`/`metz_*` paths are flagged `temp_asset` and kept, so
   nothing silently disappears.
+
+### 3.1 As implemented: `ce-voice-asset/3` (M1, 2026-10-08)
+
+Code: `scripts/common/ce_catalog.py` (pure logic, resolver interface),
+`scripts/common/ce_assets.py` (readers shared with the PoC linker),
+`scripts/catalog/build_ce_catalog.py` (CLI). Changes from the sketch
+above:
+
+- **`record_id`** (new) = lowercased asset name, unique per catalog.
+  If two folders ever share a name, the tool qualifies the ID as
+  `<folder>/<name>` and flags `record_id_qualified`.
+  **`ce_line_ref` = `<record_id>#<index>`**, no longer
+  `<ce_line_key>#<index>`. Reason: in M01, 13 `_lipsync` assets reuse
+  the `LineKey` of a real line, so `ce_line_key` isn't unique. For a
+  normal line `record_id == ce_line_key`, so the PoC verification
+  subject `ce:vo_scr_m01_00460_cryotech#0` is unchanged.
+- `ce_line_key` comes from `LineKey` (`ce_line_key_evidence: explicit`).
+  Without one, it falls back to the asset name
+  (`derived:asset_name`).
+- Subtitles are keyed by **culture** (`es-MX`, `en`, `es-ES`). Media is
+  keyed by **Wwise language** (`Spanish(Mexico)`, `English(US)`,
+  `Spanish(Spain)`). Each subtitle holds the `text` and the `.locres`
+  `source_hash`.
+- Each media item gets `exists_evidence` (`explicit:index` when the path
+  is in the language pak's index), `wem_bytes` and `wem_sha256`, with
+  `duration_s: null` (no decoding). A language whose media is missing
+  from its pak is `unresolved`, but the explicit `media_id` is kept.
+- The event gets `event_id` (only when every language agrees),
+  `event_ids_per_language_consistent`, and
+  `event_id_matches_fnv1_of_name` (`derived:wwise_shortid_fnv1`).
+- `family` / `mission` are `derived:vfs_folder` / `derived:vfs_folder_name`.
+- `hops` is dropped. Every field carries its own `evidence` (+ `reason`
+  when `unresolved`), which is what the hops list duplicated.
+- `provenance.built_at` is dropped so the output is deterministic.
+  Every record carries `source_build` (exe `FileVersion`, Steam
+  `buildid`, usmap name). Container pins live in `work/ce/build.json`
+  (`ce-build/1`).
+- **`flags`** (per record, sorted): `lipsync_variant_folder`,
+  `temp_asset`, `test_event`, `event_name_mismatch`,
+  `event_package_folder_mismatch`, `event_id_inconsistent`,
+  `multi_media:<lang>`, `multi_variation`, `no_voice_entries`,
+  `no_transcription`, `transcription_type:<T>`, `foreign_string_table`,
+  `key_not_in_string_table`, `line_key_differs_from_asset_name`,
+  `no_lipsync`, `in_multiple_containers`, `record_id_qualified`.
+- **`ambiguities`** (cross-record, written back to each record involved;
+  never resolved by picking one): `duplicate_ce_line_key`,
+  `duplicate_subtitle_reference`, `shared_event`, `shared_event_id`,
+  `shared_media_id`, `event_id_inconsistent`, `in_multiple_containers`,
+  `string_table_key_case_collision` (report only).
+- Reports:
+  - `work/ce/reports/<mission>_coverage.json`
+    (`ce-coverage-report/1`): counts by family, folder, class, evidence
+    per language/culture, flag and ambiguity, with an `accounted_for`
+    check.
+  - `<mission>_unresolved.json` (`ce-unresolved-report/1`): one row per
+    unresolved field, plus ambiguities, per-StringTable key accounting
+    (orphans, keys missing from or extra in each culture's `.locres`),
+    orphan event packages and skipped files.
+  - `<mission>_summary.md`: a readable digest with no game text.
+- Supported voice classes: `HaloAudioVoiceVariations` (exercised) and
+  `HaloAudioSound` (synthetic tests only). Any other class is
+  **skipped with a reason**, never guessed.
 
 ## 4. MCC catalog — one record per dialogue tag, slots per sample
 
