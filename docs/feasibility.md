@@ -8,6 +8,12 @@ already present on disk (parsed in place with a short throwaway Python
 script — no third-party tool was installed to do this), and public web
 sources (cited inline).
 
+> **Note (2026-10-08):** the project owner has since decided this is a
+> personal, local-only project with no distribution, using Campaign
+> Evolved es-MX audio and subtitles as the source. The licensing analysis
+> in §7–8 still stands as the reason nothing may be distributed. Current
+> plan: [`roadmap.md`](roadmap.md).
+
 **Dates:** 2026-10-07 (initial pass, §1–9); 2026-10-07 continued
 (§10–13, focused on replacing existing MCC campaign dialogue); 2026-10-08
 (§14, Stage 2A — first tool install, first actual audio decode).

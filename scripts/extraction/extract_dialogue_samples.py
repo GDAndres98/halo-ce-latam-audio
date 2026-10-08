@@ -28,8 +28,8 @@ import sys
 import wave
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fsb5_lib import FsbBank  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from common.fsb5_lib import FsbBank  # noqa: E402
 
 
 def wav_duration_seconds(path):

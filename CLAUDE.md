@@ -2,11 +2,31 @@
 
 ## Goal
 
-Produce a Latin American Spanish voice localization **mod** for *Halo: Combat
-Evolved* as it runs inside *Halo: The Master Chief Collection* (MCC), using
-official mod tools only. *Halo: Campaign Evolved* (2026, Unreal Engine 5) is
-being explored only as a possible **reference** source — see blockers below
-before assuming its assets can be reused.
+A **personal, local-only** (no distribution) Latin American Spanish
+localization of *Halo: Combat Evolved* inside *Halo: The Master Chief
+Collection* (MCC). The source is *Halo: Campaign Evolved* (2026, UE5),
+which ships a full `Spanish(Mexico)` dub and `es-MX` subtitles. The plan
+and milestones are in [`docs/roadmap.md`](docs/roadmap.md); the schemas
+are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2).
+
+- **v1.0 (required):**
+  - Replace MCC Halo CE's Spanish (Spain) dialogue with CE es-MX
+    recordings.
+  - Replace the Spanish subtitles with CE es-MX text or the user's
+    custom text.
+  - Audio and subtitle choices are **independent** per line.
+  - Matching is **manual only**.
+  - Approved mappings are **never overwritten**.
+  - Unmatched lines and custom subtitles are supported. Unmatched lines
+    keep Spain audio by default.
+- **v1.1 (potential):** non-destructive radio-effect repair. Preserve
+  originals and recipe metadata. **Do not implement effects yet.**
+- **v1.0 blockers:**
+  - **B1:** MCC subtitle replacement is unresolved.
+  - **B2:** FSB5 rebuild and game acceptance are unverified.
+
+  Research options are in roadmap §6. Neither may be attempted with
+  binary edits or repacking without explicit approval.
 
 ## Local environment (see `.env`, not committed)
 
@@ -36,8 +56,10 @@ before assuming its assets can be reused.
 4. **Cite sources** for technical claims (official docs, community tool
    docs, EULA/FAQ text) — see `docs/feasibility.md` for the citation list.
 5. **Ask before installing or running additional tools** (e.g. Reclaimer,
-   FModel, python-fsb5/vgmstream, or extracting `HCEEK.7z`). None of that
-   has been done yet as of the initial feasibility pass.
+   FModel, python-fsb5/vgmstream, or extracting `HCEEK.7z`). Approved so
+   far: vgmstream r2117 (`D:\Tools\vgmstream-r2117\`), and read-only,
+   decompress-only use of FModel's bundled `oodle-data-shared.dll`.
+   `HCEEK.7z` is still **not** extracted.
 6. **No speculative extraction.** Don't write pipeline/import code before
    a human has reviewed the feasibility findings and approved a specific
    next step.
@@ -83,12 +105,92 @@ before assuming its assets can be reused.
 - **Stage 2A done (feasibility.md §14).** vgmstream r2117 is installed
   standalone at `D:\Tools\vgmstream-r2117\` (official GitHub release,
   hash-verified, outside Steam and outside this repo — not something
-  future sessions need to reinstall, just point `scripts/
+  future sessions need to reinstall, just point `scripts/extraction/
   extract_dialogue_samples.py --vgmstream-cli` at it). 5 scripted `a10`
   lines were decoded from both language copies (10 WAVs, all duration-
   matched); see `reference-audio/stage1/wav/` and
   `stage2a_report.csv` (both git-ignored). **Nobody has listened yet** —
   don't claim spoken content is confirmed until the user says so.
 
+- **Phase 2 discovery done (2026-10-08)** — see
+  `docs/remake-audio-research.md`, `docs/subtitle-research.md`,
+  `docs/dialogue-catalog-design.md`. Headlines:
+  - CE containers are **not encrypted** (all `.utoc` Encrypted flags
+    unset, all `.pak` indexes unencrypted, zero key GUIDs). Paks are
+    **Oodle**-compressed; `.locres`/package contents need FModel (or an
+    approved Oodle reader) to read.
+  - CE ships a full **`Spanish(Mexico)`** Wwise voice track in
+    `pakchunk4-Windows.pak` (es-ES = chunk 3, en-US = chunk 2). Media IDs
+    are per-language (zero overlap); bank IDs = FNV-1 of lowercased name.
+  - CE subtitles: UE localization target `Subtitles`,
+    `Localization/Subtitles/es-MX/Subtitles.locres` (separate from es-ES).
+    Line→subtitle-key link **verified (Phase 2B)**, see below.
+  - CE line key e.g. `VO_SCR_M01_00460_CryoTech` is shared (case-
+    insensitively) by UE audio asset, `Play_` AkAudioEvent, LipSync and
+    `Tags/sound/...-sound`. CE numbering is unrelated to MCC's
+    `a10_NNN` — matching is manual only.
+  - MCC Halo CE subtitles: `Data/ui/localization/<LANG>_Halo1.bin`
+    (`SP_` = Spain). Keys are 32-bit hashes of an unknown string; EN/SP
+    share 3,399 keys; key→string alignment and tag→subtitle link are
+    **unresolved**.
+  - User's tools: FModel portable at
+    `%USERPROFILE%\Downloads\858461d19e29803479555059acb59a03a0986de8\`
+    (exports under `Output\Exports`, audio only, no JSON yet; `.usmap`
+    not loaded in FModel per its log). UE4SS v3.0.1 is installed by the
+    user inside the CE install (`Binaries\Win64\ue4ss\`, `Paks\LogicMods\`)
+    — treat as read-only; its only dump is the `.usmap`.
+
+- **Phase 2B PoC done and MANUALLY VERIFIED (2026-10-08)** —
+  `docs/poc-ce-line-link.md`. The user listened to the en / es-MX / es-ES
+  recordings of `VO_SCR_M01_00460_CryoTech` and confirmed they match
+  their subtitles (future `verifications.json` entry `v-000001`).
+  Approved decisions: read-only use of FModel's bundled
+  `Output\.data\oodle-data-shared.dll` (decompress only); `.usmap` path
+  comes from `.env` **`USMAP_FILEC`** (exact name); personal, local-only
+  project, **no distribution**.
+  - Explicit CE chain: `Audio/scripted/.../<LINE>` (`HaloAudioVoiceVariations`)
+    → `VoiceEvents[i].VoiceEvent` (import) → `Play_<LINE>` AkAudioEvent →
+    `EventCookedData.EventLanguageMap["Spanish(Mexico)"].Media[].MediaId`
+    → `Media/Spanish(Mexico)/NN/<id>.wem` in pakchunk4; and
+    `VoiceEvents[i].Transcription{StringTable, LineKey}` → StringTable
+    `TableNamespace` → `Subtitles/es-MX/Subtitles.locres[ns][LineKey]`.
+  - Run it: `python scripts/discovery/link_ce_line.py --voice-asset
+    Audio/scripted/VO_SCR_M01PILLAROFAUTUMN/VO_SCR_M01_00460_CryoTech
+    --vgmstream-cli D:/Tools/vgmstream-r2117/vgmstream-cli.exe`
+    (output in `work/ce/`). Tests: `python -m unittest discover -s tests`.
+  - MCC `SP_Halo1.bin`: structure partly decoded
+    (`scripts/common/mcc_loc.py`), but key↔string and tag↔subtitle are
+    **unresolved**; investigation **stopped** at the "undocumented
+    reverse engineering" line. Don't resume without approval.
+  - Script layout: `scripts/common/` (parsers), `scripts/discovery/`
+    (inspectors/PoC), `scripts/extraction/` (FSB decode). All outputs go
+    to git-ignored `work/`.
+
+## Catalog / mapping rules (from the Phase 2 design)
+
+- Two separate catalogs (CE, MCC) under git-ignored `work/`; cross-game
+  links exist **only** in the user-owned `mappings/manual_mappings.json`.
+- Never auto-match, rank, or pre-fill CE↔MCC pairs.
+- Every in-catalog association records evidence: `explicit`,
+  `derived:<rule>`, or `unresolved`. Never invent one.
+- Tools never create or modify `approved` mapping entries. `audio` and
+  `subtitle` are approved separately, and each is immutable to tools
+  once approved. Drift goes to `work/reports/`, never into the manifest.
+- The MCC replacement unit is the **Spanish FSB sample slot**
+  (`slot_id = "es:" + name_in_spanish_bank`), not the tag and not the
+  English sample. The Spanish bank has fewer samples (5,696 vs 6,093).
+- Human checks are recorded in `mappings/verifications.json`
+  (append-only). They are not an evidence level.
+- Derived audio (resample to 44.1 kHz, trims, v1.1 FX) is always a new
+  file under `work/derived/<sha256>/` with a `recipe.json`. Originals
+  are never edited.
+- Current phase: **planning complete, awaiting approval for M1/M2**
+  (roadmap §8). No bulk extraction, matching UI, audio processing, FSB
+  repacking or subtitle patching until approved.
+- ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
+  conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
+  decided this is a personal, local-only project with no distribution.
+  Never commit or redistribute CE content.
+
 Full findings, open questions, and the proposed next experiment are in
-[`docs/feasibility.md`](docs/feasibility.md).
+[`docs/feasibility.md`](docs/feasibility.md) and the Phase 2 docs above.

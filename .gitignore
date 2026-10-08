@@ -18,6 +18,9 @@
 /scratch/
 /reference-audio/
 /extracted/
+/work/
+/mappings/*.local.json
+/mappings/.history/
 
 # Python artifacts
 __pycache__/
