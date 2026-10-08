@@ -60,6 +60,8 @@ M1–M5 writes outside `work/` or `mappings/`, or modifies a game file.
   matches subtitles.
 
 ### M1 — CE catalog for mission M01 (metadata only) ✅ BUILT (2026-10-08), user spot-check pending
+Owner decision 2026-10-08: asset-name-based `ce_line_ref`
+(`<record_id>#<n>`) is **approved**.
 Plan in §4.1. Run: `python scripts/catalog/build_ce_catalog.py --mission M01`
 (≈ 3 s). Outputs (all git-ignored): `work/ce/catalog/m01.jsonl`,
 `work/ce/build.json`, `work/ce/reports/m01_{coverage,unresolved}.json`,
@@ -89,8 +91,41 @@ Acceptance:
 - [x] Output is deterministic (two runs → identical hashes) and carries
   schema + source build identifiers.
 - [ ] The user spot-checks ≥ 5 records (listening + reading). The checks
-  are recorded in `verifications.json` once M3 creates it. Listening
-  needs M1b (or the PoC linker per line).
+  are recorded in `verifications.json` once M3 creates it. Five
+  varied picks are in `work/ce/reports/m01_review_picks.md` (M1b).
+
+### M1b — Decode M01 es-MX + en media ✅ BUILT (2026-10-08), user listening pending
+Run: `python scripts/extraction/export_ce_audio.py --mission M01`
+(about 12 s, approved vgmstream r2117). Outputs (all git-ignored):
+- `work/ce/audio/m01/<language>/<ref>.wav`
+- `work/ce/media/<language>/<media_id>.wem` (byte-identical copies)
+- `work/ce/audio/m01/manifest.json` (`ce-audio-export/1`)
+- `work/ce/reports/m01_audio_{coverage.json,summary.md}`
+- `work/ce/reports/m01_review_picks.{json,md}`
+
+Results: remake-audio-research.md §10.
+- [x] es-MX and en recordings of every linked catalog reference are
+  decoded. → 207 references per language, 194 unique media each, 388
+  WAVs, all `ok`.
+- [x] The 13 `test_event` (`_lipsync`) records are excluded from
+  decoding, but their catalog records and anomaly reports are kept.
+  They are reported as `excluded:test_event`, not as failures.
+- [x] Repeated media is decoded once per language. The 13 `…1` replays
+  point at their `…0` sibling's file, and every reference is kept on
+  the unit.
+- [x] Filenames are stable and derived from the primary `ce_line_ref`
+  (`<record_id>__<n>.wav`). The primary is never a replay.
+- [x] The manifest records media ID, pak path, container, `.wem` sha256
+  (verified against the catalog before decoding), WAV path, sha256,
+  sample rate, channels, frames, duration and peak.
+- [x] Missing, empty, silent, unreadable and failed audio, plus source
+  hash mismatches, are detected and reported. Nothing is synthesized or
+  substituted. → 0 problems.
+- [x] The manifest and reports are deterministic (two runs → identical
+  hashes, including every WAV sha256).
+- [x] The cross-family Mendoza line is kept in `manual_review`.
+- [x] Synthetic-fixture tests pass → 40 tests total.
+- [ ] The user listens to and reads the five review picks.
 
 ### M2 — MCC catalog for level a10 (copies only)
 Plan in §4.2. Acceptance:
@@ -298,7 +333,7 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | Task | Status |
 |---|---|
 | M1 | ✅ built; awaiting owner review + spot-check |
-| M1b (decode M01 es-MX + en media into `work/`) | approved, not started |
+| M1b (decode M01 es-MX + en media into `work/`) | ✅ built; awaiting owner review + listening |
 | M2 (MCC a10 catalog from existing copies) | approved, not started |
 | B1 R1–R4, `HCEEK.7z` extraction | approved, not started |
 | B2 R7–R9 | approved, not started |

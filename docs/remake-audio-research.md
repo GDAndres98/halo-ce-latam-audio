@@ -357,6 +357,43 @@ no playable dialogue media.
 
 ---
 
+## 10. Mission M01 audio export (M1b, 2026-10-08)
+
+Built by `scripts/extraction/export_ce_audio.py --mission M01` with the
+approved vgmstream r2117. Source: catalog `af05fd61…` (same game build
+as §9). The figures below come from `work/ce/reports/m01_audio_coverage.json`.
+
+| | Spanish(Mexico) | English(US) |
+|---|---|---|
+| catalog references | 220 | 220 |
+| excluded `test_event` (`_lipsync`) | 13 | 13 |
+| linked references, audio OK | 207 | 207 |
+| unique media decoded | 194 | 194 |
+| units shared by 2 references (`…0`/`…1`) | 13 | 13 |
+| sample rate / channels | 48 kHz mono ×194 | 48 kHz mono ×194 |
+| duration min / median / max | 0.37 / 2.593 / 43.4 s | 0.37 / 2.575 / 43.4 s |
+| total | 689.6 s | 681.9 s |
+
+- **Integrity:** every pak `.wem` matched the catalog SHA-256 before it
+  was decoded. There were 0 missing, empty, silent, unreadable or
+  failed files, and no identical audio under different media IDs. Two
+  runs gave identical WAV hashes.
+- **Format:** the decoded format confirms the v1.0 resample requirement
+  (CE 48 kHz vs MCC 44.1 kHz CELT, roadmap §6).
+- **Duration observation (VERIFIED counts, HYPOTHESIS cause):** **91 of
+  93** cinematic references have *identical* es-MX and en lengths, with
+  different peak levels (so they are distinct recordings), e.g.
+  `…sarge_00240_johnson` 43.4 s and `…bridge_00150_keyes` 2.286 s. Only
+  **1 of 114** scripted references does. This is consistent with
+  cutscene stems padded to the shot length. Cinematic "durations"
+  therefore include padding and say little about the spoken length,
+  which matters later for trims (design §5.1 `edit`). No action taken.
+- **Manual review kept:** `vo_cin_m01_cin01_sc03_sarge_00341_mendoza#0`
+  (cinematic asset → systemic event + `VO_SYS_Mendoza` subtitle) decoded
+  normally and is listed in `manifest.manual_review`.
+
+---
+
 ## Sources
 
 [^wwise-ue]: Audiokinetic Q&A on the Wwise–Unreal workflow and event-based packaging: ["what's the loading strategy that events and banks use in EBP"](https://blog.audiokinetic.com/qa/10607/whats-the-loading-strategy-that-events-and-banks-use-in-ebp), ["localised defined soundbanks / SetCurrentAudioCultureAsync"](https://blog.audiokinetic.com/qa/13912/localised-defined-soundbanks-setcurrentaudiocultureasync), ["best practice multiple languages, external sources, Unreal"](https://audiokinetic.com/qa/9192/best-practice-multiple-languages-external-sources-unreal). The exact field names in §5.3 are **not** confirmed by these sources and must be checked against a real export.

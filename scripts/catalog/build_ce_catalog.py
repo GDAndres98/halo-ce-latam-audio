@@ -16,16 +16,16 @@ Example:
     python scripts/catalog/build_ce_catalog.py --mission M01
 """
 import argparse
-import hashlib
 import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common.asset_metadata import EXPLICIT, UNRESOLVED, CEContext, derived, sha256_bytes  # noqa: E402
+from common.asset_metadata import CEContext, sha256_bytes  # noqa: E402
 from common.ce_assets import (  # noqa: E402
-    event_languages, parse_steam_acf, read_event_cooked_data, read_pe_file_version, read_string_table)
+    event_languages, read_event_cooked_data, read_string_table)
+from common.ce_build import sha256_file, source_build_ids  # noqa: E402
 from common.ce_catalog import (  # noqa: E402
     AUDIO_LANGUAGES, SUBTITLE_CULTURES, SUPPORTED_CLASSES, analyze, build_record, dumps_json, dumps_jsonl)
 from common.env import REPO_ROOT  # noqa: E402
@@ -34,14 +34,6 @@ from common.locres import parse_locres  # noqa: E402
 BUILD_SCHEMA = "ce-build/1"
 WORK = REPO_ROOT / "work" / "ce"
 AUDIO_ROOT = "Meteorite/Content/Audio/"
-
-
-def sha256_file(path, chunk=1 << 20):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        while b := f.read(chunk):
-            h.update(b)
-    return h.hexdigest()
 
 
 class GameResolver:
@@ -139,24 +131,6 @@ def load_voice_asset(ctx, vfs_path):
         return None, f"parse error: {type(e).__name__}: {e}"
     return {"vfs_path": info["vfs_path"], "container": info["container"], "package_name": pkg.name,
             "class": cls, "props": props, "locations": len(ctx.package_locations(vfs_path))}, None
-
-
-def source_build_ids(ctx):
-    exe = ctx.remake / "Meteorite" / "Binaries" / "Win64" / "HaloCampaignEvolved.exe"
-    fv = read_pe_file_version(exe) if exe.is_file() else None
-    out = {"exe_file_version": fv, "exe_file_version_evidence": EXPLICIT if fv else UNRESOLVED}
-    steamapps = ctx.remake.parent.parent
-    for acf in sorted(steamapps.glob("appmanifest_*.acf")):
-        kv = parse_steam_acf(acf.read_text(encoding="utf-8", errors="replace"))
-        if kv.get("installdir", "").lower() == ctx.remake.name.lower():
-            out.update({"steam_appid": kv.get("appid"), "steam_buildid": kv.get("buildid"),
-                        "steam_buildid_evidence": EXPLICIT})
-            break
-    else:
-        out.update({"steam_buildid": None, "steam_buildid_evidence": UNRESOLVED})
-    out["usmap_name"] = ctx.usmap_path.name
-    out["usmap_build_string_evidence"] = derived("ue4ss_usmap_filename")
-    return out
 
 
 def container_pins(ctx, names):

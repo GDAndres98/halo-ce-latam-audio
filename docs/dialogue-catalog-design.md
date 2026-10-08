@@ -59,7 +59,9 @@ mappings/.history/                       (ignored)    timestamped backups before
 work/ce/catalog/<mission>.jsonl          (ignored)    CE records (§3)
 work/ce/build.json                       (ignored)    CE build pins (ce-build/1)
 work/ce/reports/<mission>_*.json|md      (ignored)    coverage / unresolved / summary (M1)
-work/ce/audio/<wwise_language>/…         (ignored)    decoded media (on demand)
+work/ce/media/<wwise_language>/<id>.wem  (ignored)    byte-identical media copies (M1b)
+work/ce/audio/<mission>/<wwise_language>/<record_id>__<n>.wav   (ignored)  decoded WAV, one per media (M1b)
+work/ce/audio/<mission>/manifest.json    (ignored)    export manifest, ce-audio-export/1 (§6.1)
 work/mcc/catalog/<level>.jsonl           (ignored)    MCC records (§4)
 work/mcc/subtitles.jsonl                 (ignored)    MCC string pool, unlinked (until B1)
 work/mcc/build.json                      (ignored)
@@ -328,6 +330,40 @@ is described by a recipe and stored under its own hash:
   chosen yet.
 - Originals (`.wem`, decoded WAV) are never modified. Changing a recipe
   produces a new hash and a new folder.
+
+### 6.1 As implemented: original-media decode (M1b, `ce-audio-export/1`)
+
+A plain decode isn't "derived audio" in the §6 sense, because it applies
+no trim, resample or FX. It has its own manifest instead of
+`work/derived/`. Code: `scripts/common/ce_audio_export.py` (pure logic,
+injected reader and decoder) and `scripts/extraction/export_ce_audio.py`
+(CLI).
+
+- **Unit** = one `(language, media_id)`. `references` lists every
+  `ce_line_ref` that plays it. `primary_ref` is the first non-replay
+  reference (a replay carries `no_transcription` or
+  `event_package_folder_mismatch`) and names the file:
+  `<language>/<record_id>__<n>.wav`, with `__m<k>` added only if one
+  entry lists several media.
+- Unit fields: `media_id`, `wem_vfs_path`, `container`, `wem_sha256`
+  (catalog value; the pak bytes must match before decoding),
+  `wem_copy`, `wav_path`, `wav_sha256`,
+  `wav{sample_rate, channels, sample_width_bytes, frames, duration_s, peak}`,
+  `status` (`ok | empty | silent | unreadable | decode_failed |
+  source_missing | source_hash_mismatch`), `reason`, `deduplicated`,
+  `catalog_conflicts`.
+- **References:** one row per `(ce_line_ref, language)`, with `status`
+  `linked | missing_in_catalog | excluded:test_event` and the unit keys.
+- `manual_review`: relationships kept for a human, never resolved
+  (currently `foreign_string_table`).
+- Top-level fields: `source_catalog` (path, sha256), `source_build`
+  (must equal the current install's, or the run stops), `decoder`
+  (vgmstream version + exe sha256), `exclusion_rules`,
+  `files_not_in_plan` (reported, never deleted). There are no
+  timestamps.
+- Catalog `duration_s` stays `null`. Decoded durations live only in the
+  manifest, so the catalog stays metadata-only and reproducible without
+  a decoder.
 
 ## 7. Evidence vocabulary
 

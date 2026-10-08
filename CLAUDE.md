@@ -188,14 +188,26 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - **Approvals (owner, 2026-10-08):** M1, M1b, M2, B1 R1–R4, `HCEEK.7z`
   extraction, B2 R7–R9. These run **sequentially, with owner review
   between tasks**. Start only the task the owner names.
-- **M1 done (2026-10-08), awaiting owner review:**
+- **M1 done (2026-10-08):**
   `python scripts/catalog/build_ce_catalog.py --mission M01` writes
   `work/ce/catalog/m01.jsonl` (`ce-voice-asset/3`, deterministic),
   `work/ce/build.json` and `work/ce/reports/m01_*`. It produces 220
   records and 0 skipped. Findings are in remake-audio-research.md §9.
-  `ce_line_ref` is now `<record_id>#<n>` (design §3.1).
-- Not started: M1b, M2, B1, B2. Matching UI, audio processing, FSB
-  repacking and subtitle patching are still not approved.
+  The owner **approved** asset-name-based
+  `ce_line_ref = <record_id>#<n>` (design §3.1).
+- **M1b done (2026-10-08), awaiting owner review + listening:**
+  `python scripts/extraction/export_ce_audio.py --mission M01` (default
+  `--vgmstream-cli D:/Tools/vgmstream-r2117/vgmstream-cli.exe`, about
+  12 s) decodes es-MX + en into `work/ce/audio/m01/<language>/<ref>.wav`.
+  It keeps byte-identical `.wem` copies in `work/ce/media/` and writes
+  `work/ce/audio/m01/manifest.json` (`ce-audio-export/1`,
+  deterministic) and `work/ce/reports/m01_audio_*` /
+  `m01_review_picks.*`. One WAV is written per (language, media_id),
+  and `test_event` records are excluded, not failed. Findings are in
+  remake-audio-research.md §10.
+- Not started: M2, B1, B2. Matching UI, audio processing (resample,
+  trims, FX), FSB repacking and subtitle patching are still not
+  approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
   decided this is a personal, local-only project with no distribution.
