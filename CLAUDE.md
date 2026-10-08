@@ -21,10 +21,12 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - **v1.1 (potential):** non-destructive radio-effect repair. Preserve
   originals and recipe metadata. **Do not implement effects yet.**
 - **v1.0 blockers:**
-  - **B1:** MCC subtitle replacement. Format and key hash are solved,
-    but whether MCC loads an edited table is unverified **for each of
-    `SU` and `SP`**. The revised PoC is planned in
-    `docs/subtitle-research.md` B.12, and each step needs approval.
+  - **B1:** MCC subtitle replacement — **✅ resolved
+    (user-reported, 2026-10-08).** Edited `*_Halo1.bin` text displays
+    in MCC with anti-cheat disabled. Originals are restored and
+    hash-verified. Residuals (variable-length text, an `SP` runtime
+    sample, per-mode coverage) move to M7. See
+    `docs/subtitle-research.md` B.12 step 3 result.
   - **B2:** FSB5 rebuild and game acceptance are unverified.
 
   Research options are in roadmap §6. Neither may be attempted with
@@ -315,10 +317,16 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     Candidate SHA-256: `SU` `de8cc7ee…d9be`, `SP` `9856cfde…b63f`.
     Report: `work/mcc/reports/b1_poc_candidates.json`. Owner-run
     commands: `b1_poc_install_rollback.md`.
-  - **Step 3 (3a `SU`, 3b `SP`, 3c both) is NOT approved.** Never copy
-    a candidate into the install or launch MCC; the owner runs step 3
-    by hand after approving it.
-- Not started: B2, WC, M4 matching UI, M8, B1 PoC step 3 (needs approval). Audio processing (resample,
+  - **Step 3 done by the owner, by hand:** "custom subtitles work"
+    (user-reported).
+    - The table, text, modes and line were not reported. Don't assume
+      them.
+    - On-disk evidence: an `SU` backup exists, with no `SP` backup.
+      Installed `SU`/`SP` equal the originals again (verified).
+    - No `verifications.json` entry yet. `v-000015` (`subtitle_load`)
+      waits for the owner's details.
+    - Never copy into the install or launch MCC yourself.
+- Not started: B2 experiments, WC, M4 matching UI, M8. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

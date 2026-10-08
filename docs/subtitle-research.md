@@ -409,11 +409,10 @@ the Saber store renders in some mode.
 
 ### B.10 Remaining blockers (B1) — revised 2026-10-08
 
-1. **(c) Load behaviour, per table:** does MCC display an edited
-   `SU_Halo1.bin` string? Separately, does it display an edited
-   `SP_Halo1.bin` string? In which graphics modes, with EAC off? Only
-   the B.12 PoC can answer this. Each table is tested on its own, and
-   each in-game step needs its own approval.
+1. ~~**(c) Load behaviour, per table.**~~ **Resolved for the `.bin`
+   store (user-reported, 2026-10-08):** edited subtitle tables display
+   in MCC (B.12 step 3 result). Residuals are listed there:
+   variable-length text, an `SP` runtime sample, and per-mode coverage.
 2. **Which store renders:** `.bin` vs Saber `.s3dpak`, per mode. The
    same PoC answers this, because it edits only the `.bin` store.
 3. ~~**Language routing.**~~ **Closed (owner baseline, 2026-10-08):**
@@ -775,6 +774,59 @@ Never have more than one table replaced at a time in 3a/3b.
 | Original text shown in a mode | another store renders there (likely Saber `strings_*`, B.7) | record; S3 for that mode, as a separate approval |
 | Hang, crash, or EAC message | integrity check or format error | restore immediately, verify hash, stop, report |
 | `[B1-SP]` shown under LATAM primary | fallback reads `SP` for subtitles | record; contradicts B.11.1, so re-plan with owner |
+
+#### Step 3 result (2026-10-08) — subtitle replacement WORKS (USER-REPORTED)
+
+**Reported by the owner:** "I manually tested custom subtitles in MCC,
+and they work." The owner did this by hand. No tool copied anything
+into the install or launched MCC.
+
+**Not reported, so not assumed:**
+- which table(s) were replaced (`SU`, `SP`, both);
+- which text was shown (the `[B1-SU]`/`[B1-SP]` markers or other custom
+  text);
+- whether the text was same-length or variable-length;
+- which graphics modes were checked;
+- which line(s) were checked.
+
+**Evidence on disk, checked 2026-10-08 (read-only):**
+- `work/mcc/loc/backup/19905945/` holds `SU_Halo1.bin` with the
+  original SHA-256 `247d2529…44d0`. That is consistent with the prepared
+  3a backup step for `SU`.
+- There is **no** `SP` backup, so no `SP` swap was made with the
+  prepared procedure.
+- **Restored and verified:** the installed `SU_Halo1.bin` is
+  `247d2529…44d0` and `SP_Halo1.bin` is `794deac3…2dda`. Both equal the
+  originals and pins (`b1_baseline.py`), and the Steam build is still
+  `19905945`.
+
+**Verification records:** none appended yet. `verifications.json` is
+append-only and needs a concrete subject, table and mode. When the owner
+confirms the details, the entry will be:
+- `v-000015`: subject `mcc:es:A10_350_captkeyes#0`, check
+  `subtitle_load`, `result: pass`;
+- fingerprint: the table name and the original and candidate SHA-256,
+  the graphics modes and the language settings.
+
+**Consequences:**
+- **B1(c) is resolved for the `.bin` store:** MCC displays edited
+  `<LANG>_Halo1.bin` text with anti-cheat disabled. The evidence is
+  user-reported and points to `SU`.
+- **Residual items** (none blocks v1.0 planning):
+  1. **Variable-length entries:** real subtitles differ in length.
+     `mcc_loc_patch.rebuild` recomputes the size fields and is
+     synthetic-tested, but no variable-length table has been tried in
+     game unless the owner's custom test was one. A one-entry
+     variable-length check belongs to M7.
+  2. **`SP` runtime sample:** `SP` is only the fallback, so it never
+     displays under the owner's settings. A runtime check needs Spain as
+     primary. It is optional, and recommended once at M7.
+  3. **Per-mode coverage:** whether both Classic and Anniversary show
+     edited text is not reported.
+  4. **Catalog evidence:** catalog `subtitle` fields stay `unresolved`
+     until the owner approves promoting
+     `derived:mcc_loc_key_crc32_tag_path`. Together with `v-000012`–`14`,
+     the owner may do so for `SU`.
 
 #### Step 4 — Record
 

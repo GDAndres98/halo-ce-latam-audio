@@ -84,7 +84,7 @@ preserved.
 | MCC FSB5 parsing + CELT decode | ✅ 5 `a10` EN/ES pairs decoded, durations cross-checked | feasibility §14 |
 | CE audio ↔ subtitle link | ✅ 1 line, all hops explicit, **manually verified by the user (2026-10-08)** | poc-ce-line-link.md |
 | CE containers | ✅ unencrypted; Oodle + usmap reading works | remake-audio-research.md |
-| MCC subtitle **replacement** | ⛔ **v1.0 blocker B1**: format + key hash solved; tag→key derived (a10 101/101); targets `SU` + `SP`; **load behaviour unverified for each table** (revised PoC planned) | subtitle-research.md B.4–B.12 |
+| MCC subtitle **replacement** | ✅ **B1 resolved (user-reported, 2026-10-08)**: edited `*_Halo1.bin` text displays in game; originals restored and hash-verified; residuals (variable-length text, `SP` runtime sample, per-mode coverage) moved to M7 | subtitle-research.md B.4–B.12 |
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
@@ -290,6 +290,14 @@ findings and no drift.
   - unmatched subtitles show MCC's original LATAM text.
 - [ ] Backup and restore cover **both** subtitle tables and the Spanish
   FSB, each with its own hash.
+- [ ] B1 residuals:
+  - a **variable-length** subtitle entry displays correctly;
+  - one representative **`SP`** runtime sample (Spain as primary)
+    passes;
+  - both graphics modes are checked.
+
+  Each result is recorded as a `subtitle_load` / `subtitle_key_link`
+  verification.
 
 Note: M7's install method (backup → overwrite → restore) is a
 **local test method only**. A Workshop release must install without
@@ -597,6 +605,13 @@ B.11–B.12:
   4. Record the results per table in `verifications.json`.
 - **Still excluded:** bulk table editing, CE text in any table, FSB
   repacking, and any install change without explicit approval.
+- **B1 RESULT (2026-10-08): resolved, user-reported.** The owner
+  tested custom subtitles in MCC by hand, and they work.
+  - The installed `SU`/`SP` are restored and equal the original hashes.
+    An `SU` backup exists; there is no `SP` backup.
+  - The details (table, text, modes) were not reported and are not
+    assumed.
+  - The residuals go to M7 (below).
 
 ### B2 — FSB5 rebuild + game acceptance
 
@@ -684,7 +699,7 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B1 PoC step 0 (read-only pre-flight) | ✅ done 2026-10-08: build `19905945`, `SU`/`SP` installed = copies = pins, keys found once per table |
 | B1 PoC step 1 (baseline, owner in game) | ✅ done 2026-10-08: `SU` text + Spain audio, Classic and Anniversary (`v-000012`–`v-000014`) |
 | B1 PoC step 2 (offline one-entry candidates) | ✅ done 2026-10-08: `SU`/`SP` candidates 16/16 checks, deterministic; install/rollback prepared |
-| B1 PoC step 3a / 3b / 3c (in-game, install change) | **not approved**; each needs separate explicit approval |
+| B1 PoC step 3 (in-game, owner by hand) | ✅ done: "custom subtitles work" (user-reported). Table/text/modes not reported; `SU` backup present, no `SP` backup; originals restored and verified. `v-000015` pending owner details |
 | `manual-mappings` key-verification change (B.11.2) | planned; needs approval |
 | B2 R7–R9 | approved, not started |
 | WC (Workshop compatibility checkpoint, inside B2) | planned; not approved |
