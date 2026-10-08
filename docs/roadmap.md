@@ -2,8 +2,11 @@
 
 **Updated:** 2026-10-08. Planning document. Schemas:
 [`dialogue-catalog-design.md`](dialogue-catalog-design.md) (v2).
-Personal, local-only project, no distribution (owner decision,
-2026-10-08).
+Development is local-only. **Intended v1.0 distribution platform:
+Steam Workshop** (owner, 2026-10-08). This is planned as M8, gated on
+asset rights and on explicit owner approval before any public
+publishing. Until M8 is approved, nothing is packaged, uploaded or
+shared.
 
 ## 1. Scope
 
@@ -45,11 +48,27 @@ The owner reported this behaviour from normal play. It is not yet
 observed per line or verified; the B1 PoC baseline (subtitle-research.md
 B.12 step 1) records it for one line.
 
+### Distribution target (owner requirement, 2026-10-08)
+
+- The intended final distribution platform for v1.0 is **Steam
+  Workshop**, via MCC's official Excession tool (M8).
+- This replaces the earlier "personal, local-only, no distribution"
+  decision **for the final release only**. All development, catalogs,
+  CE extractions and test installs stay local and git-ignored.
+- **Known conflict:** 343i's MCC modding FAQ allows "only the assets
+  contained within the retail version of MCC" (feasibility §7–8). CE
+  es-MX audio and CE subtitle text are Campaign Evolved content. A
+  public build that contains them is therefore presumed **not
+  permitted** unless M8.1 finds otherwise. M8.2 plans authorized
+  alternatives.
+- Nothing is uploaded, made public or shared without the owner's
+  explicit approval.
+
 ### Out of scope
 
 - Adding a new "Spanish (Latin America)" menu entry (impossible as data
   only, per feasibility §10.6).
-- Distribution.
+- Packaging, uploading or publishing anything before M8 is approved.
 - Automatic matching.
 - Changes to Campaign Evolved.
 
@@ -65,6 +84,7 @@ B.12 step 1) records it for one line.
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
 | Mapping / UI | design only | dialogue-catalog-design.md |
+| Steam Workshop distribution | planned (M8). Compatibility checkpoint WC is planned inside B2. Not researched in depth yet | §3 M8, §6 B2 |
 
 ## 3. Milestones and acceptance criteria
 
@@ -266,8 +286,151 @@ findings and no drift.
 - [ ] Backup and restore cover **both** subtitle tables and the Spanish
   FSB, each with its own hash.
 
+Note: M7's install method (backup → overwrite → restore) is a
+**local test method only**. A Workshop release must install without
+overwriting retail files (M8.4). The WC checkpoint (§6 B2) must
+therefore settle the delivery route before full-campaign production.
+
 ### v1.0 — repeat M1–M7 for all levels
 (a30, a50, b30, b40, c10, c20, c40, d20, d40, plus generic/systemic barks)
+
+**Gate:** full-campaign production does not start until the Workshop
+compatibility checkpoint **WC** (§6 B2) is reported and the owner has
+chosen a delivery route. a10 work (M4–M7) may continue before WC.
+
+### M8 — Steam Workshop packaging and publishing (planning only; not approved)
+
+**Status:** planned. No packaging, no tool installs, no uploads. Each
+sub-step needs its own owner approval. **Public publishing needs a
+separate, explicit owner approval**, given after the owner reviews the
+final package. B1 stays the immediate priority. After B1, M8.1 is the
+one sub-step worth starting early, because its answer can change the
+audio and subtitle sources for the whole project.
+
+Known so far (official docs, not yet tested):
+- Excession is MCC's official tool for configuring mods and uploading
+  them to Steam Workshop, and it supports Halo: Combat Evolved
+  ([Excession overview](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/excessionoverview),
+  [Creating a mod package](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/creatinghome)).
+  - A package has a Mod Folder, Mod ID, Steam Workshop ID, title,
+    description, Mod Version (`major.minor.patch`) and **Min./Max.
+    Game Version**. Both Excession and the game check the version
+    range.
+  - Content is added through **Campaign / Multiplayer Maps / Firefight
+    Maps** sections, so the package is **map-centric**.
+- Players subscribe on Workshop and launch MCC with anti-cheat
+  disabled. Mods do not run with EAC on
+  ([Halo Support: Workshop mods](https://support.halowaypoint.com/hc/en-us/articles/28916975982868-How-to-Download-and-Play-Mods-for-Halo-The-Master-Chief-Collection-via-the-Steam-Workshop)).
+- **Unverified:** whether a Workshop mod can replace or override either
+  of these shared files:
+  - the FMOD bank `halo1/sound/pc/sounds_dialogs_spanish.fsb`;
+  - `Data/ui/localization/{SU,SP}_Halo1.bin`.
+
+  The community sound mods found so far tell users to copy files into
+  the install by hand, outside Workshop. That is the opposite of M8.4.
+  WC answers this first.
+
+#### M8.1 — Asset rights and redistribution (gate for everything below)
+- [ ] A rights memo in `docs/`, with citations, covering:
+  - 343i's MCC modding FAQ (retail MCC assets only, non-commercial);
+  - the Campaign Evolved EULA and any CE modding policy;
+  - Microsoft's Game Content Usage Rules;
+  - the Steam Workshop / Subscriber Agreement terms for uploaded
+    content.
+- [ ] A conclusion for each content class: allowed, not allowed, or
+  needs permission. The classes are:
+  - CE es-MX audio;
+  - CE es-MX subtitle text;
+  - MCC retail assets, including the existing `SU` LATAM text;
+  - owner-authored text;
+  - new recordings.
+- [ ] If CE content is restricted: a draft written permission request
+  to Halo Studios / Microsoft. **The owner decides whether to send it;**
+  tools never contact anyone.
+- [ ] Until written permission exists, the public build must contain
+  **zero CE-derived bytes or text**.
+
+#### M8.2 — Authorized alternatives (if redistribution is restricted)
+Evaluate each option, with its cost and what it keeps of v1.0:
+- [ ] **New LATAM recordings** by licensed or consenting voice talent
+  (feasibility §8), wired through the same slot mappings. The
+  `user_recording` source already exists in `manual-mappings/2`.
+- [ ] **Owner-authored subtitles** (original text, not copied from CE),
+  using the existing custom-subtitle path.
+- [ ] **MCC-only content**, for example reusing MCC's own `SU` LATAM
+  text, which the FAQ permits.
+- [ ] **Two build profiles:**
+  - `personal` may use CE sources and never leaves this machine;
+  - `public` refuses any slot whose approved source is CE-derived.
+
+  This is a plan only. It needs a per-source `redistributable` rule in
+  the schema, approved before any change.
+- [ ] **Rejected** unless the owner decides otherwise after M8.1:
+  shipping a tool that extracts CE content from the player's own CE
+  copy. It still imports non-MCC assets (FAQ), and Workshop cannot run
+  tools.
+
+#### M8.3 — Packaging via Excession
+- [ ] Read the full Excession docs (setup, root folder, campaign mods,
+  upload) and record what a Halo CE package can contain.
+- [ ] Choose the package shape from the WC outcome. It is either a
+  shared-file override, or rebuilt campaign `.map` files with
+  replacement sound tags. The second is the HCEEK route, with a much
+  larger scope.
+- [ ] Getting or running Excession needs approval (hard rule 5).
+- [ ] The mod folder lives outside the repo and outside the MCC
+  install. Packaged files never enter Git.
+
+#### M8.4 — Installation without overwriting retail files
+- [ ] Confirm that the mod installs only through a Workshop subscription
+  and MCC's mod loader, and never writes into the retail install.
+- [ ] Prove it by hashing the relevant retail files at three points:
+  before subscribing, after subscribing and playing, and after
+  unsubscribing. All three hashes must match.
+- [ ] If some content cannot be delivered without overwriting retail
+  files, Workshop is **not viable for that content**. Report it and let
+  the owner choose (WC outcome C).
+
+#### M8.5 — Versioning, compatibility and uninstall
+- [ ] Versioning: Excession's Mod Version is the project's release
+  semver, with a changelog for each release.
+- [ ] Compatibility:
+  - map the tested MCC Steam build (currently `19905945`) to the game
+    version string that Excession checks;
+  - set Min./Max. Game Version to tested builds only;
+  - record the CE build used for sources (pins already exist).
+- [ ] An MCC update that changes the Spanish bank, the `SU`/`SP` tables
+  or slot IDs triggers the existing drift and ID-change reports. It
+  blocks a new release until the content is re-verified.
+- [ ] Uninstall means unsubscribing, plus any documented manual step,
+  verified by the M8.4 hash check. Document it for players in Spanish
+  and English.
+
+#### M8.6 — Workshop page, images and documentation
+- [ ] Draft the title and description (Spanish first, English second).
+  They cover:
+  - what the mod changes;
+  - the required language settings: primary Spanish (Latin America),
+    fallback Spanish (Spain);
+  - the EAC-off launch, install and uninstall;
+  - known issues and credits;
+  - a non-affiliation disclaimer and a non-commercial notice.
+- [ ] Images: only screenshots of the modded game that the owner
+  captures. No CE artwork. Logos and branding only as the usage rules
+  allow.
+- [ ] Player docs and a support/issue contact. Drafts live in `docs/`.
+  No images or game captures are committed.
+
+#### M8.7 — Release gate
+- [ ] A pre-release checklist confirms:
+  - the M8.1 conclusions are met;
+  - the `public` build profile validates;
+  - the M8.4 hash proof passed;
+  - the page is reviewed.
+- [ ] An optional private or friends-only test upload needs a
+  **separate owner approval.**
+- [ ] Public publishing needs **explicit owner approval only.** Tools
+  never change Workshop visibility.
 
 ### v1.1 — radio-effect repair
 Flagged lines get processed copies via recipes. A/B listening is
@@ -442,6 +605,37 @@ Unknowns:
 | R9 | Research MCC's official mod loading for Halo CE (Workshop/mod folders, EAC-off requirement per 343i FAQ) | low | (c) without touching the install |
 | R10 | *(needs approval later)* Sandbox rebuild of a **copy** in `work/`, validated with `fsb5_lib` + vgmstream | medium | rebuild correctness (M6) |
 | R11 | *(needs approval later)* Reversible in-game test with a hash-verified backup/restore | high | game acceptance (M7) |
+| WC | **Workshop compatibility checkpoint** (below) | low–medium | whether the B2 delivery route works as a Workshop mod |
+
+#### WC — early Steam Workshop compatibility checkpoint (inside B2)
+
+WC runs after R7–R9 and **before full-campaign production**. It also
+comes before M6 bulk generation is approved. It decides whether the
+current design can ship through Workshop at all. That design replaces
+the Spanish FSB slot and patches `SU`/`SP`. WC is planning only, and
+each step needs approval.
+
+1. **WC-1, docs (read-only):** read the Excession and MCC modding docs
+   to answer three questions:
+   - Can a Halo CE Workshop mod override shared files outside `.map`
+     files, such as the FMOD banks under `halo1/sound/pc/` and
+     `Data/ui/localization/*.bin`?
+   - Can a campaign mod reuse the retail campaign and change only audio
+     and text?
+   - How does MCC choose between mod files and retail files?
+2. **WC-2, observation (needs approval):** inspect, read-only, the
+   folder layout of one existing Halo CE Workshop mod that the owner
+   chooses to subscribe to. No game file changes.
+3. **WC-3, report** (`docs/workshop-research.md`). It ends with one of
+   three outcomes, and the owner chooses:
+   - **A.** The current route works as a Workshop mod → continue.
+   - **B.** Workshop needs rebuilt campaign `.map` files with
+     replacement sound tags → re-plan B2/M6 (HCEEK route) before
+     scaling.
+   - **C.** Workshop cannot deliver this content → the owner chooses
+     another channel, or the release stays local.
+
+WC never packages, uploads or modifies the install.
 
 Also note: CE media decode at 48 kHz while MCC slots are 44.1 kHz CELT,
 so resampling is a v1.0 requirement, independent of v1.1 effects.
@@ -459,6 +653,10 @@ so resampling is a v1.0 requirement, independent of v1.1 effects.
 | CE content divergence (rewrites, M12–M14 DLC, splits) | unmatched slots | `no_equivalent` + keep Spain audio + custom subtitle |
 | Spanish bank has fewer samples than English | slot confusion | slots keyed on Spanish samples (design §4) |
 | Local copies of game data (work/, reference-audio/) | accidental commit | `.gitignore`; review `git status` before every commit |
+| CE content may not be redistributed (MCC FAQ: retail MCC assets only) | a public v1.0 cannot ship CE audio or text | M8.1 rights memo first; M8.2 alternatives; the `public` build profile refuses CE sources |
+| Workshop mods may not be able to override shared FMOD banks or localization tables | the FSB-slot route cannot ship through Workshop | WC before full-campaign production; outcome B or C re-plans early |
+| Mods require EAC off, and MCC updates change versions | a player's mod breaks or does not load | Min./Max. Game Version pinned to tested builds; drift reports gate releases |
+| Accidental public upload | publication that cannot be undone | no upload without explicit owner approval; tools never change visibility |
 
 ## 8. Approvals
 
@@ -480,3 +678,9 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B1 PoC step 2, 3a/3b/3c | not approved; each needs separate approval |
 | `manual-mappings` key-verification change (B.11.2) | planned; needs approval |
 | B2 R7–R9 | approved, not started |
+| WC (Workshop compatibility checkpoint, inside B2) | planned; not approved |
+| M8 (Steam Workshop packaging and publishing), each sub-step M8.1–M8.7 | planned; not approved |
+| Any upload (private test or public) | **not approved**; public publishing needs explicit owner approval |
+
+**Priority (owner, 2026-10-08):** B1 is still the immediate priority. WC
+and M8 do not start until the owner names them.

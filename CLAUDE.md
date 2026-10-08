@@ -2,8 +2,7 @@
 
 ## Goal
 
-A **personal, local-only** (no distribution) Latin American Spanish
-localization of *Halo: Combat Evolved* inside *Halo: The Master Chief
+A Latin American Spanish localization of *Halo: Combat Evolved* inside *Halo: The Master Chief
 Collection* (MCC). The source is *Halo: Campaign Evolved* (2026, UE5),
 which ships a full `Spanish(Mexico)` dub and `es-MX` subtitles. The plan
 and milestones are in [`docs/roadmap.md`](docs/roadmap.md); the schemas
@@ -30,6 +29,15 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 
   Research options are in roadmap §6. Neither may be attempted with
   binary edits or repacking without explicit approval.
+- **Distribution (owner, 2026-10-08):** development is local-only. The
+  intended v1.0 release platform is **Steam Workshop** (roadmap **M8**,
+  via Excession). The early compatibility checkpoint **WC** sits inside
+  B2 and comes before full-campaign production.
+  - Planning only. Never package, upload or change Workshop visibility.
+  - Public publishing needs explicit owner approval.
+  - A public build may not contain CE content unless M8.1 finds it
+    permitted (MCC FAQ conflict).
+  - **B1 stays the immediate priority.**
 
 ## Local environment (see `.env`, not committed)
 
@@ -297,13 +305,15 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     baseline uses discriminator lines `a10_080/130/150_cryotech`.
     `--match "<text>"` classifies typed on-screen text. Step 1 (owner
     baseline) is in progress.
-- Not started: B2, M4 matching UI, the B1 PoC (needs approval). Audio processing (resample,
-  trims, FX), FSB repacking, map changes, bulk subtitle editing and any
-  install change are still not approved.
+- Not started: B2, WC, M4 matching UI, M8, the B1 PoC (needs approval). Audio processing (resample,
+  trims, FX), FSB repacking, map changes, bulk subtitle editing, any
+  install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
-  conflicts with 343i's MCC asset FAQ (feasibility §7). The user has
-  decided this is a personal, local-only project with no distribution.
-  Never commit or redistribute CE content.
+  conflicts with 343i's MCC asset FAQ (feasibility §7).
+  - Development stays local.
+  - The Workshop release (M8) is gated on the M8.1 rights memo and the
+    M8.2 alternatives.
+  - Never commit or redistribute CE content.
 
 Full findings, open questions, and the proposed next experiment are in
 [`docs/feasibility.md`](docs/feasibility.md) and the Phase 2 docs above.
