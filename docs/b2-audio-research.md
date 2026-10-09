@@ -577,6 +577,56 @@ gained `replacement_compatibility`, `replace_sample` and `loop_chunk`.
   by model comparison, that only the target sample differs. The sheet is
   `work/b2/e1b/e1b_install_rollback.md`. **E1b-game is not approved.**
 
+### 5.7 E2 — CELT 0.11 encoder: ✅ WORKS OFFLINE (2026-10-08)
+
+**Encoder found locally, with nothing to install.** The approved
+vgmstream r2117 ships `libcelt-0110.dll`, the decoder it uses for these
+banks. Its export table also lists the **full CELT 0.11.0 encoder
+API**: `celt_mode_create_0110`, `celt_encoder_create_custom_0110`,
+`celt_encode_0110` and the rest. `scripts/common/celt011.py` loads it
+with `ctypes`. The setup is a custom mode at 44,100 Hz with 512-sample
+frames, CBR 370 B mono / 464 B stereo, and FMOD framing (sync + u32
+size).
+
+Run: `python scripts/discovery/b2_e2_celt.py` (about 40 s). Outputs are
+git-ignored in `work/b2/e2/`. **15/15 checks pass:**
+- **Decoder parity:** our decode of FMOD's original packets (4 samples)
+  is **bit-identical** to vgmstream's. The mode matches the banks.
+- **Synthetic suite** (sweep, speech-like, noise, tones, odd length,
+  silence):
+  - every packet is **370 B CBR**, with frames = `ceil(n/512)`;
+  - vgmstream reads them as `Custom CELT`, decodes them all, and returns
+    exactly `frames × 512` samples;
+  - **codec delay is 128 samples** (2.9 ms);
+  - SNR is 46–48 dB on the sweep and speech-like signals. White noise
+    gives 9.9 dB, which is expected for a perceptual codec. Pure tones
+    have an ambiguous lag, so their SNR is only indicative.
+- **Generation loss on real MCC speech:** decoding English `A10_350`,
+  re-encoding it and decoding again gives **47.9 dB** SNR against the
+  first decode. Our bytes differ from FMOD's, as expected for a lossy
+  encoder.
+- **Self-encoded candidate bank:** our re-encode of English `A10_350`
+  in Spanish slot #30, `work/b2/e2/sounds_dialogs_spanish.fsb`, SHA-256
+  `950f93e5d32e6a534f0859c74200993a8a8bd780415f22cc572090663419f866`.
+  It is the same size, every other sample is identical, all 5,696
+  subsongs decode, and only #31 differs.
+- **Resampler probe** (48 kHz → 44.1 kHz, 1 kHz tone, SNR against an
+  ideal 44.1 kHz tone):
+  - the already-installed **ffmpeg** (default swresample) gives
+    **80.0 dB**;
+  - stdlib `audioop.ratecv` gives 56.1 dB. It is also removed in Python
+    3.13.
+  - **Recommendation for E3:** ffmpeg. It is already on this machine,
+    but under hard rule 5 the owner should confirm its use.
+
+**Open for E3:**
+- **128-sample delay:** optionally trim it in the recipe. It is 2.9 ms
+  and inaudible.
+- **Loudness matching:** owner-approved gain.
+- **The 40 stereo slots:** an owner choice.
+- **In game:** the candidate above (our encoder, MCC content) would
+  confirm that FMOD Ex plays our own CELT packets. It needs approval.
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |
