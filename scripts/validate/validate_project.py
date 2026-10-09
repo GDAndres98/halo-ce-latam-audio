@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common.env import REPO_ROOT  # noqa: E402
+from common.export_config import CONFIG, ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.project_validation import (  # noqa: E402
     build_ce_index, build_mcc_index, check_approved_protected, dumps, finding, validate_catalog, validate_mappings,
@@ -160,6 +161,10 @@ def run(root, use_git=True):
         out += validate_mission_progress(docs["mission_progress"], load_schema("mission-progress-1"),
                                          level_slots=level_slots, mappings_doc=docs["mappings"],
                                          verifications=docs["verifications"], file=USER_FILES["mission_progress"])
+    try:  # central audio export settings (optional file; default +3 dB global gain)
+        load_export_config(root)
+    except ConfigError as e:
+        out.append(finding("error", "export_config_invalid", CONFIG, "/", str(e)))
     summary = {"catalog_records": {"ce": len(ce_records), "mcc": len(mcc_records)},
                "ce_line_refs": len(ce), "mcc_slots": len(mcc["slots"]),
                "mappings": len((docs["mappings"] or {}).get("slots", [])),

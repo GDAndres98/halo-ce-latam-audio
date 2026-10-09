@@ -516,7 +516,9 @@ is described by a recipe and stored under its own hash:
   produces a new hash and a new folder.
 
 **As implemented (2026-10-09):** owner edit recipes live in `audio.edit` (`audio-edit/1`:
-trims, cuts, fades, speed, gain, loudness match, limiter, `for_source`). They are rendered by
+trims, cuts, silences, fades, optional loudness match + limiter, `for_source`; `speed` and
+`gain_db` were removed on 2026-10-09). The global export gain (`config/audio_export.json`) is
+applied once on top. They are rendered by
 `common/audio_edit.py` for both the M4 preview and M6. `work/derived/<stream sha>/recipe.json`
 records an `audio_edit` step with the recipe and its measured stats. See
 m4-matching-ui-design.md §9 and m6-build.md §2.1.

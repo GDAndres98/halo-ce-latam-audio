@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "audio-export-config/1",
+  "title": "Central audio export settings (config/audio_export.json, optional)",
+  "description": "Read by the M6 build and the M4 preview (scripts/common/export_config.py). Without the file, global_gain_db defaults to +3 dB.",
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "audio-export-config/1"},
+    "global_gain_db": {"type": "number", "minimum": -12, "maximum": 12,
+                       "description": "Linear gain applied once to every Campaign Evolved replacement before CELT encoding. Never limited: a recording whose peak would pass -1 dBFS gets less (reported)."},
+    "note": {"type": "string", "maxLength": 500}
+  }
+}

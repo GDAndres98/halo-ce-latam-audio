@@ -162,12 +162,19 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       preflight/install without the owner's explicit approval for that build.**
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
-      inserted silences (exact length, placed after the speed step), fades, rubberband speed, BS.1770 loudness match to the slot's Spain recording (with a
-      −1 dBFS look-ahead limiter) and manual gain.
+      inserted silences, fades, and an optional BS.1770 loudness match to the slot's Spain
+      recording (its limiter only applies there).
+      - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
+        migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
+        recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.
+      - **Global export gain:** `config/audio_export.json` `global_gain_db`, +3 dB when the file is
+        absent (`common/export_config.py`). It is applied once to every CE replacement, after the
+        optional match, before CELT. It is linear, never limited, and lines that can't take it in
+        full are reported.
       - M4 shows waveforms and previews (`common/edit_preview.py`, `work/m4/preview/`). The
         "as encoded" preview is byte-identical to the bank decode.
-      - M6 renders edited lines with the same code (`audio_pipeline.derive_edited`); unedited lines
-        are byte-identical to before.
+      - M6 renders every line with the same code (`audio_pipeline.derive_processed`). With the
+        gain at 0, unedited lines are byte-identical to before.
       - The recipe is part of the approved audio object (needs rework to change). The radio flag is
         never applied.
       - Guide: `docs/m4-user-guide.md` §4.1. Owner hands-on test pending.

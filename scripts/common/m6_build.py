@@ -116,10 +116,11 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
 
 
 def edit_problems(edit, ref, lang):
-    """Static recipe problems for one CE source (the timeline is checked when rendering)."""
-    if audio_edit.is_identity(edit):
-        return []
+    """Static recipe problems for one CE source (the timeline is checked when rendering). Includes
+    removed fields (speed, gain_db) still stored before the one-time migration."""
     out = audio_edit.problems(edit)
+    if audio_edit.is_identity(edit):
+        return out
     if edit.get("for_source") != {"ce_line_ref": ref, "language": lang}:
         out.append("made for another CE line or language")
     return out

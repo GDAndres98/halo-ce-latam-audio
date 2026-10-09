@@ -1,0 +1,5 @@
+{
+  "schema": "audio-export-config/1",
+  "global_gain_db": 3.0,
+  "note": "Copy to config/audio_export.json and change global_gain_db (-12..12). Without that file the default is +3 dB."
+}

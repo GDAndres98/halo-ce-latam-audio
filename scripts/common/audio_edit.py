@@ -1,8 +1,7 @@
-"""Non-destructive dialogue edit recipes: the M4 editor's preview and the M6 build share this code.
+"""Non-destructive dialogue edit recipes and the export processing shared by the M4 preview and M6.
 
-A recipe lives in a mapping's `audio.edit` (manual-mappings/3, optional fields added 2026-10-09).
-The identity recipe is the original `{"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}` and is never
-rendered: unedited lines keep the original pipeline byte for byte. A non-identity recipe:
+A recipe lives in a mapping's `audio.edit` (manual-mappings/3). The identity recipe is the original
+`{"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}`. A non-identity recipe (format `audio-edit/1`):
 
     {"trim_start_s": 0.12, "trim_end_s": 0.30, "gap_s": 0,
      "engine": "audio-edit/1",
@@ -11,53 +10,55 @@ rendered: unedited lines keep the original pipeline byte for byte. A non-identit
      "silences": [{"at_s": 0.80, "dur_s": 0.30}],     # silence inserted at a source time (exact length)
      "fade_in_ms": 10, "fade_out_ms": 10,             # half-cosine fades on the edited edges
      "crossfade_ms": 20,                              # equal-power crossfade at every cut
-     "speed": 1.08,                                   # pitch-preserving tempo (rubberband via ffmpeg)
-     "gain_db": -1.5,                                 # manual gain
-     "loudness": {"mode": "match_mcc", "offset_db": 0}}  # auto gain to the original MCC recording
+     "loudness": {"mode": "match_mcc", "offset_db": 0},  # optional auto gain to the original MCC recording
+     "limiter": true}                                 # how loudness matching handles peaks (below)
 
-Times are seconds on the SOURCE recording's timeline (the editor's waveform), so a recipe never
-depends on an earlier step. Render order, on the 44.1 kHz mono PCM the pipeline already produces:
+Removed 2026-10-09 (owner feedback): `speed` (pitch-preserving tempo sounded unnatural) and `gain_db`
+(per-line manual gain; replaced by one global export gain). A stored recipe that still has either
+field is reported by `problems` / `removed_fields` until the one-time migration
+(scripts/validate/migrate_reset_speed_gain.py) removes them.
 
-    1. keep [trim_start, end - trim_end] minus the cuts; crossfade each junction
-    2. fade in / fade out
-    3. tempo (if speed != 1): ffmpeg rubberband, fixed speech settings, pitch and formants preserved
-    3b. inserted silences, placed where their source time lands after steps 1-3, with short half-cosine
-       fades on both sides (crossfade_ms / 2); inserted after the tempo so their length is exact.
-       Digital silence (no room tone); BS.1770 gating ignores it, so loudness matching is unaffected.
-    4. gain = manual + (match_mcc: MCC loudness + offset - edited loudness), both ITU-R BS.1770-4
-       gated integrated loudness
-    5. peaks: `limiter` true (default) -> look-ahead peak limiter at -1 dBFS (5 ms look-ahead, 80 ms
-       release); with match_mcc the gain is re-measured after limiting (secant steps, up to 6 passes, ±0.05 LU) so the output
-       lands on the target. `limiter` false -> the gain is lowered until the peak fits (reported).
-       CE lines are ~7 dB quieter than the Spain recordings (a10 survey, 2026-10-09: 58/60 would not
-       reach the target with gain alone), hence the limiter.
-    6. round to 16-bit
+Times are seconds on the SOURCE recording's timeline (the editor's waveform). Processing order
+(`render`, RENDER_ENGINE), on the 44.1 kHz mono PCM the pipeline already produces:
 
-Nothing here reads mappings, approves anything or writes files; ffmpeg is passed in. The radio
-flag is separate (`radio_effect`) and no effect is ever applied here.
+    1. edit: keep [trim_start, end - trim_end] minus the cuts (equal-power crossfade at each junction),
+       fade in / out, then inserted silences (half-cosine fades of crossfade_ms / 2 on both sides;
+       digital silence, ignored by BS.1770 gating)
+    2. optional loudness match (loudness.mode == match_mcc): gain to the ITU-R BS.1770-4 gated loudness
+       of the slot's original MCC recording + offset. Peaks: `limiter` true -> look-ahead limiter at
+       -1 dBFS, re-measured with secant steps so the output lands on the target; false -> the match
+       gain is lowered until the peak fits. Either way the stats report it; nothing is limited when
+       loudness matching is off.
+    3. global export gain (config/audio_export.json, default +3 dB; common/export_config.py), applied
+       exactly once, linearly, to every CE replacement. Never limited or compressed: if the peak
+       would pass -1 dBFS the gain is reduced to fit (never below 0 dB for a positive setting) and
+       the shortfall is reported.
+    4. round to 16-bit
+
+Nothing here reads mappings, approves anything or writes files. The radio flag is separate
+(`radio_effect`) and no effect is ever applied here.
 """
 import math
-import subprocess
 import sys
 import wave
 from array import array
 from collections import deque
 
-ENGINE = "audio-edit/1"
+ENGINE = "audio-edit/1"            # recipe format
+RENDER_ENGINE = "audio-render/2"   # processing (2: no speed/manual gain; global export gain)
+REMOVED_FIELDS = ("speed", "gain_db")
 EDIT_ZERO = {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}
 SAMPLE_RATE = 44100
 LOUDNESS_MODES = ("off", "match_mcc")
 SILENCE_S = (0.01, 5.0)  # one inserted silence
-LIMITS = {"speed": (0.5, 2.0), "gain_db": (-24.0, 24.0), "offset_db": (-12.0, 12.0),
+LIMITS = {"offset_db": (-12.0, 12.0),
           "fade_in_ms": (0, 500), "fade_out_ms": (0, 500), "crossfade_ms": (0, 200)}
-DEFAULTS = {"cuts": [], "silences": [], "fade_in_ms": 0, "fade_out_ms": 0, "crossfade_ms": 20, "speed": 1.0, "gain_db": 0.0,
+DEFAULTS = {"cuts": [], "silences": [], "fade_in_ms": 0, "fade_out_ms": 0, "crossfade_ms": 20,
             "loudness": {"mode": "off", "offset_db": 0.0}, "limiter": True}
 LIMITER = {"lookahead_ms": 5.0, "release_ms": 80.0}
 MAX_MATCH_PASSES = 6
 MIN_KEEP_S = 0.05          # the edited line must keep at least this much source audio
 PEAK_CEILING_DB = -1.0     # headroom for the codec; also keeps M6's "no new clipping" check meaningful
-RUBBERBAND = ("rubberband=tempo={tempo}:transients=mixed:detector=soft:window=standard:"
-              "formant=preserved:pitchq=quality:channels=together")
 
 
 class EditError(ValueError):
@@ -66,12 +67,17 @@ class EditError(ValueError):
 
 # --------------------------------------------------------------------------- recipe rules
 def is_identity(edit):
-    """True when the recipe changes nothing (gap_s only matters between concatenated lines)."""
+    """True when the recipe changes nothing (gap_s only matters between concatenated lines).
+    Removed fields (speed, gain_db) are ignored here; `removed_fields` reports them."""
     e = edit or {}
     lo = e.get("loudness") or {}
     return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts") and not e.get("silences")
-            and float(e.get("speed", 1.0)) == 1.0 and not e.get("gain_db")
             and lo.get("mode", "off") == "off" and not e.get("fade_in_ms") and not e.get("fade_out_ms"))
+
+
+def removed_fields(edit):
+    """Fields of a stored recipe that are no longer supported (present until the migration runs)."""
+    return [k for k in REMOVED_FIELDS if k in (edit or {})]
 
 
 def _num(v, name):
@@ -89,6 +95,10 @@ def normalize(edit, for_source=None):
     """Owner input -> canonical recipe (rounded, defaults filled, cuts sorted). Identity -> EDIT_ZERO.
     Raises EditError for anything malformed or out of range (duration checks: `problems`)."""
     e = dict(edit or {})
+    gone = removed_fields(e)
+    if gone:
+        raise EditError(f"{', '.join(gone)} {'is' if len(gone) == 1 else 'are'} no longer supported "
+                        "(removed 2026-10-09; volume is set by the global export gain)")
     unknown = set(e) - set(EDIT_ZERO) - set(DEFAULTS) - {"engine", "for_source"}
     if unknown:
         raise EditError(f"unknown edit field(s) {sorted(unknown)}")
@@ -117,8 +127,6 @@ def normalize(edit, for_source=None):
            "fade_in_ms": _r(_num(e.get("fade_in_ms", 0), "fade_in_ms"), 0),
            "fade_out_ms": _r(_num(e.get("fade_out_ms", 0), "fade_out_ms"), 0),
            "crossfade_ms": _r(_num(e.get("crossfade_ms", DEFAULTS["crossfade_ms"]), "crossfade_ms"), 0),
-           "speed": _r(_num(e.get("speed", 1.0), "speed"), 3),
-           "gain_db": _r(_num(e.get("gain_db", 0), "gain_db"), 1),
            "loudness": {"mode": lo.get("mode", "off"), "offset_db": _r(_num(lo.get("offset_db", 0), "offset_db"), 1)},
            "limiter": e.get("limiter", True)}
     if not isinstance(rec["limiter"], bool):
@@ -138,9 +146,10 @@ def normalize(edit, for_source=None):
 def problems(edit, duration_s=None):
     """Rule violations of a stored recipe (empty = fine). With duration_s, also checks the timeline."""
     e = edit or {}
+    out = [f"{k} is no longer supported (removed 2026-10-09); run scripts/validate/migrate_reset_speed_gain.py"
+           for k in removed_fields(e)]
     if is_identity(e):
-        return []
-    out = []
+        return out
     if e.get("engine") != ENGINE:
         out.append(f"unknown edit engine {e.get('engine')!r} (expected {ENGINE})")
     if not isinstance(e.get("for_source"), dict):
@@ -183,7 +192,7 @@ def problems(edit, duration_s=None):
 
 
 def summary(edit):
-    """Short human description, e.g. 'trim 0.12/0.30 s · 1 cut (0.25 s) · speed ×1.08 · match MCC'."""
+    """Short human description, e.g. 'trim 0.12/0.30 s · 1 cut (0.25 s) · match MCC loudness'."""
     if is_identity(edit):
         return "no edits"
     e, bits = edit, []
@@ -195,15 +204,11 @@ def summary(edit):
     if e.get("silences"):
         bits.append(f"+{len(e['silences'])} silence{'s' if len(e['silences']) > 1 else ''} "
                     f"({sum(c['dur_s'] for c in e['silences']):.2f} s)")
-    if e["speed"] != 1:
-        bits.append(f"speed ×{e['speed']:g}")
     if e["loudness"]["mode"] == "match_mcc":
         bits.append("match MCC loudness" + (f" {e['loudness']['offset_db']:+g} dB" if e["loudness"]["offset_db"] else ""))
-    if e["gain_db"]:
-        bits.append(f"gain {e['gain_db']:+g} dB")
     if e["fade_in_ms"] or e["fade_out_ms"]:
         bits.append(f"fades {e['fade_in_ms']:g}/{e['fade_out_ms']:g} ms")
-    if not e.get("limiter", True):
+    if e["loudness"]["mode"] == "match_mcc" and not e.get("limiter", True):
         bits.append("no limiter")
     return " · ".join(bits)
 
@@ -380,27 +385,6 @@ def fade(x, fade_in, fade_out):
     return x
 
 
-def tempo(x, speed, ffmpeg, fs=SAMPLE_RATE):
-    """Pitch-preserving time stretch with ffmpeg's rubberband filter (deterministic; length n / speed)."""
-    a = array("f", x)
-    if sys.byteorder != "little":
-        a.byteswap()
-    args = [str(ffmpeg), "-nostdin", "-hide_banner", "-v", "error", "-f", "f32le", "-ar", str(fs), "-ac", "1",
-            "-i", "-", "-af", RUBBERBAND.format(tempo=f"{speed:.6g}"), "-f", "f32le", "-"]
-    res = subprocess.run(args, input=a.tobytes(), capture_output=True)
-    if res.returncode != 0 or not res.stdout:
-        raise EditError(f"ffmpeg rubberband failed: {res.stderr.decode(errors='replace')[:300]}")
-    b = array("f")
-    b.frombytes(res.stdout)
-    if sys.byteorder != "little":
-        b.byteswap()
-    return list(b)
-
-
-def tempo_filter(speed):
-    return RUBBERBAND.format(tempo=f"{speed:.6g}")
-
-
 def limit(x, ceiling, fs=SAMPLE_RATE, lookahead_ms=LIMITER["lookahead_ms"], release_ms=LIMITER["release_ms"]):
     """Look-ahead peak limiter -> (samples, max gain reduction dB). |output| <= ceiling for every sample:
     the gain at i is a mean of held minima that each cover sample i (sliding minimum over the next
@@ -438,51 +422,58 @@ def _gain(y, db, use_limiter, ceiling):
     return limit(z, ceiling) if use_limiter else (z, 0.0)
 
 
-def render(pcm, edit, *, ffmpeg=None, ref_lufs=None, fs=SAMPLE_RATE):
-    """44.1 kHz mono 16-bit PCM + recipe -> {"pcm": bytes, "stats": {...}}. Deterministic.
-    ref_lufs: loudness of the original MCC recording (required when loudness.mode == match_mcc)."""
-    if is_identity(edit):
-        raise EditError("identity recipes are not rendered (the original pipeline is used)")
+def global_gain(y, gain_db, ceiling_db=PEAK_CEILING_DB):
+    """Linear export gain, never limited: -> (samples, applied dB, shortfall dB). A positive gain is
+    reduced so the peak stays <= ceiling_db (never below 0 dB); the shortfall is what could not be
+    applied. A zero or negative gain is applied as is."""
+    if not gain_db:
+        return list(y), 0.0, 0.0
+    applied = gain_db
+    pk = peak_db(y)
+    if gain_db > 0 and pk is not None and pk + gain_db > ceiling_db:
+        applied = max(0.0, ceiling_db - pk)
+    g = 10 ** (applied / 20)
+    return [v * g for v in y], round(applied, 2), round(gain_db - applied, 2)
+
+
+def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, fs=SAMPLE_RATE):
+    """44.1 kHz mono 16-bit PCM + recipe + global export gain -> {"pcm": bytes, "stats": {...}}.
+    Deterministic. ref_lufs: loudness of the original MCC recording (needed for loudness matching).
+    An identity recipe with no global gain returns the input unchanged."""
     x = pcm16_to_float(pcm)
     n = len(x)
     bad = problems(edit, n / fs)
     if bad:
         raise EditError("; ".join(bad))
-    segs = kept_segments(n, edit, fs)
-    y = splice(x, segs, int(round(edit["crossfade_ms"] * fs / 1000)))
-    y = fade(y, int(round(edit["fade_in_ms"] * fs / 1000)), int(round(edit["fade_out_ms"] * fs / 1000)))
-    spliced = len(y)
-    if edit["speed"] != 1:
-        if not ffmpeg:
-            raise EditError("ffmpeg is needed for a speed change")
-        y = tempo(y, edit["speed"], ffmpeg, fs)
-    inserted = 0
-    if edit.get("silences"):
-        ratio = len(y) / spliced if spliced else 1.0
-        pts = [(int(round(spliced_position(c["at_s"], edit, fs) * ratio)), int(round(c["dur_s"] * fs)))
-               for c in edit["silences"]]
-        inserted = sum(n for _, n in pts)
-        y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
+    identity = is_identity(edit)
+    warnings, segs, inserted = [], [(0, n)], 0
+    y = x
+    if not identity:  # 1. trims, cuts, fades, inserted silences
+        segs = kept_segments(n, edit, fs)
+        y = splice(x, segs, int(round(edit["crossfade_ms"] * fs / 1000)))
+        y = fade(y, int(round(edit["fade_in_ms"] * fs / 1000)), int(round(edit["fade_out_ms"] * fs / 1000)))
+        if edit.get("silences"):
+            pts = [(spliced_position(c["at_s"], edit, fs), int(round(c["dur_s"] * fs))) for c in edit["silences"]]
+            inserted = sum(k for _, k in pts)
+            y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
+    edited = len(y)
     measured, method = loudness(y, fs)
-    auto = 0.0
-    lo = edit["loudness"]
-    if lo["mode"] == "match_mcc":
+    lo = (edit or {}).get("loudness") or DEFAULTS["loudness"]
+    match = not identity and lo["mode"] == "match_mcc"
+    auto = applied = reduction = 0.0
+    lowered, passes, target = 0.0, 0, None
+    z = y
+    if match:  # 2. optional loudness match to the MCC reference
         if ref_lufs is None:
             raise EditError("loudness matching needs the original MCC recording's loudness")
-        auto = (ref_lufs + lo["offset_db"] - measured) if measured is not None else 0.0
-    want = auto + edit["gain_db"]
-    ceiling = 10 ** (PEAK_CEILING_DB / 20)
-    use_limiter = edit.get("limiter", True)
-    pk = peak_db(y)
-    passes = 0
-    if use_limiter:
-        applied = want
-        z, reduction = _gain(y, applied, True, ceiling)
-        passes = 1
-        if lo["mode"] == "match_mcc" and measured is not None:
-            target = ref_lufs + lo["offset_db"] + edit["gain_db"]
-            prev = None
-            for _ in range(MAX_MATCH_PASSES - 1):  # secant steps on gain -> output loudness
+        ceiling = 10 ** (PEAK_CEILING_DB / 20)
+        target = ref_lufs + lo["offset_db"]
+        auto = (target - measured) if measured is not None else 0.0
+        applied = auto
+        if edit.get("limiter", True):
+            z, reduction = _gain(y, applied, True, ceiling)
+            passes, prev = 1, None
+            for _ in range(MAX_MATCH_PASSES - 1 if measured is not None else 0):  # secant steps
                 cur = loudness(z, fs)[0]
                 err = target - cur
                 if abs(err) < 0.05:
@@ -490,31 +481,41 @@ def render(pcm, edit, *, ffmpeg=None, ref_lufs=None, fs=SAMPLE_RATE):
                 slope = (cur - prev[1]) / (applied - prev[0]) if prev and applied != prev[0] else 1.0
                 prev = (applied, cur)
                 step = err / slope if slope > 0.05 else err
-                applied = min(applied + step, want + 12.0)  # never more than 12 dB past the plain-gain request
+                applied = min(applied + step, auto + 12.0)  # never more than 12 dB past the plain-gain request
                 if applied == prev[0]:
                     break
                 z, reduction = _gain(y, applied, True, ceiling)
                 passes += 1
-    else:
-        applied = want if pk is None else min(want, PEAK_CEILING_DB - pk)
-        z, reduction = _gain(y, applied, False, ceiling)
-    out = float_to_pcm16(z)
+            if reduction > 0:
+                warnings.append(f"loudness match: limiter reduced peaks by {reduction:.1f} dB (recipe limiter on)")
+        else:
+            pk = peak_db(y)
+            applied = auto if pk is None else min(auto, PEAK_CEILING_DB - pk)
+            lowered = round(auto - applied, 2) if applied < auto - 1e-9 else 0.0
+            z, _ = _gain(y, applied, False, ceiling)
+            if lowered:
+                warnings.append(f"loudness match: gain lowered by {lowered:.1f} dB for the peak (limiter off)")
+    # 3. global export gain, once, never limited
+    z, g_applied, g_short = global_gain(z, global_gain_db)
+    if g_short > 0:
+        warnings.append(f"global gain: only {g_applied:+.1f} of {global_gain_db:+.1f} dB applied "
+                        f"({g_short:.1f} dB short: the peak would pass {PEAK_CEILING_DB:g} dBFS)")
+    out = float_to_pcm16(z)  # 4. 16-bit
     final = pcm16_to_float(out)
-    out_lufs = loudness(final, fs)[0]
-    stats = {"engine": ENGINE, "source_samples": n, "source_s": round(n / fs, 3),
-             "kept_segments_s": [[round(s / fs, 3), round(e / fs, 3)] for s, e in segs],
-             "spliced_samples": spliced, "spliced_s": round(spliced / fs, 3),
-             "inserted_silence_s": round(inserted / fs, 3),
+    stats = {"engine": RENDER_ENGINE, "recipe_format": ENGINE, "identity": identity,
+             "source_samples": n, "source_s": round(n / fs, 3),
+             "kept_segments_s": [[round(a / fs, 3), round(b / fs, 3)] for a, b in segs],
+             "edited_samples": edited, "edited_s": round(edited / fs, 3), "inserted_silence_s": round(inserted / fs, 3),
              "output_samples": len(final), "output_s": round(len(final) / fs, 3),
-             "speed": edit["speed"], "tempo_filter": tempo_filter(edit["speed"]) if edit["speed"] != 1 else None,
              "loudness_method": method, "loudness_before_gain_lufs": _rnd(measured),
-             "mcc_reference_lufs": _rnd(ref_lufs), "auto_gain_db": round(auto, 2), "manual_gain_db": edit["gain_db"],
-             "requested_gain_db": round(want, 2), "applied_gain_db": round(applied, 2),
-             "limiter": use_limiter, "limiter_max_reduction_db": reduction, "loudness_passes": passes,
-             "gain_lowered_for_peak_db": round(want - applied, 2) if not use_limiter and applied < want - 1e-9 else 0.0,
-             "output_lufs": _rnd(out_lufs), "output_peak_dbfs": _rnd(peak_db(final)),
-             "loudness_target_lufs": _rnd(ref_lufs + lo["offset_db"] + edit["gain_db"])
-             if lo["mode"] == "match_mcc" and ref_lufs is not None else None}
+             "mcc_reference_lufs": _rnd(ref_lufs), "loudness_match": match,
+             "loudness_target_lufs": _rnd(target), "match_auto_gain_db": round(auto, 2),
+             "match_applied_gain_db": round(applied, 2), "limiter": bool(match and edit.get("limiter", True)),
+             "limiter_max_reduction_db": reduction, "loudness_passes": passes, "match_gain_lowered_for_peak_db": lowered,
+             "global_gain_requested_db": global_gain_db, "global_gain_applied_db": g_applied,
+             "global_gain_shortfall_db": g_short, "total_gain_db": round(applied + g_applied, 2),
+             "output_lufs": _rnd(loudness(final, fs)[0]), "output_peak_dbfs": _rnd(peak_db(final)),
+             "warnings": warnings}
     return {"pcm": out, "stats": stats}
 
 

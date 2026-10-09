@@ -255,7 +255,8 @@ User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever
   - `for_source` (the CE line and language it was made for);
   - `cuts`, `silences` (`[{at_s, dur_s}]`, inserted after the tempo so their length is exact),
     `fade_in_ms`/`fade_out_ms`, `crossfade_ms`;
-  - `speed`, `gain_db`, `loudness {mode: off|match_mcc, offset_db}`, `limiter`.
+  - `loudness {mode: off|match_mcc, offset_db}`, `limiter` (only for matching).
+  - (`speed` and `gain_db` were removed on 2026-10-09; see §9.1.)
 
   All zero is the identity and is stored in the old three-field form.
 - **Why inside `audio`:** the recipe is part of the audio decision. Approval pins it, and the
@@ -264,13 +265,11 @@ User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever
   untouched.
 - **One implementation:**
   - `common/audio_edit.py` holds the pure DSP and recipe rules, with ffmpeg injected for the tempo.
-  - `audio_pipeline.render_edited` / `derive_edited` / `codec_roundtrip` are shared by
+  - `audio_pipeline.render_edited` / `derive_processed` / `codec_roundtrip` are shared by
     `common/edit_preview.py` (M4) and `scripts/build/m6_build.py`.
   - The *as encoded* preview is the libcelt decode of the stream M6 writes, so preview and build
     can't drift apart. A test asserts byte equality.
 - **DSP choices:**
-  - **Rubberband** (via the installed ffmpeg) for speed: deterministic and length-exact. `atempo`
-    dropped about 20 ms at the end in a test.
   - **BS.1770-4 loudness** in pure Python. The K-weighting reproduces the standard's 48 kHz
     coefficients; a 997 Hz full-scale sine reads −3.01 LUFS.
   - **Equal-power crossfades** at cuts.
@@ -287,3 +286,27 @@ User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever
 - **Stack:** still the Python standard library plus one static page. Waveforms are drawn from Web
   Audio `decodeAudioData` on a `<canvas>`. Nothing new is installed: ffmpeg and libcelt were already
   approved.
+
+### 9.1 Owner feedback after testing (2026-10-09): no speed, one global gain
+
+- **Speed removed:** the rubberband time stretch sounded unnatural. It is gone from the UI, the
+  recipe, the schema and the render.
+- **Per-line manual gain removed.** Volume is now one central setting:
+  - `global_gain_db` in `config/audio_export.json`, +3 dB by default (`common/export_config.py`);
+  - applied once, after the recipe and the optional loudness match, before CELT;
+  - linear, and reduced (never limited) on lines whose peak would pass −1 dBFS, which are reported.
+
+  The preview uses the same value, so it keeps matching the build.
+- **The limiter** now only serves the optional loudness match (`limiter` in the recipe). Nothing is
+  limited when matching is off.
+- **Render engine:** `audio-render/2`. The recipe format stays `audio-edit/1` (two fields fewer), so
+  the migration changed nothing but those two fields.
+- **Migration:** the owner explicitly authorized a one-time removal of saved `speed` / `gain_db`,
+  approved mappings included, without needs rework.
+  - `mapping_store.reset_removed_edit_fields` is the only path that may touch approved objects for
+    this. It proves the document differs in nothing else (`proof_only_removed_fields`).
+  - `scripts/validate/migrate_reset_speed_gain.py` adds a verified backup, a report, idempotency and
+    rollback.
+  - The HEAD protection (`mapping_store.comparable`) treats the removal of these two fields as the
+    only allowed change, as it did for `fx_request` in v2 → v3.
+  - Record: `docs/migrations/2026-10-09-reset-speed-gain.md`.

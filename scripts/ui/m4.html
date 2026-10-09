@@ -291,7 +291,7 @@ async function loadSlots() {
       `<span class="grow mono" title="${esc(s.slot_id)}">${hl(label, S.slotTerms)}</span>` +
       (s.radio_effect ? `<span class="badge radio" title="needs radio effect (v1.1)">R</span>` : "") +
       (s.different_but_fits ? `<span class="badge fits" title="different dialogue, but fits the scene">≈</span>` : "") +
-      (s.edited ? `<span class="badge edited" title="audio edit recipe (trim, cuts, speed, loudness)">E</span>` : "") +
+      (s.edited ? `<span class="badge edited" title="audio edit recipe (trim, cuts, silences, loudness)">E</span>` : "") +
       (d && d.audio === "approved" ? `<span class="badge approved" title="audio approved">A</span>` : d && d.audio === "needs_rework" ? `<span class="badge needs_rework">A</span>` : "") +
       (d && d.subtitle === "approved" ? `<span class="badge approved" title="subtitle approved">S</span>` : d && d.subtitle === "needs_rework" ? `<span class="badge needs_rework">S</span>` : "") +
       `<span class="small muted">${s.duration_s == null ? "" : s.duration_s.toFixed(1) + "s"}</span>` +
@@ -568,7 +568,8 @@ async function save(actions, reworkOnly) {
 // The recipe is part of the audio decision (audio.edit): Save / Approve audio store it, approval locks it,
 // "needs rework" unlocks it. Previews come from the server, rendered by the same code M6 builds with.
 const editDefault = () => ({ trim_start_s: 0, trim_end_s: 0, gap_s: 0, cuts: [], silences: [], fade_in_ms: 0, fade_out_ms: 0,
-  crossfade_ms: 20, speed: 1, gain_db: 0, loudness: { mode: "off", offset_db: 0 }, limiter: true });
+  crossfade_ms: 20, loudness: { mode: "off", offset_db: 0 }, limiter: true });
+const REMOVED_EDIT_FIELDS = ["speed", "gain_db"];   // removed 2026-10-09: volume = global export gain
 function editFrom(stored) {
   const d = editDefault(); if (!stored) return d;
   const e = Object.assign(d, JSON.parse(JSON.stringify(stored)));
@@ -576,10 +577,11 @@ function editFrom(stored) {
   e.cuts = (stored.cuts || []).map(c => ({ start_s: c.start_s, end_s: c.end_s }));
   e.silences = (stored.silences || []).map(c => ({ at_s: c.at_s, dur_s: c.dur_s }));
   if (e.limiter === undefined) e.limiter = true;
+  for (const k of REMOVED_EDIT_FIELDS) delete e[k];
   return e;
 }
 function editIsIdentity(e) {
-  return !e.trim_start_s && !e.trim_end_s && !e.cuts.length && !e.silences.length && +e.speed === 1 && !e.gain_db &&
+  return !e.trim_start_s && !e.trim_end_s && !e.cuts.length && !e.silences.length &&
     e.loudness.mode === "off" && !e.fade_in_ms && !e.fade_out_ms;
 }
 function editSummary(e) {   // mirrors audio_edit.summary()
@@ -588,11 +590,9 @@ function editSummary(e) {   // mirrors audio_edit.summary()
   if (e.trim_start_s || e.trim_end_s) b.push(`trim ${(+e.trim_start_s).toFixed(2)}/${(+e.trim_end_s).toFixed(2)} s`);
   if (e.cuts.length) b.push(`${e.cuts.length} cut${e.cuts.length > 1 ? "s" : ""} (${e.cuts.reduce((a, c) => a + c.end_s - c.start_s, 0).toFixed(2)} s)`);
   if (e.silences.length) b.push(`+${e.silences.length} silence${e.silences.length > 1 ? "s" : ""} (${e.silences.reduce((a, c) => a + c.dur_s, 0).toFixed(2)} s)`);
-  if (+e.speed !== 1) b.push(`speed ×${+e.speed}`);
   if (e.loudness.mode === "match_mcc") b.push("match MCC loudness" + (e.loudness.offset_db ? ` ${e.loudness.offset_db > 0 ? "+" : ""}${e.loudness.offset_db} dB` : ""));
-  if (e.gain_db) b.push(`gain ${e.gain_db > 0 ? "+" : ""}${e.gain_db} dB`);
   if (e.fade_in_ms || e.fade_out_ms) b.push(`fades ${e.fade_in_ms}/${e.fade_out_ms} ms`);
-  if (e.limiter === false) b.push("no limiter");
+  if (e.loudness.mode === "match_mcc" && e.limiter === false) b.push("no limiter");
   return b.join(" · ");
 }
 function editConfirmText() {
@@ -772,14 +772,10 @@ function renderEditor() {
       <span class="grp">Crossfade <input type="number" id="edXf" step="5" min="0" max="200" ${dis}> ms</span>
     </div>
     <div class="row ctl">
-      <span class="grp" title="pitch-preserving tempo (rubberband); >1 = faster/shorter">Speed <input type="range" id="edSpR" min="0.75" max="1.33" step="0.01" ${dis}><input type="number" id="edSp" step="0.01" min="0.5" max="2" ${dis}>×</span>
-      <button id="edFit" ${dis} title="speed so the edited line lasts as long as the Spain recording">Fit to Spain duration</button>
-    </div>
-    <div class="row ctl">
       <span class="grp" title="automatic gain to the loudness (BS.1770) of the original MCC Spain recording"><label class="opt" style="margin:0"><input type="checkbox" id="edMatch" ${dis}> Match Spain loudness</label> offset <input type="number" id="edOff" step="0.5" min="-12" max="12" ${dis}> dB</span>
-      <span class="grp">Gain <input type="range" id="edGR" min="-12" max="12" step="0.5" ${dis}><input type="number" id="edG" step="0.5" min="-24" max="24" ${dis}> dB</span>
-      <label class="opt" title="look-ahead peak limiter at -1 dBFS; off = gain is lowered instead"><input type="checkbox" id="edLim" ${dis}> Peak limiter</label>
+      <label class="opt" title="only for loudness matching: look-ahead peak limiter at -1 dBFS so the match can reach Spain's level; off = the match gain is lowered instead"><input type="checkbox" id="edLim" ${dis}> Limiter (for matching)</label>
     </div>
+    <div class="small muted" id="edGlobal">Volume: the global export gain (config/audio_export.json) is applied to every line, after these edits.</div>
     <div class="lbl"><span>Spain (original MCC)</span><span id="wvScale"></span></div>
     <canvas class="cmp" id="wvSpain"></canvas>
     <div class="lbl"><span>Edited, as M6 encodes it (CELT round trip)</span><span></span></div>
@@ -796,9 +792,10 @@ function fillEditorInputs() {
   const e = S.edit.audio.edit, v = (id, x) => { const el = $(id); if (el && document.activeElement !== el) el.value = x; };
   v("edTs", (+e.trim_start_s).toFixed(3)); v("edTe", (+e.trim_end_s).toFixed(3));
   v("edFi", e.fade_in_ms); v("edFo", e.fade_out_ms); v("edXf", e.crossfade_ms);
-  v("edSp", e.speed); v("edSpR", e.speed); v("edOff", e.loudness.offset_db); v("edG", e.gain_db); v("edGR", e.gain_db);
+  v("edOff", e.loudness.offset_db);
   $("edMatch").checked = e.loudness.mode === "match_mcc"; $("edLim").checked = e.limiter !== false;
   $("edOff").disabled = edLocked() || e.loudness.mode !== "match_mcc";
+  $("edLim").disabled = edLocked() || e.loudness.mode !== "match_mcc";
 }
 function renderCuts() {
   const e = S.edit.audio.edit, locked = edLocked();
@@ -822,13 +819,13 @@ function renderEdStats() {
   const sgn = x => x == null ? "?" : (x >= 0 ? "+" : "") + x.toFixed(2);
   const out = st.encoded_s != null ? st.output_s : null, dl = out != null && sp != null ? out - sp : null;
   const lines = [
-    `Duration: source ${f(st.source_s, " s")} → edited <b>${f(st.output_s, " s")}</b>${st.spliced_s != null && st.spliced_s !== st.source_s && st.speed !== 1 ? ` (${f(st.spliced_s, " s")} before speed)` : ""} · Spain ${f(sp, " s")} · Δ ${sgn(dl)} s`,
-    `Loudness: CE ${f(st.loudness_before_gain_lufs, " LUFS")} → out <b>${f(st.output_lufs, " LUFS")}</b> · Spain ${f(st.mcc_reference_lufs, " LUFS")} · gain ${sgn(st.applied_gain_db)} dB · limiter ${f(st.limiter_max_reduction_db, " dB")} · peak ${f(st.output_peak_dbfs, " dBFS")}`];
+    `Duration: source ${f(st.source_s, " s")} → edited <b>${f(st.output_s, " s")}</b> · Spain ${f(sp, " s")} · Δ ${sgn(dl)} s`,
+    `Loudness: CE ${f(st.loudness_before_gain_lufs, " LUFS")} → out <b>${f(st.output_lufs, " LUFS")}</b> · Spain ${f(st.mcc_reference_lufs, " LUFS")} · peak ${f(st.output_peak_dbfs, " dBFS")}`,
+    `Gain: ${st.loudness_match ? `loudness match ${sgn(st.match_applied_gain_db)} dB${st.limiter ? ` (limiter ${f(st.limiter_max_reduction_db, " dB")})` : ""} + ` : ""}global ${sgn(st.global_gain_applied_db)} of ${sgn(st.global_gain_requested_db)} dB <span class="muted">(${esc(p.export_config ? p.export_config.source : "?")})</span>`];
   const warn = [];
-  if (st.limiter_max_reduction_db > 6) warn.push(`Heavy limiting (${st.limiter_max_reduction_db.toFixed(1)} dB): listen for squashed peaks; a negative offset or lower gain is gentler.`);
-  if (st.gain_lowered_for_peak_db > 0) warn.push(`Gain lowered by ${st.gain_lowered_for_peak_db.toFixed(1)} dB to avoid clipping (limiter off).`);
-  if (st.speed && (st.speed < 0.85 || st.speed > 1.18)) warn.push(`Speed ×${st.speed}: strong changes can sound unnatural.`);
-  if (st.identity) lines.push(`<span class="muted">No edits: M6 encodes the original recording unchanged.${st.mcc_reference_lufs != null && st.output_lufs != null ? ` It is ${(st.mcc_reference_lufs - st.output_lufs).toFixed(1)} dB quieter than Spain.` : ""}</span>`);
+  if (st.limiter_max_reduction_db > 6) warn.push(`Heavy limiting (${st.limiter_max_reduction_db.toFixed(1)} dB) in the loudness match: listen for squashed peaks; a negative offset is gentler.`);
+  for (const w of st.warnings || []) if (!w.startsWith("loudness match: limiter")) warn.push(w);
+  if (st.identity) lines.push(`<span class="muted">No edits: M6 encodes the original recording with only the global gain.${st.mcc_reference_lufs != null && st.output_lufs != null ? ` It is ${(st.mcc_reference_lufs - st.output_lufs).toFixed(1)} dB quieter than Spain.` : ""}</span>`);
   el.innerHTML = lines.join("<br>") + warn.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join("");
 }
 async function loadEditorAudio() {
@@ -886,20 +883,9 @@ function wireEditor() {
   num("edFi", v => e.fade_in_ms = Math.round(Math.max(0, Math.min(500, v))));
   num("edFo", v => e.fade_out_ms = Math.round(Math.max(0, Math.min(500, v))));
   num("edXf", v => e.crossfade_ms = Math.round(Math.max(0, Math.min(200, v))));
-  num("edSp", v => e.speed = Math.round(Math.max(0.5, Math.min(2, v)) * 1000) / 1000);
   num("edOff", v => e.loudness.offset_db = Math.round(Math.max(-12, Math.min(12, v)) * 10) / 10);
-  num("edG", v => e.gain_db = Math.round(Math.max(-24, Math.min(24, v)) * 10) / 10);
-  $("edSpR").oninput = (ev) => { e.speed = +ev.target.value; $("edSp").value = e.speed; edChanged(); };
-  $("edGR").oninput = (ev) => { e.gain_db = +ev.target.value; $("edG").value = e.gain_db; edChanged(); };
   $("edMatch").onchange = (ev) => { e.loudness.mode = ev.target.checked ? "match_mcc" : "off"; edChanged(); };
   $("edLim").onchange = (ev) => { e.limiter = ev.target.checked; edChanged(); };
-  $("edFit").onclick = () => {
-    const sp = S.detail.spanish.duration_s, src = S.ed.srcBuf; if (!sp || !src) return toast("load the audio first", "err");
-    const kept = src.duration - e.trim_start_s - e.trim_end_s - e.cuts.reduce((a, c) => a + c.end_s - c.start_s, 0);
-    const room = sp - e.silences.reduce((a, c) => a + c.dur_s, 0);   // inserted silences keep their length
-    if (room <= 0.05) return toast("the inserted silences alone are longer than the Spain line", "err");
-    e.speed = Math.round(Math.max(0.5, Math.min(2, kept / room)) * 100) / 100; edChanged();
-  };
   $("edReset").onclick = () => {
     if (editIsIdentity(e) || confirm("Reset all audio edits for this slot? (Takes effect when you save.)")) {
       S.edit.audio.edit = Object.assign(editDefault(), { gap_s: e.gap_s || 0, for_source: S.ed.src }); S.ed.sel = null; renderEditor(); setDirty();

@@ -1,12 +1,13 @@
 """M4 audio editor previews: the exact audio M6 would put in the bank for a recipe, before saving.
 
-For one CE source WAV and one recipe (common/audio_edit) it renders, with the same functions the M6
-build calls (audio_pipeline.render_edited / to_mcc_pcm + encode_for_mcc):
+For one CE source WAV, one recipe and the global export gain (common/audio_edit, common/export_config)
+it renders, with the same functions the M6 build calls (audio_pipeline.render_edited /
+to_mcc_pcm + encode_for_mcc):
   edited.wav   the 44.1 kHz PCM handed to the encoder ("pre-codec")
   encoded.wav  that PCM encoded with the MCC CELT profile and decoded by the same libcelt, codec delay
                removed: what MCC plays (M6 verifies vgmstream's decode of the bank equals this decode)
-Results are cached in work/m4/preview/<key>/ (key = hash of engine, source PCM, recipe and reference
-loudness). Originals are only read. Nothing here touches mappings.
+Results are cached in work/m4/preview/<key>/ (key = hash of render engine, source PCM, recipe,
+reference loudness and global gain). Originals are only read. Nothing here touches mappings.
 """
 import hashlib
 import json
@@ -49,30 +50,19 @@ class EditPreview:
             raise ValueError("bad preview key or kind")
         return self.dir / key / f"{kind}.wav"
 
-    def render(self, src_wav, edit, ref_lufs):
-        """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError."""
+    def render(self, src_wav, edit, ref_lufs, global_gain_db):
+        """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError.
+        Same processing as M6 for every line: recipe, optional loudness match, global export gain."""
         with self._lock:
             pcm = self._source(src_wav)
-            key = hashlib.sha256(json.dumps({"engine": audio_edit.ENGINE, "pcm": hashlib.sha256(pcm).hexdigest(),
-                                             "edit": edit, "ref": ref_lufs}, sort_keys=True).encode()).hexdigest()[:24]
+            key = hashlib.sha256(json.dumps({"engine": audio_edit.RENDER_ENGINE, "pcm": hashlib.sha256(pcm).hexdigest(),
+                                             "edit": edit, "ref": ref_lufs, "global_gain_db": global_gain_db},
+                                            sort_keys=True).encode()).hexdigest()[:24]
             out = self.dir / key
             if (out / "stats.json").is_file():
                 return {"key": key, "stats": json.loads((out / "stats.json").read_text(encoding="utf-8"))}
-            if audio_edit.is_identity(edit):  # the unedited path: M6's derive() encodes this PCM as is
-                x = audio_edit.pcm16_to_float(pcm)
-                lufs = audio_edit.loudness(x)[0]
-                n = len(x)
-                stats = {"engine": audio_edit.ENGINE, "identity": True, "source_samples": n,
-                         "source_s": round(n / audio_edit.SAMPLE_RATE, 3), "output_samples": n,
-                         "output_s": round(n / audio_edit.SAMPLE_RATE, 3), "spliced_s": round(n / audio_edit.SAMPLE_RATE, 3),
-                         "loudness_before_gain_lufs": audio_edit._rnd(lufs), "output_lufs": audio_edit._rnd(lufs),
-                         "mcc_reference_lufs": audio_edit._rnd(ref_lufs),
-                         "output_peak_dbfs": audio_edit._rnd(audio_edit.peak_db(x)), "applied_gain_db": 0,
-                         "limiter_max_reduction_db": 0.0}
-                edited = pcm
-            else:
-                r = audio_edit.render(pcm, edit, ffmpeg=self.ffmpeg, ref_lufs=ref_lufs)
-                edited, stats = r["pcm"], dict(r["stats"], identity=False)
+            r = audio_edit.render(pcm, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
+            edited, stats = r["pcm"], r["stats"]
             if self._celt is None:
                 self._celt = self._celt_factory()
             encoded, enc = codec_roundtrip(self._celt, edited)

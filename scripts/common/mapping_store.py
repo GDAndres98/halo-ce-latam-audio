@@ -107,14 +107,15 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
     return _write(path, current, new_doc, loaded_sha256, history_dir, now)
 
 
-def _write(path, current, new_doc, loaded_sha256, history_dir, now):
-    """Back up the previous bytes to .history/, then write atomically. -> new sha256."""
+def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None):
+    """Back up the previous bytes to .history/, then write atomically. -> new sha256.
+    raw: exact bytes to write instead of serializing new_doc (restore)."""
     history = Path(history_dir) if history_dir else path.parent / ".history"
     if current:
         history.mkdir(parents=True, exist_ok=True)
         stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
         (history / f"{path.stem}.{stamp}.{loaded_sha256[:12]}.json").write_bytes(current)
-    data = (json.dumps(new_doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    data = raw if raw is not None else (json.dumps(new_doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     tmp = path.with_name(path.name + ".tmp")
     with open(tmp, "wb") as f:
         f.write(data)
@@ -158,11 +159,77 @@ def migrate_doc(doc, today=None):
     return new, True
 
 
+REMOVED_EDIT_FIELDS = ("speed", "gain_db")  # audio.edit fields removed 2026-10-09 (owner-authorized reset)
+
+
 def comparable(obj, field):
-    """An approved object as the protection rules compare it across schema versions."""
+    """An approved object as the protection rules compare it across schema versions: without
+    audio.fx_request (v2 -> v3) and without the removed edit fields speed / gain_db (2026-10-09; the
+    current schema forbids them, so removing them is the only possible change)."""
     if field == "audio":
-        return {k: v for k, v in obj.items() if k != "fx_request"}
+        out = {k: v for k, v in obj.items() if k != "fx_request"}
+        if isinstance(out.get("edit"), dict):
+            out["edit"] = {k: v for k, v in out["edit"].items() if k not in REMOVED_EDIT_FIELDS}
+        return out
     return obj
+
+
+def strip_removed_edit_fields(doc):
+    """Pure. -> (new_doc, changes). Removes audio.edit.speed / gain_db from every mapping, draft or
+    approved; nothing else. changes: [{mapping_id, slot_id, audio_status, audio_revision, previous}]."""
+    new = json.loads(json.dumps(doc))
+    changes = []
+    for s in new.get("slots", []):
+        edit = s["audio"].get("edit") or {}
+        prev = {k: edit.pop(k) for k in REMOVED_EDIT_FIELDS if k in edit}
+        if prev:
+            changes.append({"mapping_id": s["mapping_id"], "slot_id": s["slot_id"],
+                            "audio_status": s["audio"]["status"], "audio_revision": s["audio"]["revision"],
+                            "previous": prev,
+                            "non_default": {k: v for k, v in prev.items() if v != {"speed": 1, "gain_db": 0}[k]}})
+    return new, changes
+
+
+def proof_only_removed_fields(old_doc, new_doc):
+    """Problems if new_doc differs from old_doc in anything but removed audio.edit fields (empty = proven)."""
+    problems = []
+    if {k: v for k, v in old_doc.items() if k != "slots"} != {k: v for k, v in new_doc.items() if k != "slots"}:
+        problems.append("top-level fields changed")
+    if [s["mapping_id"] for s in old_doc["slots"]] != [s["mapping_id"] for s in new_doc["slots"]]:
+        problems.append("mapping ids or order changed")
+        return problems
+    for o, n in zip(old_doc["slots"], new_doc["slots"]):
+        if {k: v for k, v in o.items() if k != "audio"} != {k: v for k, v in n.items() if k != "audio"}:
+            problems.append(f"{o['mapping_id']}: something besides audio changed")
+        if {k: v for k, v in o["audio"].items() if k != "edit"} != {k: v for k, v in n["audio"].items() if k != "edit"}:
+            problems.append(f"{o['mapping_id']}: audio status/source/fingerprint/revision changed")
+        oe = {k: v for k, v in o["audio"]["edit"].items() if k not in REMOVED_EDIT_FIELDS}
+        if oe != n["audio"]["edit"]:
+            problems.append(f"{o['mapping_id']}: edit fields besides speed/gain_db changed")
+    return problems
+
+
+def reset_removed_edit_fields(path, loaded_sha256, *, history_dir=None, now=None):
+    """One-time, owner-authorized (2026-10-09) migration: remove audio.edit.speed and gain_db from every
+    mapping, approved ones included, WITHOUT touching approvals (status, revision, approved_at,
+    fingerprint stay as they are; nothing becomes needs_rework). Same stale check, backup to .history/
+    and atomic write as every save. Refuses unless the result provably differs only in those fields.
+    -> (new sha256 or None when there is nothing to do, changes)."""
+    path = Path(path)
+    current = path.read_bytes()
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changes = strip_removed_edit_fields(old)
+    if not changes:
+        return None, []
+    bad = proof_only_removed_fields(old, new)
+    if bad:
+        raise ProtectedError("; ".join(bad))
+    errs = validate(new, load_schema(SCHEMA_NAME))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now), changes
 
 
 def migrate(path, loaded_sha256, *, history_dir=None, now=None):
@@ -187,3 +254,13 @@ def migrate(path, loaded_sha256, *, history_dir=None, now=None):
     if errs:
         raise StoreError("schema: " + "; ".join(errs[:5]))
     return _write(path, current, new, loaded_sha256, history_dir, now), len(new["slots"])
+
+
+def restore(path, data, loaded_sha256, *, history_dir=None, now=None):
+    """Put back exact earlier bytes (a migration rollback): stale check, .history/ backup of the current
+    file, atomic write. The caller proves `data` is the backup it means to restore. -> new sha256."""
+    path = Path(path)
+    current = path.read_bytes()
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    return _write(path, current, None, loaded_sha256, history_dir, now, raw=data)

@@ -9,9 +9,10 @@ Pipeline (docs/b2-audio-research.md §5.10):
        profile MCC's embedded decoder is proven to play, v-000017 vs v-000018)
     -> FMOD framing; sample_count = frames * 512 (as in every original MCC sample)
 
-`derive` changes no content. `derive_edited` inserts the owner's edit recipe (common/audio_edit:
-trims, cuts, fades, pitch-preserving speed, gain/loudness match) between the 44.1 kHz conversion and
-the padding, and records every step. `codec_roundtrip` is what the M4 editor plays: the same encode,
+`derive` changes no content. `derive_processed` inserts the processing stages (common/audio_edit:
+the owner's edit recipe of trims, cuts, fades and silences; optional loudness match; the global
+export gain, common/export_config) between the 44.1 kHz conversion and the padding, and records
+every step. `codec_roundtrip` is what the M4 editor plays: the same encode,
 decoded by the same libcelt, so the preview equals the bank content. Nothing here knows about
 missions, slots or mappings. Every derived stream is written to work/derived/<stream sha256>/ with
 recipe.json and the 44.1 kHz WAV it was encoded from.
@@ -130,11 +131,17 @@ def _write_derived(out_root, stream_sha, pcm, channels, recipe):
     return out
 
 
-def render_edited(src, edit, *, ffmpeg, ref_lufs=None):
-    """Source WAV -> 44.1 kHz PCM -> owner's recipe. -> (source_pcm, audio_edit.render result).
-    The single function both the M4 preview and the M6 build call (mono only)."""
+def needs_processing(edit, global_gain_db):
+    """False only for an unedited line with no global gain: then `derive` (the original path) is used."""
+    return not audio_edit.is_identity(edit) or bool(global_gain_db)
+
+
+def render_edited(src, edit, *, ffmpeg, ref_lufs=None, global_gain_db=0.0):
+    """Source WAV -> 44.1 kHz PCM -> recipe -> optional loudness match -> global gain.
+    -> (source_pcm, audio_edit.render result). The single function both the M4 preview and the M6
+    build call (mono only)."""
     source_pcm = to_mcc_pcm(ffmpeg, src, 1)
-    return source_pcm, audio_edit.render(source_pcm, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs)
+    return source_pcm, audio_edit.render(source_pcm, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
 
 
 def codec_roundtrip(celt, pcm, profile="fmod"):
@@ -145,32 +152,45 @@ def codec_roundtrip(celt, pcm, profile="fmod"):
     return decoded[CODEC_DELAY * 2:CODEC_DELAY * 2 + len(pcm)], enc
 
 
-def derive_edited(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, profile="fmod", source_meta=None):
-    """`derive` with the owner's edit recipe applied after the 44.1 kHz conversion (mono)."""
+def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global_gain_db=0.0, profile="fmod",
+                     source_meta=None, gain_source=None):
+    """`derive` with the processing stages (recipe, optional loudness match, global export gain)
+    applied after the 44.1 kHz conversion and before CELT (mono)."""
     src = Path(src)
-    source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs)
-    pcm = r["pcm"]
+    source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
+    pcm, st = r["pcm"], r["stats"]
     enc = encode_for_mcc(celt, pcm, 1, profile)
     decoded = celt.decode(enc["packets"], channels=1)
     stream_sha = sha256_bytes(enc["stream"])
     n = len(pcm) // 2
+    identity = audio_edit.is_identity(edit)
+    steps = [{"op": "ffmpeg_convert", "version": ffmpeg_version(ffmpeg), "args": ffmpeg_args("<source>", 1)}]
+    if not identity:
+        steps.append({"op": "audio_edit", "engine": audio_edit.ENGINE, "recipe": edit,
+                      "summary": audio_edit.summary(edit), "source_pcm_sha256": sha256_bytes(source_pcm)})
+    if st["loudness_match"]:
+        steps.append({"op": "loudness_match", "reference_lufs": st["mcc_reference_lufs"],
+                      "target_lufs": st["loudness_target_lufs"], "applied_gain_db": st["match_applied_gain_db"],
+                      "limiter": st["limiter"], "limiter_max_reduction_db": st["limiter_max_reduction_db"]})
+    steps += [
+        {"op": "global_gain", "requested_db": global_gain_db, "applied_db": st["global_gain_applied_db"],
+         "shortfall_db": st["global_gain_shortfall_db"], "source": gain_source,
+         "rule": f"linear; reduced to keep the peak <= {audio_edit.PEAK_CEILING_DB:g} dBFS; never limited"},
+        {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
+        {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
+         "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
+         "frame_samples": FRAME_SAMPLES, "packet_bytes": sorted({len(p) for p in enc["packets"]})}]
     recipe = {
-        "schema": RECIPE_SCHEMA,
+        "schema": RECIPE_SCHEMA, "render_engine": audio_edit.RENDER_ENGINE,
         "source": {"file": src.name, "sha256": sha256_file(src), **wav_info(src), **(source_meta or {})},
-        "steps": [
-            {"op": "ffmpeg_convert", "version": ffmpeg_version(ffmpeg), "args": ffmpeg_args("<source>", 1)},
-            {"op": "audio_edit", "engine": audio_edit.ENGINE, "recipe": edit, "summary": audio_edit.summary(edit),
-             "source_pcm_sha256": sha256_bytes(source_pcm), "stats": r["stats"]},
-            {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
-            {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
-             "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
-             "frame_samples": FRAME_SAMPLES, "packet_bytes": sorted({len(p) for p in enc["packets"]})},
-        ],
-        "content_changes": "owner edit recipe: " + audio_edit.summary(edit) + " (no effects; radio flag not applied)",
+        "steps": steps,
+        "content_changes": ("owner edit recipe: " + audio_edit.summary(edit) + "; " if not identity else "")
+        + f"global gain {st['global_gain_applied_db']:+g} dB (no effects; radio flag not applied)",
+        "stats": st,
         "pcm_44100": {"sha256": sha256_bytes(pcm), "samples": n, "seconds": round(n / SAMPLE_RATE, 3)},
         "output": {"stream_sha256": stream_sha, "stream_bytes": len(enc["stream"]), "frames": enc["frames"],
                    "sample_count": enc["sample_count"], "seconds": round(enc["sample_count"] / SAMPLE_RATE, 3),
                    "own_decode_snr_db": round(snr_db(pcm, decoded), 1)},
     }
     out = _write_derived(out_root, stream_sha, pcm, 1, recipe)
-    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, "edit_stats": r["stats"], **enc}
+    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, "edit_stats": st, **enc}

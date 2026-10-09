@@ -42,7 +42,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
 from common import audio_edit  # noqa: E402
-from common.audio_pipeline import derive, derive_edited, sha256_file, snr_db  # noqa: E402
+from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
+from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
@@ -112,23 +113,26 @@ def content_checks(exe, cand_path, idx, res):
     return checks, {"content_snr_db": round(snr, 1) if math.isfinite(snr) else str(snr)}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, mcc_ref):
+def build_once(original, targets, ce_audio, ffmpeg, celt, mcc_ref, cfg):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
     mcc_ref(entry) -> loudness (LUFS) of the slot's original Spain recording, for edit recipes that
-    match it."""
+    match it. cfg: the export config (global gain, applied once to every replacement)."""
     results = {}
+    gain = cfg["global_gain_db"]
     for e in targets:
         wav = ce_audio.wav(e["ce_mission"], e["language"], e["media"])
         meta = {"ce_line_ref": e["ce_line_ref"], "language": e["language"],
                 "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
-        if e.get("edit"):
-            ref = mcc_ref(e) if e["edit"]["loudness"]["mode"] == "match_mcc" else None
+        edit = e.get("edit") or audio_edit.EDIT_ZERO
+        if needs_processing(edit, gain):
+            ref = mcc_ref(e) if not audio_edit.is_identity(edit) and edit["loudness"]["mode"] == "match_mcc" else None
             try:
-                res = derive_edited(wav, e["edit"], ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, ref_lufs=ref,
-                                    profile="fmod", source_meta=dict(meta, mcc_reference_lufs=ref))
+                res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, ref_lufs=ref,
+                                       global_gain_db=gain, profile="fmod", gain_source=cfg["source"],
+                                       source_meta=dict(meta, mcc_reference_lufs=ref))
             except audio_edit.EditError as ex:
-                raise SystemExit(f"{e['slot_id']}: edit recipe cannot be rendered: {ex}")
-        else:
+                raise SystemExit(f"{e['slot_id']}: audio cannot be processed: {ex}")
+        else:  # unedited and no global gain: the original path, byte for byte
             res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
                          source_meta=meta)
         res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
@@ -207,11 +211,24 @@ def test_report(name, manifest, report, app):
     edited = [e for e in rep if e.get("edit")]
     L += ["", f"### Edited lines ({len(edited)}): the owner's recipes, rendered exactly as the M4 preview", ""]
     L += md_table(edited, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Recipe", lambda e: e["edit_summary"]),
-                           ("Source s", lambda e: e["edit_stats"]["source_s"]),
-                           ("Edited s", lambda e: e["edit_stats"]["output_s"]),
-                           ("LUFS out / Spain", lambda e: f"{e['edit_stats']['output_lufs']} / "
-                                                          f"{e['edit_stats']['mcc_reference_lufs']}"),
-                           ("Limiter dB", lambda e: e["edit_stats"]["limiter_max_reduction_db"])]) if edited         else ["- none"]
+                           ("Source s", lambda e: e["audio_stats"]["source_s"]),
+                           ("Edited s", lambda e: e["audio_stats"]["output_s"]),
+                           ("LUFS out / Spain", lambda e: f"{e['audio_stats']['output_lufs']} / "
+                                                          f"{e['audio_stats']['mcc_reference_lufs']}"),
+                           ("Match limiter dB", lambda e: e["audio_stats"]["limiter_max_reduction_db"])]) if edited \
+        else ["- none"]
+    g = manifest["global_gain"]
+    short = [e for e in rep if (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]
+    L += ["", f"### Global gain: {g['configured_db']:+g} dB ({g['source']}), applied once to every replacement", "",
+          f"Applied in full to {g['full']} line(s); **{len(short)} line(s) got less** because their peak would "
+          f"pass {audio_edit.PEAK_CEILING_DB:g} dBFS (no limiting or compression is used for the global gain).", ""]
+    if short:
+        L += md_table(short, [("Slot", lambda e: f"`{e['slot_id']}`"),
+                              ("Applied dB", lambda e: e["audio_stats"]["global_gain_applied_db"]),
+                              ("Short dB", lambda e: e["audio_stats"]["global_gain_shortfall_db"]),
+                              ("Peak before", lambda e: f"{round(e['audio_stats']['output_peak_dbfs'] - e['audio_stats']['global_gain_applied_db'], 2)} dBFS"),
+                              ("Note", lambda e: "loudness-matched (already at the peak ceiling)"
+                               if e["audio_stats"]["loudness_match"] else "")])
     radio = [e for e in rep if e["radio_effect"]]
     L += ["", f"## 3. Needs Radio Effect ({len(radio)}): recorded in the manifest, **no effect applied**", ""]
     L += [f"- `{e['slot_id']}` ← `{e['ce_line_ref']}`" for e in radio] or ["- none"]
@@ -231,6 +248,8 @@ def test_report(name, manifest, report, app):
           "- Radio effects not applied (v1.1); flagged lines play the clean CE recording.",
           "- Not built: stereo slots, concatenations (`ce_concat`), user recordings (none approved here "
           "unless listed above). Edited lines (flag E) are built from their recipes.",
+          f"- Global export gain {manifest['global_gain']['configured_db']:+g} dB on every replacement "
+          "(lines listed under “Global gain” got less, to avoid clipping).",
           "- Durations differ from the Spain recordings (table §1); MCC proved it plays longer/shorter samples "
           "(E1b, E3), but timing against cutscenes/scripts is part of this test.", "",
           "## 6. In-game checklist", "",
@@ -326,6 +345,11 @@ def main():
         raise SystemExit("nothing eligible to build")
     if not args.ffmpeg:
         raise SystemExit("ffmpeg not found")
+    try:
+        cfg = load_export_config(REPO_ROOT)
+    except ConfigError as e:
+        raise SystemExit(str(e))
+    print(f"global gain {cfg['global_gain_db']:+g} dB ({cfg['source']})")
 
     pins = json.loads((REPO_ROOT / "work/mcc/build.json").read_text(encoding="utf-8"))["files"]
     original = BANK.read_bytes()
@@ -347,9 +371,9 @@ def main():
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
     print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref)
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref, cfg)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref, cfg)
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
@@ -392,8 +416,10 @@ def main():
                      stream_sha256=r["recipe"]["output"]["stream_sha256"],
                      derived_dir=r["dir"].relative_to(REPO_ROOT).as_posix(),
                      content_snr_db=per_target[e["slot_id"]].get("content_snr_db"))
-            if e.get("edit"):
-                e["edit_stats"] = r["edit_stats"]
+            st = r.get("edit_stats")
+            e["audio_stats"] = st  # None: original path (no recipe, no global gain)
+            e["global_gain_applied_db"] = st["global_gain_applied_db"] if st else 0.0
+            e["warnings"] = st["warnings"] if st else []
     manifest = {
         "schema": MANIFEST_SCHEMA, "name": name, "levels": levels,
         "built_at": dt.datetime.now().isoformat(timespec="seconds"),
@@ -411,7 +437,16 @@ def main():
         "mission_association": association, "folders": folder_summary(plan["entries"]),
         "counts": dict(acts), "radio_effect_slots": [e["slot_id"] for e in plan["entries"] if e["radio_effect"]],
         "edited_slots": [e["slot_id"] for e in plan["entries"] if e["action"] == "replace" and e.get("edit")],
-        "audio_edit_engine": audio_edit.ENGINE,
+        "audio_edit_engine": audio_edit.ENGINE, "render_engine": audio_edit.RENDER_ENGINE,
+        "global_gain": {"configured_db": cfg["global_gain_db"], "source": cfg["source"],
+                        "config_sha256": cfg["sha256"], "peak_ceiling_dbfs": audio_edit.PEAK_CEILING_DB,
+                        "rule": "linear, applied once after the recipe and the optional loudness match, "
+                                "before CELT; reduced (never limited) when the peak would pass the ceiling",
+                        "full": sum(1 for r in results.values() if not (r.get("edit_stats") or {}).get(
+                            "global_gain_shortfall_db")),
+                        "short": [e["slot_id"] for e in plan["entries"] if e["action"] == "replace"
+                                  and (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]},
+        "warnings": {e["slot_id"]: e["warnings"] for e in plan["entries"] if e.get("warnings")},
         "slots": plan["entries"], "subtitles": subs, "level_status": inv,
     }
     report = {"schema": "m6-validation-report/1", "name": name, "ok": ok, "checks": checks,
@@ -427,6 +462,9 @@ def main():
     print(f"{'PASS' if ok else 'FAILED'}: {len(checks) - len(failed)}/{len(checks)} checks; "
           f"{len(results)} sample(s) replaced; candidate {cand_sha} ({len(cand) - len(original):+,} B); "
           f"{report['seconds']} s")
+    g = manifest["global_gain"]
+    print(f"  global gain {g['configured_db']:+g} dB ({g['source']}): full on {g['full']} line(s), reduced on "
+          f"{len(g['short'])} to avoid clipping (test_report.md lists them)")
     for k in failed:
         print("  FAILED:", k)
     if drift_during["changed_or_revoked"] or drift_during["newly_eligible"]:

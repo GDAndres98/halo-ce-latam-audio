@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "ui"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import audio_edit as ae  # noqa: E402
-from common.audio_pipeline import CODEC_DELAY, derive, derive_edited, to_mcc_pcm  # noqa: E402
+from common.audio_pipeline import CODEC_DELAY, derive, derive_processed, to_mcc_pcm  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.edit_preview import EditPreview  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
@@ -54,20 +54,22 @@ def write_wav(path, x, fs=FS):
 class RecipeTests(unittest.TestCase):
     def test_identity_and_canonical_form(self):
         self.assertEqual(ae.normalize({}), ae.EDIT_ZERO)
-        self.assertEqual(ae.normalize({"speed": 1.0, "limiter": False, "crossfade_ms": 40}), ae.EDIT_ZERO)
+        self.assertEqual(ae.normalize({"limiter": False, "crossfade_ms": 40}), ae.EDIT_ZERO)
         self.assertTrue(ae.is_identity({"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}))
         r = ae.normalize({"trim_start_s": 0.12345, "cuts": [{"start_s": 1.2, "end_s": 1.4}, {"start_s": 0.5, "end_s": 0.6}],
-                          "speed": 1.0804, "gain_db": -1.26, "loudness": {"mode": "match_mcc", "offset_db": 0}}, SRC)
+                          "loudness": {"mode": "match_mcc", "offset_db": -1.26}}, SRC)
         self.assertEqual(r["trim_start_s"], 0.123)
         self.assertEqual([c["start_s"] for c in r["cuts"]], [0.5, 1.2])  # sorted
-        self.assertEqual((r["speed"], r["gain_db"], r["engine"], r["for_source"]), (1.08, -1.3, ae.ENGINE, SRC))
+        self.assertEqual((r["loudness"]["offset_db"], r["engine"], r["for_source"]), (-1.3, ae.ENGINE, SRC))
+        self.assertNotIn("speed", r)
+        self.assertNotIn("gain_db", r)
         self.assertTrue(r["limiter"])
         self.assertEqual(ae.normalize(r), r)  # idempotent
-        self.assertIn("speed ×1.08", ae.summary(r))
         self.assertIn("match MCC", ae.summary(r))
+        self.assertNotIn("speed", ae.summary(r))
 
     def test_rules(self):
-        for bad in ({"speed": 3}, {"gain_db": 40}, {"bogus": 1}, {"cuts": [{"start_s": 1}]},
+        for bad in ({"speed": 1.1}, {"speed": 1}, {"gain_db": 0}, {"gain_db": 3}, {"bogus": 1}, {"cuts": [{"start_s": 1}]},
                     {"cuts": [{"start_s": 1, "end_s": 0.5}]}, {"loudness": {"mode": "loud"}}, {"trim_start_s": "x"},
                     {"cuts": [{"start_s": 0.1, "end_s": 0.5}, {"start_s": 0.4, "end_s": 0.6}]}, {"limiter": 1}):
             with self.assertRaises(ae.EditError, msg=bad):
@@ -99,12 +101,15 @@ class RecipeTests(unittest.TestCase):
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
         edit_schema = schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"]
-        r = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.5, "end_s": 0.6}], "speed": 1.1,
+        r = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
                           "silences": [{"at_s": 0.8, "dur_s": 0.4}],
                           "loudness": {"mode": "match_mcc", "offset_db": -2}}, SRC)
         self.assertEqual(validate(r, {**edit_schema, "$defs": schema["$defs"]}), [])
         self.assertEqual(validate(dict(ae.EDIT_ZERO), {**edit_schema, "$defs": schema["$defs"]}), [])
-        self.assertTrue(validate(dict(r, speed=5), {**edit_schema, "$defs": schema["$defs"]}))
+        for gone in ({"speed": 1.0}, {"gain_db": 0}):  # removed fields are no longer in the schema
+            self.assertTrue(validate(dict(r, **gone), {**edit_schema, "$defs": schema["$defs"]}))
+        self.assertEqual(ae.removed_fields(dict(r, speed=1, gain_db=0)), ["speed", "gain_db"])
+        self.assertTrue(ae.problems(dict(ae.EDIT_ZERO, speed=1.2)))  # reported even on an identity recipe
 
 
 class DspTests(unittest.TestCase):
@@ -166,7 +171,7 @@ class DspTests(unittest.TestCase):
         quiet = [0.1 * v for v in x]
         self.assertEqual(ae.limit(quiet, c), (quiet, 0.0))  # untouched below the ceiling
 
-    def test_render_without_speed_is_deterministic_and_matches_loudness(self):
+    def test_render_is_deterministic_and_matches_loudness(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))
         e = ae.normalize({"trim_start_s": 0.05, "trim_end_s": 0.05, "fade_in_ms": 10, "fade_out_ms": 10,
                           "cuts": [{"start_s": 0.7, "end_s": 0.8}], "loudness": {"mode": "match_mcc", "offset_db": 0}}, SRC)
@@ -178,32 +183,14 @@ class DspTests(unittest.TestCase):
         self.assertLessEqual(st["output_peak_dbfs"], -1.0 + 0.01)
         with self.assertRaises(ae.EditError):
             ae.render(pcm, e)                     # match needs the MCC reference
-        with self.assertRaises(ae.EditError):
-            ae.render(pcm, ae.normalize({"speed": 1.2}, SRC))   # speed needs ffmpeg
-        with self.assertRaises(ae.EditError):
-            ae.render(pcm, dict(ae.EDIT_ZERO))      # identity is never rendered
-        nolim = ae.render(ae.float_to_pcm16(speech(1.5, amp=0.3)),
-                          dict(e, limiter=False, loudness={"mode": "off", "offset_db": 0}, gain_db=24))
-        self.assertGreater(nolim["stats"]["gain_lowered_for_peak_db"], 0)
+        self.assertEqual(ae.render(pcm, dict(ae.EDIT_ZERO))["pcm"], pcm)  # identity, no global gain: unchanged
+        loud = ae.float_to_pcm16(speech(1.5, amp=0.9))
+        nolim = ae.render(loud, dict(e, limiter=False, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
+        self.assertGreater(nolim["stats"]["match_gain_lowered_for_peak_db"], 0)
         self.assertEqual(nolim["stats"]["limiter_max_reduction_db"], 0.0)
-
-    @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
-    def test_speed_is_pitch_preserving_length_exact_and_deterministic(self):
-        pcm = ae.float_to_pcm16([0.3 * math.sin(2 * math.pi * 440 * k / FS) for k in range(2 * FS)])
-        e = ae.normalize({"speed": 1.25}, SRC)
-        r1, r2 = ae.render(pcm, e, ffmpeg=FFMPEG), ae.render(pcm, e, ffmpeg=FFMPEG)
-        self.assertEqual(r1["pcm"], r2["pcm"])
-        self.assertLessEqual(abs(r1["stats"]["output_samples"] - round(2.0 * FS / 1.25)), 2)
-        self.assertIn("formant=preserved", r1["stats"]["tempo_filter"])
-        sil = ae.render(pcm, ae.normalize({"speed": 1.25, "silences": [{"at_s": 1.0, "dur_s": 0.5}]}, SRC), ffmpeg=FFMPEG)
-        self.assertEqual(sil["stats"]["output_samples"], r1["stats"]["output_samples"] + FS // 2)  # not stretched
-        mid = round(FS / 1.25)
-        self.assertEqual(set(array("h", sil["pcm"])[mid + 50:mid + FS // 2 - 50]), {0})
-
-        def zero_cross_rate(p):  # pitch of a steady 440 Hz tone: unchanged when only the tempo changes
-            a = array("h", p)[FS // 4:-FS // 4]
-            return sum(1 for i in range(1, len(a)) if (a[i - 1] < 0) != (a[i] < 0)) / len(a) * FS / 2
-        self.assertAlmostEqual(zero_cross_rate(r1["pcm"]), 440, delta=5)
+        self.assertTrue(any("lowered" in w for w in nolim["stats"]["warnings"]))
+        off = ae.render(loud, dict(e, loudness={"mode": "off", "offset_db": 0}))  # no matching: never limited
+        self.assertEqual((off["stats"]["limiter_max_reduction_db"], off["stats"]["limiter"]), (0.0, False))
 
 
 @unittest.skipUnless(FFMPEG and HAVE_CELT, "ffmpeg and libcelt needed")
@@ -225,24 +212,39 @@ class ParityTests(unittest.TestCase):
             return w.readframes(w.getnframes())
 
     def test_edited_preview_equals_m6_build(self):
-        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.8, "end_s": 0.9}], "speed": 1.1,
-                          "silences": [{"at_s": 0.5, "dur_s": 0.25}, {"at_s": 0.8, "dur_s": 0.1}], "fade_in_ms": 10, "loudness": {"mode": "match_mcc", "offset_db": -1}, "gain_db": 0.5}, SRC)
+        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.8, "end_s": 0.9}],
+                          "silences": [{"at_s": 0.5, "dur_s": 0.25}, {"at_s": 0.8, "dur_s": 0.1}], "fade_in_ms": 10,
+                          "loudness": {"mode": "match_mcc", "offset_db": -1}}, SRC)
         prev = EditPreview(self.root, FFMPEG, Celt011)
-        p = prev.render(self.src, e, -15.0)
-        built = derive_edited(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived", ref_lufs=-15.0)
+        p = prev.render(self.src, e, -15.0, 3.0)
+        built = derive_processed(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived",
+                                 ref_lufs=-15.0, global_gain_db=3.0)
         self.assertEqual(self.pcm_of(prev.path(p["key"], "edited")), built["pcm"])
         n = len(built["pcm"])
         self.assertEqual(self.pcm_of(prev.path(p["key"], "encoded")), built["decoded"][CODEC_DELAY * 2:CODEC_DELAY * 2 + n])
         self.assertEqual(p["stats"]["encoded_sample_count"], built["sample_count"])
         recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
-        self.assertEqual([s["op"] for s in recipe["steps"]], ["ffmpeg_convert", "audio_edit", "pad_end", "celt_encode"])
+        self.assertEqual([s["op"] for s in recipe["steps"]],
+                         ["ffmpeg_convert", "audio_edit", "loudness_match", "global_gain", "pad_end", "celt_encode"])
         self.assertEqual(recipe["steps"][1]["recipe"], e)
-        self.assertEqual(prev.render(self.src, e, -15.0)["key"], p["key"])  # cached
+        self.assertEqual(prev.render(self.src, e, -15.0, 3.0)["key"], p["key"])  # cached
+        self.assertNotEqual(prev.render(self.src, e, -15.0, 0.0)["key"], p["key"])  # gain is part of the preview
         self.assertEqual(self.pcm_of(self.src)[:100], ae.float_to_pcm16(speech(1.7, fs=48000, amp=0.08))[:100])  # original intact
 
-    def test_identity_preview_equals_the_original_pipeline(self):
+    def test_unedited_line_preview_equals_the_build(self):
         prev = EditPreview(self.root, FFMPEG, Celt011)
-        p = prev.render(self.src, dict(ae.EDIT_ZERO), None)
+        p = prev.render(self.src, dict(ae.EDIT_ZERO), None, 3.0)   # global gain only
+        built = derive_processed(self.src, dict(ae.EDIT_ZERO), ffmpeg=FFMPEG, celt=self.celt,
+                                 out_root=self.root / "derived", global_gain_db=3.0)
+        n = len(built["pcm"])
+        self.assertEqual(self.pcm_of(prev.path(p["key"], "encoded")), built["decoded"][CODEC_DELAY * 2:CODEC_DELAY * 2 + n])
+        self.assertEqual(p["stats"]["global_gain_applied_db"], 3.0)
+        recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
+        self.assertEqual([s["op"] for s in recipe["steps"]], ["ffmpeg_convert", "global_gain", "pad_end", "celt_encode"])
+
+    def test_zero_gain_unedited_preview_equals_the_original_pipeline(self):
+        prev = EditPreview(self.root, FFMPEG, Celt011)
+        p = prev.render(self.src, dict(ae.EDIT_ZERO), None, 0.0)
         old = derive(self.src, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived")
         self.assertEqual(self.pcm_of(prev.path(p["key"], "edited")), to_mcc_pcm(FFMPEG, self.src))
         n = len(old["pcm"])
@@ -270,7 +272,7 @@ class M4EditTests(AppTestBase):
         self.app = M4App(self.root, ce_audio=StubCe(self.wav), today=lambda: "2026-10-09", run_validator=False)
 
     def edit(self, **kw):
-        return dict({"trim_start_s": 0.1, "cuts": [{"start_s": 1.0, "end_s": 1.2}], "speed": 1.05,
+        return dict({"trim_start_s": 0.1, "cuts": [{"start_s": 1.0, "end_s": 1.2}], "fade_in_ms": 10,
                      "loudness": {"mode": "match_mcc", "offset_db": 0}}, **kw)
 
     def audio(self, edit=None, lang="Spanish(Mexico)"):
@@ -293,7 +295,7 @@ class M4EditTests(AppTestBase):
         self.assertTrue(self.app.slots("z10")["slots"][0]["edited"])
         # sending no edit keeps it while the source is the same
         self.save(audio=self.audio(), notes="n")
-        self.assertEqual(self.doc()["slots"][0]["audio"]["edit"]["speed"], 1.05)
+        self.assertEqual(self.doc()["slots"][0]["audio"]["edit"]["fade_in_ms"], 10)
         # reset
         self.save(audio=self.audio({}))
         self.assertEqual(self.doc()["slots"][0]["audio"]["edit"], {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0})
@@ -304,7 +306,7 @@ class M4EditTests(AppTestBase):
         approved = copy.deepcopy(self.doc()["slots"][0]["audio"])
         self.assertEqual(approved["status"], "approved")
         with self.assertRaises(ApiError) as cm:
-            self.save(audio=self.audio(self.edit(speed=1.1)))
+            self.save(audio=self.audio(self.edit(fade_in_ms=20)))
         self.assertEqual(cm.exception.status, 409)
         with self.assertRaises(ApiError):
             self.save(audio=self.audio({}))                     # reset is a change too
@@ -312,8 +314,8 @@ class M4EditTests(AppTestBase):
         self.save(actions=[{"action": "needs_rework", "field": "audio"}])
         a = self.doc()["slots"][0]["audio"]
         self.assertEqual((a["status"], a["revision"], a["edit"]), ("needs_rework", 2, approved["edit"]))
-        self.save(audio=self.audio(self.edit(speed=1.1)))
-        self.assertEqual(self.doc()["slots"][0]["audio"]["edit"]["speed"], 1.1)
+        self.save(audio=self.audio(self.edit(fade_in_ms=20)))
+        self.assertEqual(self.doc()["slots"][0]["audio"]["edit"]["fade_in_ms"], 20)
 
     def test_an_edit_never_moves_to_another_recording(self):
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]}, audio=self.audio(self.edit()))
@@ -331,7 +333,7 @@ class M4EditTests(AppTestBase):
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]}, audio=self.audio())
         before = (self.root / "mappings/manual_mappings.json").read_bytes()
         for bad, status in ((self.edit(trim_end_s=1.9), 422), (self.edit(trim_start_s=1.5), 400),
-                            (self.edit(speed=9), 400), ("x", 400)):
+                            (self.edit(speed=1.1), 400), (self.edit(gain_db=2), 400), ("x", 400)):
             with self.assertRaises(ApiError) as cm:
                 self.save(audio=self.audio(bad))
             self.assertEqual(cm.exception.status, status)
@@ -348,6 +350,7 @@ class M4EditTests(AppTestBase):
         before = {p: p.read_bytes() for p in (self.root / "mappings").glob("*")}
         r = app.edit_preview({"slot_id": self.slot, **SRC, "edit": self.edit(loudness={"mode": "off", "offset_db": 0})})
         self.assertFalse(r["identity"])
+        self.assertEqual((r["export_config"]["source"], r["stats"]["global_gain_requested_db"]), ("default", 3.0))
         self.assertTrue(app.preview_wav(r["key"], "encoded").is_file())
         self.assertLess(r["stats"]["output_s"], 2.0)
         with self.assertRaises(ApiError):
@@ -396,7 +399,7 @@ class ValidatorAndPlanTests(M4EditTests):
         doc = self.approved_edited()
         built = self.plan(doc)["entries"]
         changed = copy.deepcopy(doc)
-        changed["slots"][0]["audio"]["edit"]["speed"] = 1.2
+        changed["slots"][0]["audio"]["edit"]["fade_in_ms"] = 30
         self.assertEqual(compare_plans(built, self.plan(changed)["entries"])["changed_or_revoked"], [self.slot])
         self.assertEqual(compare_plans(built, self.plan(doc)["entries"])["changed_or_revoked"], [])
 

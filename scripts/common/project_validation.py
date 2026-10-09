@@ -242,9 +242,12 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
             if info["media"].get(x["language"], {}).get("evidence") != "explicit":
                 out.append(finding("error" if a["status"] == "approved" else "warning", "audio_source_unresolved",
                                    file, w + "/audio", f"{ref} has no resolved {x['language']} media"))
+        for k in audio_edit.removed_fields(a["edit"]):  # speed / gain_db, removed 2026-10-09
+            out.append(finding("error", "audio_edit_removed_field", file, w + "/audio/edit",
+                               f"{k} is no longer supported; run python scripts/validate/migrate_reset_speed_gain.py"))
         if not audio_edit.is_identity(a["edit"]):  # owner's edit recipe (non-destructive, applied by M6)
             sev = "error" if a["status"] == "approved" else "warning"
-            for p in audio_edit.problems(a["edit"]):
+            for p in audio_edit.problems({k: v for k, v in a["edit"].items() if k not in audio_edit.REMOVED_FIELDS}):
                 out.append(finding("error", "invalid_audio_edit", file, w + "/audio/edit", p))
             if a["source"] != "ce":
                 out.append(finding("error", "audio_edit_unsupported_source", file, w + "/audio/edit",

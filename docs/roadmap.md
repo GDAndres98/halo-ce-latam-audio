@@ -274,9 +274,12 @@ Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implement
 **Audio editor ✅ IMPLEMENTED (2026-10-09), owner hands-on test pending.** Non-destructive per-mapping
 recipes in `audio.edit`:
 - trims, interior cuts with crossfades, fades;
-- pitch-preserving speed;
-- loudness match to the slot's Spain recording, with a peak limiter;
-- manual gain.
+- inserted silences;
+- optional loudness match to the slot's Spain recording;
+- a global export gain (+3 dB default, `config/audio_export.json`).
+
+Speed and per-line manual gain were removed after the owner's test (2026-10-09); saved values were
+cleared by a one-time migration.
 
 Waveforms and "as encoded" previews are in M4 (user guide §4.1). M6 builds edited lines from the
 same render (m6-build.md §2.1).
