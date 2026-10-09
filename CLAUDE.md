@@ -145,6 +145,14 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       unique, deterministic, stable and round-trip; `a10` is unchanged.
       `mission-map/1` now accepts `x10`–`x70`. Never invent mission-map
       entries.
+    - **M6 limited PoC (2026-10-08):** `python scripts/build/m6_build.py
+      --level a10` builds an **audio-only** candidate bank from approved M4
+      decisions into `work/m6/a10/` (90 lines, 24/24 checks, deterministic,
+      candidate `7d8ac2ef…`). Subtitle tables are **not** generated:
+      variable-length writing is unvalidated (`docs/m6-build.md` §4).
+      Install/rollback is `scripts/build/m6_install.py --build a10
+      check|preflight|install|rollback|status`. **Never run
+      preflight/install without the owner's explicit approval for that build.**
     - **Deferred (owner):** milestone M-SYS (CE `Audio/Systemic` barks),
       `temp_mocap_VO` (backlog), and stereo replacement (stereo slots are
       only shown and played).

@@ -278,6 +278,12 @@ Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implement
   current builds.
 
 ### M6 — Build pipeline (gated by B1 + B2)
+
+**Limited PoC ✅ built offline (2026-10-08, owner request):** `python scripts/build/m6_build.py
+--level a10` gives an audio-only `a10` bank (90 approved CE lines, 24/24 checks, deterministic).
+Subtitle generation is disabled until variable-length tables are validated. Install is waiting for
+the owner's approval (`m6_install.py`). See [`m6-build.md`](m6-build.md).
+
 - [ ] Non-destructive conversion: CE es-MX media → MCC slot format, with
   recipes (design §6).
 - [ ] The Spanish bank is rebuilt **as a new file in `work/`**. Every
@@ -793,6 +799,7 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | Campaign-wide catalogs (owner request, 2026-10-08) | ✅ built offline; the 3 rule extensions (`campaign-catalog.md` §3) **approved by the owner 2026-10-08** and verified (`verify_slot_ids.py`, all checks pass) |
 | `mission-map/1` accepts cutscene folders `x10`–`x70` | ✅ owner request 2026-10-08 (no entries added) |
 | M4 search / missing-subtitle / radio-flag update, `manual-mappings/3` | ✅ owner request 2026-10-08; owner hands-on review pending |
+| M6 limited PoC (offline batch build, audio only) | ✅ built 2026-10-08 (`work/m6/a10/`, candidate `7d8ac2ef…`); **in-game install awaits the owner's explicit approval** |
 | B2 E4–E5 | not approved |
 | WC (Workshop compatibility checkpoint, inside B2) | WC-1 (docs) ✅ done 2026-10-08 (`workshop-research.md`): no documented override of FSB/loc files; WC-2 (inspect one subscribed CE mod) needs approval |
 | M4 matching UI | ✅ implemented 2026-10-08 (`m4-user-guide.md`); owner trial pending |
