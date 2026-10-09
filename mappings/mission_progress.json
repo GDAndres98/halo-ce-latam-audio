@@ -1,0 +1,12 @@
+{
+  "schema": "mission-progress/1",
+  "levels": [
+    {
+      "mcc_level": "a10",
+      "status": "in_progress",
+      "updated_at": "2026-10-08",
+      "verification": null,
+      "note": ""
+    }
+  ]
+}
