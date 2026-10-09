@@ -284,6 +284,10 @@ Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implement
 Subtitle generation is disabled until variable-length tables are validated. Install is waiting for
 the owner's approval (`m6_install.py`). See [`m6-build.md`](m6-build.md).
 
+Multi-folder update: `--level a10 --level x10 --level x20` gives 165 lines in one bank
+(`053c9741…`, 23/23 checks). `--mission a10` selects `a10` plus `x10`/`x20`/`x30` from map evidence
+(`build_level_folders.py`).
+
 - [ ] Non-destructive conversion: CE es-MX media → MCC slot format, with
   recipes (design §6).
 - [ ] The Spanish bank is rebuilt **as a new file in `work/`**. Every

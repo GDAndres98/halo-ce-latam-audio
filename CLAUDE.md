@@ -150,6 +150,13 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       decisions into `work/m6/a10/` (90 lines, 24/24 checks, deterministic,
       candidate `7d8ac2ef…`). Subtitle tables are **not** generated:
       variable-length writing is unvalidated (`docs/m6-build.md` §4).
+      Multi-folder builds: `--level a10 --level x10 --level x20` (one bank;
+      all dialogue is in `sounds_dialogs_spanish.fsb`), or `--mission a10`
+      (own folder plus the cinematics only that map uses, from
+      `work/mcc/level_folders.json`, built by
+      `scripts/catalog/build_level_folders.py`; `a10` ->
+      `x10`/`x20`/`x30`). `m6_install.py` refuses a build whose replaced
+      lines were changed or revoked in M4 since.
       Install/rollback is `scripts/build/m6_install.py --build a10
       check|preflight|install|rollback|status`. **Never run
       preflight/install without the owner's explicit approval for that build.**

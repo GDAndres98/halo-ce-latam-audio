@@ -1,6 +1,8 @@
 # M6 — building a test mod from M4 mappings
 
-**For:** the project owner. **Status (2026-10-08):** first limited proof of concept.
+**For:** the project owner. **Status (2026-10-08):** limited proof of concept.
+- Builds so far: `a10`; then `a10` + `x10` + `x20` (165 lines, 23/23 checks, candidate
+  `053c9741…`).
 - `a10` builds **audio-only**: 90 approved CE lines, 24/24 checks.
 - Subtitle generation is disabled (§4).
 - Nothing is installed without the owner's explicit approval.
@@ -8,10 +10,33 @@
 ## 1. Build
 
 ```
-python scripts/build/m6_build.py --level a10                          # ~1 min; work/m6/a10/
+python scripts/catalog/build_level_folders.py                         # once: which folders each map uses
+python scripts/build/m6_build.py --mission a10                        # a10 + its cinematics x10, x20, x30
+python scripts/build/m6_build.py --level a10 --level x10 --level x20  # explicit folders -> work/m6/a10_x10_x20/
 python scripts/build/m6_build.py --level a10 --inventory-only         # report only, build nothing
-python scripts/build/m6_build.py --level a10 --level x10 --name a10_x10   # several levels, one bank
 ```
+
+**Which folders belong to a mission (`--mission`).** `build_level_folders.py` scans each installed
+campaign `.map` (read-only) for the dialogue tag paths it contains, and writes
+`work/mcc/level_folders.json` (`derived:map_tag_path_scan`).
+- **The selection:** the map's own folder, plus the cinematic `xNN` folders used by no other map.
+- **Results (2026-10-08):**
+
+  | Map | Cinematic folders found in it |
+  |---|---|
+  | `a10` (The Pillar of Autumn) | `x10` 41/41, `x20` 36/36, `x30` 16/16 tags |
+  | `c10` | `x50` |
+  | `d40` | `x70` |
+  | `a30`–`b40`, `c20`, `c40`, `d20` | none |
+
+  `multiplayer1` is used by no campaign map.
+- **Shared generic bark folders** (`marines`, `grunt`, …) appear in many maps. They are reported but
+  never selected (milestone M-SYS, deferred).
+
+**One bank for everything.** Every `sound\dialog\…` folder lives in the single
+`sounds_dialogs_spanish.fsb` (`a10` = samples 0–100, `x10` = 5523–5563, `x20` = 5564–5599). A
+multi-folder build is one candidate bank with replacements in several ranges. The `.lst.bin` is
+unchanged.
 
 - **Mission-independent.** `--level` takes any MCC catalog folder.
 - **Several levels go into one candidate bank.** MCC has one Spanish dialogue bank for the whole
@@ -21,8 +46,12 @@ python scripts/build/m6_build.py --level a10 --level x10 --name a10_x10   # seve
   - It overwrites `work/m6/<name>/`.
   - It reuses cached decodes (`work/m6/_cache/`) and derived streams (`work/derived/`).
   - The same approved decisions always give a byte-identical bank.
-- **You can keep working in M4 while it builds.** The build only fails if the selected levels' plan
-  changed in the meantime (`plan_unchanged_during_build`).
+- **You can keep working in M4 while it builds.**
+  - The build uses the decisions it read at the start.
+  - Anything you change meanwhile is listed in `build_manifest.json` (`decisions_changed_during_build`).
+  - `m6_install.py` re-plans from your **current** mappings at `check`, `preflight` and `install`. It
+    **refuses** if a line in the build was changed or revoked since (rebuild), and only **notes**
+    newer approvals that the build doesn't contain yet.
 
 **Inputs, read-only:**
 - `mappings/manual_mappings.json` (through `mapping_store.load`) and the git-ignored local file;
@@ -79,7 +108,8 @@ Rules:
   - no new clipping; silence after the end.
 - **Determinism:** the whole build runs twice in one go and gives identical bytes (also identical
   across separate runs).
-- **Stability:** the selected levels' plan is unchanged at the end; `.lst` not written.
+- **Stability:** `.lst` not written. Edits made in M4 during the build are reported; the install
+  tool guards against stale builds (§1).
 
 ## 4. Subtitles: disabled for now
 
