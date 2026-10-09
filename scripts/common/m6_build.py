@@ -5,27 +5,31 @@ changes a mapping, approves anything or pairs lines: the only input is what the 
 mappings/manual_mappings.json (read through mapping_store.load).
 
 Audio eligibility (per mapping in the selected levels):
-  replace         audio approved, source `ce` (one CE line), mono slot, no edit trims, the CE line has
-                  resolved media in that language, and the approved fingerprint still equals the
-                  current one (no drift). The target is the slot's index in the SPANISH bank's own
-                  name table (from the MCC catalog), never an English index.
+  replace         audio approved, source `ce` (one CE line), mono slot, the CE line has resolved
+                  media in that language, the approved fingerprint still equals the current one (no
+                  drift), and its edit recipe (if any) is valid and made for that source. The
+                  target is the slot's index in the SPANISH bank's own name table (from the MCC
+                  catalog), never an English index. An edited line carries its recipe (`edit`);
+                  the CLI renders it with common/audio_edit, exactly as the M4 preview does.
   keep_original   audio approved as "keep Spain" -> sample preserved byte for byte.
   not_eligible    draft / needs_rework / unsupported (ce_concat, user_recording, composite, stereo,
-                  trims) / invalid (drift, unresolved media, test event) -> sample preserved, reason
+                  gap on one line) / invalid (drift, unresolved media, test event, bad recipe) -> sample
+                  preserved, reason
                   reported. Nothing is approved or changed to make it eligible.
 Subtitles are planned independently of audio (`subtitle_plan`) as a DRY RUN: this build writes no
 subtitle table, because mcc_loc_patch only supports same-length replacement and variable-length
 tables are unvalidated (docs/m6-build.md §4).
 """
+import json
 from collections import Counter, defaultdict
 
+from . import audio_edit
 from .fsb5_lib import parse_header
 from .fsb5_writer import ALIGN, build, decompose, replace_sample, sample_spans
 from .mcc_loc import loc_key
 from .project_validation import audio_fingerprint, subtitle_fingerprint
 
 PLAN_SCHEMA = "m6-build-plan/1"
-EDIT_ZERO = {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}
 
 
 def _flag(m, name, key):
@@ -46,7 +50,8 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
         e = {"slot_id": sid, "level": level, "mcc_tag": rec["mcc_tag"], "spanish_index": sample["index"],
              "channels": sample["channels"], "original_sample_count": sample["sample_count"],
              "original_seconds": sample["duration_s"], "mapping_id": None, "action": "keep_original",
-             "reason": "no mapping (Spain audio stays)", "radio_effect": False, "different_but_fits": False}
+             "reason": "no mapping (Spain audio stays)", "radio_effect": False, "different_but_fits": False,
+             "edit": None}
         if len(ms) > 1:
             conflicts.append({"code": "duplicate_mapping_for_slot", "slot_id": sid,
                               "mapping_ids": [m["mapping_id"] for m in ms]})
@@ -71,8 +76,8 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
             e.update(action="not_eligible", reason=f"unsupported in this build: audio source {a['source']}")
         elif sample["channels"] != 1:
             e.update(action="not_eligible", reason="unsupported: stereo slot (stereo replacement deferred)")
-        elif a["edit"] != EDIT_ZERO:
-            e.update(action="not_eligible", reason="unsupported: trims/gaps are not implemented")
+        elif a["edit"].get("gap_s"):
+            e.update(action="not_eligible", reason="unsupported: a gap applies only between concatenated lines")
         elif len(a["sources"]) != 1 or a["sources"][0]["kind"] != "ce":
             e.update(action="not_eligible", reason="invalid: source 'ce' needs exactly one CE line")
         else:
@@ -89,9 +94,15 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
             elif a["fingerprint"] != audio_fingerprint(m, ce_idx, mcc_idx, local):
                 e.update(action="not_eligible",
                          reason="invalid: approved fingerprint no longer matches the catalogs (drift); rework it")
+            elif edit_problems(a["edit"], ref, lang):
+                e.update(action="not_eligible",
+                         reason="invalid: edit recipe: " + "; ".join(edit_problems(a["edit"], ref, lang)))
             else:
-                e.update(action="replace", reason="approved CE audio", ce_line_ref=ref, language=lang,
-                         ce_mission=line[0], media=media["media"][0])
+                edited = not audio_edit.is_identity(a["edit"])
+                e.update(action="replace", reason="approved CE audio" + (" (edited)" if edited else ""),
+                         ce_line_ref=ref, language=lang, ce_mission=line[0], media=media["media"][0],
+                         edit=a["edit"] if edited else None,
+                         edit_summary=audio_edit.summary(a["edit"]) if edited else None)
         entries.append(e)
     targets = Counter(e["spanish_index"] for e in entries if e["action"] == "replace")
     for idx, n in targets.items():
@@ -102,6 +113,16 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
                     e.update(action="not_eligible", reason="conflict: several replacements for one bank sample")
     entries.sort(key=lambda e: e["spanish_index"])
     return {"schema": PLAN_SCHEMA, "levels": sorted(levels), "entries": entries, "conflicts": conflicts}
+
+
+def edit_problems(edit, ref, lang):
+    """Static recipe problems for one CE source (the timeline is checked when rendering)."""
+    if audio_edit.is_identity(edit):
+        return []
+    out = audio_edit.problems(edit)
+    if edit.get("for_source") != {"ce_line_ref": ref, "language": lang}:
+        out.append("made for another CE line or language")
+    return out
 
 
 FOLDER_GROUPS = ("replace", "approved_keep_spain", "not_approved", "unmapped", "unsupported", "invalid")
@@ -134,9 +155,9 @@ def folder_summary(entries):
 
 
 def _built_key(e):
-    """What a built slot depends on: same action, mapping and source media -> same sample."""
+    """What a built slot depends on: same action, mapping, source media and edit recipe -> same sample."""
     return (e["action"], e.get("mapping_id"), e.get("ce_line_ref"), e.get("language"),
-            (e.get("media") or {}).get("wem_sha256"))
+            (e.get("media") or {}).get("wem_sha256"), json.dumps(e.get("edit"), sort_keys=True))
 
 
 def compare_plans(built_entries, current_entries):

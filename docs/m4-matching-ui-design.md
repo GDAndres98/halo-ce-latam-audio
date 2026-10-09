@@ -175,8 +175,8 @@ Acceptance criteria (they extend roadmap M4):
   - `in_game_tested` and `reviewed` need an explicit confirmation.
   - The validator checks the file.
 - **UI-only limits:**
-  - `user_recording` / `composite` audio sources and `edit` trims are kept, but they can't be
-    edited in the UI yet;
+  - `user_recording` / `composite` audio sources are kept, but they can't be edited in the UI yet
+    (`edit` recipes can since 2026-10-09, §9);
   - stereo slots are only badged (`st`).
 - Clicking **+ use** on a CE line sets the match status to *matched* when it was *unreviewed* or
   *no equivalent*. That is the owner's own click, not a suggestion. The audio and subtitle choices
@@ -243,3 +243,46 @@ Acceptance criteria (they extend roadmap M4):
   - It is toggled with Save, independently of the approvals, and needs a matched CE line.
   - It has a "different but fits" slot filter, a **≈** badge, and a count in the level progress.
   - Tests: `DifferentButFitsTests`, which include slots saved before the flag existed.
+
+## 9. Audio editor (2026-10-09)
+
+User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever changing a file.
+
+- **Where the recipe lives:** `audio.edit` (`manual-mappings/3`). The existing `{trim_start_s,
+  trim_end_s, gap_s}` object gains optional fields, so no migration is needed and every existing
+  file stays valid and byte-identical:
+  - `engine`;
+  - `for_source` (the CE line and language it was made for);
+  - `cuts`, `fade_in_ms`/`fade_out_ms`, `crossfade_ms`;
+  - `speed`, `gain_db`, `loudness {mode: off|match_mcc, offset_db}`, `limiter`.
+
+  All zero is the identity and is stored in the old three-field form.
+- **Why inside `audio`:** the recipe is part of the audio decision. Approval pins it, and the
+  existing protections (tools never approve; approved is immutable; only *needs rework* + 1) cover
+  it with no new rule. Owner flags (`radio_effect`, `different_but_fits`) stay outside and are
+  untouched.
+- **One implementation:**
+  - `common/audio_edit.py` holds the pure DSP and recipe rules, with ffmpeg injected for the tempo.
+  - `audio_pipeline.render_edited` / `derive_edited` / `codec_roundtrip` are shared by
+    `common/edit_preview.py` (M4) and `scripts/build/m6_build.py`.
+  - The *as encoded* preview is the libcelt decode of the stream M6 writes, so preview and build
+    can't drift apart. A test asserts byte equality.
+- **DSP choices:**
+  - **Rubberband** (via the installed ffmpeg) for speed: deterministic and length-exact. `atempo`
+    dropped about 20 ms at the end in a test.
+  - **BS.1770-4 loudness** in pure Python. The K-weighting reproduces the standard's 48 kHz
+    coefficients; a 997 Hz full-scale sine reads −3.01 LUFS.
+  - **Equal-power crossfades** at cuts.
+  - **Half-cosine edge fades.**
+  - **A look-ahead peak limiter.** Every output sample is ≤ −1 dBFS by construction. Loudness
+    matching re-measures after limiting, with secant steps.
+- **Loudness reference:** the slot's own Spain recording, decoded from the pinned bank (never a
+  global target).
+- **Safety:**
+  - An edit is bound to its source. Changing the line or language resets it, and the validator and
+    builder refuse a `for_source` mismatch.
+  - Recipes are checked against the source duration before saving.
+  - Previews write only to `work/m4/preview/`.
+- **Stack:** still the Python standard library plus one static page. Waveforms are drawn from Web
+  Audio `decodeAudioData` on a `<canvas>`. Nothing new is installed: ffmpeg and libcelt were already
+  approved.

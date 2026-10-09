@@ -16,6 +16,9 @@ Design: docs/m4-matching-ui-design.md. What this module guarantees:
   - mappings/manual_mappings.local.json (custom subtitle text, git-ignored);
   - mappings/mission_progress.json (owner-set level status).
 - Audio is decoded on demand into work/ (common/ondemand_audio.py).
+- Audio editor (2026-10-09): the owner's non-destructive edit recipe is part of the audio decision
+  (`audio.edit`, common/audio_edit.py), so it follows the same approval / needs_rework rules.
+  Previews (common/edit_preview.py) render exactly what M6 encodes, into work/m4/preview/ only.
 - After every save the read-only project validator runs in-process.
 """
 import copy
@@ -31,6 +34,7 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from common import audio_edit  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.mapping_store import (  # noqa: E402
     EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
@@ -140,14 +144,18 @@ def _fits(m):
     return bool(m and (m.get("different_but_fits") or {}).get("marked"))
 
 
+def _edited(m):
+    return bool(m and not audio_edit.is_identity(m["audio"]["edit"]))
+
+
 def _subtitle_sem(s):
     return (s["source"], s["ce_locres"], s["custom_ref"])
 
 
 class M4App:
-    def __init__(self, root, *, mcc_audio=None, ce_audio=None, today=None, run_validator=True):
+    def __init__(self, root, *, mcc_audio=None, ce_audio=None, editor=None, today=None, run_validator=True):
         self.root = Path(root)
-        self.mcc_audio, self.ce_audio = mcc_audio, ce_audio
+        self.mcc_audio, self.ce_audio, self.editor = mcc_audio, ce_audio, editor
         self.today = today or (lambda: dt.date.today().isoformat())
         self.run_validator = run_validator
         self._save_lock = threading.Lock()
@@ -280,7 +288,7 @@ class M4App:
                 "matched": st == "matched", "no_equivalent": st == "no_equivalent", "deferred": st == "deferred",
                 "needs_rework": "needs_rework" in (a, sub), "audio_pending": a != "approved",
                 "subtitle_pending": sub != "approved",
-                "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m),
+                "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m), "edited": _edited(m),
                 "stereo": s["channels"] > 1}.get(status, False)
 
     def slots(self, level, status=None, q=None, limit=1500):
@@ -312,7 +320,7 @@ class M4App:
                                 "channels": s["channels"], "flags": r["flags"],
                                 "decision": self._decision_summary(m),
                                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
-                                "different_but_fits": _fits(m)})
+                                "different_but_fits": _fits(m), "edited": _edited(m)})
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
@@ -418,6 +426,7 @@ class M4App:
         if m and m["subtitle"]["custom_ref"]:
             custom = (local["custom_subtitles"].get(m["subtitle"]["custom_ref"]) or {}).get("text")
         refs = m["match"]["ce_line_refs"] if m else []
+        edit = m["audio"]["edit"] if m else dict(audio_edit.EDIT_ZERO)
         sample = {k: s.get(k) for k in ("index", "subsong", "name_in_bank", "name_occurrence_in_bank",
                                          "ordinal_in_tag", "duration_s", "channels", "freq", "codec", "evidence")}
         return {"slot_id": slot_id, "level": level, "mcc_tag": r["mcc_tag"], "tag_name": r["tag_name"],
@@ -431,6 +440,8 @@ class M4App:
                 "matched_lines": [self.ce_line(x) for x in refs if x in self.ce_lines],
                 "unknown_refs": [x for x in refs if x not in self.ce_lines],
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
+                "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
+                         "available": self.editor is not None, "engine": audio_edit.ENGINE},
                 "ce_missions": self._mission_scope(level), "sha256": {"mappings": msha, "local": lsha}}
 
     # ------------------------------------------------------------------ audio
@@ -464,6 +475,86 @@ class M4App:
             return self.ce_audio.wav(mission, lang, items[k])
         except AudioUnavailable as e:
             raise ApiError(503, str(e))
+
+    # ------------------------------------------------------------------ audio editor
+    def _ce_wav_for(self, src):
+        ref, lang = src.get("ce_line_ref"), src.get("language", "Spanish(Mexico)")
+        if ref not in self.ce_lines or lang not in CE_LANGS:
+            raise ApiError(404, "unknown CE line or language")
+        return ref, lang, self.ce_wav(ref, lang)
+
+    def edit_preview(self, body):
+        """body: {slot_id, ce_line_ref, language, edit}. Renders the recipe exactly as M6 would (never
+        saves anything) -> {key, stats, edit (canonical), summary, identity, mcc_reference_lufs, urls}."""
+        if not self.editor:
+            raise ApiError(503, "the audio editor needs ffmpeg and libcelt (see docs/m4-user-guide.md)")
+        sid = body.get("slot_id")
+        if sid not in self.slot_index:
+            raise ApiError(404, f"unknown slot {sid}")
+        level, _r, s = self.slot_index[sid]
+        if s["channels"] != 1:
+            raise ApiError(400, "the editor supports mono slots only (stereo replacement is deferred)")
+        ref, lang, wav = self._ce_wav_for(body)
+        try:
+            edit = audio_edit.normalize(body.get("edit") or {}, for_source={"ce_line_ref": ref, "language": lang})
+        except audio_edit.EditError as e:
+            raise ApiError(400, f"edit: {e}")
+        problems = audio_edit.problems(edit, self._wav_duration(wav))
+        if problems:
+            raise ApiError(422, "the edit is not valid", problems)
+        mcc_ref = None
+        if self.mcc_audio:
+            try:
+                mcc_ref = self.editor.reference_lufs(self.mcc_audio.wav(level, "spanish", s))
+            except AudioUnavailable as e:
+                if edit.get("loudness", {}).get("mode") == "match_mcc":
+                    raise ApiError(503, f"Spain recording unavailable for loudness matching: {e}")
+        try:
+            r = self.editor.render(wav, edit, mcc_ref)
+        except audio_edit.EditError as e:
+            raise ApiError(422, f"edit: {e}")
+        return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_edit.summary(edit),
+                "identity": audio_edit.is_identity(edit), "mcc_reference_lufs": mcc_ref,
+                "urls": {k: f"/audio/preview?key={r['key']}&kind={k}" for k in ("edited", "encoded")}}
+
+    def preview_wav(self, key, kind):
+        if not self.editor:
+            raise ApiError(503, "the audio editor is not configured")
+        try:
+            p = self.editor.path(key, kind)
+        except ValueError as e:
+            raise ApiError(400, str(e))
+        if not p.is_file():
+            raise ApiError(404, "preview not rendered (render it first)")
+        return p
+
+    def _normalize_edit(self, a, source, sources, current):
+        """The recipe to store with this audio choice. Not sent: kept while it still belongs to the same
+        CE source, otherwise reset (an edit never silently moves to another recording)."""
+        gap = current.get("gap_s", 0)
+        src = ({"ce_line_ref": sources[0]["ce_line_ref"], "language": sources[0]["language"]}
+               if source == "ce" and sources else None)
+        raw = a.get("edit")
+        if raw is None:
+            if audio_edit.is_identity(current) or (src and current.get("for_source") == src):
+                return current
+            return dict(audio_edit.EDIT_ZERO, gap_s=gap)
+        if not isinstance(raw, dict):
+            raise ApiError(400, "edit must be an object")
+        try:
+            edit = audio_edit.normalize(dict(raw, gap_s=raw.get("gap_s", gap)), for_source=src)
+        except audio_edit.EditError as e:
+            raise ApiError(400, f"edit: {e}")
+        if audio_edit.is_identity(edit):
+            same = audio_edit.is_identity(current) and current.get("gap_s", 0) == edit["gap_s"]
+            return current if same else edit
+        if source != "ce":
+            raise ApiError(400, "edits apply to one CE line (audio source 'ce'); reset the edit first")
+        _ref, _lang, wav = self._ce_wav_for(src)
+        problems = audio_edit.problems(edit, self._wav_duration(wav))
+        if problems:
+            raise ApiError(422, "the edit is not valid", problems)
+        return edit
 
     # ------------------------------------------------------------------ save
     def _normalize_audio(self, a, refs):
@@ -543,7 +634,8 @@ class M4App:
 
         if "audio" in body:
             source, sources = self._normalize_audio(body["audio"], slot["match"]["ce_line_refs"])
-            want = dict(slot["audio"], source=source, sources=sources)
+            edit = self._normalize_edit(body["audio"], source, sources, slot["audio"]["edit"])
+            want = dict(slot["audio"], source=source, sources=sources, edit=edit)
             changed = _audio_sem(want) != _audio_sem(slot["audio"])
             guard("audio", changed)
             if changed:

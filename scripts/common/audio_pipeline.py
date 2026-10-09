@@ -9,9 +9,12 @@ Pipeline (docs/b2-audio-research.md §5.10):
        profile MCC's embedded decoder is proven to play, v-000017 vs v-000018)
     -> FMOD framing; sample_count = frames * 512 (as in every original MCC sample)
 
-No content is changed: no trimming, gain, or effects. Those would be explicit, owner-approved recipe
-steps (design §6). Nothing here knows about missions, slots or mappings. Every derived stream is
-written to work/derived/<stream sha256>/ with recipe.json and the 44.1 kHz WAV it was encoded from.
+`derive` changes no content. `derive_edited` inserts the owner's edit recipe (common/audio_edit:
+trims, cuts, fades, pitch-preserving speed, gain/loudness match) between the 44.1 kHz conversion and
+the padding, and records every step. `codec_roundtrip` is what the M4 editor plays: the same encode,
+decoded by the same libcelt, so the preview equals the bank content. Nothing here knows about
+missions, slots or mappings. Every derived stream is written to work/derived/<stream sha256>/ with
+recipe.json and the 44.1 kHz WAV it was encoded from.
 """
 import hashlib
 import json
@@ -21,6 +24,7 @@ import wave
 from array import array
 from pathlib import Path
 
+from . import audio_edit
 from .celt011 import FRAME_SAMPLES, PROFILES, SAMPLE_RATE, fmod_frames, profile_violations
 
 CODEC_DELAY = 128  # samples; CELT 0.11 overlap for the 44.1 kHz / 512 custom mode (measured, §5.7)
@@ -110,6 +114,11 @@ def derive(src, *, ffmpeg, celt, out_root, channels=1, profile="fmod", source_me
                    "sample_count": enc["sample_count"], "seconds": round(enc["sample_count"] / SAMPLE_RATE, 3),
                    "own_decode_snr_db": round(snr_db(pcm, decoded), 1) if channels == 1 else None},
     }
+    out = _write_derived(out_root, stream_sha, pcm, channels, recipe)
+    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, **enc}
+
+
+def _write_derived(out_root, stream_sha, pcm, channels, recipe):
     out = Path(out_root) / stream_sha
     out.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out / "mcc_44100.wav"), "wb") as w:
@@ -118,4 +127,50 @@ def derive(src, *, ffmpeg, celt, out_root, channels=1, profile="fmod", source_me
         w.setframerate(SAMPLE_RATE)
         w.writeframes(pcm)
     (out / "recipe.json").write_text(json.dumps(recipe, indent=2) + "\n", encoding="utf-8")
-    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, **enc}
+    return out
+
+
+def render_edited(src, edit, *, ffmpeg, ref_lufs=None):
+    """Source WAV -> 44.1 kHz PCM -> owner's recipe. -> (source_pcm, audio_edit.render result).
+    The single function both the M4 preview and the M6 build call (mono only)."""
+    source_pcm = to_mcc_pcm(ffmpeg, src, 1)
+    return source_pcm, audio_edit.render(source_pcm, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs)
+
+
+def codec_roundtrip(celt, pcm, profile="fmod"):
+    """What MCC will play: the M6 encode of `pcm`, decoded by the same libcelt, codec delay removed,
+    cut to the input length. M6 checks that vgmstream's decode of the bank equals this decode."""
+    enc = encode_for_mcc(celt, pcm, 1, profile)
+    decoded = celt.decode(enc["packets"], channels=1)
+    return decoded[CODEC_DELAY * 2:CODEC_DELAY * 2 + len(pcm)], enc
+
+
+def derive_edited(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, profile="fmod", source_meta=None):
+    """`derive` with the owner's edit recipe applied after the 44.1 kHz conversion (mono)."""
+    src = Path(src)
+    source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs)
+    pcm = r["pcm"]
+    enc = encode_for_mcc(celt, pcm, 1, profile)
+    decoded = celt.decode(enc["packets"], channels=1)
+    stream_sha = sha256_bytes(enc["stream"])
+    n = len(pcm) // 2
+    recipe = {
+        "schema": RECIPE_SCHEMA,
+        "source": {"file": src.name, "sha256": sha256_file(src), **wav_info(src), **(source_meta or {})},
+        "steps": [
+            {"op": "ffmpeg_convert", "version": ffmpeg_version(ffmpeg), "args": ffmpeg_args("<source>", 1)},
+            {"op": "audio_edit", "engine": audio_edit.ENGINE, "recipe": edit, "summary": audio_edit.summary(edit),
+             "source_pcm_sha256": sha256_bytes(source_pcm), "stats": r["stats"]},
+            {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
+            {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
+             "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
+             "frame_samples": FRAME_SAMPLES, "packet_bytes": sorted({len(p) for p in enc["packets"]})},
+        ],
+        "content_changes": "owner edit recipe: " + audio_edit.summary(edit) + " (no effects; radio flag not applied)",
+        "pcm_44100": {"sha256": sha256_bytes(pcm), "samples": n, "seconds": round(n / SAMPLE_RATE, 3)},
+        "output": {"stream_sha256": stream_sha, "stream_bytes": len(enc["stream"]), "frames": enc["frames"],
+                   "sample_count": enc["sample_count"], "seconds": round(enc["sample_count"] / SAMPLE_RATE, 3),
+                   "own_decode_snr_db": round(snr_db(pcm, decoded), 1)},
+    }
+    out = _write_derived(out_root, stream_sha, pcm, 1, recipe)
+    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, "edit_stats": r["stats"], **enc}

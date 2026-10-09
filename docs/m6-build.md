@@ -5,6 +5,9 @@
   `053c9741…`).
 - `a10` builds **audio-only**: 90 approved CE lines, 24/24 checks.
 - Subtitle generation is disabled (§4).
+- **Audio edit recipes (2026-10-09):** approved lines with an M4 edit (trim, cuts, speed, loudness)
+  are built from their recipe (§2.1). `--mission a10` with the new code: 182 lines, 23/23 checks;
+  every unedited line's stream is byte-identical to the earlier build (166/166 compared).
 - Nothing is installed without the owner's explicit approval.
 
 ## 1. Build
@@ -76,11 +79,11 @@ From `common/m6_build.plan_audio`. Nothing is approved, changed or paired by the
 
 | Decision in M4 | Build action |
 |---|---|
-| Audio **approved**, source *CE line* (one line), mono slot, no trims, media resolved, fingerprint unchanged | **replace** the slot's sample with the CE recording |
+| Audio **approved**, source *CE line* (one line), mono slot, media resolved, fingerprint unchanged | **replace** the slot's sample with the CE recording, **with its edit recipe if it has one** (§2.1) |
 | Audio approved *keep Spain* | keep original (byte-identical) |
 | Audio draft or needs rework; slot not mapped | keep original, reason reported |
-| `ce_concat`, user recording, composite, trims; stereo slot | **not eligible**: unsupported in this build, reported |
-| Fingerprint drift, unknown or test-event line, several mappings for one slot or sample | **not eligible**: invalid or conflict. Duplicate mappings stop the build |
+| `ce_concat`, user recording, composite; a `gap_s` on one line; stereo slot | **not eligible**: unsupported in this build, reported |
+| Fingerprint drift, unknown or test-event line, invalid edit recipe or one made for another line/language, several mappings for one slot or sample | **not eligible**: invalid or conflict. Duplicate mappings stop the build |
 
 Rules:
 - **Target index:** the slot's index in the **Spanish** bank's own name table (from the MCC
@@ -90,6 +93,31 @@ Rules:
   (0, n−2) are recomputed by `fsb5_writer`.
 - **`.lst.bin`** files are never written.
 - **Radio and ≈ flags** are carried in the manifest only. No effect is applied.
+
+### 2.1 Edited lines (owner recipes from the M4 audio editor)
+
+- **The recipe** is the approved `audio.edit` (`audio-edit/1`, `common/audio_edit.py`). It is part of
+  the approved audio object, so it can only change through *needs rework*.
+- **The render path:** `audio_pipeline.derive_edited` runs CE WAV → ffmpeg 44.1 kHz → recipe
+  (trims and cuts with crossfades → fades → rubberband speed → gain: loudness match + manual →
+  −1 dBFS look-ahead limiter → 16-bit) → codec padding → CELT `fmod` profile.
+  - This is the same function the M4 preview calls. The preview's *as encoded* audio is the
+    libcelt decode of this exact stream.
+  - The simulation on `es:A10_010_cryotech#0`: the preview is byte-identical to vgmstream's decode
+    of the candidate bank.
+- **The loudness reference** is the slot's original Spain sample, decoded from the pinned bank copy
+  (hash-checked) and measured with ITU-R BS.1770-4 gated loudness.
+- **Unedited lines** (`{trim_start_s: 0, trim_end_s: 0, gap_s: 0}`) take the original `derive` path
+  unchanged.
+- **Reports:**
+  - `work/derived/<sha>/recipe.json` has an `audio_edit` step with the recipe, the source PCM hash
+    and the render stats (durations, loudness, gain, limiter);
+  - `build_manifest.json` lists `edited_slots`, plus `edit`, `edit_summary` and `edit_stats` per line;
+  - `test_report.md` flags them **E** and has an "Edited lines" table.
+- **Checks:** the per-line content checks (§3) compare against the *edited* 44.1 kHz PCM.
+- **Install guard:** the recipe is part of what a built line depends on, so `m6_install.py` refuses
+  a build whose recipe changed or was reset since.
+- **The radio flag** is still not applied.
 
 ## 3. Validation (`validation_report.json`; every check must pass)
 
@@ -161,11 +189,13 @@ python scripts/build/m6_install.py --build a10 rollback
 - **Code:**
   - `scripts/common/m6_build.py`: `plan_audio`, `subtitle_plan`, `assemble`,
     `multi_structural_checks`;
+  - `scripts/common/audio_edit.py` (recipes, rendering) and `audio_pipeline.derive_edited`;
   - `scripts/build/m6_build.py`;
   - `scripts/build/m6_install.py`.
 - **Reuse:** `audio_pipeline.derive`, `celt011` (MCC "fmod" profile), `fsb5_writer`, `vgm`,
   `ondemand_audio`.
-- **Tests:** `tests/test_m6_build.py`:
+- **Tests:** `tests/test_audio_edit.py` (recipes, M6 planning of edited lines, install guard, preview
+  == build parity), and `tests/test_m6_build.py`:
   - several replacements of different lengths, including the first and last sample;
   - order-independence and determinism;
   - collateral-change detection;

@@ -271,6 +271,16 @@ Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implement
   - stereo slots visible and playable.
 - [ ] The owner tries it on `a10` (M5 starts there).
 
+**Audio editor ✅ IMPLEMENTED (2026-10-09), owner hands-on test pending.** Non-destructive per-mapping
+recipes in `audio.edit`:
+- trims, interior cuts with crossfades, fades;
+- pitch-preserving speed;
+- loudness match to the slot's Spain recording, with a peak limiter;
+- manual gain.
+
+Waveforms and "as encoded" previews are in M4 (user guide §4.1). M6 builds edited lines from the
+same render (m6-build.md §2.1).
+
 ### M5 — a10 mapping complete (user work)
 - [ ] Every a10 Spanish slot has `match.status ≠ unreviewed` and an
   approved `audio` object. `subtitle` may wait on B1.
@@ -288,8 +298,8 @@ Multi-folder update: `--level a10 --level x10 --level x20` gives 165 lines in on
 (`053c9741…`, 23/23 checks). `--mission a10` selects `a10` plus `x10`/`x20`/`x30` from map evidence
 (`build_level_folders.py`).
 
-- [ ] Non-destructive conversion: CE es-MX media → MCC slot format, with
-  recipes (design §6).
+- [x] Non-destructive conversion: CE es-MX media → MCC slot format, with
+  recipes (design §6). Owner edit recipes are applied since 2026-10-09 (m6-build.md §2.1).
 - [ ] The Spanish bank is rebuilt **as a new file in `work/`**. Every
   untouched sample stays byte-identical, and the result parses with
   `fsb5_lib` and vgmstream. The method is the B2 strategy S-A (CELT

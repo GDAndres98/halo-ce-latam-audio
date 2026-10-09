@@ -160,6 +160,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       Install/rollback is `scripts/build/m6_install.py --build a10
       check|preflight|install|rollback|status`. **Never run
       preflight/install without the owner's explicit approval for that build.**
+    - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
+      (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
+      fades, rubberband speed, BS.1770 loudness match to the slot's Spain recording (with a
+      −1 dBFS look-ahead limiter) and manual gain.
+      - M4 shows waveforms and previews (`common/edit_preview.py`, `work/m4/preview/`). The
+        "as encoded" preview is byte-identical to the bank decode.
+      - M6 renders edited lines with the same code (`audio_pipeline.derive_edited`); unedited lines
+        are byte-identical to before.
+      - The recipe is part of the approved audio object (needs rework to change). The radio flag is
+        never applied.
+      - Guide: `docs/m4-user-guide.md` §4.1. Owner hands-on test pending.
     - **Deferred (owner):** milestone M-SYS (CE `Audio/Systemic` barks),
       `temp_mocap_VO` (backlog), and stereo replacement (stereo slots are
       only shown and played).

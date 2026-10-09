@@ -1,0 +1,90 @@
+"""M4 audio editor previews: the exact audio M6 would put in the bank for a recipe, before saving.
+
+For one CE source WAV and one recipe (common/audio_edit) it renders, with the same functions the M6
+build calls (audio_pipeline.render_edited / to_mcc_pcm + encode_for_mcc):
+  edited.wav   the 44.1 kHz PCM handed to the encoder ("pre-codec")
+  encoded.wav  that PCM encoded with the MCC CELT profile and decoded by the same libcelt, codec delay
+               removed: what MCC plays (M6 verifies vgmstream's decode of the bank equals this decode)
+Results are cached in work/m4/preview/<key>/ (key = hash of engine, source PCM, recipe and reference
+loudness). Originals are only read. Nothing here touches mappings.
+"""
+import hashlib
+import json
+import os
+import re
+import threading
+from pathlib import Path
+
+from . import audio_edit
+from .audio_pipeline import codec_roundtrip, sha256_file, to_mcc_pcm
+
+KINDS = ("edited", "encoded")
+KEY_RE = re.compile(r"^[0-9a-f]{24}$")
+
+
+class EditPreview:
+    def __init__(self, root, ffmpeg, celt_factory):
+        """celt_factory() -> a Celt011 (created on first use; the DLL is loaded once)."""
+        self.dir = Path(root) / "work" / "m4" / "preview"
+        self.ffmpeg, self._celt_factory, self._celt = ffmpeg, celt_factory, None
+        self._lock = threading.Lock()  # one render at a time: libcelt and ffmpeg calls stay sequential
+        self._pcm, self._ref = {}, {}
+
+    def _source(self, wav):
+        k = (str(wav), sha256_file(wav))
+        if k not in self._pcm:
+            if len(self._pcm) > 64:
+                self._pcm.clear()
+            self._pcm[k] = to_mcc_pcm(self.ffmpeg, wav, 1)
+        return self._pcm[k]
+
+    def reference_lufs(self, mcc_wav):
+        k = (str(mcc_wav), sha256_file(mcc_wav))
+        if k not in self._ref:
+            self._ref[k] = audio_edit.wav_loudness(mcc_wav)
+        return self._ref[k]
+
+    def path(self, key, kind):
+        if not KEY_RE.match(key or "") or kind not in KINDS:
+            raise ValueError("bad preview key or kind")
+        return self.dir / key / f"{kind}.wav"
+
+    def render(self, src_wav, edit, ref_lufs):
+        """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError."""
+        with self._lock:
+            pcm = self._source(src_wav)
+            key = hashlib.sha256(json.dumps({"engine": audio_edit.ENGINE, "pcm": hashlib.sha256(pcm).hexdigest(),
+                                             "edit": edit, "ref": ref_lufs}, sort_keys=True).encode()).hexdigest()[:24]
+            out = self.dir / key
+            if (out / "stats.json").is_file():
+                return {"key": key, "stats": json.loads((out / "stats.json").read_text(encoding="utf-8"))}
+            if audio_edit.is_identity(edit):  # the unedited path: M6's derive() encodes this PCM as is
+                x = audio_edit.pcm16_to_float(pcm)
+                lufs = audio_edit.loudness(x)[0]
+                n = len(x)
+                stats = {"engine": audio_edit.ENGINE, "identity": True, "source_samples": n,
+                         "source_s": round(n / audio_edit.SAMPLE_RATE, 3), "output_samples": n,
+                         "output_s": round(n / audio_edit.SAMPLE_RATE, 3), "spliced_s": round(n / audio_edit.SAMPLE_RATE, 3),
+                         "loudness_before_gain_lufs": audio_edit._rnd(lufs), "output_lufs": audio_edit._rnd(lufs),
+                         "mcc_reference_lufs": audio_edit._rnd(ref_lufs),
+                         "output_peak_dbfs": audio_edit._rnd(audio_edit.peak_db(x)), "applied_gain_db": 0,
+                         "limiter_max_reduction_db": 0.0}
+                edited = pcm
+            else:
+                r = audio_edit.render(pcm, edit, ffmpeg=self.ffmpeg, ref_lufs=ref_lufs)
+                edited, stats = r["pcm"], dict(r["stats"], identity=False)
+            if self._celt is None:
+                self._celt = self._celt_factory()
+            encoded, enc = codec_roundtrip(self._celt, edited)
+            stats["encoded_sample_count"] = enc["sample_count"]
+            stats["encoded_s"] = round(enc["sample_count"] / audio_edit.SAMPLE_RATE, 3)
+            tmp = out.with_name(out.name + ".tmp")
+            tmp.mkdir(parents=True, exist_ok=True)
+            audio_edit.write_wav(tmp / "edited.wav", edited)
+            audio_edit.write_wav(tmp / "encoded.wav", encoded)
+            (tmp / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+            try:
+                os.replace(tmp, out)
+            except OSError:  # another render of the same key won the race
+                pass
+            return {"key": key, "stats": stats}

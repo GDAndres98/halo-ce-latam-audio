@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 
+from . import audio_edit
 from .jsonschema_lite import validate as schema_validate
 from .mapping_store import comparable
 from .mcc_catalog import parse_slot_id, slot_id_for
@@ -241,6 +242,17 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
             if info["media"].get(x["language"], {}).get("evidence") != "explicit":
                 out.append(finding("error" if a["status"] == "approved" else "warning", "audio_source_unresolved",
                                    file, w + "/audio", f"{ref} has no resolved {x['language']} media"))
+        if not audio_edit.is_identity(a["edit"]):  # owner's edit recipe (non-destructive, applied by M6)
+            sev = "error" if a["status"] == "approved" else "warning"
+            for p in audio_edit.problems(a["edit"]):
+                out.append(finding("error", "invalid_audio_edit", file, w + "/audio/edit", p))
+            if a["source"] != "ce":
+                out.append(finding("error", "audio_edit_unsupported_source", file, w + "/audio/edit",
+                                   f"edit recipes apply to one CE line (source 'ce'), not {a['source']!r}"))
+            elif a["sources"] and {k: a["sources"][0].get(k) for k in ("ce_line_ref", "language")} \
+                    != a["edit"].get("for_source"):
+                out.append(finding(sev, "audio_edit_source_mismatch", file, w + "/audio/edit",
+                                   "the edit was made for another CE line or language; reset or redo it"))
         for x in a["sources"]:
             if x["kind"] == "user_recording":
                 if local is None:

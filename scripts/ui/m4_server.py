@@ -12,19 +12,23 @@ API (all JSON unless noted):
     GET  /api/state                               levels + progress, CE missions, file hashes
     GET  /api/slots?level=a10|all&status=&q=      slot list (status: undecided|matched|no_equivalent|
                                                   deferred|needs_rework|audio_pending|subtitle_pending|
-                                                  radio|stereo); q: words and "quoted phrases"
+                                                  radio|fits|edited|stereo); q: words and "quoted phrases"
     GET  /api/slot?id=<slot_id>                   slot detail, SU/SP text, decision, verifications
     GET  /api/ce?mission=all|mapped|M01&level=&q=&subs=missing|present&hide_used=1&keep_slot=&offset=&limit=
                                                   CE lines in catalog order, filtered by q only
     GET  /api/ce_line?ref=<ce_line_ref>
     GET  /audio/mcc?level=&lang=spanish|english&index=     WAV (decoded on demand)
     GET  /audio/ce?ref=&lang=Spanish(Mexico)|English(US)|Spanish(Spain)&k=0
+    GET  /audio/preview?key=&kind=edited|encoded  a rendered editor preview (WAV)
+    POST /api/edit/preview                        {slot_id, ce_line_ref, language, edit} -> render as M6
+                                                  would; writes only work/m4/preview/, never mappings
     POST /api/save                                see M4App.save; 409 = stale or protected
     POST /api/progress                            {level, status, note, verification, confirm, loaded_sha256}
     POST /api/validate                            run the read-only validator
 """
 import argparse
 import json
+import shutil
 import sys
 import threading
 import webbrowser
@@ -34,6 +38,8 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
+from common.edit_preview import EditPreview  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
@@ -112,6 +118,8 @@ def make_handler(app, quiet=False):
                     return self._wav(app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)))
                 if u.path == "/audio/ce":
                     return self._wav(app.ce_wav(q.get("ref", ""), q.get("lang", ""), q.get("k", 0)))
+                if u.path == "/audio/preview":
+                    return self._wav(app.preview_wav(q.get("key", ""), q.get("kind", "")))
                 raise ApiError(404, "not found")
             if self.command == "POST":
                 if (self.headers.get("Content-Type") or "").split(";")[0] != "application/json":
@@ -125,6 +133,8 @@ def make_handler(app, quiet=False):
                     raise ApiError(400, "invalid JSON")
                 if u.path == "/api/save":
                     return self._json(200, app.save(body))
+                if u.path == "/api/edit/preview":
+                    return self._json(200, app.edit_preview(body))
                 if u.path == "/api/progress":
                     return self._json(200, app.set_progress(body))
                 if u.path == "/api/validate":
@@ -147,15 +157,21 @@ def make_handler(app, quiet=False):
     return Handler
 
 
-def make_app(root, vgmstream, oodle_dll=None):
+def make_app(root, vgmstream, oodle_dll=None, ffmpeg=None, celt_dll=DEFAULT_DLL):
     decode = vgmstream_decoder(vgmstream) if Path(vgmstream).is_file() else None
     if decode is None:
         print(f"warning: vgmstream-cli not found at {vgmstream}; only already-decoded audio will play")
 
         def decode(*_a, **_k):
             return False, "vgmstream-cli not configured"
+    editor = None
+    if ffmpeg and Path(celt_dll).is_file():
+        editor = EditPreview(root, ffmpeg, lambda: Celt011(celt_dll))
+    else:
+        print(f"warning: audio editor disabled (ffmpeg {'ok' if ffmpeg else 'not found'}, "
+              f"libcelt {'ok' if Path(celt_dll).is_file() else 'not found at ' + str(celt_dll)})")
     return M4App(root, mcc_audio=MccAudio(root, decode),
-                 ce_audio=CeAudio(root, decode, ce_source_reader(oodle_dll)))
+                 ce_audio=CeAudio(root, decode, ce_source_reader(oodle_dll)), editor=editor)
 
 
 def main():
@@ -164,9 +180,11 @@ def main():
     ap.add_argument("--root", type=Path, default=REPO_ROOT)
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
     ap.add_argument("--oodle-dll", type=Path)
+    ap.add_argument("--ffmpeg", default=shutil.which("ffmpeg"), help="for the audio editor (owner-approved)")
+    ap.add_argument("--celt-dll", type=Path, default=DEFAULT_DLL, help="libcelt-0110.dll (from vgmstream)")
     ap.add_argument("--no-open", action="store_true", help="don't open a browser tab")
     args = ap.parse_args()
-    app = make_app(args.root, args.vgmstream_cli, args.oodle_dll)
+    app = make_app(args.root, args.vgmstream_cli, args.oodle_dll, args.ffmpeg, args.celt_dll)
     if not app.levels or not app.missions:
         raise SystemExit("no catalogs under work/; build them first (docs/m4-user-guide.md §1)")
     threading.Thread(target=app.validate, daemon=True).start()

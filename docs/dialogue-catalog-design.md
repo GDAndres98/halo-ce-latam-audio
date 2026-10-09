@@ -515,6 +515,12 @@ is described by a recipe and stored under its own hash:
 - Originals (`.wem`, decoded WAV) are never modified. Changing a recipe
   produces a new hash and a new folder.
 
+**As implemented (2026-10-09):** owner edit recipes live in `audio.edit` (`audio-edit/1`:
+trims, cuts, fades, speed, gain, loudness match, limiter, `for_source`). They are rendered by
+`common/audio_edit.py` for both the M4 preview and M6. `work/derived/<stream sha>/recipe.json`
+records an `audio_edit` step with the recipe and its measured stats. See
+m4-matching-ui-design.md §9 and m6-build.md §2.1.
+
 ### 6.1 As implemented: original-media decode (M1b, `ce-audio-export/1`)
 
 A plain decode isn't "derived audio" in the §6 sense, because it applies

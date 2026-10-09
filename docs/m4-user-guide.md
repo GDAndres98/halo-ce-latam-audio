@@ -31,7 +31,10 @@ already `/3`.
   - `--port`;
   - `--no-open` (don't open a browser);
   - `--vgmstream-cli`;
-  - `--oodle-dll`.
+  - `--oodle-dll`;
+  - `--ffmpeg` (default: the one on `PATH`) and `--celt-dll` (default: vgmstream's
+    `libcelt-0110.dll`), both for the audio editor (§4.1). Without them the editor is disabled, and
+    everything else works.
 - **Audio is decoded the first time you press ▶,** which takes under a second, and is cached
   under `work/`.
 - **Links:** `http://127.0.0.1:8765/#level=a10&slot=es%3AA10_140_cryotech%230` opens one slot.
@@ -46,7 +49,8 @@ already `/3`.
 | Right: CE lines | Campaign Evolved lines in **catalog order**. Scope: the missions mapped for the slot's level, all missions, or one mission. Filter: any subtitle / no es-MX subtitle / has es-MX subtitle. |
 | Footer | The validator's result after the last save. |
 
-Keyboard: `J` / `K` next / previous slot, `Space` plays Spain, `1`–`9` plays candidate 1–9 (es-MX).
+Keyboard: `J` / `K` next / previous slot, `Space` plays Spain, `1`–`9` plays candidate 1–9 (es-MX),
+`O` / `E` play the editor's original / edited line, `Esc` stops.
 
 ## 3. Searching
 
@@ -82,6 +86,7 @@ Slot filters (left):
 - needs rework;
 - **needs radio effect**;
 - **different but fits**;
+- **audio edited** (badge **E**);
 - **stereo**.
 
 ## 4. Deciding one slot
@@ -125,6 +130,57 @@ Slot filters (left):
 - The defaults never pick a line for you, never replace *custom* or *none*, never change an
   approved part, and never change decisions already saved. Anything can still be changed before
   approving.
+
+### 4.1 Audio editor (non-destructive)
+
+When the audio is **one CE line** (mono slot), an editor appears under the Audio choice. Nothing you
+do here changes a recording. You build a **recipe**, saved in the mapping's `audio.edit`, which M6
+applies when it builds the bank.
+
+**The screen:**
+- **Top waveform:** the CE source.
+  - Drag on it to **select**. Click to play from that point.
+  - Drag the black **handles** at the edges to **trim**.
+  - Grey = trimmed, red hatching = cut.
+- **Spain** and **Edited, as M6 encodes it** are drawn on one shared time scale, so you can compare
+  lengths.
+- **Stats:** durations (source → edited, Spain, Δ), loudness (CE → output, Spain), applied gain,
+  limiter reduction and peak. Warnings appear for heavy limiting (more than 6 dB), gain lowered for
+  peaks, and strong speed changes.
+
+| Control | What it does |
+|---|---|
+| ▶ Original / ▶ Selection | the CE recording, or only the selected part |
+| **▶ Edited (as encoded)** | **exactly what MCC will play**: the recipe rendered, encoded with the MCC CELT profile and decoded by the same libcelt. M6 verifies that the bank decodes to these samples. |
+| ▶ pre-codec | the edited audio before CELT (to judge the codec separately) |
+| ▶ Spain / ■ | the original MCC recording / stop |
+| ✂ **Cut selection** | removes an interior section. Each junction gets an equal-power **crossfade** (default 20 ms), and exactly the selected length is removed. Overlapping cuts merge. ▶ next to a cut plays the original around it; × removes it. |
+| **Keep only selection** | sets both trims to the selection |
+| Trim start / end, Fade in / out, Crossfade | exact values. Trimming an edge for the first time adds a 10 ms fade there; set it to 0 if you don't want one. |
+| **Speed** | pitch- and formant-preserving tempo (ffmpeg `rubberband`). `1.10` = 10 % faster and shorter. **Fit to Spain duration** computes the speed that makes the edited line as long as the Spain one. |
+| **Match Spain loudness** + offset | automatic gain to the ITU-R BS.1770 loudness of **this slot's original Spain recording**. The offset moves the target (for example −2 dB). |
+| **Gain** | manual gain on top of everything (dB) |
+| **Peak limiter** | on (default): a look-ahead limiter keeps peaks at −1 dBFS, so the loudness match can actually reach Spain's level. CE lines are about 7 dB quieter than the Spain recordings (`a10` survey: 58 of 60 can't reach it with gain alone). Off: the gain is lowered until the peak fits instead. |
+| **Reset edits** | back to the unedited recording |
+
+**Order of operations** (always the same, in M4 and M6): trims and cuts → fades → speed → gain
+(loudness match + manual) → limiter → 16-bit. Recipe times are on the source's timeline (the top
+waveform).
+
+**Rules:**
+- **Previews are rendered on the server** about 0.4 s after a change. The first render of a line
+  takes about a second; later renders of the same recipe are instant, from the cache in
+  `work/m4/preview/`.
+- **Save** keeps the recipe in the draft. **Approve audio** approves it together with the audio
+  choice, and the confirmation lists the edit. After that it's **read-only**: you can still listen
+  and select, but changing or resetting the edit needs **Mark needs rework…** (revision + 1).
+- **An edit belongs to one recording.** If you switch the line or its language, the edit is reset.
+  Choosing *keep Spain* or several lines clears it when you save.
+- **The radio flag** stays as it is. No radio processing is applied. Editing never changes it.
+- **Invalid recipes are refused:** for example a trim past the end, overlapping cuts, or keeping
+  less than 0.05 s. Nothing is written.
+- **Heavy limiting:** above about 6 dB of reduction, peaks may sound squashed. A negative loudness
+  offset is gentler.
 
 ### Lines with no source subtitle
 
@@ -174,7 +230,7 @@ infer one. "All missions" stays available for every level.
   - `mappings/manual_mappings.json` (`manual-mappings/3`);
   - `mappings/manual_mappings.local.json`;
   - `mappings/mission_progress.json`;
-  - plus audio caches under `work/`.
+  - plus audio caches under `work/` (decodes, and editor previews in `work/m4/preview/`).
 
   Every write checks the loaded hash, validates the schema, backs up to `mappings/.history/` and
   replaces the file atomically.
@@ -183,7 +239,8 @@ infer one. "All missions" stays available for every level.
   - approves anything without your click;
   - changes an approved decision;
   - writes `verifications.json`, `mission_map.json` or the catalogs;
-  - touches game files or banks.
+  - touches game files or banks;
+  - edits or replaces an original recording (CE `.wem`/WAV, MCC bank copy). Edits are recipes only.
 - Run `python scripts/validate/validate_project.py` before committing `mappings/`.
 - **The E3 test pair** (`es:A10_010_cryotech#0` ← `vo_scr_m01_00460_cryotech#0`) appears only as
   the past check `v-000019`. It is not a mapping until you decide it here.

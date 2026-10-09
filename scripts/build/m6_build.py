@@ -4,8 +4,9 @@ Reads the owner's decisions (mappings/manual_mappings.json via mapping_store.loa
 git-ignored local file), the catalogs under work/, and the pinned bank copy in reference-audio/stage1/.
 For the selected level(s) it replaces every eligible approved CE audio decision
 (common/m6_build.plan_audio) using the validated pipeline
-(common/audio_pipeline: CE WAV -> ffmpeg 44.1 kHz -> pad codec delay -> CELT 0.11 "fmod" profile,
-all intra, no transients) and assembles ONE new bank. Untouched samples stay byte-identical; the
+(common/audio_pipeline: CE WAV -> ffmpeg 44.1 kHz -> [owner's edit recipe, common/audio_edit, the
+same render the M4 editor previews] -> pad codec delay -> CELT 0.11 "fmod" profile, all intra, no
+transients) and assembles ONE new bank. Unedited lines take exactly the original path. Untouched samples stay byte-identical; the
 .lst.bin files are never written. Subtitles: dry run only (generation disabled, see docs/m6-build.md).
 
 Validation (all must pass, else the build is marked FAILED):
@@ -40,14 +41,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
-from common.audio_pipeline import derive, sha256_file, snr_db  # noqa: E402
+from common import audio_edit  # noqa: E402
+from common.audio_pipeline import derive, derive_edited, sha256_file, snr_db  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
 from common.m6_build import (  # noqa: E402
     FOLDER_GROUPS, assemble, compare_plans, entry_group, folder_summary, mission_folders, multi_structural_checks,
     plan_audio, subtitle_plan)
-from common.ondemand_audio import CeAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
+from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from common.vgm import DEFAULT_VGMSTREAM, decode_all, decode_pcm, meta, meta_value  # noqa: E402
 from m4_app import M4App  # noqa: E402
 
@@ -110,14 +112,25 @@ def content_checks(exe, cand_path, idx, res):
     return checks, {"content_snr_db": round(snr, 1) if math.isfinite(snr) else str(snr)}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt):
-    """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result})."""
+def build_once(original, targets, ce_audio, ffmpeg, celt, mcc_ref):
+    """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
+    mcc_ref(entry) -> loudness (LUFS) of the slot's original Spain recording, for edit recipes that
+    match it."""
     results = {}
     for e in targets:
         wav = ce_audio.wav(e["ce_mission"], e["language"], e["media"])
-        res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
-                     source_meta={"ce_line_ref": e["ce_line_ref"], "language": e["language"],
-                                  "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]})
+        meta = {"ce_line_ref": e["ce_line_ref"], "language": e["language"],
+                "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
+        if e.get("edit"):
+            ref = mcc_ref(e) if e["edit"]["loudness"]["mode"] == "match_mcc" else None
+            try:
+                res = derive_edited(wav, e["edit"], ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, ref_lufs=ref,
+                                    profile="fmod", source_meta=dict(meta, mcc_reference_lufs=ref))
+            except audio_edit.EditError as ex:
+                raise SystemExit(f"{e['slot_id']}: edit recipe cannot be rendered: {ex}")
+        else:
+            res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
+                         source_meta=meta)
         res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
         results[e["spanish_index"]] = res
     cand = assemble(original, {k: (r["stream"], r["sample_count"]) for k, r in results.items()})
@@ -162,7 +175,8 @@ def test_report(name, manifest, report, app):
     L += md_table(rep, [("Slot", lambda e: f"`{e['slot_id']}`"), ("CE line", lambda e: f"`{e['ce_line_ref']}`"),
                         ("Spain s", lambda e: e["original_seconds"]), ("LATAM s", lambda e: e["new_seconds"]),
                         ("Flags", lambda e: " ".join(x for x, on in (("R", e["radio_effect"]),
-                                                                     ("≈", e["different_but_fits"])) if on)),
+                                                                     ("≈", e["different_but_fits"]),
+                                                                     ("E", bool(e.get("edit")))) if on)),
                         ("Current LATAM subtitle (SU, unchanged)", su)])
     L += ["", "## Per folder", ""]
     L += md_table([{"f": f, **v} for f, v in manifest["folders"].items()],
@@ -190,6 +204,14 @@ def test_report(name, manifest, report, app):
     if odd:
         L += ["", "Mapped but not built:", ""]
         L += md_table(odd, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Why", lambda e: e["reason"])])
+    edited = [e for e in rep if e.get("edit")]
+    L += ["", f"### Edited lines ({len(edited)}): the owner's recipes, rendered exactly as the M4 preview", ""]
+    L += md_table(edited, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Recipe", lambda e: e["edit_summary"]),
+                           ("Source s", lambda e: e["edit_stats"]["source_s"]),
+                           ("Edited s", lambda e: e["edit_stats"]["output_s"]),
+                           ("LUFS out / Spain", lambda e: f"{e['edit_stats']['output_lufs']} / "
+                                                          f"{e['edit_stats']['mcc_reference_lufs']}"),
+                           ("Limiter dB", lambda e: e["edit_stats"]["limiter_max_reduction_db"])]) if edited         else ["- none"]
     radio = [e for e in rep if e["radio_effect"]]
     L += ["", f"## 3. Needs Radio Effect ({len(radio)}): recorded in the manifest, **no effect applied**", ""]
     L += [f"- `{e['slot_id']}` ← `{e['ce_line_ref']}`" for e in radio] or ["- none"]
@@ -207,8 +229,8 @@ def test_report(name, manifest, report, app):
           "## 5. Known limitations", "",
           "- Audio only; subtitle tables not generated (variable-length writer not validated).",
           "- Radio effects not applied (v1.1); flagged lines play the clean CE recording.",
-          "- Not built: stereo slots, concatenations (`ce_concat`), trims, user recordings (none approved here "
-          "unless listed above).",
+          "- Not built: stereo slots, concatenations (`ce_concat`), user recordings (none approved here "
+          "unless listed above). Edited lines (flag E) are built from their recipes.",
           "- Durations differ from the Spain recordings (table §1); MCC proved it plays longer/shorter samples "
           "(E1b, E3), but timing against cutscenes/scripts is part of this test.", "",
           "## 6. In-game checklist", "",
@@ -314,11 +336,20 @@ def main():
         raise SystemExit("Spanish bank copy does not match its pin")
     exe = args.vgmstream_cli
     ce_audio = CeAudio(REPO_ROOT, vgmstream_decoder(exe), ce_source_reader(args.oodle_dll))
+    mcc_audio = MccAudio(REPO_ROOT, vgmstream_decoder(exe))
+    refs = {}
+
+    def mcc_ref(e):  # the original Spain recording, decoded from the pinned bank copy (verified)
+        if e["slot_id"] not in refs:
+            level, _rec, sample = app.slot_index[e["slot_id"]]
+            refs[e["slot_id"]] = audio_edit.wav_loudness(mcc_audio.wav(level, "spanish", sample))
+        return refs[e["slot_id"]]
     celt = Celt011()
-    print(f"encoding {len(targets)} line(s) (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt)
+    n_edit = sum(1 for e in targets if e.get("edit"))
+    print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref)
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
@@ -361,6 +392,8 @@ def main():
                      stream_sha256=r["recipe"]["output"]["stream_sha256"],
                      derived_dir=r["dir"].relative_to(REPO_ROOT).as_posix(),
                      content_snr_db=per_target[e["slot_id"]].get("content_snr_db"))
+            if e.get("edit"):
+                e["edit_stats"] = r["edit_stats"]
     manifest = {
         "schema": MANIFEST_SCHEMA, "name": name, "levels": levels,
         "built_at": dt.datetime.now().isoformat(timespec="seconds"),
@@ -377,6 +410,8 @@ def main():
         "decisions_changed_during_build": drift_during,
         "mission_association": association, "folders": folder_summary(plan["entries"]),
         "counts": dict(acts), "radio_effect_slots": [e["slot_id"] for e in plan["entries"] if e["radio_effect"]],
+        "edited_slots": [e["slot_id"] for e in plan["entries"] if e["action"] == "replace" and e.get("edit")],
+        "audio_edit_engine": audio_edit.ENGINE,
         "slots": plan["entries"], "subtitles": subs, "level_status": inv,
     }
     report = {"schema": "m6-validation-report/1", "name": name, "ok": ok, "checks": checks,
