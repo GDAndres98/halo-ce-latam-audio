@@ -65,10 +65,26 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         kept. Recorded as `v-000015`.
       - **MCC accepts banks rebuilt by our writer**, and the header hash
         field is not checked.
-    - **Next (planned, NOT approved): E1b**, English
-      `A10_140_CryoTech` (+0.279 s, 394 frames) into Spanish #13. The
-      5,682 later samples shift by +9,088 B, and `.lst.bin` stays
-      unchanged (b2-audio-research.md §5.5).
+    - **E1b offline done:** `python scripts/discovery/b2_transplant.py
+      --exp e1b --name A10_140_cryotech`, 25/25 checks.
+      - English `A10_140_CryoTech` (4.574 s) goes into Spanish #13.
+      - The bank grows +9,088 B, and the 5,682 later samples shift
+        uniformly. `.lst.bin` is unchanged.
+      - Candidate: `6a861d02…`.
+    - **E2 offline done:** the approved vgmstream ships
+      `libcelt-0110.dll`, which exports the CELT 0.11 **encoder**.
+      - `scripts/common/celt011.py` wraps it with ctypes (44.1 kHz /
+        512, CBR 370 B, FMOD framing). `b2_e2_celt.py` passes 15/15.
+      - Decoder parity with vgmstream is bit-exact. Re-encoded MCC
+        speech keeps 47.9 dB SNR.
+      - The self-encoded candidate is `950f93e5…`. For 48→44.1 kHz,
+        ffmpeg (already installed) reaches 80 dB.
+    - **In-game installs** go through `python
+      scripts/discovery/b2_bank_install.py --exp <e1|e1b|e2> …`. E1b-game
+      and E2-game are **not approved**.
+    - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
+      (WC-1): `docs/workshop-research.md`. No documented Workshop
+      override exists for FSB or localization files.
     - Never install a bank or launch MCC without the owner's explicit
       approval for that specific experiment.
 
@@ -369,7 +385,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - No `verifications.json` entry yet. The `subtitle_load` entry (next free ID;
       `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 E1b+ experiments, WC, M4 matching UI, M8. Audio processing (resample,
+- Not started: B2 E3+, in-game E1b/E2, WC-2/3, M4 implementation, M8. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

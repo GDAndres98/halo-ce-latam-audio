@@ -247,6 +247,7 @@ findings and no drift.
     `mapping_store`.
 
 ### M4 — Local matching UI
+Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (stdlib server on 127.0.0.1, one static page, saves only via `mapping_store`).
 - [ ] It runs on 127.0.0.1 and uses the stdlib only (no install
   without approval).
 - [ ] It shows the MCC slot (EN + ES audio and durations), CE search
@@ -705,8 +706,8 @@ done by the owner, by hand, with a hash-verified backup and restore.
 | **E0** writer + identity rebuild (offline, no new tools) — ✅ **PASS 2026-10-08** | [x] Re-serialising the Spanish and English bank copies gives **byte-identical** files (0 differing ranges; SHA-256 = pins). [x] Synthetic tests for the writer (offsets, alignment, chunks, name table, size equation): 9 tests, mutation-checked. [x] Deterministic. [x] Re-parse, per-sample metadata and payload hashes identical; mono and stereo covered; vgmstream WAV and `-m` output identical on 7 subsongs per bank. See `b2-audio-research.md` §5.1. |
 | **E1** same-length transplant (offline; MCC retail content only) — ✅ **PASS 2026-10-08** | [x] The candidate (`86f787ac…`) puts the English CELT stream of `a10_350_captkeyes` into `es:A10_350_captkeyes#0`. [x] It passes every offline check in report §5 (23/23, `b2-audio-research.md` §5.3): vgmstream decodes all 5,696 subsongs, and only #31 differs (it equals the English decode); untouched streams are byte-identical (5,695 payloads, and every byte outside the target span); names and order are identical; LOOP, flags and the hash field are unchanged; `.lst.bin` is unchanged; the build is deterministic. |
 | E1-game (owner) — ✅ **PASS, user-verified 2026-10-08** | [x] Keyes speaks English at `a10_350`, completely, and the neighbouring lines play Spain Spanish, in Classic and Anniversary; the LATAM subtitles are unchanged. [x] No hang, crash, stutter or missing audio. [x] The original bank is restored and its hash `ed0ff3ec…` verified; the snapshot shows no other install file changed; the backup is kept. [x] Recorded as `v-000015`. See `b2-audio-research.md` §5.4. |
-| **E1b** different-length transplant (plan: `b2-audio-research.md` §5.5) | [ ] Offline: English `A10_140_CryoTech` (201,728 samples) into Spanish #13 `A10_140_cryotech` (189,440). [ ] The 5,682 later samples shift by exactly +9,088 B, 32-aligned. [ ] 5,695 payloads identical by index. [ ] `data_size` and the file size are +9,088, and nothing else in the header changes. [ ] `.lst.bin` is unchanged. [ ] vgmstream: all 5,696 subsongs decode, and only #14 differs (it equals English #14). [ ] In game (separate approval): the whole English line plays (about 4.57 s), and the behaviour of the next line (`a10_150`) is noted for B2-R3. The reserve pair is `a10_682_cortana` (+2.07 s). |
-| **E2** CELT 0.11 encoder qualification (offline; **tool approval needed**) | [ ] Encodes are CBR 370 B, 512-sample frames. [ ] vgmstream decodes them. [ ] The sample count is exact. [ ] SNR against the source meets an agreed threshold on 10 decoded MCC samples. |
+| **E1b** different-length transplant — ✅ **offline PASS 2026-10-08** (`b2-audio-research.md` §5.6; candidate `6a861d02…`) | [x] Offline: English `A10_140_CryoTech` (201,728 samples) into Spanish #13 `A10_140_cryotech` (189,440). [x] The 5,682 later samples shift by exactly +9,088 B, 32-aligned. [x] 5,695 payloads identical by index. [x] `data_size` and the file size are +9,088, and nothing else in the header changes. [x] `.lst.bin` is unchanged. [x] vgmstream: all 5,696 subsongs decode, and only #14 differs (it equals English #14). [ ] In game (separate approval): the whole English line plays (about 4.57 s), and the behaviour of the next line (`a10_150`) is noted for B2-R3. The reserve pair is `a10_682_cortana` (+2.07 s). |
+| **E2** CELT 0.11 encoder qualification — ✅ **offline PASS 2026-10-08** (`b2-audio-research.md` §5.7; the encoder is vgmstream's bundled `libcelt-0110.dll`, nothing installed) | [x] Encodes are CBR 370 B, 512-sample frames. [x] vgmstream decodes them (`Custom CELT`, frames × 512 samples). [x] The sample count is exact. [x] SNR: re-encoded MCC speech 47.9 dB; sweep/speech-like 46–48 dB; decoder parity with vgmstream is bit-exact. [ ] In game (separate approval): self-encoded candidate `950f93e5…` (our re-encode of English `A10_350` in slot #30) plays cleanly. |
 | **E3** one CE es-MX line (owner-named pairing) | [ ] A resample recipe is recorded. [ ] The CELT splice passes the offline checks. [ ] In game, the LATAM line plays in the slot. |
 | **E4** multi-sample (5–10 `a10` slots, owner-approved mappings) | [ ] Includes longer and shorter lines, and at least one `keep_original`. [ ] All checks pass. [ ] An owner playthrough of the `a10` opening confirms that replaced lines play and unmatched lines stay Spain. |
 | **E5** batch generator (= M6 audio) | [ ] Built only from approved `audio` objects. [ ] Deterministic, with untouched samples byte-identical. [ ] Drift-gated, with a per-slot report. |
@@ -758,10 +759,11 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B2 E0 (writer + identity rebuild, offline) | ✅ approved and done 2026-10-08: both banks byte-identical (`scripts/common/fsb5_writer.py`, `b2_e0_identity_rebuild.py`) |
 | B2 E1 offline | ✅ approved and done 2026-10-08: candidate `86f787ac…`, 23/23 checks; owner sheet `work/b2/e1/e1_install_rollback.md` prepared |
 | B2 E1-game | ✅ approved and done 2026-10-08: **user-verified pass** in Classic and Anniversary; restored and verified; `v-000015` |
-| B2 E1b (offline, then game) | **planned** (`b2-audio-research.md` §5.5); **not approved**. E1b offline and E1b-game need separate approvals |
-| B2 E2 (CELT 0.11 encoder, a new tool) | not approved; the encoder source must be chosen by the owner |
+| B2 E1b offline | ✅ done 2026-10-08 (25/25); E1b-game **not approved** (`b2_bank_install.py --exp e1b`) |
+| B2 E2 offline | ✅ done 2026-10-08 (15/15), using vgmstream's bundled libcelt; E2-game **not approved** (`b2_bank_install.py --exp e2`) |
 | B2 E3–E5 | not approved |
-| WC (Workshop compatibility checkpoint, inside B2) | planned; not approved |
+| WC (Workshop compatibility checkpoint, inside B2) | WC-1 (docs) ✅ done 2026-10-08 (`workshop-research.md`): no documented override of FSB/loc files; WC-2 (inspect one subscribed CE mod) needs approval |
+| M4 matching UI | design done 2026-10-08 (`m4-matching-ui-design.md`); implementation not started |
 | M8 (Steam Workshop packaging and publishing), each sub-step M8.1–M8.7 | planned; not approved |
 | Any upload (private test or public) | **not approved**; public publishing needs explicit owner approval |
 
