@@ -234,3 +234,7 @@ Acceptance criteria (they extend roadmap M4):
     the owner picks every line.
 - **Approve audio + subtitle** sends both `approve` actions in one save, so there is one write and
   one backup (tested). It is shown only while neither part is approved.
+- **Hide lines already used** (`/api/ce?hide_used=1&keep_slot=<slot>`) drops CE lines listed in any
+  other mapping's `match.ce_line_refs`. The current slot's own lines stay visible. Each line
+  carries `used_by`, and the page shows a "used ×N" badge. It is a filter only: the order is
+  unchanged and nothing is selected (tested).

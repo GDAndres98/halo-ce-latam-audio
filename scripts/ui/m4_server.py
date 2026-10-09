@@ -14,7 +14,7 @@ API (all JSON unless noted):
                                                   deferred|needs_rework|audio_pending|subtitle_pending|
                                                   radio|stereo); q: words and "quoted phrases"
     GET  /api/slot?id=<slot_id>                   slot detail, SU/SP text, decision, verifications
-    GET  /api/ce?mission=all|mapped|M01&level=&q=&subs=missing|present&offset=&limit=
+    GET  /api/ce?mission=all|mapped|M01&level=&q=&subs=missing|present&hide_used=1&keep_slot=&offset=&limit=
                                                   CE lines in catalog order, filtered by q only
     GET  /api/ce_line?ref=<ce_line_ref>
     GET  /audio/mcc?level=&lang=spanish|english&index=     WAV (decoded on demand)
@@ -104,7 +104,8 @@ def make_handler(app, quiet=False):
                     return self._json(200, app.slot(q.get("id", "")))
                 if u.path == "/api/ce":
                     return self._json(200, app.ce(q.get("mission", "all"), q.get("q"), q.get("offset", 0),
-                                                  q.get("limit", 100), q.get("level"), q.get("subs") or None))
+                                                  q.get("limit", 100), q.get("level"), q.get("subs") or None,
+                                                  q.get("hide_used") == "1", q.get("keep_slot") or None))
                 if u.path == "/api/ce_line":
                     return self._json(200, app.ce_line(q.get("ref", "")))
                 if u.path == "/audio/mcc":

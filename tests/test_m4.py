@@ -460,6 +460,20 @@ class SearchTests(AppTestBase):
         self.assertEqual(line["media"]["Spanish(Mexico)"]["count"], 1)   # still playable
         self.assertNotIn("score", json.dumps(self.app.ce("all", q="primero")))
 
+    def test_hide_lines_already_used(self):
+        self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]})            # slot 1 uses line_a
+        self.slot = "es:Z10_020_cortana#0"
+        self.save(match={"status": "deferred", "ce_line_refs": ["line_b#0"]})           # slot 2 uses line_b
+
+        def refs(**kw):
+            return [x["ce_line_ref"] for x in self.app.ce("M99", **kw)["lines"]]
+        self.assertEqual(refs(), ["line_a#0", "line_b#0", "lipsync_x#0"])               # off: everything
+        r = self.app.ce("M99", hide_used=True)
+        self.assertEqual(([x["ce_line_ref"] for x in r["lines"]], r["hidden_used"]), (["lipsync_x#0"], 2))
+        # the slot being edited keeps its own lines visible
+        self.assertEqual(refs(hide_used=True, keep_slot="es:Z10_020_cortana#0"), ["line_b#0", "lipsync_x#0"])
+        self.assertEqual(self.app.ce("M99")["lines"][0]["used_by"], ["es:Z10_010_keyes#0"])
+
     def test_search_never_writes_or_selects(self):
         before = snapshot(self.root)
         self.app.slots("all", q="jefe")

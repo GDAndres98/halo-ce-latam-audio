@@ -137,6 +137,8 @@ mark { background: #ffe58a; color: #1d2329; border-radius: 2px; padding: 0 1px; 
       </select>
       <input type="search" id="cq" placeholder='search es-MX / en / es-ES text, id, speaker; "a phrase"'>
     </div>
+    <label class="small" title="Hide CE lines already listed in another slot's match (any level). The current slot's own lines stay visible.">
+      <input type="checkbox" id="chide"> hide lines already used</label>
     <div class="small muted" id="ccount"></div>
     <div id="cands"></div>
     <button id="cmore" style="display:none">Load more</button>
@@ -309,7 +311,8 @@ async function selectSlot(id, force) {
   };
   for (const l of S.detail.matched_lines) S.ceCache[l.ce_line_ref] = l;
   S.dirty = false;
-  renderDetail(); renderCands();
+  renderDetail();
+  if ($("chide").checked) await loadCands(); else renderCands();  // the hidden set depends on slot + saved matches
 }
 function moveSlot(step) {
   if (!S.slots.length) return;
@@ -530,18 +533,20 @@ async function save(actions, reworkOnly) {
 async function loadCands(append) {
   const offset = append ? S.cands.length : 0;
   const q = new URLSearchParams({ mission: $("cscope").value, level: (S.detail && S.detail.level) || S.level,
-                                  q: $("cq").value, subs: $("csubs").value, offset, limit: 60 });
+                                  q: $("cq").value, subs: $("csubs").value, offset, limit: 60,
+                                  hide_used: $("chide").checked ? "1" : "", keep_slot: S.slotId || "" });
   let r;
   try { r = await api("/api/ce?" + q); } catch (e) { showErr(e); return; }
   S.cands = append ? S.cands.concat(r.lines) : r.lines;
-  S.candTotal = r.total; S.ceTerms = r.terms || [];
+  S.candTotal = r.total; S.ceTerms = r.terms || []; S.ceHidden = r.hidden_used || 0;
   for (const l of r.lines) S.ceCache[l.ce_line_ref] = l;
   renderCands();
 }
 function renderCands() {
   const chosen = new Set(S.edit ? S.edit.match.ce_line_refs : []);
   const aLocked = S.detail && S.detail.mapping && S.detail.mapping.audio.status === "approved";
-  $("ccount").textContent = `${S.cands.length} of ${S.candTotal} line(s), catalog order (never ranked)`;
+  $("ccount").textContent = `${S.cands.length} of ${S.candTotal} line(s), catalog order (never ranked)` +
+    (S.ceHidden ? ` · ${S.ceHidden} already used hidden` : "");
   $("cmore").style.display = S.cands.length < S.candTotal ? "" : "none";
   $("cands").innerHTML = S.cands.map((l, i) => {
     const t = (c) => l.subtitles[c].text ? hl(l.subtitles[c].text, S.ceTerms) : `<i class="muted">no ${c} subtitle (${esc(l.subtitles[c].reason || l.subtitles[c].evidence || "none")})</i>`;
@@ -551,6 +556,7 @@ function renderCands() {
         ${l.subtitles["es-MX"].text ? "" : '<span class="badge warn" title="no es-MX source subtitle found; you can still play and use it, and write a custom subtitle">no subtitle</span>'}
         <span class="badge">${esc(l.mission)} · ${esc(l.family)}</span>
         ${l.test_event ? '<span class="badge" title="test event: no dialogue media">test</span>' : ""}
+        ${l.used_by.length ? `<span class="badge ${l.used_by.some(x => x !== S.slotId) ? "warn" : ""}" title="already in the match of: ${esc(l.used_by.join(", "))}">used ×${l.used_by.length}</span>` : ""}
         ${l.verifications.length ? `<span class="badge" title="past checks">${l.verifications.map(esc).join(" ")}</span>` : ""}</div>
       <div class="row">${pb(LANG.es, "es-MX")} ${pb(LANG.en, "en")}
         <button data-use="${esc(l.ce_line_ref)}" ${!S.edit || chosen.has(l.ce_line_ref) || l.test_event || aLocked ? "disabled" : ""}>+ use for this slot</button></div>
@@ -596,6 +602,8 @@ $("level").onchange = async () => {
 $("sfilter").onchange = loadSlots;
 $("sall").onchange = loadSlots;
 $("csubs").onchange = () => loadCands();
+try { $("chide").checked = localStorage.getItem("m4.hideUsed") === "1"; } catch (_) {}
+$("chide").onchange = () => { try { localStorage.setItem("m4.hideUsed", $("chide").checked ? "1" : ""); } catch (_) {} loadCands(); };
 $("sq").oninput = () => { clearTimeout(tS); tS = setTimeout(loadSlots, 250); };
 $("cscope").onchange = () => loadCands();
 $("cq").oninput = () => { clearTimeout(tC); tC = setTimeout(() => loadCands(), 250); };

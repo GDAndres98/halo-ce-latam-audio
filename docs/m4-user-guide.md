@@ -68,6 +68,14 @@ Both search boxes work the same way:
 - **Lines without subtitles** stay reachable through their ID, speaker and folder, or through the
   **no es-MX subtitle** filter.
 
+**Hide lines already used** (right, under the search box) hides CE lines already listed in
+another slot's match, in any level.
+- The current slot's own lines stay visible.
+- The count line says how many lines were hidden.
+- With the toggle off, a used line shows a **used ×N** badge; hover over it to see which slots use
+  it.
+- It is a filter only, remembered by your browser.
+
 Slot filters (left):
 - undecided, matched, no equivalent, deferred;
 - audio / subtitle not approved;

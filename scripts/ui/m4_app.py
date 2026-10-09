@@ -350,9 +350,11 @@ class M4App:
             out["verifications"] = [v["id"] for v in self._verifs_for(f"ce:{ref}")]
         return out
 
-    def ce(self, mission="all", q=None, offset=0, limit=100, level=None, subs=None):
+    def ce(self, mission="all", q=None, offset=0, limit=100, level=None, subs=None, hide_used=False,
+           keep_slot=None):
         """CE lines in catalog order, filtered only by the owner's scope, query and subtitle filter
-        (subs: 'missing' = no es-MX subtitle text, 'present' = has one)."""
+        (subs: 'missing' = no es-MX subtitle text, 'present' = has one). hide_used drops lines already
+        listed in some slot's match, except those of keep_slot (the slot being edited)."""
         if mission == "mapped":
             scope = set(self._mission_scope(level)) if level else set()
         elif mission in (None, "", "all"):
@@ -367,9 +369,17 @@ class M4App:
 
         def has_mx(ref):
             return bool((self.ce_lines[ref][2]["subtitles"].get("es-MX") or {}).get("text"))
+        used = {}
+        for m in self._mappings()[0]["slots"]:
+            for ref in m["match"]["ce_line_refs"]:
+                used.setdefault(ref, []).append(m["slot_id"])
+        hidden = {ref for ref, sids in used.items() if any(x != keep_slot for x in sids)} if hide_used else set()
+        hidden -= {ref for ref, sids in used.items() if keep_slot in sids}
         refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in scope
                 and (not terms or matches(terms, self._ce_hay[ref]))
                 and (not subs or has_mx(ref) == (subs == "present"))]
+        n_hidden = sum(1 for ref in refs if ref in hidden)
+        refs = [ref for ref in refs if ref not in hidden]
         offset, limit = max(0, int(offset)), max(1, min(500, int(limit)))
         verifs = {}
         for v in self._verifications().get("verifications", []):
@@ -379,9 +389,10 @@ class M4App:
         for ref in refs[offset:offset + limit]:
             line = self.ce_line(ref, with_verifications=False)
             line["verifications"] = verifs.get(ref, [])
+            line["used_by"] = used.get(ref, [])
             lines.append(line)
         return {"scope": sorted(scope), "total": len(refs), "offset": offset, "limit": limit, "lines": lines,
-                "terms": terms,
+                "terms": terms, "hidden_used": n_hidden,
                 "order": "catalog order (mission, catalog file, entry index); filter only, never ranked"}
 
     def slot(self, slot_id):
