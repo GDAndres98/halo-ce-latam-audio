@@ -357,6 +357,198 @@ copies, anti-cheat disabled):
 | Silence at that line, or skipped | the stream or header is rejected for that sample | restore; compare with vgmstream; investigate B2-R4 |
 | Hang, crash or anti-cheat message | the bank was rejected | restore and verify immediately; stop and report |
 
+### 5.3 E1 offline result — ✅ PASS (2026-10-08, owner-approved, offline only)
+
+Run: `python scripts/discovery/b2_e1_transplant.py` (approved vgmstream
+r2117). It uses the E0 writer plus three new pure helpers in
+`fsb5_writer.py`:
+- `same_length_compatibility`;
+- `replace_stream`, which does not mutate its input;
+- `sample_spans`.
+
+Outputs (git-ignored, `work/b2/e1/`):
+- `sounds_dialogs_spanish.fsb` (the candidate);
+- `vgm/*.wav`;
+- `e1_report.json`, `e1_summary.md`;
+- `e1_install_rollback.md` (owner-run; **E1-game not approved**).
+
+| | Value |
+|---|---|
+| Original bank (copy = pin = **installed**, hashed read-only) | `ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6` |
+| **Candidate bank** | **`86f787ac184897619d471897e41650c04a4f1cb490df1b174c0f6f8793c6f55c`**, 309,320,800 B (same size) |
+| Target | Spanish #30 `A10_350_captkeyes` (slot `es:A10_350_captkeyes#0`, subsong 31) ← English #30 `A10_350_CaptKeyes` |
+| Target stream | 146,286 B, 198,144 samples, mono, LOOP `0, 198142`; ES `ce2c0d9e…` → EN `0442a6df…` |
+| Changed bytes | 138,181, all inside file bytes 3,258,496–3,404,800 (sample #30's span) |
+
+All **23/23** checks pass:
+- **Inputs:** the copies (both banks and the Spanish `.lst.bin`) match
+  their pins. The target name, occurrence, case-insensitive English
+  match and English uniqueness all check out. All six compatibility
+  checks are equal: head bits, channels, sample count, chunks, stream
+  length and CELT frame sizes (370 B).
+- **Byte level:**
+  - same size;
+  - **every byte outside the target span is identical** (full-file
+    comparison);
+  - the header, sample headers and name table are identical;
+  - **only payload #30 changed**, and the other **5,695** payloads are
+    identical;
+  - the target payload equals the English span byte for byte.
+- **Re-parse:** `fsb5_lib` metadata, names and order are identical; the
+  file round-trips through `decompose`/`build`; the build is
+  deterministic; the `.lst.bin` is untouched.
+- **vgmstream:**
+  - subsong 31 decodes to **the same WAV as English subsong 31**
+    (`39211c79…`, the E0 English value) and differs from the Spanish
+    original (`741eefa4…`), with identical `-m` metadata;
+  - neighbours 29, 30, 32 and 33 (`A10_330`–`A10_370`) decode
+    identically to the original;
+  - so do the representatives 1, 2, 573 (the longest), 4160 and 5600
+    (stereo) and 5696;
+  - **full bank:** every one of the **5,696 subsongs decodes** from both
+    the original and the candidate. The decoded PCM is hashed from
+    stdout and no files are written; the check takes about 40 s in
+    parallel. **Only subsong 31 differs**, and it equals the English
+    decode.
+
+**Tests:** 6 synthetic tests in `tests/test_b2_e1.py` cover:
+- the compatible target, and that only the target span changes;
+- that Spanish names, header and other samples are kept;
+- that the input model isn't mutated;
+- flagging of incompatible count, length, channels, frame size and
+  LOOP;
+- CELT frame-size parsing.
+
+~~**Not yet shown:** that MCC plays the candidate.~~ Shown in §5.4.
+
+### 5.4 E1-game result — ✅ PASS, USER-VERIFIED (2026-10-08)
+
+**Approval:** the owner explicitly approved E1-game. Claude ran the
+install and restore with
+`python scripts/discovery/b2_e1_game.py {preflight|install|rollback|status}`.
+The owner launched MCC with the official **anti-cheat-disabled** option
+and played.
+
+Each subcommand refuses to run while MCC or EAC processes exist. Only
+`halo1/sound/pc/sounds_dialogs_spanish.fsb` is ever written. State files
+are in git-ignored `work/b2/e1/game/`.
+
+| Step | Result |
+|---|---|
+| Pre-flight | MCC closed; Steam build `19905945`, StateFlags 4 (fully installed, no pending update); installed bank = original `ed0ff3ec…`; candidate = `86f787ac…`, differing from the installed file only inside sample #30 |
+| Snapshot | SHA-256 of all 26 files in `halo1/sound/pc` plus `SU`/`SP_Halo1.bin`; size and mtime of all 5,286 install files |
+| Backup | `work/mcc/fsb/backup/19905945/sounds_dialogs_spanish.fsb`, verified = original, **kept** |
+| Install | the placed bank verified = candidate `86f787ac…` |
+| **Owner test** (primary Spanish (Latin America), fallback Spanish (Spain), subtitles on) | **Classic and Anniversary both passed:** Keyes's `a10_350` played **in English, completely**; surrounding dialogue stayed Spain Spanish; the LATAM subtitles were unchanged; no crash, stutter or missing audio |
+| Rollback | refused at first, because `MCC-Win64-Shipping.exe` was still running. After the owner closed it, the bank was restored and verified = original `ed0ff3ec…` |
+| Snapshot after the restore | 0 hashed files changed; 0 install files added, removed or changed (size or mtime), apart from the bank itself |
+
+**Recorded:** `v-000015` on `mcc:es:A10_350_captkeyes#0`, with checks
+`correct_audio` and `audio_complete`, `pass`.
+- The fingerprint identifies the retail slot through `samples.spanish`,
+  so the validator's drift check stays meaningful.
+- An `experiment` block holds the candidate bank, the replacement stream
+  and the replaced stream SHA-256 values, plus the modes and settings.
+
+**What E1 establishes:**
+- **B2-R2 is resolved:** MCC (FMOD Ex 4.44.27) plays a dialogue bank
+  rebuilt by our writer.
+- **B2-R4 is resolved:** the 16-byte header hash field is not validated
+  against the content. It was left unchanged while one sample's bytes
+  changed.
+- In both graphics modes, the classic and the Anniversary audio paths
+  read the same `sounds_dialogs_spanish.fsb`.
+
+**Still open:**
+- **offset shifting**, i.e. a different-length stream (E1b);
+- **timing:** does the engine use the FSB length (B2-R3)? (E1b);
+- **encoding** CELT ourselves (E2).
+
+### 5.5 Proposed E1b — different-length English→Spanish transplant (NOT approved)
+
+**Candidate survey** (read-only, pinned copies). Pairs are matched by
+case-insensitive name, unique in both banks:
+- **85 `a10` pairs differ in length.** 83 of them are fully compatible:
+  mono, identical frequency and channel bits, LOOP-only chunks, and
+  every frame 370 B. The other 2 lack a LOOP chunk on one side.
+- Bank-wide, 460 or more compatible pairs differ in length.
+
+**Recommended pair:** `A10_140_cryotech`, Spanish #13 ← English #13
+`A10_140_CryoTech`.
+
+| | Spanish (current) | English (replacement) | Change |
+|---|---|---|---|
+| Samples | 189,440 (4.296 s) | 201,728 (4.574 s) | **+12,288 (+0.279 s), English longer** |
+| CELT frames (370 B) | 370 | 394 | +24 |
+| Stream / padded span | 139,860 / 139,872 B | 148,932 / 148,960 B | **+9,088 B** |
+| LOOP chunk | `0, 189438` | `0, 201726` | follows the `0, n−2` rule |
+
+**Why this pair:**
+- It is early in the cryo sequence, just before E1's baseline lines
+  (`a10_150`), so it is quick to reach.
+- The replacement is **longer**, which is the riskier direction. It
+  shows whether the engine cuts a line at the original length or lets
+  the next line overlap (B2-R3).
+- Index 13 shifts **5,682** later samples, so offset rewriting is
+  exercised across almost the whole bank.
+- Reserve pair, also MCC-only: `a10_682_cortana` (+2.067 s, 573 →
+  751 frames, the largest `a10` delta). It is later in the level, and
+  a candidate if the timing effect in `a10_140` is too small to judge.
+  It would need a separate approval.
+
+**What the writer must change** (an in-memory dry run confirmed this;
+**no file was written**):
+- **Sample #13:**
+  - the stream is replaced;
+  - the `sample_count` field is set to 201,728;
+  - LOOP is set to `0, 201726`;
+  - the frequency and channel bits are unchanged.
+- **Samples #14–#5,695:** the data offset moves **+9,088 B**, which
+  keeps 32-byte alignment. Every byte of their streams, counts and
+  chunks stays identical.
+- **Header:** `data_size` goes from 309,095,808 to 309,104,896.
+  `sample_headers_size` (the LOOP chunk keeps its 8 B), the name table
+  and the 32-byte header tail (flags and hash) are unchanged.
+- **File size:** 309,320,800 → **309,329,888 B**.
+- **`.lst.bin`: unchanged.** It maps tags to sample *index* ranges and
+  counts, not byte offsets or durations, so it stays valid.
+- One small writer API addition is needed: replace a sample's
+  `sample_count` and `chunks` together with the stream. Today
+  `replace_stream` only swaps the stream. A
+  `different_length_compatibility` check would require identical head
+  bits and channels, LOOP-only chunks, 370 B frames, and
+  `frames == ceil(n / 512)`.
+
+**E1b offline checks:**
+- copies verified against their pins;
+- payload by **index**: 5,695 identical, and #13 equal to English #13;
+- every later offset shifted by exactly +9,088, 32-byte aligned;
+- the size equation holds;
+- the name table, header tail and other sample headers are identical,
+  apart from offset bits;
+- re-parse plus round trip; deterministic;
+- `.lst.bin` untouched;
+- **vgmstream on all 5,696 subsongs:** only #14 differs, and it equals
+  English subsong 14 with the new length in `-m`. The neighbours
+  (`A10_101`, `A10_130`, `A10_150`) and the representatives are
+  unchanged.
+
+**E1b-game** (separate approval; same procedure and script pattern as
+E1, with the size change allowed in the snapshot):
+- **Expected:** at `a10_140`, the Cryo Tech speaks **English** for about
+  4.57 s. All other lines are Spain Spanish, and the LATAM subtitles are
+  unchanged.
+- **Owner observes:**
+  - whether the line plays to the end or is **cut at about 4.30 s**;
+  - whether the **next line** (`a10_150`) starts late, overlaps, or
+    behaves normally;
+  - any stutter or desync.
+- **Interpretation:**
+  - plays fully with no overlap → the engine follows the FSB length;
+  - cut off → length comes from tag or map data, and longer lines need
+    trims (recipes) or a different approach;
+  - overlap → note it for timing-sensitive slots in M4/M6.
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |

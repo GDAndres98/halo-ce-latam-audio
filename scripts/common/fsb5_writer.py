@@ -23,7 +23,7 @@ readings agree.
 """
 import struct
 
-from .fsb5_lib import bits, parse_header
+from .fsb5_lib import bits, parse_header, parse_sample_headers
 
 ALIGN = 32
 CELT_MODE = 12
@@ -149,6 +149,49 @@ def build(model):
     head = model["header_prefix"] + struct.pack("<IIIIII", model["version"], n, len(sh), len(nt), data_size,
                                                 model["mode"]) + model["header_tail"]
     return head + bytes(sh) + nt + b"".join(data_parts)
+
+
+def celt_frame_sizes(stream):
+    """Packet sizes of the CELT frames in a stream (sync + u32 size + packet each)."""
+    p, sizes = 0, []
+    while p + 8 <= len(stream) and stream[p:p + 4] == CELT_SYNC:
+        size = struct.unpack_from("<I", stream, p + 4)[0]
+        sizes.append(size)
+        p += 8 + size
+    if p != len(stream):
+        raise ValueError("stream is not a whole number of CELT frames")
+    return sizes
+
+
+def same_length_compatibility(dst, src):
+    """Checks that `src`'s stream can replace `dst`'s with no other header or offset change (E1)."""
+    return {
+        "head_bits_equal": dst["head_bits"] == src["head_bits"],  # frequency index + channel flag
+        "channels_equal": dst["channels"] == src["channels"],
+        "sample_count_equal": dst["sample_count"] == src["sample_count"],
+        "chunks_equal": dst["chunks"] == src["chunks"],  # e.g. LOOP 0, n-2
+        "stream_length_equal": len(dst["stream"]) == len(src["stream"]),
+        "celt_frame_sizes_equal": celt_frame_sizes(dst["stream"]) == celt_frame_sizes(src["stream"]),
+    }
+
+
+def replace_stream(model, index, stream):
+    """New model with sample `index`'s stream replaced; the input model is not modified."""
+    new = dict(model)
+    new["samples"] = list(model["samples"])
+    sample = dict(model["samples"][index])
+    sample["stream"] = bytes(stream)
+    new["samples"][index] = sample
+    return new
+
+
+def sample_spans(data):
+    """[(start, end)] absolute file offsets of each sample's data span (stream + padding)."""
+    h = parse_header(data)
+    samples, _ = parse_sample_headers(data, h["base_header_size"], h["sample_headers_size"], h["num_samples"])
+    start = h["base_header_size"] + h["sample_headers_size"] + h["name_table_size"]
+    ends = [s["data_offset"] for s in samples[1:]] + [h["data_size"]]
+    return [(start + s["data_offset"], start + e) for s, e in zip(samples, ends)]
 
 
 def diff_ranges(a, b, limit=20, chunk=1 << 16):

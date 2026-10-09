@@ -519,6 +519,58 @@
       "by": "user",
       "at": "2026-10-08",
       "note": "B1 PoC step 1 baseline (docs/subtitle-research.md B.12), unmodified game: SU_Halo1 text displayed in Classic and Anniversary; Spain Spanish audio in both. Speaker names not shown even with the option on (out of scope, original behaviour preserved). languages = subtitle table (latam_spanish) and audio (spanish)."
+    },
+    {
+      "id": "v-000015",
+      "subject": "mcc:es:A10_350_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_350_captkeyes",
+      "checks": [
+        "correct_audio",
+        "audio_complete"
+      ],
+      "languages": [
+        "spanish",
+        "english"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6",
+          "english": "8d072c1b73b9a8f6d7269ff1e3bb8d99b49d76a6e040ea0edf997446cbcba4bb"
+        },
+        "samples": {
+          "spanish": {
+            "index": 30,
+            "name_in_bank": "A10_350_captkeyes",
+            "data_sha256": "149749fb3a99a1851d06215384c566561774cdfa03045e590e9a917ea3d2d230"
+          },
+          "english": {
+            "index": 30,
+            "name_in_bank": "A10_350_CaptKeyes",
+            "data_sha256": "1936487d33a00b1ebbad694e4f8096c794bcfe74464b5ac69b6d5ce3dfa5c369"
+          }
+        },
+        "experiment": {
+          "id": "B2-E1",
+          "candidate_bank_sha256": "86f787ac184897619d471897e41650c04a4f1cb490df1b174c0f6f8793c6f55c",
+          "replacement_stream_sha256": "0442a6df438059808ec3ba614e47ab38e1c57a50fe7bcff8260da9d9527f41e5",
+          "replaced_stream_sha256": "ce2c0d9e9d8d6ab7b8219d9abb6604da7d66cb802b663058ae1dfc01c49e0e57"
+        },
+        "graphics_modes": [
+          "classic",
+          "anniversary"
+        ],
+        "language_settings": {
+          "primary": "Spanish (Latin America)",
+          "fallback": "Spanish (Spain)",
+          "subtitles": "on"
+        },
+        "launch": "MCC anti-cheat disabled"
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "B2 E1-game (docs/b2-audio-research.md §5.4): the E1 candidate bank (English A10_350_CaptKeyes CELT stream in Spanish slot #30) was installed. In Classic and Anniversary, Keyes' a10_350 played in English, completely; surrounding dialogue stayed Spain Spanish; LATAM subtitles unchanged; no crash, stutter or missing audio. The original bank was restored and hash-verified afterwards. The samples.spanish fingerprint identifies the retail slot, not the played audio."
     }
   ]
 }

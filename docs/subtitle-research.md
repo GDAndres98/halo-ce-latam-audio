@@ -803,7 +803,7 @@ into the install or launched MCC.
 **Verification records:** none appended yet. `verifications.json` is
 append-only and needs a concrete subject, table and mode. When the owner
 confirms the details, the entry will be:
-- `v-000015`: subject `mcc:es:A10_350_captkeyes#0`, check
+- the next free ID (`v-000015` went to B2 E1 on 2026-10-08): subject `mcc:es:A10_350_captkeyes#0`, check
   `subtitle_load`, `result: pass`;
 - fingerprint: the table name and the original and candidate SHA-256,
   the graphics modes and the language settings.

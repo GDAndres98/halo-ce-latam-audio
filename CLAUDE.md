@@ -43,10 +43,34 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - Metadata, payload hashes and vgmstream output are identical.
       - Outputs are in `work/b2/e0/` (631 MB). There are 9 synthetic
         tests in `tests/test_fsb5_writer.py`.
-    - **Next (proposed, not approved): E1**, the English
-      `a10_350` CELT stream in Spanish slot #30. It has the same length,
-      so only that sample's bytes change (b2-audio-research.md §5.2). E1
-      offline and E1-game each need approval.
+    - **E1 offline done (2026-10-08):**
+      `python scripts/discovery/b2_e1_transplant.py`, about 40 s. It
+      puts the English `a10_350` CELT stream in Spanish slot #30.
+      - Candidate: `work/b2/e1/sounds_dialogs_spanish.fsb`, SHA-256
+        `86f787ac…f55c`.
+      - 23/23 checks: only #30's bytes change, and the other 5,695
+        payloads are identical. All 5,696 subsongs decode, and only #31
+        differs (it equals the English decode).
+      - The owner-run sheet is `work/b2/e1/e1_install_rollback.md`.
+        There are 6 synthetic tests in `tests/test_b2_e1.py`.
+    - **E1-game ✅ PASS, user-verified (2026-10-08).** The owner
+      approved it explicitly.
+      - `python scripts/discovery/b2_e1_game.py
+        preflight|install|rollback|status` refuses to run while MCC is
+        open and writes only the Spanish bank.
+      - In Classic and Anniversary, Keyes's `a10_350` played in English,
+        completely, with Spanish around it and the subtitles unchanged.
+      - The bank is restored to `ed0ff3ec…`. The snapshot shows nothing
+        else changed. The backup in `work/mcc/fsb/backup/19905945/` is
+        kept. Recorded as `v-000015`.
+      - **MCC accepts banks rebuilt by our writer**, and the header hash
+        field is not checked.
+    - **Next (planned, NOT approved): E1b**, English
+      `A10_140_CryoTech` (+0.279 s, 394 frames) into Spanish #13. The
+      5,682 later samples shift by +9,088 B, and `.lst.bin` stays
+      unchanged (b2-audio-research.md §5.5).
+    - Never install a bank or launch MCC without the owner's explicit
+      approval for that specific experiment.
 
   Research options are in roadmap §6. Neither may be attempted with
   binary edits or repacking without explicit approval.
@@ -342,10 +366,10 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       them.
     - On-disk evidence: an `SU` backup exists, with no `SP` backup.
       Installed `SU`/`SP` equal the originals again (verified).
-    - No `verifications.json` entry yet. `v-000015` (`subtitle_load`)
-      waits for the owner's details.
+    - No `verifications.json` entry yet. The `subtitle_load` entry (next free ID;
+      `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 E1+ experiments, WC, M4 matching UI, M8. Audio processing (resample,
+- Not started: B2 E1b+ experiments, WC, M4 matching UI, M8. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
