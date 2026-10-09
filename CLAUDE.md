@@ -79,9 +79,27 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         speech keeps 47.9 dB SNR.
       - The self-encoded candidate is `950f93e5…`. For 48→44.1 kHz,
         ffmpeg (already installed) reaches 80 dB.
+    - **E1b-game ✅** (`v-000016`): the longer English line played
+      fully, and the next line started normally.
+    - **E2-game ❌ CRASHED** (`v-000017`): access violation in
+      `halo1.dll`, which embeds its own FMOD 4 and libcelt.
+      - The E1 and E2 banks differ only in sample #30's CELT packets.
+      - Every original MCC packet (1.69 M frames) is **intra-only with
+        no transients**. Our default encode wasn't (38 transients, 341
+        inter-predicted frames).
+      - Root cause is likely this, but not proven. Minidumps were not
+        opened.
+    - **Fix: E2b.** `celt011.encode(profile="fmod")`, now the default,
+      sets prediction 0 and complexity 0. `profile_violations()` is a
+      hard guard. Candidate: `f23ddda5…`.
+      - **Never encode game audio with `profile="default"`.**
+      - Diagnostics: `scripts/common/celt_header.py`,
+        `scripts/discovery/b2_celt_profile.py`.
     - **In-game installs** go through `python
-      scripts/discovery/b2_bank_install.py --exp <e1|e1b|e2> …`. E1b-game
-      and E2-game are **not approved**.
+      scripts/discovery/b2_bank_install.py --exp <id> …`. **E2b-game is
+      not approved.**
+    - ffmpeg (already installed) is approved for offline audio
+      conversion (owner, 2026-10-08).
     - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.

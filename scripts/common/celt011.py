@@ -18,6 +18,15 @@ FRAME_SAMPLES = 512
 PACKET_BYTES = {1: 370, 2: 464}  # as in every MCC dialogue sample
 SYNC = b"\x17\xc3\x0d\xf3"
 
+# CELT 0.11 encoder ctl requests (libcelt/celt.h); verified: both return 0, an unknown request -5.
+CELT_SET_COMPLEXITY_REQUEST = 2
+CELT_SET_PREDICTION_REQUEST = 4
+# Encoder settings. "fmod" reproduces the frame profile of every MCC dialogue packet (1.67 M frames
+# parsed, docs/b2-audio-research.md §5.8): intra-coded (no inter-frame prediction), no transient
+# short blocks, no post-filter. "default" is libcelt's default (inter-frame prediction, transients):
+# it crashed MCC in E2 and must not be used for game banks.
+PROFILES = {"fmod": {CELT_SET_PREDICTION_REQUEST: 0, CELT_SET_COMPLEXITY_REQUEST: 0}, "default": {}}
+
 
 class CeltError(RuntimeError):
     pass
@@ -34,6 +43,7 @@ class Celt011:
                 ("celt_mode_destroy_0110", None, [vp]),
                 ("celt_encoder_create_custom_0110", vp, [vp, ci, pci]),
                 ("celt_encoder_destroy_0110", None, [vp]),
+                ("celt_encoder_ctl_0110", ci, [vp, ci, ci]),
                 ("celt_encode_0110", ci, [vp, ctypes.POINTER(ctypes.c_int16), ci, ctypes.c_char_p, ci]),
                 ("celt_decoder_create_custom_0110", vp, [vp, ci, pci]),
                 ("celt_decoder_destroy_0110", None, [vp]),
@@ -50,13 +60,18 @@ class Celt011:
             self.lib.celt_mode_destroy_0110(self.mode)
             self.mode = None
 
-    def encode(self, pcm, channels=1, packet_bytes=None):
+    def encode(self, pcm, channels=1, packet_bytes=None, profile="fmod"):
         """16-bit PCM bytes -> list of CBR packets (last frame zero-padded). Returns (packets, frames)."""
         packet_bytes = packet_bytes or PACKET_BYTES[channels]
         err = ctypes.c_int(0)
         enc = self.lib.celt_encoder_create_custom_0110(self.mode, channels, ctypes.byref(err))
         if not enc or err.value:
             raise CeltError(f"celt_encoder_create_custom failed ({err.value})")
+        for request, value in PROFILES[profile].items():
+            rc = self.lib.celt_encoder_ctl_0110(enc, request, value)
+            if rc != 0:
+                self.lib.celt_encoder_destroy_0110(enc)
+                raise CeltError(f"celt_encoder_ctl({request}, {value}) failed ({rc})")
         frame_bytes = FRAME_SAMPLES * channels * 2
         frames = -(-len(pcm) // frame_bytes)
         pcm = pcm + b"\0" * (frames * frame_bytes - len(pcm))
@@ -108,3 +123,15 @@ def split_fmod_frames(stream):
         out.append(stream[p + 8:p + 8 + n])
         p += 8 + n
     return out
+
+
+def profile_violations(packets):
+    """Indices of packets outside MCC's observed CELT profile (post-filter, transient, or a non-silent
+    frame that is not intra-coded). An empty list matches every original MCC dialogue packet."""
+    from .celt_header import frame_flags
+    bad = []
+    for k, p in enumerate(packets):
+        f = frame_flags(p)
+        if f["postfilter"] or f["transient"] or (not f["silence"] and not f["intra"]):
+            bad.append(k)
+    return bad

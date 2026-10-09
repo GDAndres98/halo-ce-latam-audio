@@ -12,7 +12,10 @@ software. Steps:
   5. resampler probe (48 kHz -> 44.1 kHz) on a synthetic tone: stdlib audioop.ratecv and, if present,
      the already-installed ffmpeg; reports length and SNR against an ideal 44.1 kHz tone.
 
-Outputs (git-ignored): work/b2/e2/{e2_report.json, e2_summary.md, test_bank.fsb,
+Options: --exp <id> (output folder work/b2/<id>/, default e2b) and --profile fmod|default (CELT encoder
+settings, default fmod: intra-only, no transients; "default" crashed MCC in E2 and is kept for diagnosis).
+
+Outputs (git-ignored): work/b2/<exp>/{<exp>_report.json, <exp>_summary.md, test_bank.fsb,
 sounds_dialogs_spanish.fsb}. MCC retail content and synthetic signals only; nothing is installed.
 
 Example:
@@ -38,14 +41,14 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common.celt011 import FRAME_SAMPLES, Celt011, fmod_frames, split_fmod_frames  # noqa: E402
+from common.celt011 import FRAME_SAMPLES, PROFILES, Celt011, fmod_frames, profile_violations, split_fmod_frames  # noqa: E402
+from common.celt_header import frame_flags  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_writer import build, decompose, replace_sample, replacement_compatibility  # noqa: E402
 from common.vgm import DEFAULT_VGMSTREAM, decode_all, decode_hash, decode_pcm, meta, meta_value  # noqa: E402
 
 SR = 44100
 REF = REPO_ROOT / "reference-audio" / "stage1" / "fsb"
-OUT = REPO_ROOT / "work" / "b2" / "e2"
 TARGET = 30  # Spanish/English #30 = A10_350 (same length in both banks)
 MIN_SNR_DB = 12.0  # sanity floor for perceptual codecs on synthetic signals; reported, not a quality claim
 
@@ -78,15 +81,20 @@ def wav_data(wav):
     return wav[wav.index(b"data") + 8:]
 
 
-def align_and_snr(src, dec):
-    """(lag in samples, SNR dB) of `dec` against `src`, 16-bit mono."""
+CODEC_DELAY = 128  # CELT 0.11 overlap for this mode; measured on every aperiodic signal
+
+
+def align_and_snr(src, dec, lag=None):
+    """(lag in samples, SNR dB) of `dec` against `src`, 16-bit mono. With lag=None the lag is found by
+    audioop.findfit, which is ambiguous for periodic signals (pure tones); pass a known lag there."""
     n = len(src) // 2
     if audioop.rms(src, 2) == 0:
         return 0, (float("inf") if audioop.rms(dec, 2) == 0 else float("-inf"))
-    start = min(4096, n // 4)
-    ref = src[start * 2:(start + 2048) * 2]
-    off, _ = audioop.findfit(dec[:min(len(dec), (start + 4096) * 2)], ref)
-    lag = off - start
+    if lag is None:
+        start = min(4096, n // 4)
+        ref = src[start * 2:(start + 2048) * 2]
+        off, _ = audioop.findfit(dec[:min(len(dec), (start + 4096) * 2)], ref)
+        lag = off - start
     a = src[max(0, -lag) * 2:]
     b = dec[max(0, lag) * 2:]
     m = min(len(a), len(b)) // 2 * 2
@@ -135,7 +143,10 @@ def resample_probe(ffmpeg):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
+    ap.add_argument("--exp", default="e2b")
+    ap.add_argument("--profile", default="fmod", choices=sorted(PROFILES))
     args = ap.parse_args()
+    OUT = REPO_ROOT / "work" / "b2" / args.exp
     exe = args.vgmstream_cli
     OUT.mkdir(parents=True, exist_ok=True)
     pins = {k: v["sha256"] for k, v in json.loads((REPO_ROOT / "work" / "mcc" / "build.json")
@@ -146,7 +157,8 @@ def main():
         raise SystemExit("bank copies do not match their pins")
     m_es, m_en = decompose(es), decompose(en)
     c = Celt011()
-    checks, report = {}, {"schema": "b2-e2/1", "encoder": "libcelt-0110.dll (vgmstream r2117), CELT 0.11.0, "
+    checks, report = {}, {"schema": "b2-e2/2", "experiment": args.exp, "profile": args.profile,
+                          "encoder": "libcelt-0110.dll (vgmstream r2117), CELT 0.11.0, "
                           "custom mode 44100 Hz / 512, CBR 370 B mono"}
 
     # 1. decoder parity on original FMOD packets (a few mono samples incl. the target)
@@ -161,7 +173,7 @@ def main():
     sigs = signals()
     streams, suite = {}, {}
     for name, pcm in sigs.items():
-        packets, frames = c.encode(pcm)
+        packets, frames = c.encode(pcm, profile=args.profile)
         own = c.decode(packets)
         streams[name] = (fmod_frames(packets), frames * FRAME_SAMPLES)
         suite[name] = {"samples_in": len(pcm) // 2, "frames": frames, "packet_sizes": sorted(set(map(len, packets))),
@@ -173,7 +185,8 @@ def main():
     for idx, name in enumerate(sigs):
         wav = decode_pcm(exe, tb_path, idx + 1)
         dec = wav_data(wav) if wav else b""
-        lag, snr = align_and_snr(sigs[name], dec) if dec else (None, None)
+        lag = align_and_snr(sigs[name], dec)[0] if dec else None  # informational (ambiguous for tones)
+        snr = align_and_snr(sigs[name], dec, lag=CODEC_DELAY)[1] if dec else None
         m = meta(exe, tb_path, idx + 1)
         suite[name].update({"vgm_decoded": bool(dec), "vgm_samples": len(dec) // 2,
                             "vgm_encoding": meta_value(m, "encoding"), "lag": lag,
@@ -189,13 +202,18 @@ def main():
 
     # 3. generation loss on real MCC audio (English A10_350)
     en_pcm = wav_data(decode_pcm(exe, en_path, TARGET + 1))
-    pk, fr = c.encode(en_pcm)
+    pk, fr = c.encode(en_pcm, profile=args.profile)
     regen = c.decode(pk)
     lag, snr = align_and_snr(en_pcm, regen)
     gen = {"frames": fr, "samples": len(en_pcm) // 2, "lag": lag, "snr_db_vs_first_decode": round(snr, 1),
            "packet_sizes": sorted(set(map(len, pk))),
            "bytes_equal_fmod_original": fmod_frames(pk) == m_en["samples"][TARGET]["stream"]}
     checks["regen_same_frame_count"] = fr == len(split_fmod_frames(m_en["samples"][TARGET]["stream"]))
+    flags = [frame_flags(p) for p in pk]
+    gen["frame_flags"] = {k: sum(f[k] for f in flags) for k in ("silence", "postfilter", "transient", "intra")}
+    checks["candidate_matches_mcc_celt_profile"] = profile_violations(pk) == []
+    checks["synthetic_match_mcc_celt_profile"] = all(
+        profile_violations(split_fmod_frames(st)) == [] for st, _ in streams.values())
 
     # 4. E2 candidate bank: our re-encode of English A10_350 into Spanish slot #30
     src = dict(m_es["samples"][TARGET], stream=fmod_frames(pk), sample_count=fr * FRAME_SAMPLES)
@@ -231,15 +249,16 @@ def main():
                    "hashes": {"original_bank": pins["spanish.fsb"], "candidate": sha256(cand)},
                    "target": {"index": TARGET}, "resample_probe": resample, "ffmpeg": ffmpeg,
                    "note": "offline only; synthetic signals and MCC retail audio only; nothing installed"})
-    (OUT / "e2_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    lines = [f"# B2 E2: CELT 0.11 encoder qualification — {'PASS' if report['ok'] else 'FAIL'}", ""]
+    (OUT / f"{args.exp}_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    lines = [f"# B2 {args.exp}: CELT 0.11 encoder qualification (profile {args.profile}) — "
+             f"{'PASS' if report['ok'] else 'FAIL'}", ""]
     lines += [f"- `{k}`: {v}" for k, v in checks.items()]
     lines += ["", "| signal | frames | packets | vgm decoded | lag | SNR dB |", "|---|---|---|---|---|---|"]
     lines += [f"| {n} | {s['frames']} | {s['packet_sizes']} | {s['vgm_decoded']} | {s['lag']} | {s['snr_db']} |"
               for n, s in suite.items()]
     lines += ["", f"Generation loss (English A10_350 re-encoded): {gen}", "",
               f"Candidate: `{sha256(cand)}`", "", f"Resample probe: {resample}"]
-    (OUT / "e2_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (OUT / f"{args.exp}_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0 if report["ok"] else 1
 

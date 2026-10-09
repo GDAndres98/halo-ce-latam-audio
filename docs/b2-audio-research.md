@@ -627,6 +627,107 @@ git-ignored in `work/b2/e2/`. **15/15 checks pass:**
 - **In game:** the candidate above (our encoder, MCC content) would
   confirm that FMOD Ex plays our own CELT packets. It needs approval.
 
+### 5.8 E2-game ❌ FAILED (crash), root-cause analysis, and E2b (2026-10-08)
+
+**Result (user-reported):** with the E2 bank installed (our
+default-settings CELT re-encode of English `A10_350` in slot #30), MCC
+**crashed with a fatal error at the moment `a10_350` should play**.
+E1 and E1b, which used FMOD's own CELT packets, both played.
+- **Recorded:** `v-000017`, `result: fail`, with the crash signature.
+  The graphics mode wasn't reported, so it isn't recorded.
+- **Rollback:** passed. The bank is restored to `ed0ff3ec…`, and no
+  hashed file changed. The only other install change was **MCC's own
+  `crash_info.txt`**, written by the crash. The backup is kept.
+
+**Crash evidence:**
+- **Windows Application log, event 1000:**
+  - `mcc-win64-shipping.exe` 1.3528.0.0;
+  - **faulting module `halo1.dll` 1.3528.0.0**;
+  - **exception `0xC0000005` (access violation)**, offset `0x11cd588`.
+- **WER event 1001:** APPCRASH with the same signature.
+- `crash_info.txt`: build `2025.08.16.178512.1-Release`, with no stack.
+- **Minidumps exist but were not opened:**
+  `%LOCALAPPDATA%\CrashDumps\MCC-Win64-Shipping.exe.26220.dmp` and
+  `LocalLow\MCC\Saved\Crashes\…\UE4Minidump.dmp`. Reading process memory
+  or debugging needs approval (roadmap §6).
+- **A string search shows `halo1.dll` statically embeds FMOD 4 with
+  its own `libcelt`.** It has 104 `fmod*.cpp` source paths, including
+  `…\fmod4\src\fmod_codec_celt.cpp` and
+  `…\fmod4\lib\libcelt\custom_support.h`. So the game decodes CELT
+  with a CELT build inside `halo1.dll`, not with `fmodex64.dll`.
+
+**Isolation:**
+- The E1 bank (it played) and the E2 bank (it crashed) are
+  **byte-identical except for the 370-byte CELT packets of sample #30**:
+  same size, metadata, LOOP chunk and frame headers.
+- Bank structure and FSB5 metadata are therefore ruled out, and the
+  cause lies in the **packet contents**.
+
+**Bitstream comparison** (`scripts/common/celt_header.py`, a port of the
+CELT 0.11 range decoder that reads each packet's leading flags;
+`python scripts/discovery/b2_celt_profile.py --exp e1 e1b e2 e2b`):
+
+| Frames | Count | Post-filter | **Transient** | **Non-silent, not intra** |
+|---|---|---|---|---|
+| MCC Spanish bank, mono + stereo | 815,246 | 0 | **0** | **0** |
+| MCC English bank, mono + stereo | 870,729 | 0 | **0** | **0** |
+| E1 / E1b target (FMOD packets) | 387 / 394 | 0 | 0 | 0 |
+| **E2 target (our default encode) — crashed** | 387 | 0 | **38** | **341** |
+| **E2b target (our MCC-profile encode)** | 387 | 0 | **0** | **0** |
+
+The parser is self-consistent: in both banks, intra + silence equals
+the frame count exactly.
+
+**Root-cause hypothesis:** it is supported by evidence but **not
+proven**, because the dump wasn't analysed.
+- FMOD encoded every MCC dialogue packet in a restricted profile:
+  **intra-only** (no inter-frame energy prediction) and **no transient
+  short blocks**.
+- Our default libcelt encode used both features.
+- Those are the only packet-level differences we can measure, and the
+  crash happened exactly when those packets were decoded.
+- `halo1.dll`'s embedded decoder plausibly doesn't support one or both
+  features.
+- **Ruled out:** the post-filter (unused on both sides), frame sizes and
+  counts, the sample count and LOOP, framing, and bank metadata.
+
+**Fix candidate (E2b):** `celt011.Celt011.encode(..., profile="fmod")`,
+now the default, sets `CELT_SET_PREDICTION(0)` (intra-only) and
+`CELT_SET_COMPLEXITY(0)` (no transient analysis). Both requests return
+0; an unknown request returns −5.
+- **Guard:** `celt011.profile_violations()` rejects any packet outside
+  the MCC profile. `b2_e2_celt.py` makes it a hard check.
+- **Negative control:** rebuilding E2 with `--profile default`
+  reproduces the crashed bank exactly (`950f93e5…`), and the guard now
+  **fails** it.
+- **E2b** (`python scripts/discovery/b2_e2_celt.py --exp e2b`) passes
+  every check:
+  - 0 transients, 387/387 intra;
+  - re-encoded speech at 47.8 dB, against 47.9 dB with the default
+    settings;
+  - synthetic signals at 46–49 dB, measured at the fixed codec delay of
+    128 samples;
+  - all 5,696 subsongs decode, and only #31 differs.
+- **Candidate:** `work/b2/e2b/sounds_dialogs_spanish.fsb`,
+  **`f23ddda59b480e0a169c49773c8ec8b6f46cd4bc055ef435c21a3455cb96006a`**.
+  The sheet is `work/b2/e2b/e2b_install_rollback.md`. **Not installed;
+  needs approval.**
+- Complexity 0 and 1 both satisfy the profile, but their bytes differ.
+  FMOD's actual complexity is unknown, so we chose 0 as the most
+  conservative (fewest optional encoder decisions).
+
+**Fallbacks** if E2b also crashes:
+
+| Option | Complexity | Size impact | Compatibility risk | Redistribution |
+|---|---|---|---|---|
+| A. Match FMOD's encoder more closely: compare deeper bitstream fields such as spread and tf choices, or analyse the minidump (needs approval) | medium | none | lower once matched | unchanged (libcelt is BSD) |
+| B. FMOD's own encoder: FMOD Ex 4.44 SDK FSBankEx + `celt_encoder.dll` (legacy download, fmod.com account, FMOD EULA) | low–medium | none | **lowest** (this is how the banks were made) | the FMOD EULA governs the tool, not our audio; needs owner approval and download |
+| C. Re-encode the **whole bank as IMA ADPCM** (our own stdlib encoder; the runtime decodes `sounds_adpcm.fsb`) | medium (an encoder of about 150 lines, plus a test of whether `halo1` accepts mode 7 for the dialogue bank) | about 235 MB (−24 %) | medium; untested for the dialogue bank; every untouched line is transcoded (lossy, ADPCM hiss) | unchanged |
+| D. Whole bank as PCM16 | low | about 835 MB (+170 %) | medium; untested codec and memory path | unchanged |
+
+Whatever the codec, the CE-content redistribution limits stay as they
+are (`workshop-research.md` §2).
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |
