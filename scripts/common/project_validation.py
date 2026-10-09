@@ -370,5 +370,56 @@ def validate_mission_map(doc, schema, *, ce_missions, mcc_levels, file="mission_
     return out
 
 
+READY_STATUSES = ("ready_for_build", "in_game_tested", "reviewed")
+
+
+def level_progress(level_slot_ids, mappings_doc):
+    """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure."""
+    by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
+    out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
+           "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0}
+    for sid in level_slot_ids:
+        s = by_slot.get(sid)
+        if not s:
+            continue
+        st = s["match"]["status"]
+        if st != "unreviewed":
+            out["decided"] += 1
+        if st in ("matched", "no_equivalent", "deferred"):
+            out[st] += 1
+        out["audio_approved"] += s["audio"]["status"] == "approved"
+        out["subtitle_approved"] += s["subtitle"]["status"] == "approved"
+        out["needs_rework"] += "needs_rework" in (s["audio"]["status"], s["subtitle"]["status"])
+    out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
+    return out
+
+
+def validate_mission_progress(doc, schema, *, level_slots, mappings_doc, verifications, file="mission_progress.json"):
+    """level_slots: {level: [slot_id]} from the loaded MCC catalogs. Never edits the file."""
+    out = [finding("error", "schema", file, e.split(":")[0], e) for e in schema_validate(doc, schema)]
+    if out:
+        return out
+    ver_ids = {v["id"] for v in (verifications or {}).get("verifications", [])}
+    seen = set()
+    for e in doc["levels"]:
+        lv = e["mcc_level"]
+        if lv in seen:
+            out.append(finding("error", "duplicate_level", file, lv, "level listed twice"))
+        seen.add(lv)
+        if e["verification"] and e["verification"] not in ver_ids:
+            out.append(finding("error", "unknown_verification", file, lv, e["verification"]))
+        if lv not in level_slots:
+            if level_slots:
+                out.append(finding("info", "level_catalog_missing", file, lv, "no MCC catalog built yet"))
+            continue
+        if e["status"] in READY_STATUSES:
+            prog = level_progress(level_slots[lv], mappings_doc)
+            if not prog["ready_for_build"]:
+                out.append(finding("warning", "level_status_ahead_of_decisions", file, lv,
+                                   f"status {e['status']} but {prog['slots'] - prog['decided']} slot(s) undecided and "
+                                   f"{prog['slots'] - prog['audio_approved']} without approved audio"))
+    return out
+
+
 def dumps(obj):
     return json.dumps(obj, sort_keys=True, ensure_ascii=False, indent=2) + "\n"

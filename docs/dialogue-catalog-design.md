@@ -231,6 +231,12 @@ Changes from the sketch above:
 - `lst.<language>`: `{first_sample_index, sample_count,
   agrees_with_name_table, evidence: "derived:lst_record_layout"}`. It is
   a cross-check only; identity stays with the name table (`explicit`).
+  **Campaign-wide extension (2026-10-08, pending owner review):** when the
+  name table can't identify a tag's samples, the tag's own range is used
+  instead (`evidence: derived:lst_record_layout`, flag
+  `samples_from_lst_range:<lang>`). `%`, `#` and whitespace in a bank name
+  are percent-encoded in `slot_id`. See
+  [`campaign-catalog.md`](campaign-catalog.md) §3.
 - `kind` ∈ `scripted | flavor | insert | other`, `level`, `sequence`
   and `speaker_from_name` are all `derived:tag_name`.
 - Flags: `missing:<lang>`, `permutations`,

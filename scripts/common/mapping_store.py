@@ -1,7 +1,9 @@
 """Protected write path for mappings/manual_mappings.json (milestone M3).
 
-Not used by any tool yet. The M4 matching UI will save through this, and
-nothing else may write the file. Guarantees (docs/dialogue-catalog-design.md
+The M4 matching UI (scripts/ui/m4_app.py) saves through this, and nothing
+else may write the file. `save_user_file` gives the other user-owned files
+(manual_mappings.local.json, mission_progress.json) the same stale-check,
+schema check, backup and atomic write. Guarantees (docs/dialogue-catalog-design.md
 §5.4):
 
 1. Stale-save refusal: the on-disk bytes must still hash to what was loaded.
@@ -89,6 +91,11 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
     errs = validate(new_doc, schema or load_schema("manual-mappings-2"))
     if errs:
         raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new_doc, loaded_sha256, history_dir, now)
+
+
+def _write(path, current, new_doc, loaded_sha256, history_dir, now):
+    """Back up the previous bytes to .history/, then write atomically. -> new sha256."""
     history = Path(history_dir) if history_dir else path.parent / ".history"
     if current:
         history.mkdir(parents=True, exist_ok=True)
@@ -102,3 +109,19 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
         os.fsync(f.fileno())
     os.replace(tmp, path)
     return hashlib.sha256(data).hexdigest()
+
+
+EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()  # loaded hash of a file that doesn't exist yet
+
+
+def save_user_file(path, new_doc, loaded_sha256, schema_name, *, history_dir=None, now=None):
+    """Same stale-check, schema check, backup and atomic write for the other user-owned files
+    (manual_mappings.local.json, mission_progress.json). They hold no approvals."""
+    path = Path(path)
+    current = path.read_bytes() if path.exists() else b""
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded; reload and re-apply your edit")
+    errs = validate(new_doc, load_schema(schema_name))
+    if errs:
+        raise StoreError(f"{path.name} schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new_doc, loaded_sha256, history_dir, now)

@@ -12,11 +12,13 @@ nothing, and writes only under work/ (git-ignored):
 
 Never reads or writes mappings/; never matches anything to MCC.
 
-Example:
+Examples:
     python scripts/catalog/build_ce_catalog.py --mission M01
+    python scripts/catalog/build_ce_catalog.py --all      # every mission found (M01..M14 on this build)
 """
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -179,14 +181,32 @@ def summary_md(mission, cov, rep, build):
     return "\n".join(L) + "\n"
 
 
+def discover_missions(ctx):
+    """Mission IDs (M01, M02, ...) named by vo_scr_mNN* / vo_cin_mNN* voice folders, sorted."""
+    found = set()
+    for family in ("scripted", "cinematic"):
+        root = f"{AUDIO_ROOT}{family}/"
+        for p in ctx.list_packages(root):
+            m = re.match(r"vo_(?:scr|cin)_m(\d\d)", p[len(root):].split("/", 1)[0], re.I)
+            if m and "/" in p[len(root):]:
+                found.add(f"M{m.group(1)}")
+    return sorted(found)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mission", default="M01")
+    ap.add_argument("--all", action="store_true", help="every mission with vo_scr_mNN / vo_cin_mNN voice folders")
     ap.add_argument("--oodle-dll", type=Path)
     args = ap.parse_args()
-    mission = args.mission.upper()
-    t0 = time.time()
     ctx = CEContext(oodle_dll=args.oodle_dll)
+    missions = discover_missions(ctx) if args.all else [args.mission.upper()]
+    for mission in missions:
+        build_mission(ctx, mission)
+
+
+def build_mission(ctx, mission):
+    t0 = time.time()
     res = GameResolver(ctx)
     build_ids = source_build_ids(ctx)
 
@@ -284,7 +304,7 @@ def main():
     (rep_dir / f"{m}_unresolved.json").write_text(dumps_json(report), encoding="utf-8", newline="\n")
     (rep_dir / f"{m}_summary.md").write_text(summary_md(mission, coverage, report, build), encoding="utf-8",
                                               newline="\n")
-    print(f"{len(records)} records, {len(skipped)} skipped, "
+    print(f"{mission}: {len(records)} records, {len(skipped)} skipped, "
           f"{coverage['unresolved_items']} unresolved items, {len(report['ambiguities'])} ambiguities "
           f"({time.time() - t0:.1f}s)")
     for p in (out_cat, build_path, rep_dir / f"{m}_coverage.json", rep_dir / f"{m}_unresolved.json",

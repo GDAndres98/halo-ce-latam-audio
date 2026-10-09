@@ -4,6 +4,10 @@
 Read [`CLAUDE.md`](../CLAUDE.md) first: it has the hard rules and the full status. This file is
 only the M4 starting point; it does not repeat other documents.
 
+> **Update 2026-10-08: M4 is implemented.** See [`m4-user-guide.md`](m4-user-guide.md) and design
+> §7. The catalogs now cover the whole campaign ([`campaign-catalog.md`](campaign-catalog.md)).
+> The rest of this file is the original handoff.
+
 ## 1. Goal and where we are
 
 - **Project:** replace MCC Halo CE's Spanish (Spain) dialogue with Halo: Campaign Evolved **es-MX**

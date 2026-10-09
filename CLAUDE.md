@@ -117,8 +117,24 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - **E3-game ✅** (`v-000019`): the es-MX line played correctly and
         naturally in MCC. The pairing stays an experiment, **not** an
         approved mapping. **B2 audio route proven end to end.**
-    - **Next: M4** (matching UI). Handoff: `docs/m4-session-handoff.md`.
-    - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
+    - **M4 implemented (2026-10-08):** `python scripts/ui/m4_server.py`
+      (127.0.0.1:8765, stdlib only). Guide: `docs/m4-user-guide.md`;
+      design §7: `docs/m4-matching-ui-design.md`. Logic is in
+      `scripts/ui/m4_app.py` (tested in `tests/test_m4.py`). It saves only
+      through `mapping_store` (`save` / `save_user_file`), and level status
+      goes in `mappings/mission_progress.json`. Owner trial pending; **next
+      is M5** (owner matches `a10`). Never make or approve decisions in
+      `mappings/` yourself.
+    - **Campaign-wide catalogs (2026-10-08):** `build_ce_catalog.py --all`
+      (13 missions, 1,475 records) and `build_mcc_catalog.py --all
+      --no-audio` (28 folders, 1,903 tags, all 5,696 Spanish samples as
+      slots). Audio is decoded on demand (`scripts/common/ondemand_audio.py`).
+      The inventory is `python scripts/catalog/campaign_inventory.py
+      --scan-ce`. **Three rule extensions await owner review**
+      (`docs/campaign-catalog.md` §3): the lst-range identity fallback,
+      `%XX` in `slot_id`, and spaces in `tag_name`. `a10` is
+      byte-identical.
+    - **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.
     - Never install a bank or launch MCC without the owner's explicit
@@ -421,7 +437,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - No `verifications.json` entry yet. The `subtitle_load` entry (next free ID;
       `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 E3+, in-game E1b/E2, WC-2/3, M4 implementation, M8. Audio processing (resample,
+- Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, a CE `Systemic` catalog. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

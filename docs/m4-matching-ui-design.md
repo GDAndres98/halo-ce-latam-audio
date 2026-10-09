@@ -1,7 +1,8 @@
-# M4 — Minimum Viable Matching UI (design, not implemented)
+# M4 — Minimum Viable Matching UI
 
-**Status:** design only (2026-10-08). It reuses the M1–M3 outputs and
-`scripts/common/mapping_store.py`. No new dependencies.
+**Status:** implemented 2026-10-08 (§7). It reuses the M1–M3 outputs and
+`scripts/common/mapping_store.py`. No new dependencies. How to use it:
+[`m4-user-guide.md`](m4-user-guide.md).
 
 ## 1. What it must do
 
@@ -143,3 +144,40 @@ Acceptance criteria (they extend roadmap M4):
   matching, since MCC's Spain dub may follow es-ES wording.
 - **Show the SU/SP texts** that the chosen subtitle would replace:
   **yes**.
+
+## 7. As implemented (2026-10-08)
+
+- **Files:**
+  - `scripts/ui/m4_server.py`: HTTP, 127.0.0.1 only, with a Host/Origin check;
+  - `scripts/ui/m4_app.py`: the logic, no HTTP, so tests drive it directly;
+  - `scripts/ui/m4.html`: the page;
+  - `scripts/common/ondemand_audio.py`: decoding.
+- **Tests:** `tests/test_m4.py` (23 tests) covers the three proofs from §5 plus HTTP, audio and
+  progress. A headless-Edge click-through on a scratch copy of the data also passed: draft,
+  reorder, approve, custom subtitle, a stale-save 409, needs rework, the progress gate and the
+  filter-only search.
+- **Campaign scope, not just one level:**
+  - the level picker lists every MCC catalog (28 folders);
+  - CE candidates can come from the mapped missions, all missions, or one mission, always in
+    catalog order (mission, file, entry).
+- **On-demand audio:** a recording is decoded the first time it is played. Existing M1b/M2
+  decodes are reused (design §2 said "missing decodes run with `export_ce_audio.py`"; per-line
+  decoding replaced that).
+- **Save rules, enforced before anything is written:**
+  - `mapping_store.check_transition`, then `validate_mappings` errors for that mapping, then
+    `mapping_store.save`;
+  - custom text goes through `mapping_store.save_user_file` (stale check, schema, backup, atomic
+    write);
+  - changing the text of an approved custom subtitle counts as a change and needs *needs rework*.
+- **Level status (new):** `mappings/mission_progress.json` (`mission-progress/1`) holds the
+  owner-set steps `in_progress`, `ready_for_build`, `in_game_tested` and `reviewed`.
+  - `ready_for_build` and later need every slot decided with approved audio (the M5 criterion).
+  - `in_game_tested` and `reviewed` need an explicit confirmation.
+  - The validator checks the file.
+- **UI-only limits:**
+  - `user_recording` / `composite` audio sources and `edit` trims are kept, but they can't be
+    edited in the UI yet;
+  - stereo slots are only badged (`st`).
+- Clicking **+ use** on a CE line sets the match status to *matched* when it was *unreviewed* or
+  *no equivalent*. That is the owner's own click, not a suggestion. The audio and subtitle choices
+  are never changed by it.

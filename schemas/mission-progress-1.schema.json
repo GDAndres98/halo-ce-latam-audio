@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mission-progress/1",
+  "title": "Owner-set per-level workflow status (mappings/mission_progress.json, committed)",
+  "description": "Written only by the M4 UI on an explicit owner action. Slot-level progress is derived from manual_mappings.json and is not stored here. 'reviewed' is the owner's sign-off after the level was built and tested in MCC (step 7 of the level workflow); a tool never sets it on its own.",
+  "type": "object",
+  "required": ["schema", "levels"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "mission-progress/1"},
+    "levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mcc_level", "status", "updated_at", "verification", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "mcc_level": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "status": {"enum": ["in_progress", "ready_for_build", "in_game_tested", "reviewed"],
+                     "description": "in_progress: matching under way. ready_for_build: every slot decided and audio approved. in_game_tested: the owner tested a build in MCC. reviewed: owner sign-off."},
+          "updated_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+          "verification": {"type": ["string", "null"], "pattern": "^v-[0-9]{6}$",
+                           "description": "Optional verifications.json entry recording the in-game test."},
+          "note": {"type": "string", "maxLength": 2000}
+        }
+      }
+    }
+  }
+}

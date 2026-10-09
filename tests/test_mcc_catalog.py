@@ -186,6 +186,41 @@ class CatalogTests(unittest.TestCase):
             _, issues = build_level("z10", lst, lst, {"spanish": b, "english": b}, {})
         self.assertIn({"code": "duplicate_sample_data", "language": "spanish", "index_groups": [[0, 2]]}, issues)
 
+    def test_generic_tags_fall_back_to_their_lst_range(self):
+        """Generic barks: permutation names differ from the tag name, and basenames repeat across folders."""
+        g1, g2 = "sound\\dialog\\gen1\\", "sound\\dialog\\gen2\\"
+        samples = [("deathquiet 01", 1, b"a", None), ("deathquiet 02", 1, b"b", None),   # gen1\death_quiet
+                   ("1", 1, b"c", None),                                                   # gen2\death_quiet
+                   ("gen1_010_named", 1, b"d", None)]                                      # name resolves
+        lst = [(g1 + "death_quiet", 0, 2), (g2 + "death_quiet", 2, 1), (g1 + "gen1_010_named", 3, 1)]
+        with tempfile.TemporaryDirectory() as d:
+            b = BankIndex(write_bank(d, "g.fsb", samples), "spanish", "g.fsb")
+            recs, issues = build_level("gen1", lst, lst, {"spanish": b, "english": b}, {})
+            other, _ = build_level("gen2", lst, lst, {"spanish": b, "english": b}, {})
+        by = {r["mcc_tag"]: r for r in recs}
+        dq = by[g1 + "death_quiet"]
+        self.assertEqual(dq["slot_ids"], ["es:deathquiet%2001#0", "es:deathquiet%2002#0"])
+        self.assertEqual({s["evidence"] for s in dq["samples"]["spanish"]}, {"derived:lst_record_layout"})
+        self.assertIn("samples_from_lst_range:spanish", dq["flags"])
+        named = by[g1 + "gen1_010_named"]
+        self.assertEqual((named["slot_ids"], named["samples"]["spanish"][0]["evidence"]),
+                         (["es:gen1_010_named#0"], "explicit"))
+        self.assertNotIn("samples_from_lst_range:spanish", named["flags"])
+        self.assertEqual(other[0]["slot_ids"], ["es:1#0"])
+        self.assertFalse(set(dq["slot_ids"]) & set(other[0]["slot_ids"]))
+        self.assertNotIn("slot_id_collision", {i["code"] for i in issues})
+
+    def test_one_permutation_named_like_the_tag_keeps_the_whole_range(self):
+        """flood\\death: only 'death' matches the tag name, 'death2'/'death10' are its other permutations."""
+        tag = "sound\\dialog\\flood\\death"
+        lst = [(tag, 0, 3)]
+        with tempfile.TemporaryDirectory() as d:
+            b = BankIndex(write_bank(d, "f.fsb", [("death", 1, b"a", None), ("death10", 1, b"b", None),
+                                                  ("death2", 1, b"c", None)]), "spanish", "f.fsb")
+            recs, _ = build_level("flood", lst, lst, {"spanish": b, "english": b}, {})
+        self.assertEqual(recs[0]["slot_ids"], ["es:death#0", "es:death10#0", "es:death2#0"])
+        self.assertIn("samples_from_lst_range:spanish", recs[0]["flags"])
+
     def test_export_plan_names_and_decode_statuses(self):
         units = export_plan(self.records)
         paths = {u["key"]: u["wav_path"] for u in units}

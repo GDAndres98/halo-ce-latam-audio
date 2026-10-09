@@ -10,7 +10,7 @@
   "properties": {
     "schema": {"const": "mcc-dialogue-tag/3"},
     "mcc_tag": {"type": "string", "pattern": "^sound\\\\dialog\\\\"},
-    "tag_name": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+    "tag_name": {"type": "string", "pattern": "^[a-z0-9_]+( [a-z0-9_]+)*$", "description": "Lowercased tag basename. A few generic and b30 tags contain single inner spaces (e.g. killed enemy)."},
     "level": {"type": ["string", "null"]},
     "kind": {"enum": ["scripted", "flavor", "insert", "other"]},
     "sequence": {"type": ["string", "null"]},

@@ -14,9 +14,15 @@ Outputs (all git-ignored):
 
 Subtitle links stay unresolved (blocker B1). Never matches to Campaign Evolved.
 
-Example:
+--no-audio writes the catalog, build pins and reports only; audio is then
+decoded on demand (scripts/common/mcc_audio.py, used by the M4 UI).
+--all builds every top-level folder under sound/dialog/ in the .lst.bin
+(campaign levels, cutscenes x10..x70 and generic barks), one catalog each.
+
+Examples:
     python scripts/catalog/build_mcc_catalog.py --level a10 \
         --vgmstream-cli D:/Tools/vgmstream-r2117/vgmstream-cli.exe
+    python scripts/catalog/build_mcc_catalog.py --all --no-audio
 """
 import argparse
 import json
@@ -130,15 +136,115 @@ def picks_md(level, picks):
     return "\n".join(L)
 
 
+def lst_levels(*lsts):
+    """Top-level folders under sound\\dialog\\ in .lst.bin order of first appearance."""
+    out = {}
+    for lst in lsts:
+        for t, _, _ in lst:
+            parts = t.split("\\")
+            if len(parts) > 3 and parts[0].lower() == "sound" and parts[1].lower() == "dialog":
+                out.setdefault(parts[2].lower(), None)
+    return list(out)
+
+
+def build_one(level, *, banks, lsts, layout, files, source, args):
+    """Catalog (and, unless --no-audio, decode) one level. Returns a status line."""
+    records, issues = build_level(level, lsts["english"], lsts["spanish"], banks, source)
+    if not records:
+        raise SystemExit(f"no tags found for level {level}")
+    for lang, chk in layout.items():
+        if not (chk["contiguous_from_zero"] and chk["total_matches_bank"]):
+            issues.append({"code": "lst_layout_check_failed", "language": lang, **chk})
+
+    cat_dir = WORK / "catalog"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    catalog = "".join(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n" for r in
+                      sorted(records, key=lambda r: (min([s["index"] for s in r["samples"]["spanish"]] or [10**9]),
+                                                     r["tag_name"], r["mcc_tag"])))
+    cat_path = cat_dir / f"{level}.jsonl"
+    # ID-change guard: slot IDs are never silently renumbered (owner decision 2026-10-08).
+    rep = WORK / "reports"
+    rep.mkdir(parents=True, exist_ok=True)
+    changes = []
+    if cat_path.exists():
+        old_records = [json.loads(x) for x in cat_path.read_text(encoding="utf-8").splitlines() if x.strip()]
+        changes = compare_slot_identity(old_records, records)
+    (rep / f"{level}_id_changes.json").write_text(
+        dumps_json({"schema": "mcc-id-changes/1", "level": level, "changes": changes}), encoding="utf-8",
+        newline="\n")
+    blocking = [c for c in changes if c["change"] != "added"]
+    if blocking and not args.accept_id_changes:
+        raise SystemExit(f"{level}: {len(blocking)} slot ID change(s) vs the existing catalog (removed/moved/renamed);"
+                         f" nothing overwritten. Review work/mcc/reports/{level}_id_changes.json and re-run with "
+                         "--accept-id-changes only if intended. Mappings and verifications are never rewritten.")
+    cat_path.write_text(catalog, encoding="utf-8", newline="\n")
+
+    units = leftovers = None
+    out_root = WORK / "audio" / level
+    if not args.no_audio:
+        units = export_plan(records)
+        fsb_paths = {lang: COPIES / FILES[lang]["fsb"][0] for lang in LANGUAGES}
+        export_units(units, out_root, make_decoder(args.vgmstream_cli, fsb_paths), inspect_wav, sha256_file)
+        expected = {(out_root / u["wav_path"]).resolve() for u in units}
+        leftovers = sorted(p.relative_to(out_root).as_posix() for p in out_root.rglob("*.wav")
+                           if p.resolve() not in expected)
+
+    build = {"schema": BUILD_SCHEMA, "source_build": source["steam"], "files": files, "lst_layout": layout,
+             "catalogs": {level: {"path": cat_path.relative_to(REPO_ROOT).as_posix(), "record_schema": RECORD_SCHEMA,
+                                  "records": len(records), "sha256": sha256_file(cat_path),
+                                  "tool": "scripts/catalog/build_mcc_catalog.py"}}}
+    build_path = WORK / "build.json"
+    if build_path.exists():
+        old = json.loads(build_path.read_text(encoding="utf-8"))
+        if old.get("files") == files:
+            merged = {**old.get("catalogs", {}), **build["catalogs"]}
+            build["catalogs"] = {k: merged[k] for k in sorted(merged)}
+    build_path.write_text(dumps_json(build), encoding="utf-8", newline="\n")
+
+    if units is not None:
+        manifest = {"schema": EXPORT_SCHEMA, "level": level,
+                    "source_catalog": {"path": cat_path.relative_to(REPO_ROOT).as_posix(),
+                                       "sha256": sha256_file(cat_path)},
+                    "source_files": {k: {"copy": v["copy"], "sha256": v["sha256"]} for k, v in files.items()},
+                    "decoder": vgmstream_info(args.vgmstream_cli),
+                    "wav_root": out_root.relative_to(REPO_ROOT).as_posix(),
+                    "units": units, "files_not_in_plan": leftovers}
+        (out_root / "manifest.json").write_text(dumps_json(manifest), encoding="utf-8", newline="\n")
+
+    cov = coverage(level, records, issues, units)
+    if units is not None:
+        cov["files_not_in_plan"] = leftovers
+        cov["problem_units"] = [{"key": u["key"], "status": u["status"], "reason": u.get("reason"),
+                                 "mcc_tag": u["mcc_tag"]} for u in units
+                                if u["status"] != "ok" or not u["frames_match_header"]]
+    (rep / f"{level}_coverage.json").write_text(dumps_json(cov), encoding="utf-8", newline="\n")
+    (rep / f"{level}_issues.json").write_text(dumps_json({"schema": "mcc-issues-report/1", "level": level,
+                                                          "issues": issues,
+                                                          "unresolved": [{"mcc_tag": r["mcc_tag"], **u} for r in records
+                                                                         for u in r.get("unresolved", [])]}),
+                                              encoding="utf-8", newline="\n")
+    (rep / f"{level}_summary.md").write_text(summary_md(level, build, cov, issues), encoding="utf-8", newline="\n")
+    if units is None:
+        n_slots = sum(len(r["slot_ids"]) for r in records)
+        return f"{level}: {len(records)} tags, {n_slots} Spanish slots, {len(issues)} issues (audio on demand)"
+    picks = recommend(records, units)
+    (rep / f"{level}_review_picks.json").write_text(dumps_json(picks), encoding="utf-8", newline="\n")
+    (rep / f"{level}_review_picks.md").write_text(picks_md(level, picks), encoding="utf-8", newline="\n")
+    n_ok = sum(1 for u in units if u["status"] == "ok")
+    return (f"{level}: {len(records)} tags, {len(units)} samples decoded, {n_ok} OK, "
+            f"{len(cov['problem_units'])} problems, {len(issues)} issues")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--level", default="a10")
+    ap.add_argument("--all", action="store_true", help="every sound\\dialog\\<folder> in the .lst.bin")
+    ap.add_argument("--no-audio", action="store_true", help="catalog only; audio is decoded later on demand")
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
     ap.add_argument("--accept-id-changes", action="store_true",
                     help="overwrite even if slot IDs were removed, moved or renamed (see <level>_id_changes.json)")
     args = ap.parse_args()
-    level = args.level.lower()
-    if not args.vgmstream_cli.is_file():
+    if not args.no_audio and not args.vgmstream_cli.is_file():
         raise SystemExit(f"vgmstream-cli not found: {args.vgmstream_cli}")
     t0 = time.time()
     env, problems = load_env()
@@ -156,84 +262,13 @@ def main():
         banks[lang] = BankIndex(bank, lang, Path(fsb_rel).name)
         lsts[lang] = parse_lst((COPIES / lst_rel).read_bytes())["records"]
         layout[lang] = check_ranges(lsts[lang], bank.header["num_samples"])
-    records, issues = build_level(level, lsts["english"], lsts["spanish"], banks, source)
-    if not records:
-        raise SystemExit(f"no tags found for level {level}")
-    for lang, chk in layout.items():
-        if not (chk["contiguous_from_zero"] and chk["total_matches_bank"]):
-            issues.append({"code": "lst_layout_check_failed", "language": lang, **chk})
-
-    cat_dir = WORK / "catalog"
-    cat_dir.mkdir(parents=True, exist_ok=True)
-    catalog = "".join(json.dumps(r, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n" for r in
-                      sorted(records, key=lambda r: (min([s["index"] for s in r["samples"]["spanish"]] or [10**9]),
-                                                     r["tag_name"])))
-    cat_path = cat_dir / f"{level}.jsonl"
-    # ID-change guard: slot IDs are never silently renumbered (owner decision 2026-10-08).
-    rep = WORK / "reports"
-    rep.mkdir(parents=True, exist_ok=True)
-    changes = []
-    if cat_path.exists():
-        old_records = [json.loads(x) for x in cat_path.read_text(encoding="utf-8").splitlines() if x.strip()]
-        changes = compare_slot_identity(old_records, records)
-    (rep / f"{level}_id_changes.json").write_text(
-        dumps_json({"schema": "mcc-id-changes/1", "level": level, "changes": changes}), encoding="utf-8",
-        newline="\n")
-    blocking = [c for c in changes if c["change"] != "added"]
-    if blocking and not args.accept_id_changes:
-        raise SystemExit(f"{len(blocking)} slot ID change(s) vs the existing catalog (removed/moved/renamed); "
-                         f"nothing overwritten. Review work/mcc/reports/{level}_id_changes.json and re-run with "
-                         "--accept-id-changes only if intended. Mappings and verifications are never rewritten.")
-    cat_path.write_text(catalog, encoding="utf-8", newline="\n")
-
-    out_root = WORK / "audio" / level
-    units = export_plan(records)
-    fsb_paths = {lang: COPIES / FILES[lang]["fsb"][0] for lang in LANGUAGES}
-    export_units(units, out_root, make_decoder(args.vgmstream_cli, fsb_paths), inspect_wav, sha256_file)
-    expected = {(out_root / u["wav_path"]).resolve() for u in units}
-    leftovers = sorted(p.relative_to(out_root).as_posix() for p in out_root.rglob("*.wav") if p.resolve() not in expected)
-
-    build = {"schema": BUILD_SCHEMA, "source_build": source["steam"], "files": files, "lst_layout": layout,
-             "catalogs": {level: {"path": cat_path.relative_to(REPO_ROOT).as_posix(), "record_schema": RECORD_SCHEMA,
-                                  "records": len(records), "sha256": sha256_file(cat_path),
-                                  "tool": "scripts/catalog/build_mcc_catalog.py"}}}
-    build_path = WORK / "build.json"
-    if build_path.exists():
-        old = json.loads(build_path.read_text(encoding="utf-8"))
-        if old.get("files") == files:
-            build["catalogs"] = {**old.get("catalogs", {}), **build["catalogs"]}
-    build_path.write_text(dumps_json(build), encoding="utf-8", newline="\n")
-
-    manifest = {"schema": EXPORT_SCHEMA, "level": level,
-                "source_catalog": {"path": cat_path.relative_to(REPO_ROOT).as_posix(), "sha256": sha256_file(cat_path)},
-                "source_files": {k: {"copy": v["copy"], "sha256": v["sha256"]} for k, v in files.items()},
-                "decoder": vgmstream_info(args.vgmstream_cli), "wav_root": out_root.relative_to(REPO_ROOT).as_posix(),
-                "units": units, "files_not_in_plan": leftovers}
-    (out_root / "manifest.json").write_text(dumps_json(manifest), encoding="utf-8", newline="\n")
-
-    cov = coverage(level, records, issues, units)
-    cov["files_not_in_plan"] = leftovers
-    cov["problem_units"] = [{"key": u["key"], "status": u["status"], "reason": u.get("reason"),
-                             "mcc_tag": u["mcc_tag"]} for u in units
-                            if u["status"] != "ok" or not u["frames_match_header"]]
-    (rep / f"{level}_coverage.json").write_text(dumps_json(cov), encoding="utf-8", newline="\n")
-    (rep / f"{level}_issues.json").write_text(dumps_json({"schema": "mcc-issues-report/1", "level": level,
-                                                          "issues": issues,
-                                                          "unresolved": [{"mcc_tag": r["mcc_tag"], **u} for r in records
-                                                                         for u in r.get("unresolved", [])]}),
-                                              encoding="utf-8", newline="\n")
-    (rep / f"{level}_summary.md").write_text(summary_md(level, build, cov, issues), encoding="utf-8", newline="\n")
-    picks = recommend(records, units)
-    (rep / f"{level}_review_picks.json").write_text(dumps_json(picks), encoding="utf-8", newline="\n")
-    (rep / f"{level}_review_picks.md").write_text(picks_md(level, picks), encoding="utf-8", newline="\n")
-
-    n_ok = sum(1 for u in units if u["status"] == "ok")
-    print(f"{len(records)} tags, {len(units)} samples decoded, {n_ok} OK, {len(cov['problem_units'])} problems, "
-          f"{len(issues)} issues ({time.time() - t0:.1f}s)")
-    for p in (cat_path, build_path, out_root / "manifest.json"):
-        print(f"  wrote {p.relative_to(REPO_ROOT).as_posix()}")
-    print(f"  wrote work/mcc/reports/{level}_{{coverage,issues,summary,review_picks}}.*")
+    levels = lst_levels(lsts["spanish"], lsts["english"]) if args.all else [args.level.lower()]
+    for level in levels:
+        print(build_one(level, banks=banks, lsts=lsts, layout=layout, files=files, source=source, args=args))
+    print(f"{len(levels)} level(s): wrote work/mcc/catalog/<level>.jsonl, work/mcc/build.json and "
+          f"work/mcc/reports/<level>_* ({time.time() - t0:.1f}s)")
 
 
 if __name__ == "__main__":
     main()
+

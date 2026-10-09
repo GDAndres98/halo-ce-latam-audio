@@ -88,7 +88,8 @@ preserved.
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
-| Mapping / UI | design only | dialogue-catalog-design.md |
+| Campaign-wide catalogs | ✅ 13 CE missions (1,475 records) and 28 MCC folders (1,903 tags, all 5,696 Spanish samples as slots); audio on demand; 3 rule extensions pending owner review | campaign-catalog.md |
+| Mapping / UI | ✅ M4 implemented 2026-10-08; no mappings decided yet | m4-user-guide.md |
 | Steam Workshop distribution | planned (M8). Compatibility checkpoint WC is planned inside B2. Not researched in depth yet | §3 M8, §6 B2 |
 
 ## 3. Milestones and acceptance criteria
@@ -246,17 +247,23 @@ findings and no drift.
   - pins are populated from the verified builds, written through
     `mapping_store`.
 
-### M4 — Local matching UI
-Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (stdlib server on 127.0.0.1, one static page, saves only via `mapping_store`).
-- [ ] It runs on 127.0.0.1 and uses the stdlib only (no install
-  without approval).
-- [ ] It shows the MCC slot (EN + ES audio and durations), CE search
+### M4 — Local matching UI ✅ IMPLEMENTED (2026-10-08), owner trial pending
+Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implemented). Use:
+[`m4-user-guide.md`](m4-user-guide.md). Run `python scripts/ui/m4_server.py`.
+- [x] It runs on 127.0.0.1 and uses the stdlib only (no install
+  without approval). → Tested (`tests/test_m4.py`).
+- [x] It shows the MCC slot (EN + ES audio and durations), CE search
   filtered by the user's `mission_map.json`, CE en / es-MX audio and
-  text, and evidence levels.
-- [ ] Separate approve actions for audio and subtitle, a custom-subtitle
+  text, and evidence levels. → Also all missions or one mission; es-ES
+  text and audio collapsed; SU/SP text per table.
+- [x] Separate approve actions for audio and subtitle, a custom-subtitle
   editor (local file only), and "no equivalent" / "defer".
-- [ ] No suggestions or ranking, and nothing is pre-filled.
-- [ ] Decoding on demand stays under `work/`.
+- [x] No suggestions or ranking, and nothing is pre-filled. → Catalog
+  order; the search is a filter (tested).
+- [x] Decoding on demand stays under `work/`.
+- [x] Mission selection and per-level progress; owner-set level status
+  in `mappings/mission_progress.json`.
+- [ ] The owner tries it on `a10` (M5 starts there).
 
 ### M5 — a10 mapping complete (user work)
 - [ ] Every a10 Spanish slot has `match.status ≠ unreviewed` and an
@@ -765,10 +772,11 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B2 E1b-game | ✅ **user-verified pass** 2026-10-08 (`v-000016`): the longer line plays fully, with no overlap |
 | B2 E2b (MCC-profile encoder) | offline ✅; **E2b-game ✅ user-verified pass 2026-10-08** (`v-000018`); bank restored and verified. **B2 technically unblocked** |
 | B2 E3 | ✅ offline (30/30) and **in game, user-verified** 2026-10-08 (`v-000019`); bank restored. **B2 audio route proven end to end** |
-| M4 handoff | ✅ `docs/m4-session-handoff.md` (2026-10-08); implementation in a new session |
+| M4 handoff | ✅ `docs/m4-session-handoff.md` (2026-10-08) |
+| Campaign-wide catalogs (owner request, 2026-10-08) | ✅ built offline; rule extensions in `campaign-catalog.md` §3 **await owner review** |
 | B2 E4–E5 | not approved |
 | WC (Workshop compatibility checkpoint, inside B2) | WC-1 (docs) ✅ done 2026-10-08 (`workshop-research.md`): no documented override of FSB/loc files; WC-2 (inspect one subscribed CE mod) needs approval |
-| M4 matching UI | design done 2026-10-08 (`m4-matching-ui-design.md`); implementation not started |
+| M4 matching UI | ✅ implemented 2026-10-08 (`m4-user-guide.md`); owner trial pending |
 | M8 (Steam Workshop packaging and publishing), each sub-step M8.1–M8.7 | planned; not approved |
 | Any upload (private test or public) | **not approved**; public publishing needs explicit owner approval |
 

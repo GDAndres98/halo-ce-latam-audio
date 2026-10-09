@@ -8,6 +8,8 @@ Checks, without modifying anything:
   - mappings/manual_mappings.local.json: schema, and that git ignores it;
   - mappings/verifications.json: schema, sequence, append-only vs HEAD, subjects, drift;
   - mappings/mission_map.json: schema, duplicates;
+  - mappings/mission_progress.json (optional): schema, duplicates, and levels marked ready or
+    reviewed whose slot decisions no longer support it;
   - repository hygiene: no game assets, work/ or reference-audio/ files tracked by git.
 
 Writes only work/reports/validation.json and work/reports/drift.json (use --no-write to skip).
@@ -30,13 +32,14 @@ from common.env import REPO_ROOT  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.project_validation import (  # noqa: E402
     build_ce_index, build_mcc_index, check_approved_protected, dumps, finding, validate_catalog, validate_mappings,
-    validate_mission_map, validate_verifications)
+    validate_mission_map, validate_mission_progress, validate_verifications)
 from common.jsonschema_lite import validate as schema_validate  # noqa: E402
 
 ASSET_RE = re.compile(r"\.(map|pak|ucas|utoc|fsb|wav|ogg|bnk|wem|7z|locres|uasset|usmap|raw|bin)$|(^|/)\.env$|"
                       r"^(work|reference-audio|extracted|scratch)/|\.local\.json$", re.I)
 USER_FILES = {"mappings": "mappings/manual_mappings.json", "local": "mappings/manual_mappings.local.json",
-              "verifications": "mappings/verifications.json", "mission_map": "mappings/mission_map.json"}
+              "verifications": "mappings/verifications.json", "mission_map": "mappings/mission_map.json",
+              "mission_progress": "mappings/mission_progress.json"}
 
 
 def git(root, *args):
@@ -145,6 +148,13 @@ def run(root, use_git=True):
         out += validate_mission_map(docs["mission_map"], load_schema("mission-map-1"),
                                     ce_missions={r["mission"] for r in ce_records},
                                     mcc_levels={r["level"] for r in mcc_records}, file=USER_FILES["mission_map"])
+    if docs["mission_progress"] is not None:
+        level_slots = {}
+        for r in mcc_records:
+            level_slots.setdefault(r["level"], []).extend(r["slot_ids"])
+        out += validate_mission_progress(docs["mission_progress"], load_schema("mission-progress-1"),
+                                         level_slots=level_slots, mappings_doc=docs["mappings"],
+                                         verifications=docs["verifications"], file=USER_FILES["mission_progress"])
     summary = {"catalog_records": {"ce": len(ce_records), "mcc": len(mcc_records)},
                "ce_line_refs": len(ce), "mcc_slots": len(mcc["slots"]),
                "mappings": len((docs["mappings"] or {}).get("slots", [])),

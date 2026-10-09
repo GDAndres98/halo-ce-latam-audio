@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M4 Dialogue Matching</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2329; --muted: #66707a; --line: #dde1e6;
+  --accent: #2f6fde; --accent-ink: #ffffff; --ok: #1f8a4c; --warn: #b26b00; --bad: #c0392b;
+  --chip: #eef2f8; --sel: #e3ecfb; --code: #f0f2f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181c; --panel: #1d2126; --ink: #e6e9ec; --muted: #9aa4ae; --line: #2e343b;
+    --accent: #6c9cf0; --accent-ink: #0d1117; --ok: #49c27c; --warn: #e0a345; --bad: #ef6f62;
+    --chip: #262c34; --sel: #23324a; --code: #262b31;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+select, input, textarea, button { font: inherit; color: inherit; }
+select, input[type=search], input[type=text], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+button { background: var(--chip); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.play { padding: 2px 7px; }
+.bar { flex: 1 1 200px; min-width: 160px; height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; display: flex; }
+.bar span { display: block; height: 100%; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+main { display: grid; grid-template-columns: minmax(240px, 22%) minmax(360px, 1fr) minmax(320px, 34%); gap: 0; height: calc(100vh - 92px); }
+section.col { overflow: auto; border-right: 1px solid var(--line); padding: 10px 12px; }
+section.col:last-child { border-right: 0; }
+.col h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+.tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.tools > * { flex: 1 1 auto; }
+ul.list { list-style: none; margin: 0; padding: 0; }
+ul.list li { padding: 5px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+ul.list li:hover { background: var(--chip); }
+ul.list li.sel { background: var(--sel); }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; border: 1.5px solid var(--muted); }
+.dot.matched { background: var(--ok); border-color: var(--ok); }
+.dot.no_equivalent { background: var(--muted); border-color: var(--muted); }
+.dot.deferred { background: var(--warn); border-color: var(--warn); }
+.badge { font-size: 11px; padding: 0 5px; border-radius: 4px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.badge.approved { background: var(--ok); color: var(--accent-ink); }
+.badge.needs_rework { background: var(--bad); color: #fff; }
+.badge.draft { background: var(--chip); }
+.grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.card h3 { margin: 0 0 6px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+.text { background: var(--code); border-radius: 6px; padding: 5px 8px; margin: 3px 0; white-space: pre-wrap; word-break: break-word; }
+.text b { color: var(--muted); font-weight: 600; margin-right: 6px; font-size: 12px; }
+.chip { display: flex; gap: 6px; align-items: center; background: var(--chip); border-radius: 6px; padding: 4px 6px; margin: 4px 0; }
+.cand { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; margin-bottom: 7px; background: var(--panel); }
+.cand.chosen { border-color: var(--ok); }
+.cand .head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cand .num { font-size: 11px; color: var(--muted); width: 16px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+label.opt { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; }
+textarea { width: 100%; min-height: 54px; }
+#msg { position: fixed; right: 16px; bottom: 16px; max-width: 520px; padding: 9px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 18px rgba(0,0,0,.18); display: none; white-space: pre-wrap; z-index: 5; }
+#msg.err { border-color: var(--bad); }
+#msg.ok { border-color: var(--ok); }
+footer { height: 30px; padding: 5px 16px; border-top: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); display: flex; gap: 16px; overflow: hidden; white-space: nowrap; }
+.disabled-section { opacity: .65; pointer-events: none; }
+.kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; height: auto; }
+  section.col { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>M4 · Dialogue matching</h1>
+  <label>Level <select id="level"></select></label>
+  <div class="bar" id="pbar" title="decided / audio approved / subtitle approved"></div>
+  <span id="ptext" class="small muted"></span>
+  <label class="small">Level status
+    <select id="lstatus">
+      <option value="">— not set —</option>
+      <option value="in_progress">in progress</option>
+      <option value="ready_for_build">ready for build</option>
+      <option value="in_game_tested">tested in MCC</option>
+      <option value="reviewed">reviewed</option>
+    </select></label>
+  <button id="lstatusSave">Set</button>
+  <span class="small muted"><span class="kbd">J</span>/<span class="kbd">K</span> slot · <span class="kbd">Space</span> Spain · <span class="kbd">1</span>–<span class="kbd">9</span> candidate</span>
+</header>
+<main>
+  <section class="col" id="colSlots">
+    <h2>MCC slots</h2>
+    <div class="tools">
+      <select id="sfilter">
+        <option value="">all</option>
+        <option value="undecided">undecided</option>
+        <option value="matched">matched</option>
+        <option value="no_equivalent">no equivalent</option>
+        <option value="deferred">deferred</option>
+        <option value="audio_pending">audio not approved</option>
+        <option value="needs_rework">needs rework</option>
+      </select>
+      <input type="search" id="sq" placeholder="search tag / SU / SP text">
+    </div>
+    <div class="small muted" id="scount"></div>
+    <ul class="list" id="slots"></ul>
+  </section>
+  <section class="col" id="colDetail">
+    <h2>Slot</h2>
+    <div id="detail" class="muted">Pick a slot on the left.</div>
+  </section>
+  <section class="col" id="colCe">
+    <h2>Campaign Evolved lines</h2>
+    <div class="tools">
+      <select id="cscope"></select>
+      <input type="search" id="cq" placeholder="search id / es-MX / en / es-ES text">
+    </div>
+    <div class="small muted" id="ccount"></div>
+    <div id="cands"></div>
+    <button id="cmore" style="display:none">Load more</button>
+  </section>
+</main>
+<footer id="foot">validator: not run yet</footer>
+<div id="msg"></div>
+<audio id="player" preload="none"></audio>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const S = { state: null, level: null, slots: [], slotId: null, detail: null, edit: null, dirty: false,
+            cands: [], candTotal: 0, ceCache: {} };
+const LANG = { es: "Spanish(Mexico)", en: "English(US)", esES: "Spanish(Spain)" };
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function fmt(d) { return d == null ? "?" : d.toFixed(2) + " s"; }
+function toast(text, kind) {
+  const m = $("msg"); m.textContent = text; m.className = kind || ""; m.style.display = "block";
+  clearTimeout(toast.t); toast.t = setTimeout(() => m.style.display = "none", kind === "err" ? 9000 : 3500);
+}
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({ error: r.statusText }));
+  if (!r.ok) { const e = new Error(j.error || r.statusText); e.status = r.status; e.details = j.details || []; throw e; }
+  return j;
+}
+function showErr(e) { toast((e.status ? e.status + ": " : "") + e.message + (e.details && e.details.length ? "\n- " + e.details.join("\n- ") : ""), "err"); }
+
+// ---------------------------------------------------------------- audio
+const player = $("player");
+function play(url, btn) {
+  if (btn) { btn.disabled = true; btn.dataset.label = btn.dataset.label || btn.textContent; btn.textContent = "…"; }
+  player.src = url;
+  player.play().catch(err => toast("audio: " + (err.message || err) + " (decode may have failed; see server log)", "err"))
+    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label; } });
+}
+player.addEventListener("error", () => toast("audio could not be loaded (decode failed or source missing)", "err"));
+const mccUrl = (level, lang, index) => `/audio/mcc?level=${encodeURIComponent(level)}&lang=${lang}&index=${index}`;
+const ceUrl = (ref, lang) => `/audio/ce?ref=${encodeURIComponent(ref)}&lang=${encodeURIComponent(lang)}`;
+
+// ---------------------------------------------------------------- state / levels
+async function loadState(keepLevel) {
+  S.state = await api("/api/state");
+  const sel = $("level"); const prev = keepLevel || sel.value;
+  sel.innerHTML = "";
+  for (const group of ["campaign", "cutscene", "generic"]) {
+    const og = document.createElement("optgroup"); og.label = group;
+    for (const l of S.state.levels.filter(x => x.group === group)) {
+      const p = l.progress, st = l.status ? " · " + l.status.status.replace(/_/g, " ") : "";
+      const o = new Option(`${l.level} — ${p.decided}/${p.slots} decided${st}`, l.level);
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  }
+  sel.value = prev && S.state.levels.some(l => l.level === prev) ? prev : (S.state.levels[0] || {}).level;
+  S.level = sel.value;
+  renderProgress(); renderFooter(S.state.validation);
+  const cs = $("cscope"), prevScope = cs.value;
+  cs.innerHTML = "";
+  const lvl = curLevel();
+  if (lvl && lvl.ce_missions.length) cs.appendChild(new Option(`mapped for ${lvl.level}: ${lvl.ce_missions.join(", ")}`, "mapped"));
+  cs.appendChild(new Option("all missions", "all"));
+  for (const m of S.state.missions) cs.appendChild(new Option(`${m.mission} (${m.lines} lines)`, m.mission));
+  cs.value = [...cs.options].some(o => o.value === prevScope) && keepLevel ? prevScope : cs.options[0].value;
+}
+const curLevel = () => S.state.levels.find(l => l.level === S.level);
+function renderProgress() {
+  const l = curLevel(); if (!l) return;
+  const p = l.progress, n = Math.max(1, p.slots);
+  $("pbar").innerHTML = `<span style="width:${100 * p.audio_approved / n}%;background:var(--ok)"></span>` +
+    `<span style="width:${100 * Math.max(0, p.decided - p.audio_approved) / n}%;background:var(--accent)"></span>`;
+  $("ptext").textContent = `${p.decided}/${p.slots} decided · audio ✔ ${p.audio_approved} · subtitle ✔ ${p.subtitle_approved}` +
+    (p.needs_rework ? ` · rework ${p.needs_rework}` : "");
+  $("lstatus").value = l.status ? l.status.status : "";
+}
+function renderFooter(v) {
+  if (!v) { $("foot").textContent = "validator: running…"; return; }
+  const s = v.summary, sev = s.by_severity || {};
+  const bits = [`validator: ${sev.error || 0} error(s), ${sev.warning || 0} warning(s), drift ${v.drift_entries}`,
+                `catalogs: ${s.catalog_records.mcc} MCC tags, ${s.catalog_records.ce} CE records`, `mappings ${s.mappings}`];
+  $("foot").innerHTML = bits.map(esc).join(" · ") + (v.findings.length ? " · " + v.findings.slice(0, 3).map(f => `<span title="${esc(f.message)}">[${esc(f.severity)}] ${esc(f.code)}</span>`).join(" ") : "");
+}
+
+// ---------------------------------------------------------------- slots
+async function loadSlots() {
+  const q = new URLSearchParams({ level: S.level, status: $("sfilter").value, q: $("sq").value });
+  const r = await api("/api/slots?" + q);
+  S.slots = r.slots;
+  $("scount").textContent = `${r.slots.length} slot(s)`;
+  const ul = $("slots"); ul.innerHTML = "";
+  for (const s of r.slots) {
+    const li = document.createElement("li"); li.dataset.id = s.slot_id;
+    const d = s.decision;
+    const label = s.tag_name + (s.permutations > 1 ? ` #${s.ordinal}` : "");
+    li.innerHTML = `<span class="dot ${d ? d.match : ""}" title="${d ? d.match : "unreviewed"}"></span>` +
+      `<span class="grow mono" title="${esc(s.slot_id)}">${esc(label)}</span>` +
+      (d && d.audio === "approved" ? `<span class="badge approved" title="audio approved">A</span>` : d && d.audio === "needs_rework" ? `<span class="badge needs_rework">A</span>` : "") +
+      (d && d.subtitle === "approved" ? `<span class="badge approved" title="subtitle approved">S</span>` : d && d.subtitle === "needs_rework" ? `<span class="badge needs_rework">S</span>` : "") +
+      `<span class="small muted">${s.duration_s == null ? "" : s.duration_s.toFixed(1) + "s"}</span>` +
+      (s.channels > 1 ? `<span class="badge" title="stereo slot: needs an owner decision">st</span>` : "");
+    li.onclick = () => selectSlot(s.slot_id);
+    if (s.slot_id === S.slotId) li.classList.add("sel");
+    ul.appendChild(li);
+  }
+}
+function markSel() { for (const li of $("slots").children) li.classList.toggle("sel", li.dataset.id === S.slotId); }
+async function selectSlot(id, force) {
+  if (!force && S.dirty && id !== S.slotId && !confirm("Discard unsaved edits on this slot?")) return;
+  S.slotId = id; markSel();
+  history.replaceState(null, "", "#" + new URLSearchParams({ level: S.level, slot: id }));
+  const li = [...$("slots").children].find(x => x.dataset.id === id); if (li) li.scrollIntoView({ block: "nearest" });
+  try {
+    S.detail = await api("/api/slot?id=" + encodeURIComponent(id));
+  } catch (e) { showErr(e); return; }
+  const m = S.detail.mapping;
+  S.edit = {
+    match: { status: m ? m.match.status : "unreviewed", ce_line_refs: m ? [...m.match.ce_line_refs] : [] },
+    audio: { source: m ? m.audio.source : "keep_original", language: m && m.audio.sources[0] ? m.audio.sources[0].language : LANG.es,
+             fx_request: m ? m.audio.fx_request : null },
+    subtitle: { source: m ? m.subtitle.source : "keep_original",
+                ref: m && m.subtitle.ce_locres ? m.subtitle.ce_locres.ce_line_ref : null,
+                culture: m && m.subtitle.ce_locres ? m.subtitle.ce_locres.culture : "es-MX",
+                custom_text: S.detail.custom_text || "" },
+    notes: m ? m.notes : "",
+  };
+  for (const l of S.detail.matched_lines) S.ceCache[l.ce_line_ref] = l;
+  S.dirty = false;
+  renderDetail(); renderCands();
+}
+function moveSlot(step) {
+  if (!S.slots.length) return;
+  const i = S.slots.findIndex(s => s.slot_id === S.slotId);
+  const j = Math.min(S.slots.length - 1, Math.max(0, (i < 0 ? -1 : i) + step));
+  selectSlot(S.slots[j].slot_id);
+}
+
+// ---------------------------------------------------------------- detail
+function statusBadge(o) { return o ? `<span class="badge ${o.status}">${o.status.replace("_", " ")} · rev ${o.revision}</span>` : `<span class="badge">new</span>`; }
+function ceDur(ref, lang) { const l = S.ceCache[ref]; return l && l.media[lang] ? l.media[lang].duration_s : null; }
+function audioSources() {
+  const e = S.edit;
+  if (e.audio.source === "keep_original") return [];
+  return e.match.ce_line_refs.map(r => ({ kind: "ce", ce_line_ref: r, language: e.audio.language }));
+}
+function audioSourceKind() {
+  if (S.edit.audio.source === "keep_original") return "keep_original";
+  return S.edit.match.ce_line_refs.length > 1 ? "ce_concat" : "ce";
+}
+function renderDetail() {
+  const d = S.detail, e = S.edit, m = d.mapping;
+  const aLocked = m && m.audio.status === "approved", sLocked = m && m.subtitle.status === "approved";
+  const sp = d.spanish;
+  const en = d.english.map(x => `<button class="play" data-play="${esc(mccUrl(d.level, "english", x.index))}">▶ English${d.english.length > 1 ? " #" + x.ordinal_in_tag : ""} ${fmt(x.duration_s)}</button>`).join(" ");
+  const sub = (t) => { const x = d.mcc_subtitles[t]; return `<div class="text"><b>${t}</b>${x.table_loaded ? (x.text == null ? '<i class="muted">no entry for this key</i>' : esc(x.text)) : '<i class="muted">table copy not found</i>'}</div>`; };
+  const chips = e.match.ce_line_refs.map((r, i) => {
+    const l = S.ceCache[r];
+    return `<div class="chip"><span class="mono grow" title="${esc(r)}">${i + 1}. ${esc(r)}</span>
+      <button class="play" data-play="${esc(ceUrl(r, LANG.es))}">▶ es-MX ${fmt(ceDur(r, LANG.es))}</button>
+      <button class="play" data-play="${esc(ceUrl(r, LANG.en))}">▶ en</button>
+      <button data-up="${i}" ${i === 0 || aLocked ? "disabled" : ""} title="move up">↑</button>
+      <button data-down="${i}" ${i === e.match.ce_line_refs.length - 1 || aLocked ? "disabled" : ""} title="move down">↓</button>
+      <button data-rm="${i}" ${aLocked ? "disabled" : ""} title="remove">×</button></div>` +
+      (l ? `<div class="text small"><b>es-MX</b>${esc(l.subtitles["es-MX"].text || "—")}</div>` : "");
+  }).join("");
+  const srcs = audioSources();
+  const ceTotal = srcs.length ? srcs.reduce((a, s) => a + (ceDur(s.ce_line_ref, s.language) ?? NaN), 0) : null;
+  const delta = ceTotal == null ? "" : isNaN(ceTotal) ? "Δ vs Spain: play the CE line(s) once to measure" :
+    `CE ${fmt(ceTotal)} · Spain ${fmt(sp.duration_s)} · Δ ${(ceTotal - sp.duration_s >= 0 ? "+" : "") + (ceTotal - sp.duration_s).toFixed(2)} s`;
+  const subRefs = e.match.ce_line_refs;
+  const subPreview = (() => {
+    if (e.subtitle.source === "keep_original") return "(MCC's own SU/SP text stays)";
+    if (e.subtitle.source === "none") return "(no subtitle)";
+    if (e.subtitle.source === "custom") return e.subtitle.custom_text;
+    const l = S.ceCache[e.subtitle.ref]; return l ? (l.subtitles[e.subtitle.culture].text || "(no text in this culture)") : "(pick a matched line)";
+  })();
+  const vers = d.verifications.map(v => `<span class="badge" title="${esc(v.checks.join(", "))} · ${esc(v.note || "")}">${esc(v.id)} ${esc(v.result)}</span>`).join(" ");
+  const drift = Object.entries(d.fingerprint_drift).filter(([, x]) => x).map(([f]) => f);
+  $("detail").className = "";
+  $("detail").innerHTML = `
+  <div class="card">
+    <h3><span class="mono">${esc(d.slot_id)}</span></h3>
+    <div class="small muted mono">${esc(d.mcc_tag)} · ${esc(d.kind)} · speaker (from name): ${esc(d.speaker_from_name || "?")} · ${sp.channels} ch · bank #${sp.index}</div>
+    ${d.flags.length ? `<div class="small muted">flags: ${d.flags.map(esc).join(", ")}</div>` : ""}
+    <div class="row"><button class="play primary" data-play="${esc(mccUrl(d.level, "spanish", sp.index))}" id="playSpain">▶ Spain ${fmt(sp.duration_s)}</button> ${en || '<span class="muted small">no English sample</span>'}</div>
+    ${sub("SU")}${sub("SP")}
+    <div class="small muted">SU = Latin America table, SP = Spain table; key = CRC of the tag path (${esc(d.mcc_subtitles.SU.evidence)}).</div>
+    ${vers ? `<div class="row small">past checks: ${vers}</div>` : ""}
+    ${drift.length ? `<div class="row small" style="color:var(--warn)">approved ${drift.join(" + ")} no longer matches the current catalogs (drift); see work/reports/drift.json</div>` : ""}
+  </div>
+  <div class="card">
+    <h3>Match <span class="badge">${esc(e.match.status)}</span></h3>
+    <div class="row">${["unreviewed", "matched", "no_equivalent", "deferred"].map(s => `<label class="opt"><input type="radio" name="mst" value="${s}" ${e.match.status === s ? "checked" : ""} ${aLocked && s !== e.match.status ? "disabled" : ""}> ${s.replace("_", " ")}</label>`).join("")}</div>
+    ${chips || '<div class="small muted">No CE line chosen. Use “+ use” on the right.</div>'}
+    ${d.unknown_refs.length ? `<div class="small" style="color:var(--bad)">unknown refs: ${d.unknown_refs.map(esc).join(", ")}</div>` : ""}
+  </div>
+  <div class="card ${aLocked ? "" : ""}">
+    <h3>Audio ${statusBadge(m && m.audio)}</h3>
+    <div id="audioBox" class="${aLocked ? "disabled-section" : ""}">
+      <div class="row">
+        <label class="opt"><input type="radio" name="asrc" value="keep_original" ${e.audio.source === "keep_original" ? "checked" : ""}> keep Spain</label>
+        <label class="opt"><input type="radio" name="asrc" value="ce" ${e.audio.source !== "keep_original" ? "checked" : ""} ${e.match.ce_line_refs.length ? "" : "disabled"}> CE line(s) from the match</label>
+        <select id="alang" ${e.audio.source === "keep_original" ? "disabled" : ""}>${Object.values(LANG).map(l => `<option ${l === e.audio.language ? "selected" : ""}>${l}</option>`).join("")}</select>
+      </div>
+      <div class="small muted">source: <b>${audioSourceKind()}</b>${srcs.length ? " · " + srcs.length + " line(s) in order" : ""}${delta ? " · " + esc(delta) : ""}</div>
+      <label class="opt small"><input type="checkbox" id="afx" ${e.audio.fx_request === "radio" ? "checked" : ""}> flag for radio effect (v1.1 note only; no effect applied)</label>
+    </div>
+    <div class="row">
+      ${aLocked ? `<button id="reworkAudio">Mark needs rework…</button><span class="small muted">approved ${esc(m.audio.approved_at)}; read-only</span>` : `<button id="approveAudio" class="primary">Approve audio</button>`}
+    </div>
+  </div>
+  <div class="card">
+    <h3>Subtitle ${statusBadge(m && m.subtitle)}</h3>
+    <div class="${sLocked ? "disabled-section" : ""}">
+      <div class="row">
+        <label class="opt"><input type="radio" name="ssrc" value="keep_original" ${e.subtitle.source === "keep_original" ? "checked" : ""}> keep MCC text</label>
+        <label class="opt"><input type="radio" name="ssrc" value="ce_locres" ${e.subtitle.source === "ce_locres" ? "checked" : ""} ${subRefs.length ? "" : "disabled"}> CE text</label>
+        <label class="opt"><input type="radio" name="ssrc" value="custom" ${e.subtitle.source === "custom" ? "checked" : ""}> custom</label>
+        <label class="opt"><input type="radio" name="ssrc" value="none" ${e.subtitle.source === "none" ? "checked" : ""}> none</label>
+      </div>
+      ${e.subtitle.source === "ce_locres" ? `<div class="row">
+        <select id="sref">${subRefs.map(r => `<option ${r === e.subtitle.ref ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
+        <select id="scul">${["es-MX", "en", "es-ES"].map(c => `<option ${c === e.subtitle.culture ? "selected" : ""}>${c}</option>`).join("")}</select></div>` : ""}
+      ${e.subtitle.source === "custom" ? `<textarea id="stext" placeholder="your subtitle text (stored only in the git-ignored local file)">${esc(e.subtitle.custom_text)}</textarea>` : ""}
+      <div class="text"><b>preview</b>${esc(subPreview)}${["ce_locres", "custom"].includes(e.subtitle.source) ? ` <span class="muted small">(${(subPreview || "").length} chars)</span>` : ""}</div>
+    </div>
+    <div class="row">
+      ${sLocked ? `<button id="reworkSub">Mark needs rework…</button><span class="small muted">approved ${esc(m.subtitle.approved_at)}; read-only</span>` : `<button id="approveSub" class="primary">Approve subtitle</button>`}
+    </div>
+  </div>
+  <div class="card">
+    <h3>Notes</h3>
+    <textarea id="notes" maxlength="2000" placeholder="IDs and remarks only (committed file; no local paths)">${esc(e.notes)}</textarea>
+    <div class="row"><button id="save" class="primary">Save</button><span id="dirty" class="small muted">${S.dirty ? "unsaved changes" : ""}</span></div>
+  </div>`;
+  wireDetail();
+}
+function setDirty() { S.dirty = true; const x = $("dirty"); if (x) x.textContent = "unsaved changes"; }
+function wireDetail() {
+  const e = S.edit;
+  document.querySelectorAll('input[name=mst]').forEach(r => r.onchange = () => {
+    e.match.status = r.value;
+    if (r.value === "unreviewed" || r.value === "no_equivalent") {
+      if (e.match.ce_line_refs.length && !confirm("This clears the chosen CE line(s) from the match. Continue?")) { renderDetail(); return; }
+      e.match.ce_line_refs = [];
+      e.audio.source = "keep_original";
+      if (e.subtitle.source === "ce_locres") e.subtitle.source = "keep_original";
+    }
+    setDirty(); renderDetail(); renderCands();
+  });
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const i = +b.dataset.rm; const r = e.match.ce_line_refs.splice(i, 1)[0];
+    if (!e.match.ce_line_refs.length) { e.audio.source = "keep_original"; if (e.match.status === "matched") e.match.status = "unreviewed"; }
+    if (e.subtitle.ref === r && e.subtitle.source === "ce_locres") { e.subtitle.source = "keep_original"; e.subtitle.ref = null; }
+    setDirty(); renderDetail(); renderCands(); });
+  document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; const a = e.match.ce_line_refs; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setDirty(); renderDetail(); });
+  document.querySelectorAll('[data-down]').forEach(b => b.onclick = () => { const i = +b.dataset.down; const a = e.match.ce_line_refs; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setDirty(); renderDetail(); });
+  document.querySelectorAll('input[name=asrc]').forEach(r => r.onchange = () => { e.audio.source = r.value; setDirty(); renderDetail(); });
+  if ($("alang")) $("alang").onchange = (ev) => { e.audio.language = ev.target.value; setDirty(); renderDetail(); };
+  if ($("afx")) $("afx").onchange = (ev) => { e.audio.fx_request = ev.target.checked ? "radio" : null; setDirty(); };
+  document.querySelectorAll('input[name=ssrc]').forEach(r => r.onchange = () => {
+    e.subtitle.source = r.value;
+    if (r.value === "ce_locres" && !e.match.ce_line_refs.includes(e.subtitle.ref)) e.subtitle.ref = e.match.ce_line_refs[0] || null;
+    setDirty(); renderDetail(); });
+  if ($("sref")) $("sref").onchange = (ev) => { e.subtitle.ref = ev.target.value; setDirty(); renderDetail(); };
+  if ($("scul")) $("scul").onchange = (ev) => { e.subtitle.culture = ev.target.value; setDirty(); renderDetail(); };
+  if ($("stext")) $("stext").oninput = (ev) => { e.subtitle.custom_text = ev.target.value; setDirty(); };
+  $("notes").oninput = (ev) => { e.notes = ev.target.value; setDirty(); };
+  $("save").onclick = () => save([]);
+  if ($("approveAudio")) $("approveAudio").onclick = () => {
+    const what = audioSourceKind() === "keep_original" ? "keep the Spain recording" : `use ${audioSources().length} CE line(s) in ${e.audio.language}`;
+    if (confirm(`Approve audio for ${S.slotId}: ${what}?\nApproved decisions are read-only until you mark them “needs rework”.`)) save([{ action: "approve", field: "audio" }]);
+  };
+  if ($("approveSub")) $("approveSub").onclick = () => {
+    if (confirm(`Approve subtitle for ${S.slotId} (${e.subtitle.source})?\nApproved decisions are read-only until you mark them “needs rework”.`)) save([{ action: "approve", field: "subtitle" }]);
+  };
+  if ($("reworkAudio")) $("reworkAudio").onclick = () => { if (confirm("Move the approved AUDIO decision to “needs rework”? Its revision goes up by one.")) save([{ action: "needs_rework", field: "audio" }], true); };
+  if ($("reworkSub")) $("reworkSub").onclick = () => { if (confirm("Move the approved SUBTITLE decision to “needs rework”? Its revision goes up by one.")) save([{ action: "needs_rework", field: "subtitle" }], true); };
+  document.querySelectorAll('#detail [data-play]').forEach(b => b.onclick = () => play(b.dataset.play, b));
+}
+function payload(actions, reworkOnly) {
+  const e = S.edit, d = S.detail, m = d.mapping;
+  const body = { slot_id: d.slot_id, loaded_sha256: d.sha256.mappings, local_sha256: d.sha256.local, actions };
+  if (reworkOnly) return body;
+  const aLocked = m && m.audio.status === "approved", sLocked = m && m.subtitle.status === "approved";
+  body.match = { status: e.match.status, ce_line_refs: e.match.ce_line_refs };
+  if (!aLocked) body.audio = { source: audioSourceKind(), sources: audioSources(), fx_request: e.audio.fx_request };
+  if (!sLocked) {
+    body.subtitle = { source: e.subtitle.source };
+    if (e.subtitle.source === "ce_locres") body.subtitle.ce_locres = { ce_line_ref: e.subtitle.ref, culture: e.subtitle.culture };
+    if (e.subtitle.source === "custom") body.subtitle.custom_text = e.subtitle.custom_text;
+  }
+  body.notes = e.notes;
+  return body;
+}
+async function save(actions, reworkOnly) {
+  try {
+    const r = await api("/api/save", payload(actions, reworkOnly));
+    toast(r.saved ? "saved" + (actions.length ? " (" + actions.map(a => a.action.replace("_", " ") + " " + a.field).join(", ") + ")" : "") : r.message, "ok");
+    if (r.validation) renderFooter(r.validation);
+    S.dirty = false;
+    await loadState(S.level); await loadSlots(); await selectSlot(S.slotId, true);
+  } catch (e) { showErr(e); }
+}
+
+// ---------------------------------------------------------------- CE candidates
+async function loadCands(append) {
+  const offset = append ? S.cands.length : 0;
+  const q = new URLSearchParams({ mission: $("cscope").value, level: S.level, q: $("cq").value, offset, limit: 60 });
+  let r;
+  try { r = await api("/api/ce?" + q); } catch (e) { showErr(e); return; }
+  S.cands = append ? S.cands.concat(r.lines) : r.lines;
+  S.candTotal = r.total;
+  for (const l of r.lines) S.ceCache[l.ce_line_ref] = l;
+  renderCands();
+}
+function renderCands() {
+  const chosen = new Set(S.edit ? S.edit.match.ce_line_refs : []);
+  const aLocked = S.detail && S.detail.mapping && S.detail.mapping.audio.status === "approved";
+  $("ccount").textContent = `${S.cands.length} of ${S.candTotal} line(s), catalog order (never ranked)`;
+  $("cmore").style.display = S.cands.length < S.candTotal ? "" : "none";
+  $("cands").innerHTML = S.cands.map((l, i) => {
+    const t = (c) => l.subtitles[c].text ? esc(l.subtitles[c].text) : `<i class="muted">${esc(l.subtitles[c].evidence || "none")}</i>`;
+    const pb = (lang, label) => l.media[lang].count ? `<button class="play" data-play="${esc(ceUrl(l.ce_line_ref, lang))}">▶ ${label} ${l.media[lang].duration_s == null ? "" : fmt(l.media[lang].duration_s)}</button>` : `<span class="badge" title="${esc(l.media[lang].reason || "")}">no ${label}</span>`;
+    return `<div class="cand ${chosen.has(l.ce_line_ref) ? "chosen" : ""}">
+      <div class="head"><span class="num">${i < 9 ? i + 1 : ""}</span><span class="mono grow" title="${esc(l.ce_line_ref)}">${esc(l.display_key)}${l.entries_in_record > 1 ? " #" + l.entry_index : ""}</span>
+        <span class="badge">${esc(l.mission)} · ${esc(l.family)}</span>
+        ${l.test_event ? '<span class="badge" title="test event: no dialogue media">test</span>' : ""}
+        ${l.verifications.length ? `<span class="badge" title="past checks">${l.verifications.map(esc).join(" ")}</span>` : ""}</div>
+      <div class="row">${pb(LANG.es, "es-MX")} ${pb(LANG.en, "en")}
+        <button data-use="${esc(l.ce_line_ref)}" ${!S.edit || chosen.has(l.ce_line_ref) || l.test_event || aLocked ? "disabled" : ""}>+ use for this slot</button></div>
+      <div class="text small"><b>es-MX</b>${t("es-MX")}</div>
+      <div class="text small"><b>en</b>${t("en")}</div>
+      <details><summary>es-ES text and audio</summary><div class="text small"><b>es-ES</b>${t("es-ES")}</div>${pb(LANG.esES, "es-ES")}</details>
+    </div>`;
+  }).join("");
+  document.querySelectorAll('#cands [data-play]').forEach(b => b.onclick = () => play(b.dataset.play, b));
+  document.querySelectorAll('#cands [data-use]').forEach(b => b.onclick = () => {
+    const e = S.edit; e.match.ce_line_refs.push(b.dataset.use);
+    if (e.match.status === "unreviewed" || e.match.status === "no_equivalent") e.match.status = "matched";
+    setDirty(); renderDetail(); renderCands();
+  });
+}
+
+// ---------------------------------------------------------------- level status
+$("lstatusSave").onclick = async () => {
+  const st = $("lstatus").value; if (!st) return;
+  const confirmIt = st === "in_game_tested" || st === "reviewed";
+  let note = "", verification = null;
+  if (confirmIt) {
+    if (!confirm(`Mark ${S.level} as “${st.replace(/_/g, " ")}”? Only do this after the level was built and checked in MCC.`)) return;
+    verification = prompt("verifications.json entry for the in-game test (e.g. v-000020), or leave empty:", "") || null;
+    note = prompt("Note (optional):", "") || "";
+  }
+  try {
+    const r = await api("/api/progress", { level: S.level, status: st, note, verification, confirm: confirmIt, loaded_sha256: S.state.sha256.progress });
+    toast(`${S.level}: ${st.replace(/_/g, " ")}`, "ok"); if (r.validation) renderFooter(r.validation);
+    await loadState(S.level);
+  } catch (e) { showErr(e); renderProgress(); }
+};
+
+// ---------------------------------------------------------------- events
+let tS, tC;
+$("level").onchange = async () => {
+  if (S.dirty && !confirm("Discard unsaved edits on this slot?")) { $("level").value = S.level; return; }
+  S.level = $("level").value; S.slotId = null; S.detail = null; S.edit = null; S.dirty = false;
+  $("detail").className = "muted"; $("detail").textContent = "Pick a slot on the left.";
+  await loadState(S.level); $("cscope").value = $("cscope").options[0].value; await loadSlots(); await loadCands();
+};
+$("sfilter").onchange = loadSlots;
+$("sq").oninput = () => { clearTimeout(tS); tS = setTimeout(loadSlots, 250); };
+$("cscope").onchange = () => loadCands();
+$("cq").oninput = () => { clearTimeout(tC); tC = setTimeout(() => loadCands(), 250); };
+$("cmore").onclick = () => loadCands(true);
+window.addEventListener("beforeunload", (ev) => { if (S.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
+document.addEventListener("keydown", (ev) => {
+  const tag = (ev.target.tagName || "").toLowerCase();
+  if (["input", "textarea", "select"].includes(tag) || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.key === "j" || ev.key === "J") { moveSlot(1); ev.preventDefault(); }
+  else if (ev.key === "k" || ev.key === "K") { moveSlot(-1); ev.preventDefault(); }
+  else if (ev.key === " ") { const b = $("playSpain"); if (b) { play(b.dataset.play, b); ev.preventDefault(); } }
+  else if (/^[1-9]$/.test(ev.key)) { const l = S.cands[+ev.key - 1]; if (l && l.media[LANG.es].count) play(ceUrl(l.ce_line_ref, LANG.es)); }
+});
+
+(async () => {
+  const h = new URLSearchParams(location.hash.slice(1));
+  try { await loadState(h.get("level")); await loadSlots(); await loadCands(); if (h.get("slot")) await selectSlot(h.get("slot")); }
+  catch (e) { showErr(e); }
+  setTimeout(async () => { try { const s = await api("/api/state"); renderFooter(s.validation); } catch (_) {} }, 4000);
+})();
+</script>
+</body>
+</html>

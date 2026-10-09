@@ -8,7 +8,14 @@ Schema: docs/dialogue-catalog-design.md §4 (`mcc-dialogue-tag/3`).
 Rules enforced here:
 - sample identity comes from each bank's **own embedded name table**,
   resolved independently per language; the `.lst.bin` range is only a
-  cross-check (`derived:lst_record_layout`);
+  cross-check (`derived:lst_record_layout`). Fallback (campaign-wide
+  catalogs, 2026-10-08): when the tag's basename finds no sample in the
+  name table, or is shared by several `.lst.bin` tags (generic barks,
+  cutscene permutations named `deathquiet 01`, `1`, ...), or its name hits
+  are a strict subset of its range (`flood\\death` = `death`, `death2`, ...),
+  the samples come from the tag's own `.lst.bin` range instead. Those samples carry
+  `evidence: derived:lst_record_layout` and the record is flagged
+  `samples_from_lst_range:<lang>`; nothing changes where names resolve;
 - the replacement unit is the Spanish sample slot,
   `slot_id = "es:<name_in_spanish_bank>#<occurrence>"`;
 - subtitle links stay `unresolved` (blocker B1); nothing is guessed;
@@ -96,8 +103,18 @@ class BankIndex:
         }
 
 
-def build_record(tag, lst_ranges, banks, source):
-    """tag: lst path; lst_ranges: {lang: (start, count) | None}; banks: {lang: BankIndex}."""
+def slot_id_for(name_in_bank, occurrence):
+    """es:<name>#<occurrence>. Only '%', '#' and whitespace in the name are percent-encoded
+    (generic bark names such as 'deathquiet 01'); every a10 name is unchanged."""
+    enc = "".join(f"%{ord(ch):02X}" if ch in "%#" or ch.isspace() else ch for ch in name_in_bank)
+    return f"es:{enc}#{occurrence}"
+
+
+def build_record(tag, lst_ranges, banks, source, shared_basenames=None):
+    """tag: lst path; lst_ranges: {lang: (start, count) | None}; banks: {lang: BankIndex}.
+
+    shared_basenames: {lang: set of lowercased basenames used by more than one lst tag}; for those
+    (and for names the bank doesn't have) the tag's own lst range is used (see module doc)."""
     info = parse_tag_name(tag)
     base = tag_basename(tag)
     rec = {"schema": RECORD_SCHEMA, "mcc_tag": tag, "tag_name": base.lower(), **info,
@@ -114,11 +131,20 @@ def build_record(tag, lst_ranges, banks, source):
         rec["lst"][lang]["agrees_with_name_table"] = lst_idx == idxs
         if lst_idx != idxs:
             flags.add(f"lst_disagrees_with_names:{lang}")
+        shared = base.lower() in (shared_basenames or {}).get(lang, ())
+        subset = bool(idxs) and set(idxs) < set(lst_idx)  # e.g. one permutation named exactly like the tag
+        from_lst = (bool(lst_idx) and lst_idx != idxs and (not idxs or shared or subset)
+                    and all(bi.bank.names[i] for i in lst_idx if i < len(bi.bank.names)))
+        if from_lst:
+            idxs = [i for i in lst_idx if i < len(bi.bank.names)]
+            flags.add(f"samples_from_lst_range:{lang}")
         samples = [bi.sample(i) for i in idxs]
         for k, s in enumerate(samples):
             s["ordinal_in_tag"] = k
+            if from_lst:
+                s["evidence"] = LST_EVIDENCE
             if lang == "spanish":
-                s["slot_id"] = f"es:{s['name_in_bank']}#{s['name_occurrence_in_bank']}"
+                s["slot_id"] = slot_id_for(s["name_in_bank"], s["name_occurrence_in_bank"])
         rec["samples"][lang] = samples
         if not samples:
             flags.add(f"missing:{lang}")
@@ -153,13 +179,17 @@ def build_level(level, lst_en, lst_es, banks, source):
         issues.append({"code": "lst_tag_lists_differ", "only_english": sorted(set(en) - set(es)),
                        "only_spanish": sorted(set(es) - set(en))})
     tags = list(dict.fromkeys(list(en) + list(es)))
-    records = [build_record(t, {"english": en.get(t), "spanish": es.get(t)}, banks, source) for t in tags]
+    shared = {lang: {b for b, n in Counter(tag_basename(t).lower() for t, _, _ in lst).items() if n > 1}
+              for lang, lst in (("english", lst_en), ("spanish", lst_es))}
+    records = [build_record(t, {"english": en.get(t), "spanish": es.get(t)}, banks, source, shared)
+               for t in tags]
     # Bank samples carrying the level prefix but owned by no tag (would otherwise be silently dropped).
     names = {r["tag_name"] for r in records}
     for lang in LANGUAGES:
         bi = banks[lang]
+        claimed = {s["index"] for r in records for s in r["samples"][lang]}  # incl. lst-range fallbacks
         stray = sorted(i for n, idxs in bi.by_name.items() if n.startswith(f"{level.lower()}_") and n not in names
-                       for i in idxs)
+                       for i in idxs if i not in claimed)
         if stray:
             issues.append({"code": "bank_samples_without_tag", "language": lang,
                            "samples": [{"index": i, "name": bi.bank.names[i]} for i in stray]})
