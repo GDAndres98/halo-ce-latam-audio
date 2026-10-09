@@ -328,7 +328,10 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
         for f in approved:
             if comparable(s[f], f) == comparable(hs[f], f):  # across v2 -> v3 (fx_request moved out)
                 continue
-            if s[f]["status"] == "needs_rework" and s[f]["revision"] == hs[f]["revision"] + 1:
+            # Since HEAD the owner may have reworked it (revision + 1 per rework, enforced at save time by
+            # mapping_store) and possibly approved it again: a higher revision is that trace. A change
+            # without a higher revision is a silent edit.
+            if s[f]["status"] in ("needs_rework", "approved") and s[f]["revision"] > hs[f]["revision"]:
                 continue
             out.append(finding("error", "approved_object_modified", file, f"{hs['mapping_id']}/{f}",
                                "approved decisions are immutable; only a user move to needs_rework "

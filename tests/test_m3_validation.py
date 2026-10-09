@@ -266,6 +266,15 @@ class ProtectionTests(unittest.TestCase):
         rework = copy.deepcopy(self.head)
         rework["slots"][0]["audio"].update(status="needs_rework", revision=2)
         self.assertEqual(check_approved_protected(self.head, rework), [])
+        reapproved = copy.deepcopy(edited)              # rework, edit, approve again (since the last commit)
+        reapproved["slots"][0]["audio"]["revision"] = 2
+        self.assertEqual(check_approved_protected(self.head, reapproved), [])
+        twice = copy.deepcopy(reapproved)
+        twice["slots"][0]["audio"]["revision"] = 3
+        self.assertEqual(check_approved_protected(self.head, twice), [])
+        draft = copy.deepcopy(rework)
+        draft["slots"][0]["audio"]["status"] = "draft"   # an approved object never becomes a plain draft
+        self.assertEqual(codes(check_approved_protected(self.head, draft)), ["approved_object_modified"])
         self.assertEqual(codes(check_approved_protected(self.head, doc())), ["approved_mapping_removed"])
         moved = copy.deepcopy(self.head)
         moved["slots"][0]["slot_id"] = "es:Other#0"
