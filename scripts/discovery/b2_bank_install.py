@@ -1,8 +1,11 @@
-"""B2 E1-game: owner-approved install / rollback of the E1 candidate bank (one file only).
+"""B2 in-game experiments: owner-approved install / rollback of a candidate Spanish bank (one file only).
+
+Works for any offline experiment in work/b2/<exp>/ (E1, E1b, ...); the candidate hash and target sample
+come from that experiment's report. Run only after the owner approves that experiment in game.
 
 Subcommands (each refuses to run while MCC / EAC processes exist, and stops on any mismatch):
-  preflight  verify Steam build, installed bank == pinned original, candidate == E1 report hash,
-             candidate differs from the original only inside sample #30; snapshot SHA-256 of every
+  preflight  verify Steam build, installed bank == pinned original, candidate == report hash,
+             candidate differs from the original only in the target sample (later ones may move); snapshot SHA-256 of every
              file under halo1/sound/pc plus the SU/SP subtitle tables, and size/mtime of every
              install file; back up the installed bank to work/mcc/fsb/backup/<build>/ and verify it.
   install    copy the candidate over halo1/sound/pc/sounds_dialogs_spanish.fsb and verify its hash
@@ -12,10 +15,10 @@ Subcommands (each refuses to run while MCC / EAC processes exist, and stops on a
   status     print the installed bank's hash and which state it matches.
 
 Never launches MCC; touches no file other than sounds_dialogs_spanish.fsb in the install.
-State/report: work/b2/e1/game/{preflight,install,rollback}.json (git-ignored).
+State/report: work/b2/<exp>/game/{preflight,install,rollback}.json (git-ignored).
 
 Example:
-    python scripts/discovery/b2_e1_game.py preflight
+    python scripts/discovery/b2_bank_install.py --exp e1b preflight
 """
 import argparse
 import csv
@@ -30,15 +33,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common.ce_assets import parse_steam_acf  # noqa: E402
 from common.env import REPO_ROOT, load_env, require_path  # noqa: E402
-from common.fsb5_writer import sample_spans  # noqa: E402
+from common.fsb5_writer import decompose  # noqa: E402
 
 BUILD = "19905945"
 ORIGINAL = "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
-CANDIDATE = "86f787ac184897619d471897e41650c04a4f1cb490df1b174c0f6f8793c6f55c"
-TARGET_INDEX = 30
-CAND = REPO_ROOT / "work" / "b2" / "e1" / "sounds_dialogs_spanish.fsb"
+# Per-experiment values, set by configure() from work/b2/<exp>/<exp>_report.json
+CANDIDATE = TARGET_INDEX = CAND = STATE = None
 BACKUP = REPO_ROOT / "work" / "mcc" / "fsb" / "backup" / BUILD / "sounds_dialogs_spanish.fsb"
-STATE = REPO_ROOT / "work" / "b2" / "e1" / "game"
 PROC_MARKERS = ("mcc", "halo", "easyanticheat")
 
 
@@ -107,11 +108,15 @@ def preflight():
     if inst_sha != ORIGINAL:
         stop(f"installed bank {inst_sha} is not the pinned original")
     if sha256_file(CAND) != CANDIDATE:
-        stop("E1 candidate hash mismatch; re-run b2_e1_transplant.py")
-    orig, cand = inst.read_bytes(), CAND.read_bytes()
-    t0, t1 = sample_spans(orig)[TARGET_INDEX]
-    if len(orig) != len(cand) or orig[:t0] != cand[:t0] or orig[t1:] != cand[t1:]:
-        stop("candidate differs from the installed original outside sample #30")
+        stop("candidate hash mismatch; re-run the offline experiment")
+    mo, mc = decompose(inst.read_bytes()), decompose(CAND.read_bytes())
+    k = TARGET_INDEX
+    same_elsewhere = (mo["names"] == mc["names"] and mo["header_tail"] == mc["header_tail"]
+                      and len(mo["samples"]) == len(mc["samples"])
+                      and all(a == b for n, (a, b) in enumerate(zip(mo["samples"], mc["samples"])) if n != k))
+    if not same_elsewhere or mo["samples"][k] == mc["samples"][k]:
+        stop(f"candidate does not differ from the installed original in exactly sample #{k}")
+    del mo, mc
     print("checks OK; snapshotting install (hashing halo1/sound/pc and SU/SP)...")
     snap = snapshot(root)
     BACKUP.parent.mkdir(parents=True, exist_ok=True)
@@ -125,11 +130,11 @@ def preflight():
     if sha256_file(BACKUP) != ORIGINAL:
         stop("backup hash mismatch")
     write_state("preflight", {"steam_build": build, "steam_state_flags": flags, "installed_sha256": inst_sha,
-                              "candidate_sha256": CANDIDATE, "target_span": [t0, t1],
+                              "candidate_sha256": CANDIDATE, "target_index": k,
                               "backup": BACKUP.relative_to(REPO_ROOT).as_posix(), "backup_sha256": ORIGINAL,
                               "backup_note": note, "snapshot": snap})
     print(f"PREFLIGHT OK: build {build}; installed = original; candidate verified, differs only in "
-          f"[{t0},{t1}); {note} and verified; {len(snap['sha256'])} files hashed, {len(snap['stat'])} stat'ed")
+          f"sample #{k}; {note} and verified; {len(snap['sha256'])} files hashed, {len(snap['stat'])} stat'ed")
 
 
 def install():
@@ -185,14 +190,32 @@ def rollback():
 def status():
     root, inst = paths()
     h = sha256_file(inst)
-    print(h, "= ORIGINAL" if h == ORIGINAL else "= E1 CANDIDATE" if h == CANDIDATE else "= UNKNOWN")
+    print(h, "= ORIGINAL" if h == ORIGINAL else f"= {EXP_ID.upper()} CANDIDATE" if h == CANDIDATE
+          else "= UNKNOWN")
     print("running:", running_game_processes() or "none")
+
+
+EXP_ID = None
+
+
+def configure(exp):
+    """Load candidate path/hash and target index from the experiment's offline report."""
+    global CANDIDATE, TARGET_INDEX, CAND, STATE, EXP_ID
+    base = REPO_ROOT / "work" / "b2" / exp
+    rep = json.loads((base / f"{exp}_report.json").read_text(encoding="utf-8"))
+    if not rep.get("ok"):
+        stop(f"{exp} offline report is not ok; re-run the offline experiment")
+    CANDIDATE = rep["hashes"]["candidate"]
+    TARGET_INDEX = rep["target"]["index"] if "target" in rep else rep["spanish"]["index"]
+    CAND, STATE, EXP_ID = base / "sounds_dialogs_spanish.fsb", base / "game", exp
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--exp", default="e1", help="offline experiment folder under work/b2/ (default e1)")
     ap.add_argument("action", choices=["preflight", "install", "rollback", "status"])
     a = ap.parse_args()
+    configure(a.exp)
     {"preflight": preflight, "install": install, "rollback": rollback, "status": status}[a.action]()
 
 

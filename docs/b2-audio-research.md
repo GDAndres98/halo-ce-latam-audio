@@ -425,7 +425,7 @@ All **23/23** checks pass:
 
 **Approval:** the owner explicitly approved E1-game. Claude ran the
 install and restore with
-`python scripts/discovery/b2_e1_game.py {preflight|install|rollback|status}`.
+`python scripts/discovery/b2_bank_install.py {preflight|install|rollback|status}`.
 The owner launched MCC with the official **anti-cheat-disabled** option
 and played.
 
@@ -548,6 +548,34 @@ E1, with the size change allowed in the snapshot):
   - cut off → length comes from tag or map data, and longer lines need
     trims (recipes) or a different approach;
   - overlap → note it for timing-sensitive slots in M4/M6.
+
+### 5.6 E1b offline result — ✅ PASS (2026-10-08)
+
+Run: `python scripts/discovery/b2_transplant.py --exp e1b --name A10_140_cryotech`
+(about 40 s). This general transplant tool handles any length; `fsb5_writer`
+gained `replacement_compatibility`, `replace_sample` and `loop_chunk`.
+- **Candidate:** `work/b2/e1b/sounds_dialogs_spanish.fsb`, SHA-256
+  `6a861d0240640aa4395a6dda3ade55b13680613d32e47334a2eb0fb1db6cbbc7`.
+  The size is 309,329,888 B (**+9,088 B**).
+- **Slot #13:** 4.296 s → 4.574 s (201,728 samples), LOOP `0, 201726`,
+  frequency and channel bits unchanged.
+- **25/25 checks pass:**
+  - every one of the other 5,695 samples is identical, including the
+    model and the payload by index;
+  - earlier offsets are unchanged, and the 5,682 later offsets all shift
+    by exactly +9,088, 32-byte aligned;
+  - `data_size` and the file size are +9,088, and the size equation
+    holds;
+  - the header tail, `sample_headers_size`, name-table bytes, names and
+    order are identical;
+  - the file round-trips and the build is deterministic;
+  - `.lst.bin` is untouched;
+  - vgmstream: all 5,696 subsongs decode, only #14 differs, it equals
+    English #14, and `-m` reports 201,728 samples.
+- **Install path:** `scripts/discovery/b2_bank_install.py --exp e1b`
+  (the E1 script, renamed and generalised). Its pre-flight now checks,
+  by model comparison, that only the target sample differs. The sheet is
+  `work/b2/e1b/e1b_install_rollback.md`. **E1b-game is not approved.**
 
 ## 6. Risks
 

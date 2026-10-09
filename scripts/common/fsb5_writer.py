@@ -185,6 +185,34 @@ def replace_stream(model, index, stream):
     return new
 
 
+def loop_chunk(sample_count):
+    """LOOP chunk (type 3) as every MCC dialogue sample carries it: start 0, end = count - 2."""
+    return (3, struct.pack("<II", 0, sample_count - 2))
+
+
+def replacement_compatibility(dst, src):
+    """Checks that `src` (stream + count) can stand in for `dst`; lengths may differ (E1b+)."""
+    frames = celt_frame_sizes(src["stream"])
+    return {
+        "head_bits_equal": dst["head_bits"] == src["head_bits"],  # frequency index + channel flag
+        "channels_equal": dst["channels"] == src["channels"],
+        "frame_size_equal": set(frames) == set(celt_frame_sizes(dst["stream"])) and len(set(frames)) == 1,
+        "frame_count_matches_samples": len(frames) == -(-src["sample_count"] // CELT_FRAME_SAMPLES),
+        "sample_count_frame_aligned": src["sample_count"] % CELT_FRAME_SAMPLES == 0,
+        "dst_chunks_loop_only": [t for t, _ in dst["chunks"]] in ([3], []),
+    }
+
+
+def replace_sample(model, index, stream, sample_count):
+    """New model with sample `index`'s stream and sample count replaced, and its LOOP chunk (if it
+    has one) recomputed as 0, n-2. Head bits, other chunks and every other sample are unchanged."""
+    new = replace_stream(model, index, stream)
+    s = new["samples"][index]
+    s["sample_count"] = sample_count
+    s["chunks"] = [loop_chunk(sample_count) if t == 3 else (t, p) for t, p in s["chunks"]]
+    return new
+
+
 def sample_spans(data):
     """[(start, end)] absolute file offsets of each sample's data span (stream + padding)."""
     h = parse_header(data)

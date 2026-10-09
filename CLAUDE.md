@@ -55,7 +55,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         There are 6 synthetic tests in `tests/test_b2_e1.py`.
     - **E1-game ✅ PASS, user-verified (2026-10-08).** The owner
       approved it explicitly.
-      - `python scripts/discovery/b2_e1_game.py
+      - `python scripts/discovery/b2_bank_install.py
         preflight|install|rollback|status` refuses to run while MCC is
         open and writes only the Spanish bank.
       - In Classic and Anniversary, Keyes's `a10_350` played in English,
