@@ -394,6 +394,18 @@ full validator can also check them.
   version. The validator compares approved objects with `git HEAD` across the two versions
   (ignoring the moved field).
 
+**Optional `different_but_fits: {marked, set_at, revision}` (added to `/3` on 2026-10-08, no
+migration):**
+- **What it is:** the owner's note that the matched CE dialogue differs from the MCC line but fits
+  the scene.
+- **Rules:** the same as `radio_effect`: independent of approvals, and every change bumps its own
+  revision (`mapping_store.OWNER_FLAGS`).
+- **Validity:** it may be `true` only while `match.ce_line_refs` is non-empty (validator:
+  `different_but_fits_without_match`).
+- **Older slots:** a slot saved without it counts as unmarked.
+- **Why optional:** the owner was actively mapping `a10`, and an optional field avoided rewriting
+  the file.
+
 **`manual-mappings/2` as implemented** (changes from the §5.1 sketch):
 - The top level is `{"schema": "manual-mappings/2", "pins":
   {ce_build, mcc_steam_buildid, mcc_spanish_fsb_sha256}, "slots": []}`.

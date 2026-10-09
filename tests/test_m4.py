@@ -545,6 +545,46 @@ class RadioEffectTests(AppTestBase):
             check_transition(old, new)
 
 
+class DifferentButFitsTests(AppTestBase):
+    def test_flag_is_independent_persistent_and_filterable(self):
+        self.match_a()
+        self.save(actions=[{"action": "approve", "field": "audio"}, {"action": "approve", "field": "subtitle"}])
+        approved = copy.deepcopy(self.doc()["slots"][0])
+        self.save(different_but_fits={"marked": True})          # allowed while both parts are approved
+        s = self.doc()["slots"][0]
+        self.assertEqual(s["different_but_fits"], {"marked": True, "set_at": "2026-10-09", "revision": 2})
+        self.assertEqual((s["audio"], s["subtitle"]), (approved["audio"], approved["subtitle"]))
+        self.assertEqual(list(s)[-1], "notes")
+        self.assertEqual(validate(self.doc(), load_schema("manual-mappings-3")), [])
+        app2 = M4App(self.root, run_validator=False)
+        self.assertEqual([x["slot_id"] for x in app2.slots("z10", status="fits")["slots"]], [self.slot])
+        self.assertTrue(app2.slots("z10")["slots"][0]["different_but_fits"])
+        self.assertEqual(app2.state()["levels"][0]["progress"]["different_but_fits"], 1)
+        self.save(actions=[{"action": "needs_rework", "field": "audio"}])   # rework keeps the flag
+        self.assertTrue(self.doc()["slots"][0]["different_but_fits"]["marked"])
+        self.save(different_but_fits={"marked": False})
+        self.assertEqual(self.doc()["slots"][0]["different_but_fits"]["revision"], 3)
+        with self.assertRaises(ApiError):
+            self.save(different_but_fits={"marked": 1})
+
+    def test_needs_a_matched_line(self):
+        with self.assertRaises(ApiError) as cm:
+            self.save(match={"status": "no_equivalent", "ce_line_refs": []}, different_but_fits={"marked": True})
+        self.assertEqual(cm.exception.status, 422)
+
+    def test_optional_for_slots_saved_before_the_flag_existed(self):
+        self.match_a()
+        doc = self.doc()
+        del doc["slots"][0]["different_but_fits"]                 # as written by the previous app version
+        (self.root / "mappings/manual_mappings.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        self.assertEqual(validate(doc, load_schema("manual-mappings-3")), [])
+        self.assertFalse(self.app.slots("z10")["slots"][0]["different_but_fits"])
+        self.save(notes="unrelated edit")                         # an edit without the flag doesn't add it
+        self.assertNotIn("different_but_fits", self.doc()["slots"][0])
+        self.save(different_but_fits={"marked": True})
+        self.assertEqual(self.doc()["slots"][0]["different_but_fits"]["revision"], 1)
+
+
 class MigrationTests(unittest.TestCase):
     def test_v2_to_v3_moves_the_flag_and_keeps_approvals(self):
         from common import mapping_store

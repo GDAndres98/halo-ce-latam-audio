@@ -155,6 +155,17 @@
             "revision": {"type": "integer", "minimum": 1}
           }
         },
+        "different_but_fits": {
+          "type": "object",
+          "description": "Optional owner flag (added 2026-10-08, no migration needed): the matched CE dialogue differs from the MCC line, but the owner judges it fits the scene. Same rules as radio_effect: independent of approvals, every change bumps its revision; may only be true while the match lists CE lines (validator). Missing = not marked.",
+          "required": ["marked", "set_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "marked": {"type": "boolean"},
+            "set_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          }
+        },
         "notes": {"type": "string", "maxLength": 2000}
       }
     }

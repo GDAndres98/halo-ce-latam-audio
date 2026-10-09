@@ -238,3 +238,8 @@ Acceptance criteria (they extend roadmap M4):
   other mapping's `match.ce_line_refs`. The current slot's own lines stay visible. Each line
   carries `used_by`, and the page shows a "used ×N" badge. It is a filter only: the order is
   unchanged and nothing is selected (tested).
+- **Different dialogue, but fits the scene:** an optional slot-level flag, `different_but_fits`.
+  - It sits in the Match card because it describes the match.
+  - It is toggled with Save, independently of the approvals, and needs a matched CE line.
+  - It has a "different but fits" slot filter, a **≈** badge, and a count in the level progress.
+  - Tests: `DifferentButFitsTests`, which include slots saved before the flag existed.

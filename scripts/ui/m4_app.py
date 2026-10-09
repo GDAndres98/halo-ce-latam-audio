@@ -123,6 +123,7 @@ def default_slot(mapping_id, slot_id, mcc_tag):
                          "mcc_key_hash": None, "mcc_key_verification": None, "fingerprint": None,
                          "approved_at": None, "revision": 1},
             "radio_effect": {"needed": False, "set_at": None, "revision": 1},
+            "different_but_fits": {"marked": False, "set_at": None, "revision": 1},
             "notes": ""}
 
 
@@ -133,6 +134,10 @@ def _next_id(prefix, used):
 
 def _audio_sem(a):
     return (a["source"], a["sources"], a["edit"])
+
+
+def _fits(m):
+    return bool(m and (m.get("different_but_fits") or {}).get("marked"))
 
 
 def _subtitle_sem(s):
@@ -275,7 +280,8 @@ class M4App:
                 "matched": st == "matched", "no_equivalent": st == "no_equivalent", "deferred": st == "deferred",
                 "needs_rework": "needs_rework" in (a, sub), "audio_pending": a != "approved",
                 "subtitle_pending": sub != "approved",
-                "radio": bool(m and m["radio_effect"]["needed"]), "stereo": s["channels"] > 1}.get(status, False)
+                "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m),
+                "stereo": s["channels"] > 1}.get(status, False)
 
     def slots(self, level, status=None, q=None, limit=1500):
         """level may be 'all' (search every level). Catalog order; the query and status only filter."""
@@ -305,7 +311,8 @@ class M4App:
                                 "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
                                 "channels": s["channels"], "flags": r["flags"],
                                 "decision": self._decision_summary(m),
-                                "radio_effect": bool(m and m["radio_effect"]["needed"])})
+                                "radio_effect": bool(m and m["radio_effect"]["needed"]),
+                                "different_but_fits": _fits(m)})
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
@@ -582,6 +589,18 @@ class M4App:
                 slot["radio_effect"] = {"needed": needed, "set_at": today,
                                         "revision": cur["revision"] + (0 if idx is None else 1)}
 
+        if "different_but_fits" in body:  # owner flag on the match; independent of approvals like radio_effect
+            marked = (body["different_but_fits"] or {}).get("marked")
+            if not isinstance(marked, bool):
+                raise ApiError(400, "different_but_fits.marked must be true or false")
+            cur = slot.get("different_but_fits") or {"marked": False, "set_at": None, "revision": 1}
+            if marked != cur["marked"]:
+                existed = idx is not None and "different_but_fits" in slot
+                slot["different_but_fits"] = {"marked": marked, "set_at": today,
+                                              "revision": cur["revision"] + (1 if existed else 0)}
+            elif "different_but_fits" not in slot:
+                slot["different_but_fits"] = cur
+
         if "notes" in body:
             notes = body["notes"] or ""
             if len(notes) > 2000:
@@ -595,6 +614,8 @@ class M4App:
             slot[f].update(status="approved", approved_at=today,
                            fingerprint=fn(slot, self.ce_idx, self.mcc_idx, new_local))
 
+        if "different_but_fits" in slot and list(slot)[-1] != "notes":
+            slot["notes"] = slot.pop("notes")
         if idx is None:
             new_doc["slots"].append(slot)
         if new_doc == doc and not local_changed:

@@ -81,6 +81,7 @@ Slot filters (left):
 - audio / subtitle not approved;
 - needs rework;
 - **needs radio effect**;
+- **different but fits**;
 - **stereo**.
 
 ## 4. Deciding one slot
@@ -99,6 +100,13 @@ Slot filters (left):
    - Each change raises the flag's own revision and records the date.
    - It applies only to selected CE audio, so choosing *keep Spain* clears and disables it.
    - The future build pipeline reads it from `radio_effect` in `manual_mappings.json`.
+   **Different dialogue, but fits the scene** (the **≈** checkbox under Match) is your note that the
+   CE line says something different from the MCC line but works in that moment.
+   - It needs at least one picked CE line, and clearing the match clears it.
+   - Like the radio flag, it is saved with **Save**, survives restarts and *needs rework*, and
+     never changes an approval.
+   - Each change raises its own revision.
+   - Find marked slots with the **different but fits** filter or the **≈** badge.
 5. **Subtitle,** independently of the audio:
    - *keep MCC text*;
    - *CE text* (pick the line and the culture; cultures without text are disabled);

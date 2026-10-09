@@ -30,6 +30,7 @@ from .jsonschema_lite import load_schema, validate
 UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework
 SCHEMA_ID = "manual-mappings/3"
 SCHEMA_NAME = "manual-mappings-3"
+OWNER_FLAGS = ("radio_effect", "different_but_fits")  # slot-level flags outside the approved objects
 
 
 class StoreError(Exception):
@@ -78,10 +79,11 @@ def check_transition(old_doc, new_doc, user_actions=()):
             was = old.get(mid, {}).get(f, {}).get("status")
             if ns[f]["status"] == "approved" and was != "approved" and allowed.get((mid, f)) != "approve":
                 problems.append(f"{mid}/{f}: only an explicit user 'approve' action can approve")
-    for mid, ns in new.items():  # the radio flag is independent of approvals, but every change is counted
-        orad, nrad = old.get(mid, {}).get("radio_effect"), ns.get("radio_effect")
-        if orad and nrad and orad != nrad and nrad["revision"] != orad["revision"] + 1:
-            problems.append(f"{mid}/radio_effect: a change must bump its revision by exactly 1")
+    for mid, ns in new.items():  # owner flags are independent of approvals, but every change is counted
+        for flag in OWNER_FLAGS:
+            oflag, nflag = old.get(mid, {}).get(flag), ns.get(flag)
+            if oflag and nflag and oflag != nflag and nflag["revision"] != oflag["revision"] + 1:
+                problems.append(f"{mid}/{flag}: a change must bump its revision by exactly 1")
     unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework")]
     if unused:
         problems.append(f"unknown user actions {unused}")

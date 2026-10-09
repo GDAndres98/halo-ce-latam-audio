@@ -202,6 +202,9 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
         if radio.get("needed") and s["audio"]["source"] == "keep_original":
             out.append(finding("error", "radio_effect_without_selected_audio", file, w + "/radio_effect",
                                "the 'needs radio effect' flag applies to selected CE audio, not to kept Spain audio"))
+        if (s.get("different_but_fits") or {}).get("marked") and not s["match"]["ce_line_refs"]:
+            out.append(finding("error", "different_but_fits_without_match", file, w + "/different_but_fits",
+                               "'different dialogue, fits the scene' needs at least one matched CE line"))
         if ABS_PATH.search(s["notes"]):
             out.append(finding("error", "local_path_in_committed_file", file, w + "/notes",
                                "absolute paths belong in manual_mappings.local.json"))
@@ -395,7 +398,8 @@ def level_progress(level_slot_ids, mappings_doc):
     """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure."""
     by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
-           "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0}
+           "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0,
+           "different_but_fits": 0}
     for sid in level_slot_ids:
         s = by_slot.get(sid)
         if not s:
@@ -408,6 +412,7 @@ def level_progress(level_slot_ids, mappings_doc):
         out["audio_approved"] += s["audio"]["status"] == "approved"
         out["subtitle_approved"] += s["subtitle"]["status"] == "approved"
         out["radio_effect"] += bool((s.get("radio_effect") or {}).get("needed"))
+        out["different_but_fits"] += bool((s.get("different_but_fits") or {}).get("marked"))
         out["needs_rework"] += "needs_rework" in (s["audio"]["status"], s["subtitle"]["status"])
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out
