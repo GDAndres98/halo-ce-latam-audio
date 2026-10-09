@@ -95,9 +95,11 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - **Never encode game audio with `profile="default"`.**
       - Diagnostics: `scripts/common/celt_header.py`,
         `scripts/discovery/b2_celt_profile.py`.
+    - **E2b-game ✅ PASS** (`v-000018`): our MCC-profile CELT encode
+      plays correctly in MCC. **B2 is technically unblocked.**
     - **In-game installs** go through `python
-      scripts/discovery/b2_bank_install.py --exp <id> …`. **E2b-game is
-      not approved.**
+      scripts/discovery/b2_bank_install.py --exp <id> …`, with the
+      owner's approval for each experiment.
     - ffmpeg (already installed) is approved for offline audio
       conversion (owner, 2026-10-08).
     - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**

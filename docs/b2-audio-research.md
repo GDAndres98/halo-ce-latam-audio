@@ -728,6 +728,21 @@ now the default, sets `CELT_SET_PREDICTION(0)` (intra-only) and
 Whatever the codec, the CE-content redistribution limits stay as they
 are (`workshop-research.md` §2).
 
+### 5.9 E2b-game — ✅ PASS, USER-VERIFIED (2026-10-08)
+
+The E2b candidate (`f23ddda5…`, our MCC-profile CELT re-encode of English `A10_350` in slot #30) was
+installed with `b2_bank_install.py --exp e2b` and tested by the owner.
+- **Owner report:** Keyes's `a10_350` played correctly, completely and naturally; the surrounding
+  Spanish dialogue and the LATAM subtitles were unchanged; no crash or missing audio.
+- **Graphics modes:** not reported, so not recorded.
+- **Rollback:** the bank is restored to `ed0ff3ec…`, and the snapshot shows no other change.
+- **Recorded:** `v-000018` (pass). `v-000017` (E2, fail) is kept unchanged.
+
+**Conclusion:** our CELT pipeline (libcelt 0.11 from vgmstream, **profile `fmod`**: all intra, no
+transients) produces audio that MCC's embedded decoder plays. Together with E2's crash, this strongly
+supports the §5.8 root cause. **B2 is technically unblocked:** we can splice our own CELT encodes of
+any length (E1b) into the Spanish bank.
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |
