@@ -125,15 +125,29 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       goes in `mappings/mission_progress.json`. Owner trial pending; **next
       is M5** (owner matches `a10`). Never make or approve decisions in
       `mappings/` yourself.
+    - **M4 update (2026-10-08):** subtitle search (SU/SP/EN and CE text,
+      phrases, accent-insensitive, highlighted, filter only), custom
+      subtitles for CE lines without source text, and the "Needs radio
+      effect" flag. The mappings file is now **`manual-mappings/3`**:
+      `audio.fx_request` became the slot-level `radio_effect`, which is
+      independent of approvals. The v2→v3 migration is
+      `scripts/validate/migrate_mappings.py`. The stack stays Python stdlib
+      plus one static page (design §8).
     - **Campaign-wide catalogs (2026-10-08):** `build_ce_catalog.py --all`
       (13 missions, 1,475 records) and `build_mcc_catalog.py --all
       --no-audio` (28 folders, 1,903 tags, all 5,696 Spanish samples as
       slots). Audio is decoded on demand (`scripts/common/ondemand_audio.py`).
       The inventory is `python scripts/catalog/campaign_inventory.py
-      --scan-ce`. **Three rule extensions await owner review**
-      (`docs/campaign-catalog.md` §3): the lst-range identity fallback,
-      `%XX` in `slot_id`, and spaces in `tag_name`. `a10` is
-      byte-identical.
+      --scan-ce`. The three rule extensions (`docs/campaign-catalog.md`
+      §3: the lst-range identity fallback, `%XX` in `slot_id`, spaces in
+      `tag_name`) were **approved by the owner on 2026-10-08** and verified
+      by `python scripts/validate/verify_slot_ids.py`: all 5,696 IDs are
+      unique, deterministic, stable and round-trip; `a10` is unchanged.
+      `mission-map/1` now accepts `x10`–`x70`. Never invent mission-map
+      entries.
+    - **Deferred (owner):** milestone M-SYS (CE `Audio/Systemic` barks),
+      `temp_mocap_VO` (backlog), and stereo replacement (stereo slots are
+      only shown and played).
     - **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.
@@ -343,7 +357,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 - `mappings/verifications.json` exists (committed, IDs only):
   `v-000001`–`v-000011`, all passed (`ce:` = CE line refs, `mcc:` =
   Spanish slots). It is append-only; never rewrite entries.
-- **M3 done and approved (2026-10-08)**, including the `manual-mappings/2`
+- **M3 done and approved (2026-10-08)**, including the `manual-mappings/2` (now `/3`)
   changes:
   - **Schemas:** six versioned schemas in `schemas/`, checked by
     `scripts/common/jsonschema_lite.py`, a stdlib subset that refuses
@@ -437,7 +451,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - No `verifications.json` entry yet. The `subtitle_load` entry (next free ID;
       `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, a CE `Systemic` catalog. Audio processing (resample,
+- Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, M-SYS (CE `Systemic` catalog), stereo replacement, v1.1 radio effects. Audio processing (resample,
   trims, FX), FSB repacking, map changes, bulk subtitle editing, any
   install change, packaging and any upload are still not approved.
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That

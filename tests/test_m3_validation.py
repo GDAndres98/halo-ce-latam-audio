@@ -23,7 +23,7 @@ from common.project_validation import (  # noqa: E402
     subtitle_fingerprint, validate_catalog, validate_mappings, validate_mission_map, validate_verifications)
 
 H = {c: c * 64 for c in "abcdef0123456789"}  # fake sha256 values
-MAP_SCHEMA = load_schema("manual-mappings-2")
+MAP_SCHEMA = load_schema("manual-mappings-3")
 VER_SCHEMA = load_schema("verifications-1")
 CE_SCHEMA = load_schema("ce-voice-asset-3")
 MCC_SCHEMA = load_schema("mcc-dialogue-tag-3")
@@ -80,11 +80,12 @@ def slot(**over):
          "match": {"status": "matched", "ce_line_refs": ["line_a#0"], "decided_at": "2026-10-08", "revision": 1},
          "audio": {"status": "draft", "source": "ce",
                    "sources": [{"kind": "ce", "ce_line_ref": "line_a#0", "language": "Spanish(Mexico)"}],
-                   "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}, "fx_request": None, "fingerprint": None,
+                   "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}, "fingerprint": None,
                    "approved_at": None, "revision": 1},
          "subtitle": {"status": "draft", "source": "custom", "ce_locres": None, "custom_ref": "c-000001",
                       "mcc_key_hash": None, "mcc_key_verification": None, "fingerprint": None, "approved_at": None,
                       "revision": 1},
+         "radio_effect": {"needed": False, "set_at": None, "revision": 1},
          "notes": ""}
     for path, v in over.items():
         cur = s
@@ -96,7 +97,7 @@ def slot(**over):
 
 
 def doc(*slots, pins=PINS):
-    return {"schema": "manual-mappings/2", "pins": dict(pins), "slots": list(slots)}
+    return {"schema": "manual-mappings/3", "pins": dict(pins), "slots": list(slots)}
 
 
 def check(d, local=LOCAL, verifications=None, ce=CE, mcc=MCC):
@@ -136,10 +137,10 @@ class SchemaEngineTests(unittest.TestCase):
         self.assertTrue(validate({"a": 0}, s))
 
     def test_all_project_schemas_load_and_templates_validate(self):
-        for name in ("ce-voice-asset-3", "mcc-dialogue-tag-3", "manual-mappings-2", "manual-mappings-local-1",
+        for name in ("ce-voice-asset-3", "mcc-dialogue-tag-3", "manual-mappings-2", "manual-mappings-3", "manual-mappings-local-1",
                      "verifications-1", "mission-map-1"):
             load_schema(name)
-        for rel, schema in (("mappings/manual_mappings.json", "manual-mappings-2"),
+        for rel, schema in (("mappings/manual_mappings.json", "manual-mappings-3"),
                             ("mappings/manual_mappings.local.example.json", "manual-mappings-local-1"),
                             ("mappings/mission_map.json", "mission-map-1")):
             d = json.loads((ROOT / rel).read_text(encoding="utf-8"))
@@ -184,7 +185,8 @@ class MappingRuleTests(unittest.TestCase):
             slot(audio__status="approved"),                                          # approval w/o fingerprint
             slot(subtitle__source="ce_locres"),                                      # custom_ref with ce_locres
             slot(subtitle__mcc_key_hash=123),                                        # key without verification id
-            slot(audio__fx_request="reverb"),
+            slot(audio__fx_request="radio"),                                        # moved out in v3
+            slot(radio_effect__needed="yes"),
             slot(mapping_id="m-1"),
         ]
         for s in bad:

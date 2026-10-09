@@ -88,7 +88,7 @@ preserved.
 | FSB5 **rebuild** + game acceptance | ⛔ **v1.0 blocker B2**: unverified, not attempted | feasibility §10.8 |
 | CE catalog, mission M01 | ✅ 220 voice assets, metadata only, deterministic (M1, 2026-10-08) | §3 M1 below, remake-audio-research.md §9 |
 | MCC catalog, level a10 | ✅ 101 tags, 202 samples decoded, deterministic (M2, 2026-10-08) | mcc-a10-catalog.md |
-| Campaign-wide catalogs | ✅ 13 CE missions (1,475 records) and 28 MCC folders (1,903 tags, all 5,696 Spanish samples as slots); audio on demand; 3 rule extensions pending owner review | campaign-catalog.md |
+| Campaign-wide catalogs | ✅ 13 CE missions (1,475 records) and 28 MCC folders (1,903 tags, all 5,696 Spanish samples as slots); audio on demand; rule extensions approved and verified | campaign-catalog.md |
 | Mapping / UI | ✅ M4 implemented 2026-10-08; no mappings decided yet | m4-user-guide.md |
 | Steam Workshop distribution | planned (M8). Compatibility checkpoint WC is planned inside B2. Not researched in depth yet | §3 M8, §6 B2 |
 
@@ -263,6 +263,12 @@ Design: [`m4-matching-ui-design.md`](m4-matching-ui-design.md) (§7 as implement
 - [x] Decoding on demand stays under `work/`.
 - [x] Mission selection and per-level progress; owner-set level status
   in `mappings/mission_progress.json`.
+- [x] Update 2026-10-08 (owner requests):
+  - search on SU/SP/EN and CE subtitle text (partial words, phrases, accent- and case-insensitive,
+    across levels and missions, highlighted, filter only);
+  - custom subtitles for CE lines without source text;
+  - the "Needs radio effect" flag (`manual-mappings/3`);
+  - stereo slots visible and playable.
 - [ ] The owner tries it on `a10` (M5 starts there).
 
 ### M5 — a10 mapping complete (user work)
@@ -317,6 +323,15 @@ therefore settle the delivery route before full-campaign production.
 
 ### v1.0 — repeat M1–M7 for all levels
 (a30, a50, b30, b40, c10, c20, c40, d20, d40, plus generic/systemic barks)
+
+Catalogs for every level and mission already exist (`campaign-catalog.md`).
+
+**Extraction backlog (owner, 2026-10-08):**
+- **M-SYS:** a CE `Audio/Systemic` catalog (2,280 packages) for the MCC generic combat barks. It is
+  a separate milestone and not started.
+- **`temp_mocap_VO`** (46 CE packages): kept in the backlog and not catalogued.
+- **Stereo slots** (`x20` 4, `multiplayer1` 36): visible and playable in M4. Stereo replacement is
+  deferred.
 
 **Gate:** full-campaign production does not start until the Workshop
 compatibility checkpoint **WC** (§6 B2) is reported and the owner has
@@ -458,7 +473,9 @@ Evaluate each option, with its cost and what it keeps of v1.0:
 
 ### v1.1 — radio-effect repair
 Flagged lines get processed copies via recipes. A/B listening is
-recorded in `verifications.json`.
+recorded in `verifications.json`. The owner's flag already exists:
+`radio_effect.needed` in `manual-mappings/3`, set in M4 (2026-10-08).
+No effect is implemented.
 
 ## 4. First-mission catalog generation plan (M1 + M2)
 
@@ -773,7 +790,9 @@ review between tasks**: M1, M1b, M2, B1 research R1–R4, extraction of
 | B2 E2b (MCC-profile encoder) | offline ✅; **E2b-game ✅ user-verified pass 2026-10-08** (`v-000018`); bank restored and verified. **B2 technically unblocked** |
 | B2 E3 | ✅ offline (30/30) and **in game, user-verified** 2026-10-08 (`v-000019`); bank restored. **B2 audio route proven end to end** |
 | M4 handoff | ✅ `docs/m4-session-handoff.md` (2026-10-08) |
-| Campaign-wide catalogs (owner request, 2026-10-08) | ✅ built offline; rule extensions in `campaign-catalog.md` §3 **await owner review** |
+| Campaign-wide catalogs (owner request, 2026-10-08) | ✅ built offline; the 3 rule extensions (`campaign-catalog.md` §3) **approved by the owner 2026-10-08** and verified (`verify_slot_ids.py`, all checks pass) |
+| `mission-map/1` accepts cutscene folders `x10`–`x70` | ✅ owner request 2026-10-08 (no entries added) |
+| M4 search / missing-subtitle / radio-flag update, `manual-mappings/3` | ✅ owner request 2026-10-08; owner hands-on review pending |
 | B2 E4–E5 | not approved |
 | WC (Workshop compatibility checkpoint, inside B2) | WC-1 (docs) ✅ done 2026-10-08 (`workshop-research.md`): no documented override of FSB/loc files; WC-2 (inspect one subscribed CE mod) needs approval |
 | M4 matching UI | ✅ implemented 2026-10-08 (`m4-user-guide.md`); owner trial pending |

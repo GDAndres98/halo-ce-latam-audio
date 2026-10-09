@@ -49,7 +49,7 @@ If `work/` is missing, rebuild it with those commands. The install paths come fr
 
 ## 4. What it may write, and the protections
 
-- **`mappings/manual_mappings.json`** (`manual-mappings/2`), **only** through
+- **`mappings/manual_mappings.json`** (`manual-mappings/2`, now `/3`), **only** through
   `scripts/common/mapping_store.py`: `load()` → edit → `save(path, doc, loaded_sha256,
   user_actions=[UserAction("approve" | "needs_rework", mapping_id, field)])`.
   - The store refuses stale saves and approvals not made by a user action.

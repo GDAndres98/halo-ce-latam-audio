@@ -1,5 +1,5 @@
 {
-  "schema": "manual-mappings/2",
+  "schema": "manual-mappings/3",
   "pins": {
     "ce_build": "2026.08.11.1121610.2-Rel-i343-Meteorite-2607-CU4",
     "mcc_steam_buildid": "19905945",

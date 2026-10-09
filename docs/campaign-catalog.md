@@ -1,7 +1,8 @@
 # Campaign-wide catalogs and inventory (2026-10-08)
 
-**Status:** built offline and validated. Three catalog-rule extensions are pending **owner review**
-(§3). Nothing in this work matches lines across games. Everything lands in git-ignored `work/`.
+**Status:** built offline and validated. The three catalog-rule extensions in §3 were **approved by
+the owner on 2026-10-08** and verified (§3.1). Nothing in this work matches lines across games.
+Everything lands in git-ignored `work/`.
 
 ## 1. How to rebuild everything
 
@@ -11,6 +12,7 @@ python scripts/catalog/build_mcc_catalog.py --all --no-audio   # 28 MCC folders,
 python scripts/catalog/build_mcc_catalog.py --level a10        # optional: eager a10 decode (M2 reports)
 python scripts/extraction/export_ce_audio.py --mission M01     # optional: eager M01 decode (M1b reports)
 python scripts/catalog/campaign_inventory.py --scan-ce         # work/reports/campaign_inventory.{json,md}
+python scripts/validate/verify_slot_ids.py                     # slot-ID guarantees (§3.1)
 python scripts/validate/validate_project.py
 ```
 
@@ -45,7 +47,7 @@ Source: `work/reports/campaign_inventory.md`, which has the full per-level and p
   their locres keys, the media IDs and `.wem` hashes, and the source build. None of these were
   changed.
 
-## 3. Rule extensions (pending owner review)
+## 3. Rule extensions (approved by the owner, 2026-10-08)
 
 `a10` is unaffected by all three: its catalog is byte-identical.
 
@@ -72,18 +74,37 @@ Source: `work/reports/campaign_inventory.md`, which has the full per-level and p
    `killed enemy`, `getting shot`, `monitor humming` and `player dead1`. The pattern in
    `mcc-dialogue-tag-3.schema.json` was widened to `^[a-z0-9_]+( [a-z0-9_]+)*$`.
 
-If the owner rejects (1), the affected levels need another identity rule before they can be
-matched. No mappings exist for them yet.
+### 3.1 Verification (required before the rules count as final)
+
+`python scripts/validate/verify_slot_ids.py` rebuilds every level in memory from the pinned bank
+copies. It writes `work/reports/slot_id_verification.json` and exits 1 on any failure. Result on
+2026-10-08: **all checks pass.**
+
+| Check | Result |
+|---|---|
+| Deterministic: two independent builds give identical records | ✅ |
+| Stable: the builds equal the catalogs on disk (no ID added, removed, moved or renamed) | ✅ |
+| Unique: 5,696 slot IDs, each once; every Spanish bank sample has exactly one | ✅ |
+| Round trip: `parse_slot_id(id)` gives back `(name_in_bank, occurrence)`, and `slot_id_for` gives back the ID | ✅ (3,693 IDs use `%XX`, none in `a10`) |
+| Resolvable: name + occurrence leads back to the same bank index | ✅ |
+| Compatible: all 13 slot references in `verifications.json` and `manual_mappings.json` still resolve to the same tag; the `a10` catalog is unchanged (101 plain `#0` IDs, file hash = `build.json`) | ✅ |
+
+There are also standing guards:
+- **Validator:** `validate_project.py` now fails if any MCC catalog `slot_id` is not canonical or
+  does not round-trip (`slot_id_not_canonical`, `slot_id_round_trip`).
+- **Tests:** a 2,000-name random round-trip test is in `tests/test_m4.py`.
+- **Builder:** the existing ID-change guard in `build_mcc_catalog.py` still stops any rebuild that
+  would change an existing ID.
 
 ## 4. Gaps (from the inventory)
 
 | Gap | What it means | Next step |
 |---|---|---|
 | Levels without mission scope | Only `a10 ↔ M01` is in `mission_map.json`. | Owner adds entries (M4 also searches all missions). |
-| Cutscene levels can't be scoped | `mission-map/1` allows only `a10`–`d40`. | Owner decision: widen the pattern to `x10`–`x70`. |
-| Generic barks have no CE catalog | CE combat barks live under `Audio/Systemic` (2,280 packages), which the M1 builder does not cover. | Separate catalog design for Systemic (M1-style). |
-| `temp_mocap_VO` (46 packages) not catalogued | It looks like temporary capture audio. | Owner decides whether to include it. |
-| Stereo slots | `x20`: 4, `multiplayer1`: 36. | Owner choice per slot (handoff §8). |
+| Cutscene scoping | **Resolved:** `mission-map/1` now accepts `x10`–`x70`. No entry was added. | Owner adds entries if wanted. |
+| Generic barks have no CE catalog | CE combat barks live under `Audio/Systemic` (2,280 packages). | **Deferred** to milestone M-SYS (owner, 2026-10-08). |
+| `temp_mocap_VO` (46 packages) not catalogued | It looks like temporary capture audio. | **Kept in the extraction backlog** (owner). |
+| Stereo slots | `x20`: 4, `multiplayer1`: 36. | Visible and playable in M4; **stereo replacement deferred** (owner). |
 | English bank samples without tag | `b40` 4 and `monitor` 5 (English only). | Reported in `<level>_issues.json`; English is reference audio only. |
 | Tags without an `SU` subtitle key | All generic barks, plus 1 in `b30` and 1 in `c10`. | Expected for barks; such lines keep no subtitle. |
 | CE es-MX unresolved | M01: 13 media and 13 subtitles (test events); 12 subtitles in M06/M09/M10/M12/M13. | Never filled from another culture. |
@@ -91,7 +112,8 @@ matched. No mappings exist for them yet.
 
 ## 5. Code
 
-- `scripts/common/mcc_catalog.py`: `slot_id_for`, the shared-basename fallback in `build_record`.
+- `scripts/common/mcc_catalog.py`: `slot_id_for` / `parse_slot_id`, and the fallback in `build_record`.
+- `scripts/validate/verify_slot_ids.py`.
 - `scripts/catalog/build_mcc_catalog.py`: `--all`, `--no-audio`, `build_one`.
 - `scripts/catalog/build_ce_catalog.py`: `--all` (`discover_missions`).
 - `scripts/catalog/campaign_inventory.py`.

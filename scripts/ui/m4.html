@@ -40,7 +40,8 @@ section.col:last-child { border-right: 0; }
 .tools { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .tools > * { flex: 1 1 auto; }
 ul.list { list-style: none; margin: 0; padding: 0; }
-ul.list li { padding: 5px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+ul.list li { padding: 5px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+ul.list li .snip { flex-basis: 100%; padding-left: 15px; }
 ul.list li:hover { background: var(--chip); }
 ul.list li.sel { background: var(--sel); }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; border: 1.5px solid var(--muted); }
@@ -70,6 +71,11 @@ textarea { width: 100%; min-height: 54px; }
 #msg.ok { border-color: var(--ok); }
 footer { height: 30px; padding: 5px 16px; border-top: 1px solid var(--line); background: var(--panel); font-size: 12px; color: var(--muted); display: flex; gap: 16px; overflow: hidden; white-space: nowrap; }
 .disabled-section { opacity: .65; pointer-events: none; }
+mark { background: #ffe58a; color: #1d2329; border-radius: 2px; padding: 0 1px; }
+.snip { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nosub { border: 1px dashed var(--warn); color: var(--warn); border-radius: 6px; padding: 4px 8px; margin: 3px 0; font-size: 12px; }
+.badge.radio { background: #7a4fd6; color: #fff; }
+.badge.warn { background: var(--warn); color: var(--accent-ink); }
 .kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
 @media (max-width: 900px) {
   main { grid-template-columns: 1fr; height: auto; }
@@ -105,10 +111,14 @@ footer { height: 30px; padding: 5px 16px; border-top: 1px solid var(--line); bac
         <option value="no_equivalent">no equivalent</option>
         <option value="deferred">deferred</option>
         <option value="audio_pending">audio not approved</option>
+        <option value="subtitle_pending">subtitle not approved</option>
         <option value="needs_rework">needs rework</option>
+        <option value="radio">needs radio effect</option>
+        <option value="stereo">stereo</option>
       </select>
-      <input type="search" id="sq" placeholder="search tag / SU / SP text">
+      <input type="search" id="sq" placeholder='search SU / SP / EN text, tag, speaker; "a phrase"'>
     </div>
+    <label class="small"><input type="checkbox" id="sall"> search every level</label>
     <div class="small muted" id="scount"></div>
     <ul class="list" id="slots"></ul>
   </section>
@@ -120,7 +130,12 @@ footer { height: 30px; padding: 5px 16px; border-top: 1px solid var(--line); bac
     <h2>Campaign Evolved lines</h2>
     <div class="tools">
       <select id="cscope"></select>
-      <input type="search" id="cq" placeholder="search id / es-MX / en / es-ES text">
+      <select id="csubs" title="filter by es-MX source subtitle">
+        <option value="">any subtitle</option>
+        <option value="missing">no es-MX subtitle</option>
+        <option value="present">has es-MX subtitle</option>
+      </select>
+      <input type="search" id="cq" placeholder='search es-MX / en / es-ES text, id, speaker; "a phrase"'>
     </div>
     <div class="small muted" id="ccount"></div>
     <div id="cands"></div>
@@ -135,10 +150,40 @@ footer { height: 30px; padding: 5px 16px; border-top: 1px solid var(--line); bac
 "use strict";
 const $ = (id) => document.getElementById(id);
 const S = { state: null, level: null, slots: [], slotId: null, detail: null, edit: null, dirty: false,
-            cands: [], candTotal: 0, ceCache: {} };
+            cands: [], candTotal: 0, ceCache: {}, slotTerms: [], ceTerms: [] };
 const LANG = { es: "Spanish(Mexico)", en: "English(US)", esES: "Spanish(Spain)" };
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+// Mirrors m4_app.fold(): letters/digits lower-cased without accents; other runs -> one space.
+function foldMap(text) {
+  const out = [], idx = []; let space = true;
+  const chars = Array.from(String(text ?? ""));
+  let pos = 0;
+  for (const ch of chars) {
+    const base = ch.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+    if (base && /^[\p{L}\p{N}]+$/u.test(base)) { for (const b of base) { out.push(b); idx.push([pos, pos + ch.length]); } space = false; }
+    else if (!space) { out.push(" "); idx.push([pos, pos + ch.length]); space = true; }
+    pos += ch.length;
+  }
+  return { s: out.join(""), idx };
+}
+// Escaped HTML of `text` with every search term wrapped in <mark>. Display only; never filters or ranks.
+function hl(text, terms) {
+  text = String(text ?? "");
+  if (!terms || !terms.length || !text) return esc(text);
+  const { s, idx } = foldMap(text); const ranges = [];
+  for (const t of terms) {
+    let i = s.indexOf(t);
+    while (t && i >= 0) { ranges.push([idx[i][0], idx[i + t.length - 1][1]]); i = s.indexOf(t, i + 1); }
+  }
+  if (!ranges.length) return esc(text);
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [ranges[0]];
+  for (const r of ranges.slice(1)) { const m = merged[merged.length - 1]; if (r[0] <= m[1]) m[1] = Math.max(m[1], r[1]); else merged.push(r); }
+  let html = "", at = 0;
+  for (const [a, b] of merged) { html += esc(text.slice(at, a)) + "<mark>" + esc(text.slice(a, b)) + "</mark>"; at = b; }
+  return html + esc(text.slice(at));
+}
 function fmt(d) { return d == null ? "?" : d.toFixed(2) + " s"; }
 function toast(text, kind) {
   const m = $("msg"); m.textContent = text; m.className = kind || ""; m.style.display = "block";
@@ -210,25 +255,37 @@ function renderFooter(v) {
 
 // ---------------------------------------------------------------- slots
 async function loadSlots() {
-  const q = new URLSearchParams({ level: S.level, status: $("sfilter").value, q: $("sq").value });
+  const all = $("sall").checked;
+  const q = new URLSearchParams({ level: all ? "all" : S.level, status: $("sfilter").value, q: $("sq").value });
   const r = await api("/api/slots?" + q);
-  S.slots = r.slots;
-  $("scount").textContent = `${r.slots.length} slot(s)`;
+  S.slots = r.slots; S.slotTerms = r.terms || [];
+  $("scount").textContent = `${r.total} slot(s)${all ? " in all levels" : ""}${r.truncated ? `, first ${r.slots.length} shown` : ""} · catalog order`;
   const ul = $("slots"); ul.innerHTML = "";
   for (const s of r.slots) {
     const li = document.createElement("li"); li.dataset.id = s.slot_id;
     const d = s.decision;
     const label = s.tag_name + (s.permutations > 1 ? ` #${s.ordinal}` : "");
     li.innerHTML = `<span class="dot ${d ? d.match : ""}" title="${d ? d.match : "unreviewed"}"></span>` +
-      `<span class="grow mono" title="${esc(s.slot_id)}">${esc(label)}</span>` +
+      (all ? `<span class="badge">${esc(s.level)}</span>` : "") +
+      `<span class="grow mono" title="${esc(s.slot_id)}">${hl(label, S.slotTerms)}</span>` +
+      (s.radio_effect ? `<span class="badge radio" title="needs radio effect (v1.1)">R</span>` : "") +
       (d && d.audio === "approved" ? `<span class="badge approved" title="audio approved">A</span>` : d && d.audio === "needs_rework" ? `<span class="badge needs_rework">A</span>` : "") +
       (d && d.subtitle === "approved" ? `<span class="badge approved" title="subtitle approved">S</span>` : d && d.subtitle === "needs_rework" ? `<span class="badge needs_rework">S</span>` : "") +
       `<span class="small muted">${s.duration_s == null ? "" : s.duration_s.toFixed(1) + "s"}</span>` +
-      (s.channels > 1 ? `<span class="badge" title="stereo slot: needs an owner decision">st</span>` : "");
+      (s.channels > 1 ? `<span class="badge warn" title="stereo slot: playable; stereo replacement not implemented yet">stereo</span>` : "") +
+      (s.texts ? snippet(s.texts, S.slotTerms) : "");
     li.onclick = () => selectSlot(s.slot_id);
     if (s.slot_id === S.slotId) li.classList.add("sel");
     ul.appendChild(li);
   }
+}
+function snippet(texts, terms) {
+  for (const t of ["SU", "SP", "EN"]) {
+    const v = texts[t]; if (!v) continue;
+    const html = hl(v, terms);
+    if (html.includes("<mark>")) return `<span class="snip"><b>${t}</b> ${html}</span>`;
+  }
+  return "";
 }
 function markSel() { for (const li of $("slots").children) li.classList.toggle("sel", li.dataset.id === S.slotId); }
 async function selectSlot(id, force) {
@@ -242,13 +299,13 @@ async function selectSlot(id, force) {
   const m = S.detail.mapping;
   S.edit = {
     match: { status: m ? m.match.status : "unreviewed", ce_line_refs: m ? [...m.match.ce_line_refs] : [] },
-    audio: { source: m ? m.audio.source : "keep_original", language: m && m.audio.sources[0] ? m.audio.sources[0].language : LANG.es,
-             fx_request: m ? m.audio.fx_request : null },
+    audio: { source: m ? m.audio.source : "keep_original", language: m && m.audio.sources[0] ? m.audio.sources[0].language : LANG.es },
     subtitle: { source: m ? m.subtitle.source : "keep_original",
                 ref: m && m.subtitle.ce_locres ? m.subtitle.ce_locres.ce_line_ref : null,
                 culture: m && m.subtitle.ce_locres ? m.subtitle.ce_locres.culture : "es-MX",
                 custom_text: S.detail.custom_text || "" },
     notes: m ? m.notes : "",
+    radio: m ? m.radio_effect.needed : false,
   };
   for (const l of S.detail.matched_lines) S.ceCache[l.ce_line_ref] = l;
   S.dirty = false;
@@ -262,7 +319,11 @@ function moveSlot(step) {
 }
 
 // ---------------------------------------------------------------- detail
-function statusBadge(o) { return o ? `<span class="badge ${o.status}">${o.status.replace("_", " ")} · rev ${o.revision}</span>` : `<span class="badge">new</span>`; }
+function statusBadge(o) {
+  if (!o) return `<span class="badge">undecided · new</span>`;
+  const label = o.status === "draft" ? "undecided (draft)" : o.status.replace("_", " ");
+  return `<span class="badge ${o.status}">${label} · rev ${o.revision}</span>`;
+}
 function ceDur(ref, lang) { const l = S.ceCache[ref]; return l && l.media[lang] ? l.media[lang].duration_s : null; }
 function audioSources() {
   const e = S.edit;
@@ -278,7 +339,7 @@ function renderDetail() {
   const aLocked = m && m.audio.status === "approved", sLocked = m && m.subtitle.status === "approved";
   const sp = d.spanish;
   const en = d.english.map(x => `<button class="play" data-play="${esc(mccUrl(d.level, "english", x.index))}">▶ English${d.english.length > 1 ? " #" + x.ordinal_in_tag : ""} ${fmt(x.duration_s)}</button>`).join(" ");
-  const sub = (t) => { const x = d.mcc_subtitles[t]; return `<div class="text"><b>${t}</b>${x.table_loaded ? (x.text == null ? '<i class="muted">no entry for this key</i>' : esc(x.text)) : '<i class="muted">table copy not found</i>'}</div>`; };
+  const sub = (t) => { const x = d.mcc_subtitles[t]; if (!x) return ""; return `<div class="text"><b>${t}</b>${x.speaker_label ? `<span class="muted small">${esc(x.speaker_label)}: </span>` : ""}${x.table_loaded ? (x.text == null ? '<i class="muted">no subtitle under this key</i>' : hl(x.text, S.slotTerms)) : '<i class="muted">table copy not found</i>'}</div>`; };
   const chips = e.match.ce_line_refs.map((r, i) => {
     const l = S.ceCache[r];
     return `<div class="chip"><span class="mono grow" title="${esc(r)}">${i + 1}. ${esc(r)}</span>
@@ -287,13 +348,15 @@ function renderDetail() {
       <button data-up="${i}" ${i === 0 || aLocked ? "disabled" : ""} title="move up">↑</button>
       <button data-down="${i}" ${i === e.match.ce_line_refs.length - 1 || aLocked ? "disabled" : ""} title="move down">↓</button>
       <button data-rm="${i}" ${aLocked ? "disabled" : ""} title="remove">×</button></div>` +
-      (l ? `<div class="text small"><b>es-MX</b>${esc(l.subtitles["es-MX"].text || "—")}</div>` : "");
+      (l ? (l.subtitles["es-MX"].text ? `<div class="text small"><b>es-MX</b>${esc(l.subtitles["es-MX"].text)}</div>`
+             : `<div class="nosub">No es-MX source subtitle found for this line (${esc(l.subtitles["es-MX"].reason || l.subtitles["es-MX"].evidence || "none")}). Use a custom subtitle if it has dialogue.</div>`) : "");
   }).join("");
   const srcs = audioSources();
   const ceTotal = srcs.length ? srcs.reduce((a, s) => a + (ceDur(s.ce_line_ref, s.language) ?? NaN), 0) : null;
   const delta = ceTotal == null ? "" : isNaN(ceTotal) ? "Δ vs Spain: play the CE line(s) once to measure" :
     `CE ${fmt(ceTotal)} · Spain ${fmt(sp.duration_s)} · Δ ${(ceTotal - sp.duration_s >= 0 ? "+" : "") + (ceTotal - sp.duration_s).toFixed(2)} s`;
   const subRefs = e.match.ce_line_refs;
+  const missingSubs = subRefs.filter(r => S.ceCache[r] && !S.ceCache[r].subtitles["es-MX"].text);
   const subPreview = (() => {
     if (e.subtitle.source === "keep_original") return "(MCC's own SU/SP text stays)";
     if (e.subtitle.source === "none") return "(no subtitle)";
@@ -309,8 +372,9 @@ function renderDetail() {
     <div class="small muted mono">${esc(d.mcc_tag)} · ${esc(d.kind)} · speaker (from name): ${esc(d.speaker_from_name || "?")} · ${sp.channels} ch · bank #${sp.index}</div>
     ${d.flags.length ? `<div class="small muted">flags: ${d.flags.map(esc).join(", ")}</div>` : ""}
     <div class="row"><button class="play primary" data-play="${esc(mccUrl(d.level, "spanish", sp.index))}" id="playSpain">▶ Spain ${fmt(sp.duration_s)}</button> ${en || '<span class="muted small">no English sample</span>'}</div>
-    ${sub("SU")}${sub("SP")}
-    <div class="small muted">SU = Latin America table, SP = Spain table; key = CRC of the tag path (${esc(d.mcc_subtitles.SU.evidence)}).</div>
+    ${sub("SU")}${sub("SP")}${sub("EN")}
+    <div class="small muted">SU = Latin America, SP = Spain, EN = English (reference) tables; key = CRC of the tag path (${esc(d.mcc_subtitles.SU.evidence)}).</div>
+    ${sp.channels > 1 ? `<div class="nosub">Stereo slot (${sp.channels} ch): you can listen and record decisions, but stereo replacement is not implemented yet (M6 will need an owner choice).</div>` : ""}
     ${vers ? `<div class="row small">past checks: ${vers}</div>` : ""}
     ${drift.length ? `<div class="row small" style="color:var(--warn)">approved ${drift.join(" + ")} no longer matches the current catalogs (drift); see work/reports/drift.json</div>` : ""}
   </div>
@@ -329,8 +393,11 @@ function renderDetail() {
         <select id="alang" ${e.audio.source === "keep_original" ? "disabled" : ""}>${Object.values(LANG).map(l => `<option ${l === e.audio.language ? "selected" : ""}>${l}</option>`).join("")}</select>
       </div>
       <div class="small muted">source: <b>${audioSourceKind()}</b>${srcs.length ? " · " + srcs.length + " line(s) in order" : ""}${delta ? " · " + esc(delta) : ""}</div>
-      <label class="opt small"><input type="checkbox" id="afx" ${e.audio.fx_request === "radio" ? "checked" : ""}> flag for radio effect (v1.1 note only; no effect applied)</label>
     </div>
+    <label class="opt small" title="Your manual flag for the v1.1 radio repair. Independent of approval; saved with Save. No effect is applied now.">
+      <input type="checkbox" id="radio" ${e.radio ? "checked" : ""} ${e.audio.source === "keep_original" ? "disabled" : ""}>
+      <span class="badge radio">R</span> Needs radio effect${e.audio.source === "keep_original" ? " (choose CE audio first)" : ""}
+      ${m && m.radio_effect.set_at ? `<span class="muted">· last changed ${esc(m.radio_effect.set_at)}, rev ${m.radio_effect.revision}</span>` : ""}</label>
     <div class="row">
       ${aLocked ? `<button id="reworkAudio">Mark needs rework…</button><span class="small muted">approved ${esc(m.audio.approved_at)}; read-only</span>` : `<button id="approveAudio" class="primary">Approve audio</button>`}
     </div>
@@ -346,8 +413,11 @@ function renderDetail() {
       </div>
       ${e.subtitle.source === "ce_locres" ? `<div class="row">
         <select id="sref">${subRefs.map(r => `<option ${r === e.subtitle.ref ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
-        <select id="scul">${["es-MX", "en", "es-ES"].map(c => `<option ${c === e.subtitle.culture ? "selected" : ""}>${c}</option>`).join("")}</select></div>` : ""}
-      ${e.subtitle.source === "custom" ? `<textarea id="stext" placeholder="your subtitle text (stored only in the git-ignored local file)">${esc(e.subtitle.custom_text)}</textarea>` : ""}
+        <select id="scul">${["es-MX", "en", "es-ES"].map(c => { const l = S.ceCache[e.subtitle.ref]; const has = l && l.subtitles[c].text;
+          return `<option value="${c}" ${c === e.subtitle.culture ? "selected" : ""} ${has ? "" : "disabled"}>${c}${has ? "" : " (no text)"}</option>`; }).join("")}</select></div>` : ""}
+      ${missingSubs.length ? `<div class="nosub">No es-MX source subtitle for: ${missingSubs.map(esc).join(", ")}.
+        ${e.subtitle.source === "custom" ? "" : '<button id="goCustom">Write a custom subtitle</button>'}</div>` : ""}
+      ${e.subtitle.source === "custom" ? `<textarea id="stext" placeholder="your LATAM Spanish subtitle (stored only in the git-ignored local file); Save keeps it as a draft">${esc(e.subtitle.custom_text)}</textarea>` : ""}
       <div class="text"><b>preview</b>${esc(subPreview)}${["ce_locres", "custom"].includes(e.subtitle.source) ? ` <span class="muted small">(${(subPreview || "").length} chars)</span>` : ""}</div>
     </div>
     <div class="row">
@@ -369,20 +439,24 @@ function wireDetail() {
     if (r.value === "unreviewed" || r.value === "no_equivalent") {
       if (e.match.ce_line_refs.length && !confirm("This clears the chosen CE line(s) from the match. Continue?")) { renderDetail(); return; }
       e.match.ce_line_refs = [];
-      e.audio.source = "keep_original";
+      e.audio.source = "keep_original"; e.radio = false;
       if (e.subtitle.source === "ce_locres") e.subtitle.source = "keep_original";
     }
     setDirty(); renderDetail(); renderCands();
   });
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const i = +b.dataset.rm; const r = e.match.ce_line_refs.splice(i, 1)[0];
-    if (!e.match.ce_line_refs.length) { e.audio.source = "keep_original"; if (e.match.status === "matched") e.match.status = "unreviewed"; }
+    if (!e.match.ce_line_refs.length) { e.audio.source = "keep_original"; e.radio = false; if (e.match.status === "matched") e.match.status = "unreviewed"; }
     if (e.subtitle.ref === r && e.subtitle.source === "ce_locres") { e.subtitle.source = "keep_original"; e.subtitle.ref = null; }
     setDirty(); renderDetail(); renderCands(); });
   document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; const a = e.match.ce_line_refs; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setDirty(); renderDetail(); });
   document.querySelectorAll('[data-down]').forEach(b => b.onclick = () => { const i = +b.dataset.down; const a = e.match.ce_line_refs; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setDirty(); renderDetail(); });
-  document.querySelectorAll('input[name=asrc]').forEach(r => r.onchange = () => { e.audio.source = r.value; setDirty(); renderDetail(); });
+  document.querySelectorAll('input[name=asrc]').forEach(r => r.onchange = () => {
+    e.audio.source = r.value;
+    if (r.value === "keep_original" && e.radio) { e.radio = false; toast("“Needs radio effect” cleared: it applies to selected CE audio only"); }
+    setDirty(); renderDetail(); });
   if ($("alang")) $("alang").onchange = (ev) => { e.audio.language = ev.target.value; setDirty(); renderDetail(); };
-  if ($("afx")) $("afx").onchange = (ev) => { e.audio.fx_request = ev.target.checked ? "radio" : null; setDirty(); };
+  if ($("radio")) $("radio").onchange = (ev) => { e.radio = ev.target.checked; setDirty(); };
+  if ($("goCustom")) $("goCustom").onclick = () => { e.subtitle.source = "custom"; setDirty(); renderDetail(); const t = $("stext"); if (t) t.focus(); };
   document.querySelectorAll('input[name=ssrc]').forEach(r => r.onchange = () => {
     e.subtitle.source = r.value;
     if (r.value === "ce_locres" && !e.match.ce_line_refs.includes(e.subtitle.ref)) e.subtitle.ref = e.match.ce_line_refs[0] || null;
@@ -409,7 +483,8 @@ function payload(actions, reworkOnly) {
   if (reworkOnly) return body;
   const aLocked = m && m.audio.status === "approved", sLocked = m && m.subtitle.status === "approved";
   body.match = { status: e.match.status, ce_line_refs: e.match.ce_line_refs };
-  if (!aLocked) body.audio = { source: audioSourceKind(), sources: audioSources(), fx_request: e.audio.fx_request };
+  if (!aLocked) body.audio = { source: audioSourceKind(), sources: audioSources() };
+  body.radio_effect = { needed: e.radio };
   if (!sLocked) {
     body.subtitle = { source: e.subtitle.source };
     if (e.subtitle.source === "ce_locres") body.subtitle.ce_locres = { ce_line_ref: e.subtitle.ref, culture: e.subtitle.culture };
@@ -431,11 +506,12 @@ async function save(actions, reworkOnly) {
 // ---------------------------------------------------------------- CE candidates
 async function loadCands(append) {
   const offset = append ? S.cands.length : 0;
-  const q = new URLSearchParams({ mission: $("cscope").value, level: S.level, q: $("cq").value, offset, limit: 60 });
+  const q = new URLSearchParams({ mission: $("cscope").value, level: (S.detail && S.detail.level) || S.level,
+                                  q: $("cq").value, subs: $("csubs").value, offset, limit: 60 });
   let r;
   try { r = await api("/api/ce?" + q); } catch (e) { showErr(e); return; }
   S.cands = append ? S.cands.concat(r.lines) : r.lines;
-  S.candTotal = r.total;
+  S.candTotal = r.total; S.ceTerms = r.terms || [];
   for (const l of r.lines) S.ceCache[l.ce_line_ref] = l;
   renderCands();
 }
@@ -445,10 +521,11 @@ function renderCands() {
   $("ccount").textContent = `${S.cands.length} of ${S.candTotal} line(s), catalog order (never ranked)`;
   $("cmore").style.display = S.cands.length < S.candTotal ? "" : "none";
   $("cands").innerHTML = S.cands.map((l, i) => {
-    const t = (c) => l.subtitles[c].text ? esc(l.subtitles[c].text) : `<i class="muted">${esc(l.subtitles[c].evidence || "none")}</i>`;
+    const t = (c) => l.subtitles[c].text ? hl(l.subtitles[c].text, S.ceTerms) : `<i class="muted">no ${c} subtitle (${esc(l.subtitles[c].reason || l.subtitles[c].evidence || "none")})</i>`;
     const pb = (lang, label) => l.media[lang].count ? `<button class="play" data-play="${esc(ceUrl(l.ce_line_ref, lang))}">▶ ${label} ${l.media[lang].duration_s == null ? "" : fmt(l.media[lang].duration_s)}</button>` : `<span class="badge" title="${esc(l.media[lang].reason || "")}">no ${label}</span>`;
     return `<div class="cand ${chosen.has(l.ce_line_ref) ? "chosen" : ""}">
-      <div class="head"><span class="num">${i < 9 ? i + 1 : ""}</span><span class="mono grow" title="${esc(l.ce_line_ref)}">${esc(l.display_key)}${l.entries_in_record > 1 ? " #" + l.entry_index : ""}</span>
+      <div class="head"><span class="num">${i < 9 ? i + 1 : ""}</span><span class="mono grow" title="${esc(l.ce_line_ref)}">${hl(l.display_key, S.ceTerms)}${l.entries_in_record > 1 ? " #" + l.entry_index : ""}</span>
+        ${l.subtitles["es-MX"].text ? "" : '<span class="badge warn" title="no es-MX source subtitle found; you can still play and use it, and write a custom subtitle">no subtitle</span>'}
         <span class="badge">${esc(l.mission)} · ${esc(l.family)}</span>
         ${l.test_event ? '<span class="badge" title="test event: no dialogue media">test</span>' : ""}
         ${l.verifications.length ? `<span class="badge" title="past checks">${l.verifications.map(esc).join(" ")}</span>` : ""}</div>
@@ -493,6 +570,8 @@ $("level").onchange = async () => {
   await loadState(S.level); $("cscope").value = $("cscope").options[0].value; await loadSlots(); await loadCands();
 };
 $("sfilter").onchange = loadSlots;
+$("sall").onchange = loadSlots;
+$("csubs").onchange = () => loadCands();
 $("sq").oninput = () => { clearTimeout(tS); tS = setTimeout(loadSlots, 250); };
 $("cscope").onchange = () => loadCands();
 $("cq").oninput = () => { clearTimeout(tC); tC = setTimeout(() => loadCands(), 250); };

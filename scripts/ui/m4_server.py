@@ -10,10 +10,11 @@ Design: docs/m4-matching-ui-design.md; usage: docs/m4-user-guide.md.
 
 API (all JSON unless noted):
     GET  /api/state                               levels + progress, CE missions, file hashes
-    GET  /api/slots?level=a10&status=&q=          slot list (status: undecided|matched|no_equivalent|
-                                                  deferred|needs_rework|audio_pending)
+    GET  /api/slots?level=a10|all&status=&q=      slot list (status: undecided|matched|no_equivalent|
+                                                  deferred|needs_rework|audio_pending|subtitle_pending|
+                                                  radio|stereo); q: words and "quoted phrases"
     GET  /api/slot?id=<slot_id>                   slot detail, SU/SP text, decision, verifications
-    GET  /api/ce?mission=all|mapped|M01&level=&q=&offset=&limit=
+    GET  /api/ce?mission=all|mapped|M01&level=&q=&subs=missing|present&offset=&limit=
                                                   CE lines in catalog order, filtered by q only
     GET  /api/ce_line?ref=<ce_line_ref>
     GET  /audio/mcc?level=&lang=spanish|english&index=     WAV (decoded on demand)
@@ -98,12 +99,12 @@ def make_handler(app, quiet=False):
                 if u.path == "/api/state":
                     return self._json(200, app.state())
                 if u.path == "/api/slots":
-                    return self._json(200, app.slots(q.get("level", ""), q.get("status") or None, q.get("q")))
+                    return self._json(200, app.slots(q.get("level", ""), q.get("status") or None, q.get("q")))  # level=all ok
                 if u.path == "/api/slot":
                     return self._json(200, app.slot(q.get("id", "")))
                 if u.path == "/api/ce":
                     return self._json(200, app.ce(q.get("mission", "all"), q.get("q"), q.get("offset", 0),
-                                                  q.get("limit", 100), q.get("level")))
+                                                  q.get("limit", 100), q.get("level"), q.get("subs") or None))
                 if u.path == "/api/ce_line":
                     return self._json(200, app.ce_line(q.get("ref", "")))
                 if u.path == "/audio/mcc":

@@ -137,7 +137,12 @@ def run(root, use_git=True):
         out.append(finding("error", "file_missing", USER_FILES["mappings"], "/",
                            "create it from the empty template (docs/dialogue-catalog-design.md §5.1)"))
     else:
-        f, d = validate_mappings(docs["mappings"], load_schema("manual-mappings-2"), ce=ce, mcc=mcc, local=local,
+        version = docs["mappings"].get("schema")
+        if version == "manual-mappings/2":
+            out.append(finding("error", "mapping_schema_outdated", USER_FILES["mappings"], "/schema",
+                               "manual-mappings/2 -> /3: run python scripts/validate/migrate_mappings.py"))
+        schema_name = "manual-mappings-2" if version == "manual-mappings/2" else "manual-mappings-3"
+        f, d = validate_mappings(docs["mappings"], load_schema(schema_name), ce=ce, mcc=mcc, local=local,
                                  verifications=docs["verifications"], current_pins=current_pins(root),
                                  file=USER_FILES["mappings"])
         out += f

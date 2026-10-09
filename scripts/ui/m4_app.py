@@ -33,9 +33,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.mapping_store import (  # noqa: E402
-    EMPTY_SHA256, ProtectedError, StaleError, StoreError, UserAction, check_transition, save as save_mappings,
-    save_user_file)
-from common.mcc_loc import loc_key, parse_mcc_loc  # noqa: E402
+    EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
+    save as save_mappings, save_user_file)
+from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
     READY_STATUSES, audio_fingerprint, build_ce_index, build_mcc_index, level_progress, subtitle_fingerprint,
@@ -46,7 +46,8 @@ LOCAL = "mappings/manual_mappings.local.json"
 VERIFICATIONS = "mappings/verifications.json"
 MISSION_MAP = "mappings/mission_map.json"
 PROGRESS = "mappings/mission_progress.json"
-LOC_TABLES = {"SU": "work/mcc/loc/copies/SU_Halo1.bin", "SP": "work/mcc/loc/copies/SP_Halo1.bin"}
+LOC_TABLES = {"SU": "work/mcc/loc/copies/SU_Halo1.bin", "SP": "work/mcc/loc/copies/SP_Halo1.bin",
+              "EN": "work/mcc/loc/copies/EN_Halo1.bin"}  # SU = Latin America, SP = Spain, EN = English
 MCC_LANGS = ("spanish", "english")
 CE_LANGS = ("Spanish(Mexico)", "English(US)", "Spanish(Spain)")
 CULTURES = ("es-MX", "en", "es-ES")
@@ -66,13 +67,37 @@ def _sha(data):
 
 
 def fold(text):
-    """Case- and accent-insensitive form used by the owner's search filter."""
-    nfkd = unicodedata.normalize("NFKD", text or "")
-    return "".join(c for c in nfkd if not unicodedata.combining(c)).casefold()
+    """Search form: case-, accent- and punctuation-insensitive. Letters and digits are kept (accents
+    removed, lower-cased); every other run of characters becomes one space. m4.html's highlighter
+    mirrors this exactly."""
+    out, space = [], True
+    for ch in text or "":
+        base = "".join(c for c in unicodedata.normalize("NFKD", ch) if not unicodedata.combining(c)).casefold()
+        if base and all(c.isalnum() for c in base):
+            out.append(base)
+            space = False
+        elif not space:
+            out.append(" ")
+            space = True
+    return "".join(out).strip()
+
+
+def parse_query(q):
+    """'jefe "las aguas" desp' -> ['jefe', 'las aguas', 'desp']: words and quoted phrases, all folded.
+    Each term must appear somewhere (partial words allowed). A filter only; nothing is scored."""
+    terms, rest = [], q or ""
+    for phrase in re.findall(r'"([^"]*)"', rest):
+        f = fold(phrase)
+        if f:
+            terms.append(f)
+    rest = re.sub(r'"[^"]*"', " ", rest)  # an unclosed quote (still typing) keeps its words as plain terms
+    terms += fold(rest).split()
+    return terms
 
 
 def matches(query_terms, haystack):
-    return all(t in haystack for t in query_terms)
+    hay = f" {haystack} "
+    return all(t in hay for t in query_terms)
 
 
 def level_sort_key(level):
@@ -92,11 +117,12 @@ def default_slot(mapping_id, slot_id, mcc_tag):
     return {"mapping_id": mapping_id, "slot_id": slot_id, "mcc_tag": mcc_tag,
             "match": {"status": "unreviewed", "ce_line_refs": [], "decided_at": None, "revision": 1},
             "audio": {"status": "draft", "source": "keep_original", "sources": [],
-                      "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}, "fx_request": None,
+                      "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0},
                       "fingerprint": None, "approved_at": None, "revision": 1},
             "subtitle": {"status": "draft", "source": "keep_original", "ce_locres": None, "custom_ref": None,
                          "mcc_key_hash": None, "mcc_key_verification": None, "fingerprint": None,
                          "approved_at": None, "revision": 1},
+            "radio_effect": {"needed": False, "set_at": None, "revision": 1},
             "notes": ""}
 
 
@@ -106,7 +132,7 @@ def _next_id(prefix, used):
 
 
 def _audio_sem(a):
-    return (a["source"], a["sources"], a["edit"], a["fx_request"])
+    return (a["source"], a["sources"], a["edit"])
 
 
 def _subtitle_sem(s):
@@ -150,6 +176,15 @@ class M4App:
         for name, rel in LOC_TABLES.items():
             p = self.root / rel
             self.loc[name] = parse_mcc_loc(p.read_bytes())["entries"] if p.is_file() else None
+        self._mcc_hay = {}
+        for lv, recs in self.levels.items():
+            for r in recs:
+                texts = self._mcc_text(r["mcc_tag"])
+                base = " ".join([lv, r["mcc_tag"], r["speaker_from_name"] or "", r["kind"]] +
+                                [v["text"] or "" for v in texts.values()] +
+                                [v["speaker_label"] or "" for v in texts.values()])
+                for smp in r["samples"]["spanish"]:
+                    self._mcc_hay[smp["slot_id"]] = fold(smp["slot_id"] + " " + smp["name_in_bank"] + " " + base)
         self._ce_hay = {ref: fold(" ".join([ref, r["display_key"], r.get("folder", "")] +
                                            [(e["subtitles"].get(c) or {}).get("text") or "" for c in CULTURES]))
                         for ref, (_m, r, e) in self.ce_lines.items()}
@@ -165,6 +200,9 @@ class M4App:
         doc, sha = self._read_user(MAPPINGS)
         if doc is None:
             raise ApiError(500, f"{MAPPINGS} is missing; create it from the template (design §5.1)")
+        if doc.get("schema") != SCHEMA_ID:
+            raise ApiError(409, f"{MAPPINGS} is {doc.get('schema')}; run python scripts/validate/migrate_mappings.py "
+                                "--write first")
         return doc, sha
 
     def _local(self):
@@ -221,41 +259,60 @@ class M4App:
 
     def _mcc_text(self, mcc_tag):
         key = loc_key(mcc_tag)
-        return {t: {"key": key, "text": None if tbl is None else tbl.get(key), "table_loaded": tbl is not None,
-                    "evidence": SUBTITLE_KEY_EVIDENCE} for t, tbl in self.loc.items()}
+        out = {}
+        for t, tbl in self.loc.items():
+            raw = None if tbl is None else tbl.get(key)
+            sp = split_speaker(raw) if raw else None  # EN carries a speaker label; shown apart, never edited
+            out[t] = {"key": key, "text": sp[2] if sp else raw, "speaker_label": sp[1] if sp else None,
+                      "table_loaded": tbl is not None, "evidence": SUBTITLE_KEY_EVIDENCE}
+        return out
 
-    def slots(self, level, status=None, q=None):
-        if level not in self.levels:
+    def _slot_filter(self, status, m, s):
+        st = m["match"]["status"] if m else "unreviewed"
+        a = m["audio"]["status"] if m else "draft"
+        sub = m["subtitle"]["status"] if m else "draft"
+        return {None: True, "": True, "undecided": st == "unreviewed",
+                "matched": st == "matched", "no_equivalent": st == "no_equivalent", "deferred": st == "deferred",
+                "needs_rework": "needs_rework" in (a, sub), "audio_pending": a != "approved",
+                "subtitle_pending": sub != "approved",
+                "radio": bool(m and m["radio_effect"]["needed"]), "stereo": s["channels"] > 1}.get(status, False)
+
+    def slots(self, level, status=None, q=None, limit=1500):
+        """level may be 'all' (search every level). Catalog order; the query and status only filter."""
+        if level != "all" and level not in self.levels:
             raise ApiError(404, f"unknown level {level}")
         mappings, msha = self._mappings()
         by_slot = {s["slot_id"]: s for s in mappings["slots"]}
-        terms = fold(q).split() if q else []
-        out = []
-        for r in self.levels[level]:
-            en = r["samples"]["english"]
-            for s in r["samples"]["spanish"]:
-                m = by_slot.get(s["slot_id"])
-                st = m["match"]["status"] if m else "unreviewed"
-                if status == "undecided" and st != "unreviewed" or status in MATCH_STATUSES and st != status:
-                    continue
-                if status == "needs_rework" and not (m and "needs_rework" in (m["audio"]["status"],
-                                                                               m["subtitle"]["status"])):
-                    continue
-                if status == "audio_pending" and m and m["audio"]["status"] == "approved":
-                    continue
-                if terms:
-                    texts = self._mcc_text(r["mcc_tag"])
-                    hay = fold(" ".join([s["slot_id"], r["mcc_tag"]] + [v["text"] or "" for v in texts.values()]))
-                    if not matches(terms, hay):
+        terms = parse_query(q)
+        out, total = [], 0
+        for lv in (self.levels if level == "all" else [level]):
+            for r in self.levels[lv]:
+                en = r["samples"]["english"]
+                for s in r["samples"]["spanish"]:
+                    m = by_slot.get(s["slot_id"])
+                    if not self._slot_filter(status, m, s):
                         continue
-                k = s["ordinal_in_tag"]
-                out.append({"slot_id": s["slot_id"], "mcc_tag": r["mcc_tag"], "tag_name": r["tag_name"],
-                            "kind": r["kind"], "speaker_from_name": r["speaker_from_name"], "ordinal": k,
-                            "permutations": len(r["samples"]["spanish"]), "duration_s": s["duration_s"],
-                            "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
-                            "channels": s["channels"], "flags": r["flags"], "decision": self._decision_summary(m)})
-        sids = [sid for r in self.levels[level] for sid in r["slot_ids"]]
-        return {"level": level, "slots": out, "progress": level_progress(sids, mappings), "sha256": msha}
+                    if terms and not matches(terms, self._mcc_hay[s["slot_id"]]):
+                        continue
+                    total += 1
+                    if len(out) >= limit:
+                        continue
+                    k = s["ordinal_in_tag"]
+                    out.append({"slot_id": s["slot_id"], "level": lv, "mcc_tag": r["mcc_tag"],
+                                "tag_name": r["tag_name"], "kind": r["kind"],
+                                "speaker_from_name": r["speaker_from_name"], "ordinal": k,
+                                "permutations": len(r["samples"]["spanish"]), "duration_s": s["duration_s"],
+                                "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
+                                "channels": s["channels"], "flags": r["flags"],
+                                "decision": self._decision_summary(m),
+                                "radio_effect": bool(m and m["radio_effect"]["needed"])})
+                    if terms:  # lets the page show and highlight what matched
+                        out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
+        prog = None
+        if level != "all":
+            prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings)
+        return {"level": level, "slots": out, "total": total, "truncated": total > len(out),
+                "progress": prog, "sha256": msha, "terms": terms}
 
     def _verifs_for(self, subject):
         return [v for v in self._verifications().get("verifications", []) if v.get("subject") == subject]
@@ -287,13 +344,15 @@ class M4App:
         out = {"ce_line_ref": ref, "mission": mission, "record_id": r["record_id"], "display_key": r["display_key"],
                "family": r["family"], "folder": r.get("folder"), "entry_index": e["index"],
                "entries_in_record": len(r["entries"]), "flags": r["flags"], "test_event": "test_event" in r["flags"],
-               "media": media, "subtitles": subs}
+               "media": media, "subtitles": subs,
+               "has_source_subtitle": {c: bool(subs[c]["text"]) for c in CULTURES}}
         if with_verifications:
             out["verifications"] = [v["id"] for v in self._verifs_for(f"ce:{ref}")]
         return out
 
-    def ce(self, mission="all", q=None, offset=0, limit=100, level=None):
-        """CE lines in catalog order, filtered only by the owner's scope and query."""
+    def ce(self, mission="all", q=None, offset=0, limit=100, level=None, subs=None):
+        """CE lines in catalog order, filtered only by the owner's scope, query and subtitle filter
+        (subs: 'missing' = no es-MX subtitle text, 'present' = has one)."""
         if mission == "mapped":
             scope = set(self._mission_scope(level)) if level else set()
         elif mission in (None, "", "all"):
@@ -302,9 +361,15 @@ class M4App:
             scope = {mission.upper()}
         else:
             raise ApiError(404, f"unknown mission {mission}")
-        terms = fold(q).split() if q else []
+        terms = parse_query(q)
+        if subs not in (None, "", "missing", "present"):
+            raise ApiError(400, f"unknown subtitle filter {subs!r}")
+
+        def has_mx(ref):
+            return bool((self.ce_lines[ref][2]["subtitles"].get("es-MX") or {}).get("text"))
         refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in scope
-                and (not terms or matches(terms, self._ce_hay[ref]))]
+                and (not terms or matches(terms, self._ce_hay[ref]))
+                and (not subs or has_mx(ref) == (subs == "present"))]
         offset, limit = max(0, int(offset)), max(1, min(500, int(limit)))
         verifs = {}
         for v in self._verifications().get("verifications", []):
@@ -316,6 +381,7 @@ class M4App:
             line["verifications"] = verifs.get(ref, [])
             lines.append(line)
         return {"scope": sorted(scope), "total": len(refs), "offset": offset, "limit": limit, "lines": lines,
+                "terms": terms,
                 "order": "catalog order (mission, catalog file, entry index); filter only, never ranked"}
 
     def slot(self, slot_id):
@@ -394,10 +460,7 @@ class M4App:
             if lang not in CE_LANGS:
                 raise ApiError(400, f"unknown language {lang}")
             sources.append({"kind": "ce", "ce_line_ref": ref, "language": lang})
-        fx = a.get("fx_request")
-        if fx not in (None, "radio"):
-            raise ApiError(400, "fx_request must be null or 'radio'")
-        return source, sources, fx
+        return source, sources
 
     def save(self, body):
         """body: {loaded_sha256, slot_id, match?, audio?, subtitle?, notes?, actions?: [{action, field}],
@@ -461,8 +524,8 @@ class M4App:
                 raise ApiError(409, f"{field} is approved and read-only; choose 'needs rework' first")
 
         if "audio" in body:
-            source, sources, fx = self._normalize_audio(body["audio"], slot["match"]["ce_line_refs"])
-            want = dict(slot["audio"], source=source, sources=sources, fx_request=fx)
+            source, sources = self._normalize_audio(body["audio"], slot["match"]["ce_line_refs"])
+            want = dict(slot["audio"], source=source, sources=sources)
             changed = _audio_sem(want) != _audio_sem(slot["audio"])
             guard("audio", changed)
             if changed:
@@ -499,6 +562,15 @@ class M4App:
             if changed:
                 slot["subtitle"] = want
 
+        if "radio_effect" in body:  # independent of approvals: never touches the audio/subtitle objects
+            needed = (body["radio_effect"] or {}).get("needed")
+            if not isinstance(needed, bool):
+                raise ApiError(400, "radio_effect.needed must be true or false")
+            cur = slot["radio_effect"]
+            if needed != cur["needed"]:
+                slot["radio_effect"] = {"needed": needed, "set_at": today,
+                                        "revision": cur["revision"] + (0 if idx is None else 1)}
+
         if "notes" in body:
             notes = body["notes"] or ""
             if len(notes) > 2000:
@@ -523,7 +595,7 @@ class M4App:
         except ProtectedError as e:
             raise ApiError(409, str(e))
         verifs = self._verifications()
-        findings, _ = validate_mappings(new_doc, load_schema("manual-mappings-2"), ce=self.ce_idx, mcc=self.mcc_idx,
+        findings, _ = validate_mappings(new_doc, load_schema(SCHEMA_NAME), ce=self.ce_idx, mcc=self.mcc_idx,
                                         local=new_local, verifications=verifs, current_pins=self._current_pins(),
                                         file=MAPPINGS)
         errors = [f for f in findings if f["severity"] == "error" and (f"({mid})" in f["where"] or f["code"] == "schema")]

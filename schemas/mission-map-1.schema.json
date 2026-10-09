@@ -15,7 +15,7 @@
         "required": ["mcc_level", "ce_missions", "decided_at", "note"],
         "additionalProperties": false,
         "properties": {
-          "mcc_level": {"type": "string", "pattern": "^[a-d][0-9]{2}$"},
+          "mcc_level": {"type": "string", "pattern": "^([a-d][0-9]{2}|x[0-9]{2})$", "description": "Campaign level (a10..d40) or cutscene folder (x10..x70). Generic bark folders are not mission-scoped."},
           "ce_missions": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^M[0-9]{2}$"}},
           "decided_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
           "note": {"type": "string"}

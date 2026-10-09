@@ -367,7 +367,9 @@ JSON Schema and validator.
 |---|---|---|
 | `ce-voice-asset-3.schema.json` | `ce-voice-asset/3` | Campaign Evolved catalog records (remake only) |
 | `mcc-dialogue-tag-3.schema.json` | `mcc-dialogue-tag/3` | MCC catalog records (MCC only; `subtitle.key_hash` must be `null` while unresolved) |
-| `manual-mappings-2.schema.json` | `manual-mappings/2` | `mappings/manual_mappings.json` |
+| `manual-mappings-3.schema.json` | `manual-mappings/3` | `mappings/manual_mappings.json` (current) |
+| `manual-mappings-2.schema.json` | `manual-mappings/2` | older files, read only by the migration |
+| `mission-progress-1.schema.json` | `mission-progress/1` | `mappings/mission_progress.json` (M4 level status) |
 | `manual-mappings-local-1.schema.json` | `manual-mappings-local/1` | `mappings/manual_mappings.local.json` (git-ignored) |
 | `verifications-1.schema.json` | `verifications/1` | `mappings/verifications.json` |
 | `mission-map-1.schema.json` | `mission-map/1` | `mappings/mission_map.json` |
@@ -377,6 +379,20 @@ because no package may be installed without approval. It **refuses any
 keyword it doesn't implement**, so a schema can't silently claim a
 check that isn't enforced. The files are standard JSON Schema, so any
 full validator can also check them.
+
+**`manual-mappings/3` (2026-10-08):** it is `/2` with one change:
+- **What changed:** `audio.fx_request` became the slot-level
+  `radio_effect: {needed, set_at, revision}`.
+- **Why:** the owner's "Needs radio effect" flag must stay independent of the audio approval, and
+  a field inside the approved `audio` object would be frozen with it.
+- **Rules for the flag:**
+  - every change bumps its own revision (`mapping_store.check_transition`);
+  - `needs_rework` leaves it alone;
+  - it may only be `true` with selected CE audio (validator: `radio_effect_without_selected_audio`).
+- **Migration:** `python scripts/validate/migrate_mappings.py --write` (`mapping_store.migrate`).
+  It refuses if any approved object would change, and a normal save may not change the schema
+  version. The validator compares approved objects with `git HEAD` across the two versions
+  (ignoring the moved field).
 
 **`manual-mappings/2` as implemented** (changes from the §5.1 sketch):
 - The top level is `{"schema": "manual-mappings/2", "pins":
@@ -480,8 +496,9 @@ is described by a recipe and stored under its own hash:
   "created_at": "…", "tool_versions": {} }
 ```
 
-- v1.1 radio repair: the user flags lines in `audio.fx_request`, and
-  the processing step reads the flag. No effect is implemented or
+- v1.1 radio repair: the user flags lines in the slot-level
+  `radio_effect.needed` (`manual-mappings/3`; it was `audio.fx_request` in
+  `/2`), and the processing step reads the flag. No effect is implemented or
   chosen yet.
 - Originals (`.wem`, decoded WAV) are never modified. Changing a recipe
   produces a new hash and a new folder.

@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manual-mappings/3",
+  "title": "User-owned cross-game mapping decisions (mappings/manual_mappings.json, committed). v3: radio_effect is a slot-level flag; audio.fx_request removed (migration: mapping_store.migrate)",
+  "description": "The ONLY place CE and MCC identifiers meet. IDs only: no game text, no custom subtitle text, no local paths (those live in the git-ignored manual_mappings.local.json). Every decision is made by the user; tools never create approvals. Audio and subtitle are independent. See docs/dialogue-catalog-design.md §5.",
+  "type": "object",
+  "required": ["schema", "pins", "slots"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "manual-mappings/3"},
+    "pins": {
+      "type": "object",
+      "required": ["ce_build", "mcc_steam_buildid", "mcc_spanish_fsb_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "ce_build": {"type": ["string", "null"], "description": "Campaign Evolved exe FileVersion the decisions were made against."},
+        "mcc_steam_buildid": {"type": ["string", "null"]},
+        "mcc_spanish_fsb_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "slots": {"type": "array", "items": {"$ref": "#/$defs/slot"}}
+  },
+  "$defs": {
+    "mapping_id": {"type": "string", "pattern": "^m-[0-9]{6}$"},
+    "slot_id": {"type": "string", "pattern": "^es:[^#\\s]+#[0-9]+$"},
+    "ce_line_ref": {"type": "string", "pattern": "^[a-z0-9_]+(/[a-z0-9_]+)?#[0-9]+$"},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9:.+-]+Z?)?$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "decision_status": {"enum": ["draft", "approved", "needs_rework"]},
+    "ce_source": {
+      "type": "object",
+      "required": ["kind", "ce_line_ref", "language"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"const": "ce"},
+        "ce_line_ref": {"$ref": "#/$defs/ce_line_ref"},
+        "language": {"enum": ["Spanish(Mexico)", "English(US)", "Spanish(Spain)"]}
+      }
+    },
+    "user_source": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "additionalProperties": false,
+      "properties": {"kind": {"const": "user_recording"}, "ref": {"type": "string", "pattern": "^r-[0-9]{6}$"}}
+    },
+    "approval": {
+      "if": {"required": ["status"], "properties": {"status": {"const": "approved"}}},
+      "then": {
+        "required": ["approved_at", "fingerprint"],
+        "properties": {"approved_at": {"$ref": "#/$defs/date"}, "fingerprint": {"type": "object"}}
+      }
+    },
+    "slot": {
+      "type": "object",
+      "required": ["mapping_id", "slot_id", "mcc_tag", "match", "audio", "subtitle", "radio_effect", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "mapping_id": {"$ref": "#/$defs/mapping_id"},
+        "slot_id": {"$ref": "#/$defs/slot_id"},
+        "mcc_tag": {"type": "string", "pattern": "^sound\\\\dialog\\\\"},
+        "match": {
+          "type": "object",
+          "required": ["status", "ce_line_refs", "decided_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"enum": ["unreviewed", "matched", "no_equivalent", "deferred"]},
+            "ce_line_refs": {"type": "array", "items": {"$ref": "#/$defs/ce_line_ref"}, "uniqueItems": true},
+            "decided_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          },
+          "allOf": [
+            {"if": {"properties": {"status": {"const": "matched"}}},
+             "then": {"properties": {"ce_line_refs": {"minItems": 1}}}},
+            {"if": {"properties": {"status": {"enum": ["no_equivalent", "unreviewed"]}}},
+             "then": {"properties": {"ce_line_refs": {"maxItems": 0}}}}
+          ]
+        },
+        "audio": {
+          "type": "object",
+          "required": ["status", "source", "sources", "edit", "fingerprint", "approved_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"$ref": "#/$defs/decision_status"},
+            "source": {"enum": ["keep_original", "ce", "ce_concat", "user_recording", "composite"],
+                       "description": "keep_original: Spain audio stays. ce: one CE line. ce_concat: >=2 CE lines in order. user_recording: one local recording. composite: >=2 sources of any kind, in order."},
+            "sources": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/ce_source"}, {"$ref": "#/$defs/user_source"}]}},
+            "edit": {
+              "type": "object",
+              "required": ["trim_start_s", "trim_end_s", "gap_s"],
+              "additionalProperties": false,
+              "properties": {
+                "trim_start_s": {"type": "number", "minimum": 0},
+                "trim_end_s": {"type": "number", "minimum": 0},
+                "gap_s": {"type": "number", "minimum": 0}
+              }
+            },
+            "fingerprint": {"type": ["object", "null"]},
+            "approved_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          },
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"if": {"properties": {"source": {"const": "keep_original"}}}, "then": {"properties": {"sources": {"maxItems": 0}}}},
+            {"if": {"properties": {"source": {"const": "ce"}}},
+             "then": {"properties": {"sources": {"minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/ce_source"}}}}},
+            {"if": {"properties": {"source": {"const": "ce_concat"}}},
+             "then": {"properties": {"sources": {"minItems": 2, "items": {"$ref": "#/$defs/ce_source"}}}}},
+            {"if": {"properties": {"source": {"const": "user_recording"}}},
+             "then": {"properties": {"sources": {"minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/user_source"}}}}},
+            {"if": {"properties": {"source": {"const": "composite"}}}, "then": {"properties": {"sources": {"minItems": 2}}}}
+          ]
+        },
+        "subtitle": {
+          "type": "object",
+          "required": ["status", "source", "ce_locres", "custom_ref", "mcc_key_hash", "mcc_key_verification",
+                       "fingerprint", "approved_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"$ref": "#/$defs/decision_status"},
+            "source": {"enum": ["keep_original", "ce_locres", "custom", "none"]},
+            "ce_locres": {
+              "anyOf": [
+                {"type": "null"},
+                {"type": "object", "required": ["ce_line_ref", "culture"], "additionalProperties": false,
+                 "properties": {"ce_line_ref": {"$ref": "#/$defs/ce_line_ref"}, "culture": {"enum": ["es-MX", "en", "es-ES"]}}}
+              ]
+            },
+            "custom_ref": {"type": ["string", "null"], "pattern": "^c-[0-9]{6}$"},
+            "mcc_key_hash": {"type": ["integer", "null"], "description": "Target row in SP_Halo1.bin. Must stay null until blocker B1 yields a verified link."},
+            "mcc_key_verification": {"type": ["string", "null"], "pattern": "^v-[0-9]{6}$"},
+            "fingerprint": {"type": ["object", "null"]},
+            "approved_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          },
+          "allOf": [
+            {"$ref": "#/$defs/approval"},
+            {"if": {"properties": {"source": {"const": "ce_locres"}}},
+             "then": {"properties": {"ce_locres": {"type": "object"}, "custom_ref": {"type": "null"}}},
+             "else": {"properties": {"ce_locres": {"type": "null"}}}},
+            {"if": {"properties": {"source": {"const": "custom"}}},
+             "then": {"properties": {"custom_ref": {"type": "string"}}},
+             "else": {"properties": {"custom_ref": {"type": "null"}}}},
+            {"if": {"properties": {"mcc_key_hash": {"type": "integer"}}},
+             "then": {"properties": {"mcc_key_verification": {"type": "string"}}}}
+          ]
+        },
+        "radio_effect": {
+          "type": "object",
+          "description": "Owner's manual 'Needs radio effect' flag (v1.1 metadata for the build pipeline; no effect is applied). Independent of the audio and subtitle approvals: toggling it never changes an approved object. It may only be true while the audio uses selected CE audio (validator).",
+          "required": ["needed", "set_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "needed": {"type": "boolean"},
+            "set_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          }
+        },
+        "notes": {"type": "string", "maxLength": 2000}
+      }
+    }
+  }
+}

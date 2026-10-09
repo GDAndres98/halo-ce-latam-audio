@@ -12,6 +12,8 @@ import json
 import re
 
 from .jsonschema_lite import validate as schema_validate
+from .mapping_store import comparable
+from .mcc_catalog import parse_slot_id, slot_id_for
 
 ABS_PATH = re.compile(r"(^|[\s\"'(])([A-Za-z]:[\\/]|/(home|Users|mnt|media)/|\\\\)")
 TEST_EVENT_FLAG = "test_event"
@@ -104,6 +106,18 @@ def validate_catalog(name, records, schema, expected_schema_id, build=None, file
             out.append(finding("error", "schema", name, f"line {i + 1}", e))
         keys = ([e["ce_line_ref"] for e in r.get("entries", [])] if expected_schema_id.startswith("ce-")
                 else r.get("slot_ids", []))
+        if not expected_schema_id.startswith("ce-"):
+            for smp in (r.get("samples") or {}).get("spanish", []):
+                sid = smp.get("slot_id", "")
+                if slot_id_for(smp.get("name_in_bank", ""), smp.get("name_occurrence_in_bank", -1)) != sid:
+                    out.append(finding("error", "slot_id_not_canonical", name, f"line {i + 1}", sid))
+                else:
+                    try:
+                        back = parse_slot_id(sid)
+                    except ValueError:
+                        back = None
+                    if back != (smp["name_in_bank"], smp["name_occurrence_in_bank"]):
+                        out.append(finding("error", "slot_id_round_trip", name, f"line {i + 1}", sid))
         for k in keys:
             if k in seen:
                 out.append(finding("error", "duplicate_id", name, f"line {i + 1}", f"{k} also on line {seen[k]}"))
@@ -184,6 +198,10 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
             out.append(finding("error", "conflicting_slot_decisions", file, w,
                                f"{s['slot_id']} is also mapped by {slots_seen[s['slot_id']]}"))
         slots_seen.setdefault(s["slot_id"], s["mapping_id"])
+        radio = s.get("radio_effect") or {}
+        if radio.get("needed") and s["audio"]["source"] == "keep_original":
+            out.append(finding("error", "radio_effect_without_selected_audio", file, w + "/radio_effect",
+                               "the 'needs radio effect' flag applies to selected CE audio, not to kept Spain audio"))
         if ABS_PATH.search(s["notes"]):
             out.append(finding("error", "local_path_in_committed_file", file, w + "/notes",
                                "absolute paths belong in manual_mappings.local.json"))
@@ -293,7 +311,7 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
             out.append(finding("error", "approved_mapping_retargeted", file, hs["mapping_id"],
                                f"slot_id changed {hs['slot_id']} -> {s['slot_id']}"))
         for f in approved:
-            if s[f] == hs[f]:
+            if comparable(s[f], f) == comparable(hs[f], f):  # across v2 -> v3 (fx_request moved out)
                 continue
             if s[f]["status"] == "needs_rework" and s[f]["revision"] == hs[f]["revision"] + 1:
                 continue
@@ -377,7 +395,7 @@ def level_progress(level_slot_ids, mappings_doc):
     """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure."""
     by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
-           "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0}
+           "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0}
     for sid in level_slot_ids:
         s = by_slot.get(sid)
         if not s:
@@ -389,6 +407,7 @@ def level_progress(level_slot_ids, mappings_doc):
             out[st] += 1
         out["audio_approved"] += s["audio"]["status"] == "approved"
         out["subtitle_approved"] += s["subtitle"]["status"] == "approved"
+        out["radio_effect"] += bool((s.get("radio_effect") or {}).get("needed"))
         out["needs_rework"] += "needs_rework" in (s["audio"]["status"], s["subtitle"]["status"])
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out

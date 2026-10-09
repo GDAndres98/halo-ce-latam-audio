@@ -137,25 +137,21 @@ def scan_ce_folders(oodle_dll=None):
 
 def gaps(levels, missions, scan):
     g = []
-    unmapped = [lv["level"] for lv in levels if lv["group"] == "campaign" and not lv["ce_missions"]]
+    unmapped = [lv["level"] for lv in levels if lv["group"] in ("campaign", "cutscene") and not lv["ce_missions"]]
     if unmapped:
         g.append({"code": "levels_without_mission_scope", "owner_action": True, "items": unmapped,
                   "note": "mission_map.json scopes CE search per level; M4 still allows searching all missions."})
-    cut = [lv["level"] for lv in levels if lv["group"] == "cutscene"]
-    if cut:
-        g.append({"code": "cutscene_levels_not_scopable", "items": cut,
-                  "note": "mission-map/1 accepts only a10..d40 level names; cutscene levels are matched with "
-                          "'all missions' or a chosen mission until the schema is widened (owner decision)."})
     gen = [lv["level"] for lv in levels if lv["group"] == "generic"]
     if gen:
         g.append({"code": "generic_barks_have_no_ce_catalog", "items": gen,
                   "note": "MCC combat/AI barks live in generic folders; their CE counterparts are under "
-                          "Audio/Systemic, which no CE catalog covers yet (M1 builder handles vo_scr/vo_cin only)."})
+                          "Audio/Systemic. Deferred by the owner (2026-10-08) to a separate milestone (M-SYS)."})
     lst = [lv["level"] for lv in levels if lv["tags_resolved_from_lst_range"]]
     if lst:
-        g.append({"code": "slots_identified_by_lst_range", "owner_action": True, "items": lst,
+        g.append({"code": "slots_identified_by_lst_range", "items": lst,
                   "note": "Name-table lookup failed or was ambiguous; samples come from the tag's .lst.bin range "
-                          "(derived:lst_record_layout). Owner review of this rule extension is pending."})
+                          "(derived:lst_record_layout). Rule approved by the owner 2026-10-08; verified by "
+                          "scripts/validate/verify_slot_ids.py."})
     miss = [f"{lv['level']}:{lv['tags_missing_spanish']}" for lv in levels if lv["tags_missing_spanish"]]
     if miss:
         g.append({"code": "mcc_tags_without_spanish_sample", "items": miss})
@@ -165,7 +161,8 @@ def gaps(levels, missions, scan):
                   "note": "Reported per level in work/mcc/reports/<level>_issues.json; not catalogued as slots."})
     st = [f"{lv['level']}:{lv['stereo_slots']}" for lv in levels if lv["stereo_slots"]]
     if st:
-        g.append({"code": "stereo_slots_need_owner_choice", "owner_action": True, "items": st})
+        g.append({"code": "stereo_slots_replacement_deferred", "items": st,
+                  "note": "Visible and playable in M4; stereo replacement is deferred (owner, 2026-10-08)."})
     subs = [f"{lv['level']}:{lv['tags'] - (lv['subtitle_keys_present'].get('SU') or 0)}" for lv in levels
             if lv["subtitle_keys_present"].get("SU") is not None and lv["subtitle_keys_present"]["SU"] < lv["tags"]]
     if subs:
@@ -190,11 +187,12 @@ def gaps(levels, missions, scan):
                     extra.append(f"{fam}/{folder} ({n})")
         if extra:
             g.append({"code": "ce_voice_folders_not_catalogued", "items": extra,
-                      "note": "lipsync folders are covered through their parent records; others need a decision."})
+                      "note": "Kept in the extraction backlog by the owner (2026-10-08); lipsync folders are "
+                              "covered through their parent records."})
         others = {k: sum(v.values()) for k, v in scan.items() if k not in ("scripted", "cinematic")}
         if others.get("Systemic"):
             g.append({"code": "ce_systemic_audio_not_catalogued", "items": [f"Systemic ({others['Systemic']} packages)"],
-                      "note": "Candidate source for MCC generic barks; needs its own catalog design (M1-style)."})
+                      "note": "Candidate source for MCC generic barks; deferred to milestone M-SYS (owner)."})
     return g
 
 

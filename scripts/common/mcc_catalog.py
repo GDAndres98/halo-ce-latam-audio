@@ -110,6 +110,27 @@ def slot_id_for(name_in_bank, occurrence):
     return f"es:{enc}#{occurrence}"
 
 
+def parse_slot_id(slot_id):
+    """Inverse of slot_id_for: 'es:deathquiet%2001#2' -> ('deathquiet 01', 2). Raises ValueError."""
+    if not slot_id.startswith("es:") or "#" not in slot_id:
+        raise ValueError(f"not a slot id: {slot_id!r}")
+    enc, occ = slot_id[3:].rsplit("#", 1)
+    out, i = [], 0
+    while i < len(enc):
+        if enc[i] == "%":
+            h = enc[i + 1:i + 3]
+            if len(h) != 2 or not all(c in "0123456789ABCDEF" for c in h):
+                raise ValueError(f"bad escape in {slot_id!r}")
+            out.append(chr(int(h, 16)))
+            i += 3
+        else:
+            out.append(enc[i])
+            i += 1
+    if not occ.isdigit():
+        raise ValueError(f"bad occurrence in {slot_id!r}")
+    return "".join(out), int(occ)
+
+
 def build_record(tag, lst_ranges, banks, source, shared_basenames=None):
     """tag: lst path; lst_ranges: {lang: (start, count) | None}; banks: {lang: BankIndex}.
 

@@ -181,3 +181,43 @@ Acceptance criteria (they extend roadmap M4):
 - Clicking **+ use** on a CE line sets the match status to *matched* when it was *unreviewed* or
   *no equivalent*. That is the owner's own click, not a suggestion. The audio and subtitle choices
   are never changed by it.
+
+## 8. Update 2026-10-08: search, missing subtitles, radio flag
+
+- **Stack decision: kept Python (stdlib) with one static HTML/JS page.** A Node/TypeScript
+  rewrite was allowed but brings no clear benefit here:
+  - the app has to call the existing Python store, schemas, validator and audio tools in-process;
+  - a second runtime would mean a toolchain, dependencies and a parallel implementation of the
+    approval protections;
+  - the page is about 600 lines of plain JS and needs no build step.
+
+  Nothing new to install.
+- **Search** (`m4_app.parse_query` / `fold`, mirrored by `foldMap` / `hl` in `m4.html`):
+  - words match partially; `"quoted phrases"` must appear together;
+  - case, accents and punctuation are ignored;
+  - MCC slots search the SU, SP and **EN** (`EN_Halo1.bin`, speaker label kept apart) text plus
+    the IDs, tag, bank name and speaker; `level=all` searches every level;
+  - CE lines search the es-MX/en/es-ES text, ID, display key and folder; `subs=missing|present`
+    filters on es-MX source text;
+  - matches are highlighted in the page;
+  - a search is still only a filter: catalog order, no scores (tested).
+- **Missing source subtitles:**
+  - `ce_line.has_source_subtitle` per culture;
+  - a "no subtitle" badge with the catalog's reason;
+  - a dashed notice on matched lines, with a shortcut to a custom subtitle;
+  - cultures without text are disabled for *CE text*, and approving missing CE text is refused
+    (422);
+  - custom text stays a draft until approved separately, and persists in the local file;
+  - the catalogs are never touched.
+- **Needs radio effect:** the slot-level `radio_effect` in `manual-mappings/3`
+  ([`dialogue-catalog-design.md`](dialogue-catalog-design.md) §5).
+  - It is toggled with Save, independently of the approvals, with its own revision.
+  - It survives *needs rework*.
+  - It is only valid with selected CE audio.
+  - It has a slot filter, an **R** badge, and a count in the level progress.
+- **Stereo slots:** a badge, a slot filter and a notice. They are playable, but replacement is
+  deferred.
+- **Tests:** `tests/test_m4.py` (31 tests) covers search, the missing-subtitle flow, custom-text
+  persistence across restarts, the radio flag, the v2→v3 migration and slot-ID round trips. The
+  headless-Edge click-through was extended with search highlighting, the no-subtitle filter, a
+  custom subtitle, and the radio flag across a reload.

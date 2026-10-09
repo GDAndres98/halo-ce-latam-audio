@@ -12,7 +12,9 @@ schema check, backup and atomic write. Guarantees (docs/dialogue-catalog-design.
 3. Approved objects are immutable: they may only change through
    `UserAction("needs_rework", ...)`, which must bump `revision` by exactly 1.
    Mappings holding an approved object can't be deleted or retargeted.
-4. The new document must pass the manual-mappings/2 schema.
+4. The new document must pass the current schema (manual-mappings/3) and
+   keep the loaded document's schema version; version changes go only
+   through `migrate()`, which proves approved decisions survive unchanged.
 5. The previous bytes are backed up to mappings/.history/ before every save,
    then written atomically (temp file, fsync, rename).
 """
@@ -26,6 +28,8 @@ from pathlib import Path
 from .jsonschema_lite import load_schema, validate
 
 UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework
+SCHEMA_ID = "manual-mappings/3"
+SCHEMA_NAME = "manual-mappings-3"
 
 
 class StoreError(Exception):
@@ -74,6 +78,10 @@ def check_transition(old_doc, new_doc, user_actions=()):
             was = old.get(mid, {}).get(f, {}).get("status")
             if ns[f]["status"] == "approved" and was != "approved" and allowed.get((mid, f)) != "approve":
                 problems.append(f"{mid}/{f}: only an explicit user 'approve' action can approve")
+    for mid, ns in new.items():  # the radio flag is independent of approvals, but every change is counted
+        orad, nrad = old.get(mid, {}).get("radio_effect"), ns.get("radio_effect")
+        if orad and nrad and orad != nrad and nrad["revision"] != orad["revision"] + 1:
+            problems.append(f"{mid}/radio_effect: a change must bump its revision by exactly 1")
     unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework")]
     if unused:
         problems.append(f"unknown user actions {unused}")
@@ -87,8 +95,11 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded; reload and re-apply your edit")
     old_doc = json.loads(current.decode("utf-8")) if current else {"slots": []}
+    if current and old_doc.get("schema") != new_doc.get("schema"):
+        raise StoreError(f"schema version change {old_doc.get('schema')} -> {new_doc.get('schema')}: "
+                         "use mapping_store.migrate()")
     check_transition(old_doc, new_doc, user_actions)
-    errs = validate(new_doc, schema or load_schema("manual-mappings-2"))
+    errs = validate(new_doc, schema or load_schema(SCHEMA_NAME))
     if errs:
         raise StoreError("schema: " + "; ".join(errs[:5]))
     return _write(path, current, new_doc, loaded_sha256, history_dir, now)
@@ -125,3 +136,52 @@ def save_user_file(path, new_doc, loaded_sha256, schema_name, *, history_dir=Non
     if errs:
         raise StoreError(f"{path.name} schema: " + "; ".join(errs[:5]))
     return _write(path, current, new_doc, loaded_sha256, history_dir, now)
+
+
+# --------------------------------------------------------------------------- migrations
+def migrate_doc(doc, today=None):
+    """manual-mappings/2 -> /3 (pure). audio.fx_request == "radio" becomes radio_effect.needed.
+    Returns (new_doc, changed). Any other version is returned unchanged."""
+    if doc.get("schema") != "manual-mappings/2":
+        return doc, False
+    new = json.loads(json.dumps(doc))
+    new["schema"] = SCHEMA_ID
+    for s in new["slots"]:
+        fx = s["audio"].pop("fx_request", None)
+        notes = s.pop("notes")  # re-added last to keep the usual key order
+        s["radio_effect"] = {"needed": fx == "radio",
+                             "set_at": (s["match"].get("decided_at") or today) if fx == "radio" else None,
+                             "revision": 1}
+        s["notes"] = notes
+    return new, True
+
+
+def comparable(obj, field):
+    """An approved object as the protection rules compare it across schema versions."""
+    if field == "audio":
+        return {k: v for k, v in obj.items() if k != "fx_request"}
+    return obj
+
+
+def migrate(path, loaded_sha256, *, history_dir=None, now=None):
+    """Upgrade the file to the current schema with the usual stale check, backup and atomic write.
+    Refuses if any approved object would differ (other than the dropped audio.fx_request).
+    -> (new sha256 or None if already current, number of slots)."""
+    path = Path(path)
+    current = path.read_bytes()
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changed = migrate_doc(old, (now or dt.datetime.now()).date().isoformat())
+    if not changed:
+        return None, len(old.get("slots", []))
+    olds = {s["mapping_id"]: s for s in old["slots"]}
+    for s in new["slots"]:
+        o = olds[s["mapping_id"]]
+        for f in ("audio", "subtitle"):
+            if o[f]["status"] == "approved" and comparable(o[f], f) != comparable(s[f], f):
+                raise ProtectedError(f"{s['mapping_id']}/{f}: migration would change an approved object")
+    errs = validate(new, load_schema(SCHEMA_NAME))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now), len(new["slots"])

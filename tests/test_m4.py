@@ -31,12 +31,14 @@ sys.path.insert(0, str(ROOT / "scripts" / "ui"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.jsonschema_lite import load_schema, validate  # noqa: E402
-from common.mcc_catalog import slot_id_for  # noqa: E402
+from common.mcc_catalog import parse_slot_id, slot_id_for  # noqa: E402
+from common.mcc_loc import SPEAKER_SEP, loc_key  # noqa: E402
 from common.ondemand_audio import AudioUnavailable, CeAudio, MccAudio  # noqa: E402
 from common.project_validation import level_progress, validate_mission_progress  # noqa: E402
-from m4_app import ApiError, M4App, fold  # noqa: E402
+from m4_app import ApiError, M4App, fold, parse_query  # noqa: E402
 import m4_server  # noqa: E402
 from test_m3_validation import H, ce_record, mcc_record  # noqa: E402
+from test_mcc_loc_patch import build as build_loc  # noqa: E402
 
 T = "sound\\dialog\\z10\\"
 PINS = {"ce_build": "ce-1", "mcc_steam_buildid": "9", "mcc_spanish_fsb_sha256": H["c"]}
@@ -78,7 +80,8 @@ def make_root(tmp):
     recs = [mcc_record(), mcc_record("Z10_020_cortana", T + "z10_020_cortana", index=1, data="f")]
     (root / "work/mcc/catalog/z10.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs), encoding="utf-8")
     # M98 sorts before M99; inside a mission the file order is kept (never re-sorted or ranked).
-    m98 = [ce_rec("zz_late", "M98", "Último en el archivo", wem="1"), ce_rec("aa_early", "M98", "Primero", wem="2")]
+    m98 = [ce_rec("zz_late", "M98", "Último en el archivo", wem="1"), ce_rec("aa_early", "M98", "Primero", wem="2"),
+           ce_rec("no_text", "M98", "", wem="3", sub_mx="unresolved")]  # spoken, but no subtitle in any culture
     m99 = [ce_rec("line_a", "M99", "Jefe Maestro, despierte"), ce_rec("line_b", "M99", "Corre", media_id=200, wem="f"),
            ce_rec("lipsync_x", "M99", "x", flags=("test_event",), mx="unresolved")]
     for name, rs in (("m98", m98), ("m99", m99)):
@@ -87,7 +90,15 @@ def make_root(tmp):
     (root / "work/mcc/build.json").write_text(json.dumps({"source_build": {"steam_buildid": "9"},
                                                           "files": {"spanish.fsb": {"sha256": H["c"]}}}))
     (root / "mappings/manual_mappings.json").write_text(json.dumps(
-        {"schema": "manual-mappings/2", "pins": PINS, "slots": []}, indent=2) + "\n", encoding="utf-8")
+        {"schema": "manual-mappings/3", "pins": PINS, "slots": []}, indent=2) + "\n", encoding="utf-8")
+    keys = {loc_key(T + "z10_010_keyes"): ("Despierte, Jefe Maestro.", "Despierta, jefe maestro.",
+                                           f"cor&idKEYES{SPEAKER_SEP}Wake up, Master Chief."),
+            loc_key(T + "z10_020_cortana"): ("¿Qué pasó?", "¿Qué ha pasado?", "What happened?")}
+    (root / "work/mcc/loc/copies").mkdir(parents=True)
+    for n, name in enumerate(("SU", "SP", "EN")):
+        ks = sorted(keys)
+        (root / f"work/mcc/loc/copies/{name}_Halo1.bin").write_bytes(
+            build_loc(ks, [keys[k][n] for k in ks], name=f"{name}_Halo1".encode()))
     (root / "mappings/verifications.json").write_text(json.dumps({"schema_version": 1, "verifications": []}))
     (root / "mappings/mission_map.json").write_text(json.dumps(
         {"schema": "mission-map/1", "entries": [{"mcc_level": "z10", "ce_missions": ["M99"],
@@ -129,14 +140,14 @@ class ViewTests(AppTestBase):
     def test_catalog_order_and_filter_only(self):
         r = self.app.ce("all")
         self.assertEqual([x["ce_line_ref"] for x in r["lines"]],
-                         ["zz_late#0", "aa_early#0", "line_a#0", "line_b#0", "lipsync_x#0"])
+                         ["zz_late#0", "aa_early#0", "no_text#0", "line_a#0", "line_b#0", "lipsync_x#0"])
         self.assertIn("never ranked", r["order"])
         self.assertEqual([x["ce_line_ref"] for x in self.app.ce("all", q="jefe")["lines"]], ["line_a#0"])
         # accent- and case-insensitive filter; a non-matching query returns nothing rather than "closest" lines
         self.assertEqual([x["ce_line_ref"] for x in self.app.ce("all", q="ULTIMO")["lines"]], ["zz_late#0"])
         self.assertEqual(self.app.ce("all", q="no such words")["total"], 0)
         self.assertEqual(self.app.ce("mapped", level="z10")["scope"], ["M99"])
-        self.assertEqual(self.app.ce("M98")["total"], 2)
+        self.assertEqual(self.app.ce("M98")["total"], 3)
         self.assertEqual(fold("Último"), "ultimo")
 
     def test_new_slot_is_not_prefilled(self):
@@ -168,7 +179,7 @@ class SaveTests(AppTestBase):
         self.assertEqual((s["mapping_id"], s["match"]["status"], s["match"]["decided_at"]), ("m-000001", "matched", "2026-10-09"))
         self.assertEqual(s["audio"]["status"], "draft")
         self.assertEqual(s["subtitle"]["source"], "keep_original")  # never inferred from the match
-        self.assertEqual(validate(self.doc(), load_schema("manual-mappings-2")), [])
+        self.assertEqual(validate(self.doc(), load_schema("manual-mappings-3")), [])
         self.save(notes="second save")
         self.assertEqual(len(list((self.root / "mappings/.history").glob("manual_mappings.*.json"))), 2)
 
@@ -404,14 +415,160 @@ class HttpTests(unittest.TestCase):
             self.assertLessEqual(mods, allowed, name)
 
 
+class SearchTests(AppTestBase):
+    def ids(self, **kw):
+        return [x["slot_id"] for x in self.app.slots(kw.pop("level", "z10"), **kw)["slots"]]
+
+    def test_query_parsing(self):
+        self.assertEqual(parse_query('Jefe "las  Aguas," desp'), ["las aguas", "jefe", "desp"])
+        self.assertEqual(fold("¿Qué pasó, JEFE?"), "que paso jefe")
+        self.assertEqual(parse_query('"unclosed phrase'), ["unclosed", "phrase"])
+
+    def test_mcc_search_su_sp_en_and_metadata(self):
+        k, c = "es:Z10_010_keyes#0", "es:Z10_020_cortana#0"
+        self.assertEqual(self.ids(q="despierte"), [k])           # SU (Latin America)
+        self.assertEqual(self.ids(q="DESPIERTA"), [k])           # SP (Spain), case-insensitive
+        self.assertEqual(self.ids(q="wake up master"), [k])      # EN, speaker label stripped from the text
+        self.assertEqual(self.ids(q='"what happened"'), [c])     # phrase, punctuation ignored
+        self.assertEqual(self.ids(q="que paso"), [c])            # accents ignored
+        self.assertEqual(self.ids(q="cortan"), [c])              # partial word on the tag / speaker
+        self.assertEqual(self.ids(q="nothing like this"), [])
+        self.assertEqual(self.ids(level="all", q="happened"), [c])  # across levels
+        self.assertEqual(self.app.slot(k)["mcc_subtitles"]["EN"]["speaker_label"], "KEYES")
+        self.assertEqual(self.app.slot(k)["mcc_subtitles"]["EN"]["text"], "Wake up, Master Chief.")
+
+    def test_ce_search_and_missing_subtitle_filter(self):
+        def refs(**kw):
+            return [x["ce_line_ref"] for x in self.app.ce("all", **kw)["lines"]]
+        self.assertEqual(refs(q="english"), ["zz_late#0", "aa_early#0", "line_a#0", "line_b#0", "lipsync_x#0"])
+        self.assertEqual(refs(q='"maestro despierte"'), ["line_a#0"])
+        self.assertEqual(refs(subs="missing"), ["no_text#0"])
+        self.assertEqual(refs(q="no_text"), ["no_text#0"])      # found by its identifier
+        line = self.app.ce_line("no_text#0")
+        self.assertEqual(line["has_source_subtitle"], {"es-MX": False, "en": False, "es-ES": False})
+        self.assertEqual(line["media"]["Spanish(Mexico)"]["count"], 1)   # still playable
+        self.assertNotIn("score", json.dumps(self.app.ce("all", q="primero")))
+
+    def test_search_never_writes_or_selects(self):
+        before = snapshot(self.root)
+        self.app.slots("all", q="jefe")
+        self.app.ce("all", q="jefe")
+        self.assertEqual(snapshot(self.root), before)
+        self.assertEqual(self.app.slot("es:Z10_010_keyes#0")["mapping"], None)
+
+
+class MissingSubtitleTests(AppTestBase):
+    def test_custom_text_for_a_line_without_source_subtitle(self):
+        self.save(match={"status": "matched", "ce_line_refs": ["no_text#0"]},
+                  audio={"source": "ce", "sources": [{"ce_line_ref": "no_text#0"}]})
+        catalog_before = (self.root / "work/ce/catalog/m98.jsonl").read_bytes()
+        with self.assertRaises(ApiError) as cm:  # the CE text can't be approved: there is none
+            self.save(subtitle={"source": "ce_locres", "ce_locres": {"ce_line_ref": "no_text#0", "culture": "es-MX"}},
+                      actions=[{"action": "approve", "field": "subtitle"}])
+        self.assertEqual(cm.exception.status, 422)
+        # draft custom text: saved, survives a restart, still undecided
+        self.save(subtitle={"source": "custom", "custom_text": "Texto propio"})
+        app2 = M4App(self.root, today=lambda: "2026-10-10", run_validator=False)
+        d = app2.slot(self.slot)
+        self.assertEqual((d["custom_text"], d["mapping"]["subtitle"]["status"]), ("Texto propio", "draft"))
+        # audio approved on its own; the subtitle stays undecided
+        self.save(actions=[{"action": "approve", "field": "audio"}])
+        self.assertEqual(self.doc()["slots"][0]["subtitle"]["status"], "draft")
+        self.save(subtitle={"source": "custom", "custom_text": "Texto final"},
+                  local_sha256=self.app.slot(self.slot)["sha256"]["local"],
+                  actions=[{"action": "approve", "field": "subtitle"}])
+        s = self.doc()["slots"][0]["subtitle"]
+        self.assertEqual(s["status"], "approved")
+        self.assertEqual(s["fingerprint"]["custom"]["text_sha256"],
+                         hashlib.sha256("Texto final".encode()).hexdigest())
+        self.assertEqual((self.root / "work/ce/catalog/m98.jsonl").read_bytes(), catalog_before)
+
+
+class RadioEffectTests(AppTestBase):
+    def test_flag_is_independent_persistent_and_filterable(self):
+        self.match_a()
+        self.save(actions=[{"action": "approve", "field": "audio"}])
+        audio = copy.deepcopy(self.doc()["slots"][0]["audio"])
+        self.save(radio_effect={"needed": True})  # allowed while the audio is approved
+        s = self.doc()["slots"][0]
+        self.assertEqual(s["radio_effect"], {"needed": True, "set_at": "2026-10-09", "revision": 2})
+        self.assertEqual(s["audio"], audio)       # the approved object is untouched
+        app2 = M4App(self.root, run_validator=False)
+        self.assertEqual([x["slot_id"] for x in app2.slots("z10", status="radio")["slots"]], [self.slot])
+        self.assertEqual(app2.slots("all", status="radio")["total"], 1)
+        self.assertEqual(app2.state()["levels"][0]["progress"]["radio_effect"], 1)
+        # needs rework keeps the flag
+        self.save(actions=[{"action": "needs_rework", "field": "audio"}])
+        self.assertTrue(self.doc()["slots"][0]["radio_effect"]["needed"])
+        # the flag only applies to selected CE audio
+        with self.assertRaises(ApiError) as cm:
+            self.save(audio={"source": "keep_original", "sources": []}, match={"status": "deferred", "ce_line_refs": []})
+        self.assertEqual(cm.exception.status, 422)
+        self.save(audio={"source": "keep_original", "sources": []}, match={"status": "deferred", "ce_line_refs": []},
+                  radio_effect={"needed": False})
+        self.assertEqual(self.doc()["slots"][0]["radio_effect"]["revision"], 3)
+        with self.assertRaises(ApiError):
+            self.save(radio_effect={"needed": "yes"})
+
+    def test_store_refuses_a_flag_change_without_revision(self):
+        from common.mapping_store import ProtectedError, check_transition
+        self.match_a()
+        old = self.doc()
+        new = copy.deepcopy(old)
+        new["slots"][0]["radio_effect"]["needed"] = True
+        with self.assertRaises(ProtectedError):
+            check_transition(old, new)
+
+
+class MigrationTests(unittest.TestCase):
+    def test_v2_to_v3_moves_the_flag_and_keeps_approvals(self):
+        from common import mapping_store
+        from test_m3_validation import slot as m3_slot
+        s2 = copy.deepcopy(m3_slot(audio__status="approved", audio__approved_at="2026-10-08",
+                                   audio__fingerprint={"x": 1}))
+        del s2["radio_effect"]
+        s2["audio"]["fx_request"] = "radio"
+        v2 = {"schema": "manual-mappings/2", "pins": PINS, "slots": [s2]}
+        self.assertEqual(validate(v2, load_schema("manual-mappings-2")), [])
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "manual_mappings.json"
+            p.write_text(json.dumps(v2), encoding="utf-8")
+            _doc, sha = mapping_store.load(p)
+            mapping_store.migrate(p, sha, history_dir=Path(d) / "h")
+            v3 = json.loads(p.read_text(encoding="utf-8"))
+            self.assertEqual(v3["schema"], "manual-mappings/3")
+            self.assertTrue(v3["slots"][0]["radio_effect"]["needed"])
+            self.assertNotIn("fx_request", v3["slots"][0]["audio"])
+            self.assertEqual(v3["slots"][0]["audio"]["status"], "approved")
+            self.assertEqual(validate(v3, load_schema("manual-mappings-3")), [])
+            self.assertEqual(len(list((Path(d) / "h").iterdir())), 1)
+            with self.assertRaises(mapping_store.StoreError):  # a normal save may not change the version
+                mapping_store.save(p, v2, mapping_store.load(p)[1], schema=load_schema("manual-mappings-2"))
+        self.assertEqual(mapping_store.migrate_doc(v3), (v3, False))
+
+
 class CampaignCatalogRuleTests(unittest.TestCase):
     def test_slot_id_encoding_keeps_plain_names(self):
         self.assertEqual(slot_id_for("A10_010_cryotech", 0), "es:A10_010_cryotech#0")
         self.assertEqual(slot_id_for("deathquiet 01", 2), "es:deathquiet%2001#2")
         self.assertEqual(slot_id_for("a#b%c", 0), "es:a%23b%25c#0")
-        pattern = load_schema("manual-mappings-2")["$defs"]["slot_id"]["pattern"]
+        pattern = load_schema("manual-mappings-3")["$defs"]["slot_id"]["pattern"]
         import re
         self.assertTrue(re.match(pattern, slot_id_for("x\ty z", 1)))
+
+    def test_slot_id_round_trip(self):
+        import random
+        rnd = random.Random(7)
+        alphabet = "aZ_09 .-%#\t()'ñé"
+        for _ in range(2000):
+            name = "".join(rnd.choice(alphabet) for _ in range(rnd.randint(1, 12)))
+            occ = rnd.randint(0, 40)
+            sid = slot_id_for(name, occ)
+            self.assertEqual(parse_slot_id(sid), (name, occ), sid)
+            self.assertNotRegex(sid[3:].rsplit("#", 1)[0], r"[#\s]")
+        for bad in ("A10_x#0", "es:a%2#0", "es:a%zz#0", "es:a#x"):
+            with self.assertRaises(ValueError):
+                parse_slot_id(bad)
 
 
 if __name__ == "__main__":
