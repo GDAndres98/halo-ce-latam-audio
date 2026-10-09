@@ -427,9 +427,23 @@ function renderDetail() {
   <div class="card">
     <h3>Notes</h3>
     <textarea id="notes" maxlength="2000" placeholder="IDs and remarks only (committed file; no local paths)">${esc(e.notes)}</textarea>
-    <div class="row"><button id="save" class="primary">Save</button><span id="dirty" class="small muted">${S.dirty ? "unsaved changes" : ""}</span></div>
+    <div class="row"><button id="save" class="primary">Save</button>
+      ${!aLocked && !sLocked ? `<button id="approveBoth" class="primary" title="Save and approve audio and subtitle together">Approve audio + subtitle</button>` : ""}
+      <span id="dirty" class="small muted">${S.dirty ? "unsaved changes" : ""}</span></div>
   </div>`;
   wireDetail();
+}
+// Owner preference (2026-10-08): once the owner has picked CE line(s), audio defaults to "CE line(s) from
+// the match" and the subtitle to "CE text" (es-MX of the first picked line that has one). Only replaces the
+// "keep" choices; never picks a line, never overrides custom/none, never touches an approved part.
+function applyCeDefaults() {
+  const e = S.edit, m = S.detail && S.detail.mapping;
+  if (!e.match.ce_line_refs.length) return;
+  if (!(m && m.audio.status === "approved") && e.audio.source === "keep_original") e.audio.source = "ce";
+  if (!(m && m.subtitle.status === "approved") && e.subtitle.source === "keep_original") {
+    const ref = e.match.ce_line_refs.find(r => S.ceCache[r] && S.ceCache[r].subtitles["es-MX"].text);
+    if (ref) { e.subtitle.source = "ce_locres"; e.subtitle.ref = ref; e.subtitle.culture = "es-MX"; }
+  }
 }
 function setDirty() { S.dirty = true; const x = $("dirty"); if (x) x.textContent = "unsaved changes"; }
 function wireDetail() {
@@ -446,7 +460,7 @@ function wireDetail() {
   });
   document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const i = +b.dataset.rm; const r = e.match.ce_line_refs.splice(i, 1)[0];
     if (!e.match.ce_line_refs.length) { e.audio.source = "keep_original"; e.radio = false; if (e.match.status === "matched") e.match.status = "unreviewed"; }
-    if (e.subtitle.ref === r && e.subtitle.source === "ce_locres") { e.subtitle.source = "keep_original"; e.subtitle.ref = null; }
+    if (e.subtitle.ref === r && e.subtitle.source === "ce_locres") { e.subtitle.source = "keep_original"; e.subtitle.ref = null; applyCeDefaults(); }
     setDirty(); renderDetail(); renderCands(); });
   document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; const a = e.match.ce_line_refs; [a[i - 1], a[i]] = [a[i], a[i - 1]]; setDirty(); renderDetail(); });
   document.querySelectorAll('[data-down]').forEach(b => b.onclick = () => { const i = +b.dataset.down; const a = e.match.ce_line_refs; [a[i + 1], a[i]] = [a[i], a[i + 1]]; setDirty(); renderDetail(); });
@@ -469,6 +483,15 @@ function wireDetail() {
   if ($("approveAudio")) $("approveAudio").onclick = () => {
     const what = audioSourceKind() === "keep_original" ? "keep the Spain recording" : `use ${audioSources().length} CE line(s) in ${e.audio.language}`;
     if (confirm(`Approve audio for ${S.slotId}: ${what}?\nApproved decisions are read-only until you mark them “needs rework”.`)) save([{ action: "approve", field: "audio" }]);
+  };
+  if ($("approveBoth")) $("approveBoth").onclick = () => {
+    const what = audioSourceKind() === "keep_original" ? "keep the Spain recording" : `${audioSources().length} CE line(s) in ${e.audio.language}`;
+    const sub = e.subtitle.source === "ce_locres" ? `CE text (${e.subtitle.culture} of ${e.subtitle.ref})` : e.subtitle.source.replace("_", " ");
+    if (confirm(`Approve BOTH for ${S.slotId}?
+• Audio: ${what}
+• Subtitle: ${sub}
+Approved decisions are read-only until you mark them “needs rework”.`))
+      save([{ action: "approve", field: "audio" }, { action: "approve", field: "subtitle" }]);
   };
   if ($("approveSub")) $("approveSub").onclick = () => {
     if (confirm(`Approve subtitle for ${S.slotId} (${e.subtitle.source})?\nApproved decisions are read-only until you mark them “needs rework”.`)) save([{ action: "approve", field: "subtitle" }]);
@@ -540,6 +563,7 @@ function renderCands() {
   document.querySelectorAll('#cands [data-use]').forEach(b => b.onclick = () => {
     const e = S.edit; e.match.ce_line_refs.push(b.dataset.use);
     if (e.match.status === "unreviewed" || e.match.status === "no_equivalent") e.match.status = "matched";
+    applyCeDefaults();
     setDirty(); renderDetail(); renderCands();
   });
 }

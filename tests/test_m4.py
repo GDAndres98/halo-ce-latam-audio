@@ -214,6 +214,17 @@ class SaveTests(AppTestBase):
         self.save(audio={"source": "keep_original", "sources": []}, match={"status": "deferred", "ce_line_refs": []})
         self.assertEqual(self.doc()["slots"][0]["audio"]["source"], "keep_original")
 
+    def test_approve_audio_and_subtitle_in_one_save(self):
+        self.match_a()
+        backups = lambda: len(list((self.root / "mappings/.history").glob("*.json")))  # noqa: E731
+        before = backups()
+        self.save(subtitle={"source": "ce_locres", "ce_locres": {"ce_line_ref": "line_a#0", "culture": "es-MX"}},
+                  actions=[{"action": "approve", "field": "audio"}, {"action": "approve", "field": "subtitle"}])
+        s = self.doc()["slots"][0]
+        self.assertEqual((s["audio"]["status"], s["subtitle"]["status"]), ("approved", "approved"))
+        self.assertTrue(s["audio"]["fingerprint"] and s["subtitle"]["fingerprint"])
+        self.assertEqual(backups(), before + 1)  # one write for both approvals
+
     def test_audio_and_subtitle_are_independent(self):
         self.match_a()
         self.save(subtitle={"source": "ce_locres", "ce_locres": {"ce_line_ref": "line_a#0", "culture": "es-MX"}},

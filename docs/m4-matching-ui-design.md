@@ -221,3 +221,16 @@ Acceptance criteria (they extend roadmap M4):
   persistence across restarts, the radio flag, the v2→v3 migration and slot-ID round trips. The
   headless-Edge click-through was extended with search highlighting, the no-subtitle filter, a
   custom subtitle, and the radio flag across a reload.
+
+### 8.1 Owner preference: CE defaults and "approve both" (2026-10-08)
+
+- **CE defaults** (`applyCeDefaults` in `m4.html`) run only when the owner clicks **+ use** on a CE
+  line, or removes the line a CE subtitle was using.
+  - The audio changes from `keep_original` to `ce`/`ce_concat` over the picked lines.
+  - The subtitle changes from `keep_original` to `ce_locres`, using es-MX of the first picked line
+    with text.
+  - They never choose a CE line, never override `custom`/`none` or approved parts, and never
+    rewrite saved decisions on load. The "no suggestions, no pre-filled matches" rule still holds:
+    the owner picks every line.
+- **Approve audio + subtitle** sends both `approve` actions in one save, so there is one write and
+  one backup (tested). It is shown only while neither part is approved.

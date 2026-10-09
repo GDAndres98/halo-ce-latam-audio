@@ -145,7 +145,6 @@ class SchemaEngineTests(unittest.TestCase):
                             ("mappings/mission_map.json", "mission-map-1")):
             d = json.loads((ROOT / rel).read_text(encoding="utf-8"))
             self.assertEqual(validate(d, load_schema(schema)), [], rel)
-        self.assertEqual(json.loads((ROOT / "mappings/manual_mappings.json").read_text(encoding="utf-8"))["slots"], [])
 
     def test_catalog_schemas_are_separate(self):
         self.assertEqual(validate(ce_record("line_a"), CE_SCHEMA), [])

@@ -96,8 +96,19 @@ Slot filters (left):
    - *CE text* (pick the line and the culture; cultures without text are disabled);
    - *custom*;
    - *none*.
-6. **Save** keeps a draft. **Approve audio** / **Approve subtitle** save and approve. An approved
-   part is read-only. To change it, use **Mark needs rework…**, which raises its revision by one.
+6. **Save** keeps a draft. **Approve audio** / **Approve subtitle** save and approve one part.
+   **Approve audio + subtitle** (next to Save) approves both in one save, after a confirmation that
+   lists both choices. An approved part is read-only. To change it, use **Mark needs rework…**,
+   which raises its revision by one.
+
+**Defaults after you pick a line (owner preference, 2026-10-08):**
+- **Audio** switches from *keep Spain* to *CE line(s) from the match*.
+- **Subtitle** switches from *keep MCC text* to *CE text*: es-MX of the first picked line that has
+  es-MX text. If none has text, it stays on *keep MCC text* and the "no source subtitle" notice
+  appears.
+- The defaults never pick a line for you, never replace *custom* or *none*, never change an
+  approved part, and never change decisions already saved. Anything can still be changed before
+  approving.
 
 ### Lines with no source subtitle
 
