@@ -730,6 +730,47 @@
       "by": "user",
       "at": "2026-10-08",
       "note": "B2 E2b-game PASSED: our own CELT 0.11 re-encode of English A10_350 with the MCC profile (all intra, no transients) in Spanish slot #30 played correctly, completely and naturally; surrounding Spanish dialogue and LATAM subtitles unchanged; no crash. Contrast with v-000017 (E2, default encoder settings, crash). Original bank restored and hash-verified; install snapshot unchanged."
+    },
+    {
+      "id": "v-000019",
+      "subject": "mcc:es:A10_010_cryotech#0",
+      "mcc_tag": "sound\\dialog\\a10\\a10_010_cryotech",
+      "checks": [
+        "correct_audio"
+      ],
+      "languages": [
+        "spanish",
+        "Spanish(Mexico)"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
+        },
+        "samples": {
+          "spanish": {
+            "index": 0,
+            "name_in_bank": "A10_010_cryotech",
+            "data_sha256": "e9606677be5754d3dab805cd6f066cae83dc5115a0030ac0347a066b25792611"
+          }
+        },
+        "experiment": {
+          "id": "B2-E3",
+          "candidate_bank_sha256": "fc6f7161662dcf8209357eec241eb70e2467c91b846aea69011ffb944308dda1",
+          "ce_line_ref": "vo_scr_m01_00460_cryotech#0",
+          "ce_language": "Spanish(Mexico)",
+          "ce_media_id": 132700376,
+          "ce_wem_sha256": "42b21129c08aabe3c4d22681143531499923462c934183cf0d344656a58a3849",
+          "derived_stream_sha256": "a4197541e289130cd1edb282e345af7fe2a3ac57be9ef80f564ff0557bd99aba",
+          "pairing": "owner-selected experiment pairing; NOT an approved manual_mappings.json entry"
+        },
+        "graphics_modes": "not reported",
+        "language_settings": "not reported"
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-08",
+      "note": "B2 E3-game PASSED (owner report): with the E3 bank installed, the Campaign Evolved es-MX recording vo_scr_m01_00460_cryotech#0 played in MCC slot es:A10_010_cryotech#0 correctly and sounded natural; no crashes, missing audio or playback problems. Only these observations were reported. Installed and rolled back with b2_bank_install.py --exp e3; original bank restored and hash-verified; install snapshot unchanged. First Latin American Spanish line heard in MCC."
     }
   ]
 }

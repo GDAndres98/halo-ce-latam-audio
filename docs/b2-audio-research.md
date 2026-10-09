@@ -823,6 +823,31 @@ future line.
 **Sheet:** `work/b2/e3/e3_install_rollback.md`, using `b2_bank_install.py --exp e3`. **Not
 installed; E3-game needs approval.**
 
+### 5.12 E3-game — ✅ PASS, USER-VERIFIED (2026-10-08)
+
+**The first Latin American Spanish line was heard in MCC.**
+- **What ran:** the owner installed and rolled back the E3 bank (`fc6f7161…`) with
+  `b2_bank_install.py --exp e3`.
+- **Owner report:** the CE es-MX recording `vo_scr_m01_00460_cryotech#0` played in slot
+  `es:A10_010_cryotech#0` **correctly and sounded natural**; no crashes, missing audio or playback
+  problems.
+- **Not reported, not recorded:** graphics modes and language settings.
+- **Rollback:** the bank is restored and verified = `ed0ff3ec…`. A fresh read-only re-check of the
+  pre-flight snapshot shows 0 hashed changes and 0 install files added, removed or changed. The
+  backup is kept.
+- **Recorded:** `v-000019` (check `correct_audio`, pass). The fingerprint holds the CE media and
+  `.wem` hashes, the derived stream and the candidate bank.
+- **The pairing stays an experiment pairing.** `manual_mappings.json` is unchanged (0 slots); the
+  permanent decision belongs to M4.
+
+**B2 status:** the whole audio route is proven end to end:
+- CE es-MX `.wem` → vgmstream WAV → ffmpeg 44.1 kHz → CELT 0.11 (MCC profile) → spliced into
+  the Spain bank;
+- MCC plays it.
+
+What is left for v1.0 audio is production, not research: M4 matching, then the M6 batch generator
+(`audio_pipeline` + `bank_checks`, many slots per bank), then the M7 full-level test.
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |

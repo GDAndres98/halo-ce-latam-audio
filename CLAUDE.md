@@ -27,7 +27,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     hash-verified. Residuals (variable-length text, an `SP` runtime
     sample, per-mode coverage) move to M7. See
     `docs/subtitle-research.md` B.12 step 3 result.
-  - **B2:** FSB5 rebuild and game acceptance are unverified. Research
+  - **B2:** ✅ **resolved in practice (2026-10-08):** a CE es-MX line plays in MCC (E3, `v-000019`). Research
     is done (`docs/b2-audio-research.md`):
     - The runtime is FMOD Ex 4.44.27, which plays FSB5 CELT 0.11 and
       IMA ADPCM. The codec is per bank.
@@ -112,8 +112,12 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - **E3 offline ✅:** owner-selected pair `es:A10_010_cryotech#0`
         ← `vo_scr_m01_00460_cryotech#0` (experiment only, **not** in
         `manual_mappings.json`). Candidate `fc6f7161…`: 30/30 checks,
-        3.553 s → 3.634 s, 45.1 dB, reproducible. **E3-game not
-        approved.** Never pick pairings yourself.
+        3.553 s → 3.634 s, 45.1 dB, reproducible. Never pick pairings
+        yourself.
+      - **E3-game ✅** (`v-000019`): the es-MX line played correctly and
+        naturally in MCC. The pairing stays an experiment, **not** an
+        approved mapping. **B2 audio route proven end to end.**
+    - **Next: M4** (matching UI). Handoff: `docs/m4-session-handoff.md`.
     - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.
