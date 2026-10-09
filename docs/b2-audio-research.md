@@ -743,6 +743,46 @@ transients) produces audio that MCC's embedded decoder plays. Together with E2's
 supports the §5.8 root cause. **B2 is technically unblocked:** we can splice our own CELT encodes of
 any length (E1b) into the Spanish bank.
 
+### 5.10 E3 pipeline: CE WAV → MCC CELT (offline, 2026-10-08)
+
+**Reusable library**, with no mission, slot or mapping knowledge:
+- `scripts/common/audio_pipeline.py` converts the source WAV with ffmpeg (owner-approved; 9.0.1
+  here) to 44,100 Hz 16-bit mono. It then pads the end with **128 samples**, CELT's codec delay, so
+  the last real sample survives, and encodes CELT 0.11 with the **MCC profile** (`fmod`). The
+  encoder zero-pads to a whole 512-sample frame, and `sample_count = frames × 512`, as in every
+  original sample. The profile guard runs on every packet.
+- **No content changes:** no trim, gain or effects. Those would be owner-approved recipe steps.
+- Each result is written to `work/derived/<stream sha256>/` (`recipe.json` plus the 44.1 kHz WAV),
+  following design §6. The recipe records the source SHA-256, the ffmpeg version and arguments, the
+  padding, the encoder library and profile, and the output hashes.
+- `scripts/common/bank_checks.py` validates any one-sample replacement, structurally and with
+  vgmstream on every subsong.
+
+**Readiness on real CE audio** (`python scripts/discovery/b2_pipeline_survey.py --mission m01`, 25 s):
+**all 194 M01 es-MX recordings** pass.
+- Every packet is 370 B in the MCC profile.
+- Every stream covers source + delay within one frame.
+- The 48 kHz → 44.1 kHz durations agree within 2 ms.
+- Decode SNR against the 44.1 kHz source is **41.1–48.3 dB** (median 46.3).
+
+**E3 tool:** `python scripts/discovery/b2_ce_replace.py --exp e3 --slot <slot_id> --ce-ref <ref> --owner-selected`.
+- It **refuses to run without `--owner-selected`**: it never chooses a pairing.
+- It resolves the slot from the MCC catalog and the recording from the M1b manifest (hash-checked).
+  It derives the stream twice (determinism) and splices it.
+- It validates with `bank_checks`, plus content SNR ≥ 30 dB and a duration check.
+- It writes the candidate, `e3_manifest.json` (inputs, recipe and outputs) and the report and install
+  sheet to `work/b2/e3/`.
+- Stereo slots are refused until the owner chooses how to handle them.
+
+**Status:** `manual_mappings.json` has **no approved audio mappings**, so **no E3 candidate was
+built**. A local shortlist (`work/b2/e3_shortlist.md`) lists MCC slots and verified CE lines as two
+**independent** lists; it suggests no pairing. The owner picks one of each.
+
+**Tests:** `tests/test_audio_pipeline.py` covers:
+- a synthetic 48 kHz WAV through ffmpeg, CELT, the FSB5 bank and the checks;
+- determinism, delay padding and the profile guard;
+- validator pass and fail cases.
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |

@@ -1,0 +1,121 @@
+"""Source WAV -> MCC-ready CELT stream (B2 E3 and the future batch generator).
+
+Pipeline (docs/b2-audio-research.md §5.10):
+    source WAV (e.g. Campaign Evolved es-MX, 48 kHz mono 16-bit)
+    -> ffmpeg (owner-approved, already installed): resample to 44,100 Hz, 16-bit, target channel count
+    -> pad the end with CODEC_DELAY samples of silence, so the last real sample survives CELT's
+       128-sample delay; the encoder then zero-pads to a whole 512-sample frame
+    -> CELT 0.11 via libcelt-0110 with the MCC profile ("fmod": all intra, no transients; the only
+       profile MCC's embedded decoder is proven to play, v-000017 vs v-000018)
+    -> FMOD framing; sample_count = frames * 512 (as in every original MCC sample)
+
+No content is changed: no trimming, gain, or effects. Those would be explicit, owner-approved recipe
+steps (design §6). Nothing here knows about missions, slots or mappings. Every derived stream is
+written to work/derived/<stream sha256>/ with recipe.json and the 44.1 kHz WAV it was encoded from.
+"""
+import hashlib
+import json
+import math
+import subprocess
+import wave
+from array import array
+from pathlib import Path
+
+from .celt011 import FRAME_SAMPLES, PROFILES, SAMPLE_RATE, fmod_frames, profile_violations
+
+CODEC_DELAY = 128  # samples; CELT 0.11 overlap for the 44.1 kHz / 512 custom mode (measured, §5.7)
+RECIPE_SCHEMA = "derived-audio-recipe/1"
+
+
+def sha256_bytes(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def sha256_file(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def wav_info(path):
+    with wave.open(str(path), "rb") as w:
+        return {"sample_rate": w.getframerate(), "channels": w.getnchannels(), "sample_width": w.getsampwidth(),
+                "frames": w.getnframes(), "seconds": round(w.getnframes() / w.getframerate(), 3)}
+
+
+def ffmpeg_version(ffmpeg):
+    out = subprocess.run([str(ffmpeg), "-hide_banner", "-version"], capture_output=True, text=True).stdout
+    return out.splitlines()[0].strip() if out else None
+
+
+def ffmpeg_args(src, channels):
+    return ["-nostdin", "-hide_banner", "-v", "error", "-i", str(src), "-map_metadata", "-1",
+            "-ac", str(channels), "-ar", str(SAMPLE_RATE), "-c:a", "pcm_s16le", "-f", "s16le", "-"]
+
+
+def to_mcc_pcm(ffmpeg, src, channels=1):
+    """Resample/convert `src` to 44.1 kHz 16-bit PCM (raw, interleaved) with ffmpeg."""
+    res = subprocess.run([str(ffmpeg)] + ffmpeg_args(src, channels), capture_output=True)
+    if res.returncode != 0 or not res.stdout:
+        raise RuntimeError(f"ffmpeg failed: {res.stderr.decode(errors='replace')[:300]}")
+    return res.stdout
+
+
+def encode_for_mcc(celt, pcm, channels=1, profile="fmod"):
+    """44.1 kHz PCM -> dict(stream, sample_count, frames, packets). Refuses non-MCC-profile output."""
+    if profile not in PROFILES:
+        raise ValueError(f"unknown CELT profile {profile!r}")
+    padded = pcm + b"\0" * (CODEC_DELAY * channels * 2)
+    packets, frames = celt.encode(padded, channels=channels, profile=profile)
+    bad = profile_violations(packets)
+    if bad:
+        raise ValueError(f"{len(bad)} packets outside the MCC CELT profile (first: {bad[0]})")
+    return {"stream": fmod_frames(packets), "packets": packets, "frames": frames,
+            "sample_count": frames * FRAME_SAMPLES}
+
+
+def snr_db(ref, test, lag=CODEC_DELAY):
+    """SNR (dB) of `test` against `ref` (16-bit mono PCM), with `test` delayed by `lag` samples."""
+    a = array("h", ref)
+    b = array("h", test[lag * 2:lag * 2 + len(ref)])
+    n = min(len(a), len(b))
+    sig = sum(v * v for v in a[:n])
+    err = sum((u - v) ** 2 for u, v in zip(a[:n], b[:n]))
+    return float("inf") if err == 0 else (float("-inf") if sig == 0 else 10 * math.log10(sig / err))
+
+
+def derive(src, *, ffmpeg, celt, out_root, channels=1, profile="fmod", source_meta=None):
+    """Run the pipeline for one source WAV. Writes work/derived/<sha>/ and returns the result dict."""
+    src = Path(src)
+    pcm = to_mcc_pcm(ffmpeg, src, channels)
+    enc = encode_for_mcc(celt, pcm, channels, profile)
+    decoded = celt.decode(enc["packets"], channels=channels)
+    stream_sha = sha256_bytes(enc["stream"])
+    in_samples = len(pcm) // (2 * channels)
+    recipe = {
+        "schema": RECIPE_SCHEMA,
+        "source": {"file": src.name, "sha256": sha256_file(src), **wav_info(src), **(source_meta or {})},
+        "steps": [
+            {"op": "ffmpeg_convert", "version": ffmpeg_version(ffmpeg), "args": ffmpeg_args("<source>", channels)},
+            {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
+            {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
+             "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
+             "frame_samples": FRAME_SAMPLES, "packet_bytes": sorted({len(p) for p in enc["packets"]})},
+        ],
+        "content_changes": "none (no trim, gain or effects)",
+        "pcm_44100": {"sha256": sha256_bytes(pcm), "samples": in_samples, "seconds": round(in_samples / SAMPLE_RATE, 3)},
+        "output": {"stream_sha256": stream_sha, "stream_bytes": len(enc["stream"]), "frames": enc["frames"],
+                   "sample_count": enc["sample_count"], "seconds": round(enc["sample_count"] / SAMPLE_RATE, 3),
+                   "own_decode_snr_db": round(snr_db(pcm, decoded), 1) if channels == 1 else None},
+    }
+    out = Path(out_root) / stream_sha
+    out.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(out / "mcc_44100.wav"), "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes(pcm)
+    (out / "recipe.json").write_text(json.dumps(recipe, indent=2) + "\n", encoding="utf-8")
+    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, **enc}

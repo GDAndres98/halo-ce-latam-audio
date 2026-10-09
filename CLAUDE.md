@@ -102,6 +102,15 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       owner's approval for each experiment.
     - ffmpeg (already installed) is approved for offline audio
       conversion (owner, 2026-10-08).
+    - **E3 pipeline (offline):** `scripts/common/audio_pipeline.py`
+      (ffmpeg to 44.1 kHz, pad 128 for the codec delay, CELT `fmod`
+      profile, `work/derived/<sha>/recipe.json`) and
+      `scripts/common/bank_checks.py`.
+      - `b2_pipeline_survey.py`: all 194 M01 es-MX lines pass (41–48 dB).
+      - `b2_ce_replace.py --exp e3 --slot … --ce-ref … --owner-selected`
+        refuses to run without owner selection.
+      - **No E3 candidate yet:** waiting for the owner's pairing choice.
+        Never pick one.
     - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.
