@@ -7,7 +7,9 @@ scripts/discovery/b2_bank_install.py (same process guard, Steam build check and 
 
 Subcommands (each refuses to run while MCC / EAC processes exist and stops on any mismatch):
   check      read-only: Steam build, every installed file == its pinned original, every candidate ==
-             its manifest hash, the build's validation report is ok.
+             its manifest hash, the build's validation report is ok, and the build still matches the
+             CURRENT approved decisions (refuses if a replaced line was changed or revoked in M4; warns
+             if newer approvals are missing). preflight runs the same checks.
   preflight  check + back up every original OUTSIDE the install (work/mcc/backup/<build>/...), verify
              each backup, snapshot SHA-256 of halo1/sound/pc + SU/SP and size/mtime of every file.
   install    copy each candidate, verify it; then re-hash the snapshot set: only the listed files may
@@ -31,6 +33,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discovery"))
 from common.env import REPO_ROOT, load_env, require_path  # noqa: E402
 from b2_bank_install import running_game_processes, sha256_file, steam_build  # noqa: E402
+from common import mapping_store  # noqa: E402
+from common.m6_build import compare_plans, plan_audio  # noqa: E402
 
 STEAM_BUILD = "19905945"
 
@@ -78,10 +82,32 @@ def require_closed():
         stop(f"MCC/EAC appears to be running: {procs}. Close it completely first.")
 
 
+def stale_check(b):
+    """Re-plan the build's folders from the CURRENT mappings: refuse if a replaced line is no longer the
+    approved decision; warn if newer approvals are simply not in this build."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts" / "ui"))
+    from m4_app import M4App
+    app = M4App(REPO_ROOT, run_validator=False)
+    doc, _ = mapping_store.load(REPO_ROOT / "mappings" / "manual_mappings.json")
+    lp = REPO_ROOT / "mappings" / "manual_mappings.local.json"
+    local = json.loads(lp.read_text(encoding="utf-8")) if lp.is_file() else None
+    cur = plan_audio(doc, b.manifest["levels"], slot_index=app.slot_index, ce_lines=app.ce_lines,
+                     ce_idx=app.ce_idx, mcc_idx=app.mcc_idx, local=local)
+    diff = compare_plans(b.manifest["slots"], cur["entries"])
+    if diff["changed_or_revoked"]:
+        stop(f"{len(diff['changed_or_revoked'])} line(s) in this build are no longer the approved decision "
+             f"(e.g. {diff['changed_or_revoked'][:5]}); rebuild before installing")
+    if diff["newly_eligible"]:
+        print(f"note: {len(diff['newly_eligible'])} newer approval(s) are not in this build "
+              f"(e.g. {diff['newly_eligible'][:5]}); rebuild to include them, or test this build as is")
+    return diff
+
+
 def check(b, quiet=False):
     require_closed()
     if not b.report.get("ok"):
         stop("the build's validation report is not ok; rebuild")
+    stale_check(b)
     build, flags = steam_build(b.root)
     if build != STEAM_BUILD:
         stop(f"Steam build {build} != {STEAM_BUILD}: the pins and the build are for another game version")
@@ -133,6 +159,7 @@ def restore_all(b):
 
 def install(b):
     require_closed()
+    stale_check(b)
     pre = b.read_state("preflight")
     if not pre:
         stop("run preflight first")

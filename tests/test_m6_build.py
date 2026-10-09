@@ -155,5 +155,58 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(s["summary"]["variable_length"], {"SU": 1, "SP": 1})
 
 
+class FolderAndMissionTests(unittest.TestCase):
+    def test_map_tag_path_scan(self):
+        sys.path.insert(0, str(ROOT / "scripts" / "catalog"))
+        from build_level_folders import tag_paths
+        blob = (b"\x00junk sound\\dialog\\x10\\x10_010_keyes\x00 more sound\\dialog\\a10\\a10_350_captkeyes\x00"
+                b"sound\\dialog\\marines\\aussie\\conditional\\aussie\x00sound\\dialog\\\x00")
+        self.assertEqual(tag_paths(blob), {"sound\\dialog\\x10\\x10_010_keyes", "sound\\dialog\\a10\\a10_350_captkeyes",
+                                           "sound\\dialog\\marines\\aussie\\conditional\\aussie"})
+
+    def test_mission_folders_take_only_cinematics_used_by_that_map(self):
+        from common.m6_build import mission_folders
+        lf = {"levels": {"a10": {"evidence": "derived:map_tag_path_scan", "map_sha256": "x",
+                                 "folders": {"a10": {}, "x10": {}, "x20": {}, "marines": {}, "x99": {}}}},
+              "folders": {"a10": {"used_by": ["a10"]}, "x10": {"used_by": ["a10"]}, "x20": {"used_by": ["a10"]},
+                          "marines": {"used_by": ["a10", "a30"]}, "x99": {"used_by": ["a10", "c10"]}}}
+        r = mission_folders(lf, "a10")
+        self.assertEqual(r["selected"], ["a10", "x10", "x20"])
+        self.assertEqual(r["shared_not_selected"], ["marines", "x99"])
+        with self.assertRaises(ValueError):
+            mission_folders(lf, "b30")
+
+    def test_folder_summary_groups(self):
+        from common.m6_build import folder_summary
+        base = {"channels": 1, "mapping_id": "m-000001"}
+        entries = [dict(base, level="x20", action="replace", reason="approved CE audio"),
+                   dict(base, level="x20", action="keep_original", reason="approved: keep Spain audio", channels=2),
+                   dict(base, level="x20", action="keep_original", reason="audio draft (not approved): Spain audio stays"),
+                   dict(base, level="x20", action="keep_original", reason="no mapping", mapping_id=None),
+                   dict(base, level="x20", action="not_eligible", reason="unsupported: stereo slot", channels=2),
+                   dict(base, level="a10", action="not_eligible", reason="invalid: drift")]
+        s = folder_summary(entries)
+        self.assertEqual({k: v for k, v in s["x20"].items() if v},
+                         {"replace": 1, "approved_keep_spain": 1, "not_approved": 1, "unmapped": 1,
+                          "unsupported": 1, "slots": 5, "stereo": 2})
+        self.assertEqual(s["a10"]["invalid"], 1)
+
+    def test_compare_plans_flags_revoked_lines_but_only_notes_new_ones(self):
+        from common.m6_build import compare_plans
+        built = [{"slot_id": "a", "action": "replace", "mapping_id": "m-1", "ce_line_ref": "x#0", "language": "L",
+                  "media": {"wem_sha256": "h"}},
+                 {"slot_id": "b", "action": "keep_original", "mapping_id": None}]
+        self.assertEqual(compare_plans(built, copy.deepcopy(built)), {"changed_or_revoked": [], "newly_eligible": []})
+        revoked = copy.deepcopy(built)
+        revoked[0].update(action="keep_original", reason="audio needs_rework")
+        self.assertEqual(compare_plans(built, revoked)["changed_or_revoked"], ["a"])
+        other = copy.deepcopy(built)
+        other[0]["ce_line_ref"] = "y#0"
+        self.assertEqual(compare_plans(built, other)["changed_or_revoked"], ["a"])
+        newer = copy.deepcopy(built)
+        newer[1].update(action="replace", mapping_id="m-2")
+        self.assertEqual(compare_plans(built, newer), {"changed_or_revoked": [], "newly_eligible": ["b"]})
+
+
 if __name__ == "__main__":
     unittest.main()

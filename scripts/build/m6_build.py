@@ -9,8 +9,7 @@ all intra, no transients) and assembles ONE new bank. Untouched samples stay byt
 .lst.bin files are never written. Subtitles: dry run only (generation disabled, see docs/m6-build.md).
 
 Validation (all must pass, else the build is marked FAILED):
-  validator clean; the selected levels' plan is unchanged at the end (M4 may keep saving other
-  levels); plan has no conflicts; bank copy = pin;
+  validator clean; plan has no conflicts; bank copy = pin;
   multi-sample structural checks; every one of the bank's subsongs decodes in the candidate and only
   the targets differ from the original; each target: vgmstream decode == own decode, content SNR vs
   its 44.1 kHz source >= 30 dB, sample count, Custom CELT, duration covers the source, no new
@@ -45,7 +44,9 @@ from common.audio_pipeline import derive, sha256_file, snr_db  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
-from common.m6_build import assemble, multi_structural_checks, plan_audio, subtitle_plan  # noqa: E402
+from common.m6_build import (  # noqa: E402
+    FOLDER_GROUPS, assemble, compare_plans, entry_group, folder_summary, mission_folders, multi_structural_checks,
+    plan_audio, subtitle_plan)
 from common.ondemand_audio import CeAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from common.vgm import DEFAULT_VGMSTREAM, decode_all, decode_pcm, meta, meta_value  # noqa: E402
 from m4_app import M4App  # noqa: E402
@@ -163,9 +164,28 @@ def test_report(name, manifest, report, app):
                         ("Flags", lambda e: " ".join(x for x, on in (("R", e["radio_effect"]),
                                                                      ("≈", e["different_but_fits"])) if on)),
                         ("Current LATAM subtitle (SU, unchanged)", su)])
+    L += ["", "## Per folder", ""]
+    L += md_table([{"f": f, **v} for f, v in manifest["folders"].items()],
+                  [("Folder", lambda r: f"`{r['f']}`"), ("Slots", lambda r: r["slots"]),
+                   ("LATAM (approved CE)", lambda r: r["replace"]),
+                   ("Approved keep Spain", lambda r: r["approved_keep_spain"]),
+                   ("Not approved", lambda r: r["not_approved"]), ("Unmapped", lambda r: r["unmapped"]),
+                   ("Unsupported", lambda r: r["unsupported"]), ("Invalid", lambda r: r["invalid"]),
+                   ("Stereo (replaced)", lambda r: f"{r['stereo']} ({r['stereo_replaced']})")])
+    a = manifest.get("mission_association")
+    if a:
+        L += ["", f"Mission `{a['mission']}`: folders {', '.join(f'`{x}`' for x in a['selected'])} "
+                  f"(cinematics only this map uses; evidence {a['evidence']}). Shared bark folders not touched: "
+                  f"{', '.join(a['shared_not_selected'])}."]
     L += ["", f"## 2. Lines that keep their Spain Spanish audio ({len(keep)})", ""]
+    for f in manifest["folders"]:
+        fk = [e for e in keep if e["level"] == f]
+        if fk:
+            L += [f"**`{f}`** ({len(fk)}):", ""] + [f"- {n} × {g.replace('_', ' ')}: " + ", ".join(
+                f"`{e['slot_id']}`" for e in fk if entry_group(e) == g)
+                for g, n in Counter(entry_group(e) for e in fk).most_common()] + [""]
     reasons = Counter(e["reason"] for e in keep)
-    L += [f"- {n} × {r}" for r, n in reasons.most_common()]
+    L += ["All reasons:", ""] + [f"- {n} × {r}" for r, n in reasons.most_common()]
     odd = [e for e in keep if e["action"] == "not_eligible" or (e["mapping_id"] and e["reason"].startswith("audio "))]
     if odd:
         L += ["", "Mapped but not built:", ""]
@@ -194,7 +214,7 @@ def test_report(name, manifest, report, app):
           "## 6. In-game checklist", "",
           "Settings: Halo CE, primary language **Spanish (Latin America)**, fallback **Spanish (Spain)**, subtitles on.",
           "Launch with **Play Halo: MCC Anti-Cheat Disabled**. Test Classic graphics, then Anniversary.", "",
-          "1. The game loads `a10` without a crash or hang.",
+          "1. The game loads each mission in this build without a crash or hang; cinematics play through.",
           "2. Lines in §1 play in LATAM Spanish, completely (no cut-off start or end, no clicks, normal volume).",
           "3. The next line starts normally after a longer or shorter replacement (no overlap, no long silence).",
           "4. Lines in §2 still play the original Spain recording.",
@@ -225,15 +245,24 @@ def install_sheet(name, manifest):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--level", action="append", help="MCC level folder(s) to build (default a10)")
+    ap.add_argument("--level", action="append", help="MCC dialogue folder(s) to build (default a10)")
+    ap.add_argument("--mission", help="playable map (e.g. a10): its own folder plus the cinematic folders only "
+                                      "it uses, from work/mcc/level_folders.json (build_level_folders.py)")
     ap.add_argument("--name", help="build folder under work/m6/ (default: the levels joined by '_')")
     ap.add_argument("--inventory-only", action="store_true", help="report mappings and eligibility, build nothing")
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
     ap.add_argument("--ffmpeg", default=shutil.which("ffmpeg"))
     ap.add_argument("--oodle-dll", type=Path)
     args = ap.parse_args()
-    levels = sorted({lv.lower() for lv in (args.level or ["a10"])})
-    name = args.name or "_".join(levels)
+    association = None
+    if args.mission:
+        lf = json.loads((REPO_ROOT / "work/mcc/level_folders.json").read_text(encoding="utf-8"))
+        association = {"mission": args.mission.lower(), **mission_folders(lf, args.mission.lower())}
+        print(f"mission {args.mission}: folders {association['selected']} ({association['evidence']}); "
+              f"shared, not selected: {association['shared_not_selected']}")
+    levels = sorted({lv.lower() for lv in (args.level or [])} | set((association or {}).get("selected", []))
+                    or {"a10"})
+    name = args.name or (f"mission_{association['mission']}" if association and not args.level else "_".join(levels))
     out = REPO_ROOT / "work" / "m6" / name
     t0 = time.time()
 
@@ -260,6 +289,9 @@ def main():
     acts = Counter(e["action"] for e in plan["entries"])
     print(f"mappings {len(doc['slots'])} in {len(inv)} level(s): " +
           ", ".join(f"{lv} {v['mappings']}" for lv, v in inv.items()))
+    for f, v in folder_summary(plan["entries"]).items():
+        print(f"  {f}: " + ", ".join(f"{g} {v[g]}" for g in FOLDER_GROUPS if v[g]) +
+              f" (slots {v['slots']}, stereo {v['stereo']}, stereo replaced {v['stereo_replaced']})")
     print(f"plan {', '.join(levels)}: {acts.get('replace', 0)} replace, {acts.get('keep_original', 0)} keep Spain, "
           f"{acts.get('not_eligible', 0)} not eligible; conflicts {len(plan['conflicts'])}; subtitle text changes "
           f"{subs['summary']['approved_text_changes']} (generation disabled)")
@@ -315,11 +347,9 @@ def main():
     # current approved decisions for the selected levels, so re-plan from the file as it is now.
     doc_after, msha_after = mapping_store.load(REPO_ROOT / "mappings" / "manual_mappings.json")
     local_after = json.loads(local_p.read_text(encoding="utf-8")) if local_p.is_file() else None
-    checks["plan_unchanged_during_build"] = (
-        plan_audio(doc_after, levels, local=local_after, **idx)["entries"]
-        == plan_audio(doc, levels, local=local, **idx)["entries"]
-        and subtitle_plan(doc_after, set(levels), local=local_after, tables={t: app.loc.get(t) for t in ("SU", "SP")},
-                          **idx)["rows"] == subs["rows"])
+    # The build is consistent with the snapshot it read; later edits are reported, and m6_install.py
+    # refuses to install a build whose replaced lines are no longer the approved decisions.
+    drift_during = compare_plans(plan["entries"], plan_audio(doc_after, levels, local=local_after, **idx)["entries"])
     checks["lst_not_written"] = sha256_file(LST) == pins["spanish.lst"]["sha256"]
     ok = all(checks.values())
 
@@ -344,6 +374,8 @@ def main():
                            "size": len(cand), "growth_bytes": len(cand) - len(original)}],
         "not_written": ["halo1/sound/pc/lst/sounds_dialogs_spanish.lst.bin", "Data/ui/localization/SU_Halo1.bin",
                         "Data/ui/localization/SP_Halo1.bin"],
+        "decisions_changed_during_build": drift_during,
+        "mission_association": association, "folders": folder_summary(plan["entries"]),
         "counts": dict(acts), "radio_effect_slots": [e["slot_id"] for e in plan["entries"] if e["radio_effect"]],
         "slots": plan["entries"], "subtitles": subs, "level_status": inv,
     }
@@ -362,6 +394,10 @@ def main():
           f"{report['seconds']} s")
     for k in failed:
         print("  FAILED:", k)
+    if drift_during["changed_or_revoked"] or drift_during["newly_eligible"]:
+        print(f"  note: decisions changed in M4 during the build (built from the snapshot): "
+              f"{len(drift_during['changed_or_revoked'])} changed/revoked, {len(drift_during['newly_eligible'])} "
+              "newly approved; rebuild to include them (m6_install.py refuses changed/revoked ones)")
     for s, ks in list(bad_targets.items())[:10]:
         print("  target", s, "failed", ks)
     print(f"wrote work/m6/{name}/ (sounds_dialogs_spanish.fsb, build_manifest.json, validation_report.json, "

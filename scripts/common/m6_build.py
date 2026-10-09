@@ -104,6 +104,76 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
     return {"schema": PLAN_SCHEMA, "levels": sorted(levels), "entries": entries, "conflicts": conflicts}
 
 
+FOLDER_GROUPS = ("replace", "approved_keep_spain", "not_approved", "unmapped", "unsupported", "invalid")
+
+
+def entry_group(e):
+    """Report group of one planned slot (per folder, owner request 2026-10-08)."""
+    if e["action"] == "replace":
+        return "replace"
+    if e["mapping_id"] is None:
+        return "unmapped"
+    if e["action"] == "not_eligible":
+        return "unsupported" if e["reason"].startswith("unsupported") else "invalid"
+    if e["reason"].startswith("approved"):
+        return "approved_keep_spain"
+    return "not_approved"
+
+
+def folder_summary(entries):
+    """{folder: {group: count, slots, stereo, stereo_replaced}} in catalog-folder order."""
+    out = {}
+    for e in entries:
+        f = out.setdefault(e["level"], {**{g: 0 for g in FOLDER_GROUPS}, "slots": 0, "stereo": 0,
+                                        "stereo_replaced": 0})
+        f[entry_group(e)] += 1
+        f["slots"] += 1
+        f["stereo"] += e["channels"] > 1
+        f["stereo_replaced"] += e["channels"] > 1 and e["action"] == "replace"
+    return out
+
+
+def _built_key(e):
+    """What a built slot depends on: same action, mapping and source media -> same sample."""
+    return (e["action"], e.get("mapping_id"), e.get("ce_line_ref"), e.get("language"),
+            (e.get("media") or {}).get("wem_sha256"))
+
+
+def compare_plans(built_entries, current_entries):
+    """Built plan vs a plan from the current mappings.
+    -> {"changed_or_revoked": [...], "newly_eligible": [...]}: the first means the build no longer matches
+    an approved decision (do not install; rebuild); the second only means newer approvals are missing."""
+    cur = {e["slot_id"]: e for e in current_entries}
+    changed, new = [], []
+    for e in built_entries:
+        c = cur.get(e["slot_id"])
+        if e["action"] == "replace" and (c is None or _built_key(c) != _built_key(e)):
+            changed.append(e["slot_id"])
+        elif e["action"] != "replace" and c is not None and c["action"] == "replace":
+            new.append(e["slot_id"])
+    return {"changed_or_revoked": changed, "newly_eligible": new}
+
+
+def mission_folders(level_folders, mission):
+    """Dialogue folders of one playable map: its own folder plus cutscene folders (xNN) used by no other
+    campaign map, from work/mcc/level_folders.json (derived:map_tag_path_scan). Shared generic bark folders
+    are listed separately and not selected (milestone M-SYS)."""
+    lv = level_folders["levels"].get(mission)
+    if not lv:
+        raise ValueError(f"{mission} is not in level_folders.json (run build_level_folders.py)")
+    own, cine, shared = [], [], []
+    for f in lv["folders"]:
+        used = level_folders["folders"][f]["used_by"]
+        if f == mission:
+            own.append(f)
+        elif f.startswith("x") and f[1:].isdigit() and used == [mission]:
+            cine.append(f)
+        else:
+            shared.append(f)
+    return {"selected": own + sorted(cine), "cinematics": sorted(cine), "shared_not_selected": sorted(shared),
+            "evidence": lv["evidence"], "map_sha256": lv["map_sha256"]}
+
+
 def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, tables):
     """Dry run of approved subtitle decisions against each table independently.
 
