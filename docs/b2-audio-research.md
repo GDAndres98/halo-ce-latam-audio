@@ -783,6 +783,46 @@ built**. A local shortlist (`work/b2/e3_shortlist.md`) lists MCC slots and verif
 - determinism, delay padding and the profile guard;
 - validator pass and fail cases.
 
+### 5.11 E3 offline — ✅ PASS (2026-10-08)
+
+**Owner-selected experiment pairing**, confirmed by listening: MCC slot `es:A10_010_cryotech#0`
+(Spanish #0) ← CE `vo_scr_m01_00460_cryotech#0`, Spanish(Mexico). It is **not** written to
+`manual_mappings.json`; the permanent mapping decision belongs to M4.
+
+Run: `python scripts/discovery/b2_ce_replace.py --exp e3 --slot "es:A10_010_cryotech#0" --ce-ref
+"vo_scr_m01_00460_cryotech#0" --owner-selected` (about 35 s).
+
+| | Value |
+|---|---|
+| Source | es-MX WAV `e7612c63…` (from `.wem` `42b21129…`), 48 kHz mono, 3.629 s |
+| Derived | `work/derived/a4197541…/`: ffmpeg 9.0.1 → 44.1 kHz (160,025 samples), pad 128, CELT `fmod` profile, 370 B packets |
+| Slot #0 | 3.553 s (Spain, 156,672 samples) → **3.634 s** (160,256 samples, 313 frames); LOOP `0, n−2` |
+| Candidate | `work/b2/e3/sounds_dialogs_spanish.fsb`, **`fc6f7161662dcf8209357eec241eb70e2467c91b846aea69011ffb944308dda1`**, 309,323,456 B (+2,656 B) |
+| Reproducibility | the stream and bank are built twice in-process and the tool was run twice: same SHA-256 |
+
+**30/30 checks pass:**
+- **Structure:** sample count, names and order are unchanged. The header tail and
+  `sample_headers_size` are unchanged. The target stream, count, LOOP, head bits and chunk types are
+  as expected. **The other 5,695 samples are identical**, by model and by payload index. Earlier
+  offsets are unchanged, and later offsets shift by exactly the growth, 32-byte aligned. The size
+  equation and data-size delta hold, and the bank round-trips. **`.lst.bin` is unchanged.**
+- **Decoding:**
+  - vgmstream decodes **all 5,696 subsongs**, and **only subsong 1 differs**;
+  - it reports 160,256 samples for the target, `Custom CELT`;
+  - vgmstream's decode equals our own decode;
+  - **content SNR is 45.1 dB** against the 44.1 kHz source.
+- **Signal:**
+  - **no clipping** (peak 20,843 → 20,855; 0 full-scale samples);
+  - **not truncated** (the last 100 ms of the source decode at 34.1 dB);
+  - after the source ends there are only 103 samples of pure silence;
+  - the duration covers source + delay within one frame.
+
+The clipping, tail and after-end checks are now permanent checks in `b2_ce_replace.py`, for every
+future line.
+
+**Sheet:** `work/b2/e3/e3_install_rollback.md`, using `b2_bank_install.py --exp e3`. **Not
+installed; E3-game needs approval.**
+
 ## 6. Risks
 
 | ID | Risk | Impact | Mitigation / test |

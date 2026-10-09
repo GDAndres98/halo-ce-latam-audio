@@ -19,8 +19,10 @@ Example:
 import argparse
 import hashlib
 import json
+import math
 import shutil
 import sys
+from array import array
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -129,10 +131,25 @@ def main():
     vgm_pcm = vgm_target[vgm_target.index(b"data") + 8:]
     content_snr = snr_db(res["pcm"], vgm_pcm)
     src_samples = len(res["pcm"]) // 2
+    src_a, dec_a = array("h", res["pcm"]), array("h", vgm_pcm)
+    tail = min(4410, src_samples)  # last 100 ms of the source, aligned for the codec delay
+    tail_snr = snr_db(res["pcm"][-tail * 2:], vgm_pcm[(src_samples - tail) * 2:], lag=128)
+    tail_silent = max((abs(v) for v in src_a[-tail:]), default=0) < 64
+    full_scale = sum(1 for v in dec_a if v in (32767, -32768))
+    full_scale_src = sum(1 for v in src_a if v in (32767, -32768))
+    after_end = dec_a[128 + src_samples:]
+    extra = {"peak_source": max(map(abs, src_a)), "peak_decoded": max(map(abs, dec_a)),
+             "full_scale_samples_decoded": full_scale, "full_scale_samples_source": full_scale_src,
+             "tail_100ms_snr_db": round(tail_snr, 1) if math.isfinite(tail_snr) else str(tail_snr),
+             "samples_after_source_end": len(after_end),
+             "max_abs_after_source_end": max(map(abs, after_end), default=0)}
     checks.update({
         "vgm_target_equals_own_decode": vgm_pcm == res["decoded"][:len(vgm_pcm)],
         "content_snr_vs_source_ok": content_snr >= MIN_CONTENT_SNR_DB,
         "duration_covers_source_plus_delay": src_samples + 128 <= res["sample_count"] < src_samples + 128 + 512,
+        "no_new_clipping": full_scale <= full_scale_src,
+        "tail_not_truncated": tail_silent or tail_snr >= 20.0,
+        "silence_after_source_end": extra["max_abs_after_source_end"] < 64,
         "lst_untouched": hashlib.sha256((REPO_ROOT / "reference-audio" / "stage1" / "lst" /
                                          "sounds_dialogs_spanish.lst.bin").read_bytes()).hexdigest()
         == pins["spanish.lst"],
@@ -157,7 +174,7 @@ def main():
         "target": {"index": index, "slot_id": args.slot, "original_sample_count": slot["sample_count"],
                    "original_seconds": round(slot["sample_count"] / 44100, 3), "new_sample_count": res["sample_count"],
                    "new_seconds": seconds, "source_seconds": res["recipe"]["source"]["seconds"]},
-        "content_snr_db": round(content_snr, 1), "target_meta": target_meta,
+        "content_snr_db": round(content_snr, 1), "signal_checks": extra, "target_meta": target_meta,
         "hashes": {"original_bank": pins["spanish.fsb"], "candidate": cand_sha},
         "note": "offline only; nothing installed",
     }

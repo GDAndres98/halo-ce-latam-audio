@@ -109,8 +109,11 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - `b2_pipeline_survey.py`: all 194 M01 es-MX lines pass (41–48 dB).
       - `b2_ce_replace.py --exp e3 --slot … --ce-ref … --owner-selected`
         refuses to run without owner selection.
-      - **No E3 candidate yet:** waiting for the owner's pairing choice.
-        Never pick one.
+      - **E3 offline ✅:** owner-selected pair `es:A10_010_cryotech#0`
+        ← `vo_scr_m01_00460_cryotech#0` (experiment only, **not** in
+        `manual_mappings.json`). Candidate `fc6f7161…`: 30/30 checks,
+        3.553 s → 3.634 s, 45.1 dB, reproducible. **E3-game not
+        approved.** Never pick pairings yourself.
     - **M4** design: `docs/m4-matching-ui-design.md`. **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.
