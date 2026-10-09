@@ -105,6 +105,12 @@
                             "properties": {"start_s": {"type": "number", "minimum": 0},
                                            "end_s": {"type": "number", "minimum": 0}}}
                 },
+                "silences": {
+                  "type": "array",
+                  "items": {"type": "object", "required": ["at_s", "dur_s"], "additionalProperties": false,
+                            "properties": {"at_s": {"type": "number", "minimum": 0},
+                                           "dur_s": {"type": "number", "minimum": 0.01, "maximum": 5}}}
+                },
                 "fade_in_ms": {"type": "number", "minimum": 0, "maximum": 500},
                 "fade_out_ms": {"type": "number", "minimum": 0, "maximum": 500},
                 "crossfade_ms": {"type": "number", "minimum": 0, "maximum": 200},

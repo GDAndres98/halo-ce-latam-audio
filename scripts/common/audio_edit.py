@@ -8,6 +8,7 @@ rendered: unedited lines keep the original pipeline byte for byte. A non-identit
      "engine": "audio-edit/1",
      "for_source": {"ce_line_ref": "...#0", "language": "Spanish(Mexico)"},
      "cuts": [{"start_s": 1.20, "end_s": 1.45}],      # interior sections removed (source seconds)
+     "silences": [{"at_s": 0.80, "dur_s": 0.30}],     # silence inserted at a source time (exact length)
      "fade_in_ms": 10, "fade_out_ms": 10,             # half-cosine fades on the edited edges
      "crossfade_ms": 20,                              # equal-power crossfade at every cut
      "speed": 1.08,                                   # pitch-preserving tempo (rubberband via ffmpeg)
@@ -20,6 +21,9 @@ depends on an earlier step. Render order, on the 44.1 kHz mono PCM the pipeline 
     1. keep [trim_start, end - trim_end] minus the cuts; crossfade each junction
     2. fade in / fade out
     3. tempo (if speed != 1): ffmpeg rubberband, fixed speech settings, pitch and formants preserved
+    3b. inserted silences, placed where their source time lands after steps 1-3, with short half-cosine
+       fades on both sides (crossfade_ms / 2); inserted after the tempo so their length is exact.
+       Digital silence (no room tone); BS.1770 gating ignores it, so loudness matching is unaffected.
     4. gain = manual + (match_mcc: MCC loudness + offset - edited loudness), both ITU-R BS.1770-4
        gated integrated loudness
     5. peaks: `limiter` true (default) -> look-ahead peak limiter at -1 dBFS (5 ms look-ahead, 80 ms
@@ -43,9 +47,10 @@ ENGINE = "audio-edit/1"
 EDIT_ZERO = {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}
 SAMPLE_RATE = 44100
 LOUDNESS_MODES = ("off", "match_mcc")
+SILENCE_S = (0.01, 5.0)  # one inserted silence
 LIMITS = {"speed": (0.5, 2.0), "gain_db": (-24.0, 24.0), "offset_db": (-12.0, 12.0),
           "fade_in_ms": (0, 500), "fade_out_ms": (0, 500), "crossfade_ms": (0, 200)}
-DEFAULTS = {"cuts": [], "fade_in_ms": 0, "fade_out_ms": 0, "crossfade_ms": 20, "speed": 1.0, "gain_db": 0.0,
+DEFAULTS = {"cuts": [], "silences": [], "fade_in_ms": 0, "fade_out_ms": 0, "crossfade_ms": 20, "speed": 1.0, "gain_db": 0.0,
             "loudness": {"mode": "off", "offset_db": 0.0}, "limiter": True}
 LIMITER = {"lookahead_ms": 5.0, "release_ms": 80.0}
 MAX_MATCH_PASSES = 6
@@ -64,7 +69,7 @@ def is_identity(edit):
     """True when the recipe changes nothing (gap_s only matters between concatenated lines)."""
     e = edit or {}
     lo = e.get("loudness") or {}
-    return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts")
+    return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts") and not e.get("silences")
             and float(e.get("speed", 1.0)) == 1.0 and not e.get("gain_db")
             and lo.get("mode", "off") == "off" and not e.get("fade_in_ms") and not e.get("fade_out_ms"))
 
@@ -96,12 +101,19 @@ def normalize(edit, for_source=None):
             raise EditError("each cut is {start_s, end_s}")
         cuts.append({"start_s": _r(_num(c["start_s"], "cut start"), 3), "end_s": _r(_num(c["end_s"], "cut end"), 3)})
     cuts.sort(key=lambda c: (c["start_s"], c["end_s"]))
+    silences = []
+    for c in e.get("silences") or []:
+        if not isinstance(c, dict) or set(c) != {"at_s", "dur_s"}:
+            raise EditError("each inserted silence is {at_s, dur_s}")
+        silences.append({"at_s": _r(_num(c["at_s"], "silence position"), 3),
+                         "dur_s": _r(_num(c["dur_s"], "silence length"), 3)})
+    silences.sort(key=lambda c: c["at_s"])
     lo = e.get("loudness") or DEFAULTS["loudness"]
     if not isinstance(lo, dict) or set(lo) - {"mode", "offset_db"}:
         raise EditError("loudness is {mode, offset_db}")
     if lo.get("mode", "off") not in LOUDNESS_MODES:
         raise EditError(f"loudness mode must be one of {LOUDNESS_MODES}")
-    rec = {**out, "engine": ENGINE, "for_source": None, "cuts": cuts,
+    rec = {**out, "engine": ENGINE, "for_source": None, "cuts": cuts, "silences": silences,
            "fade_in_ms": _r(_num(e.get("fade_in_ms", 0), "fade_in_ms"), 0),
            "fade_out_ms": _r(_num(e.get("fade_out_ms", 0), "fade_out_ms"), 0),
            "crossfade_ms": _r(_num(e.get("crossfade_ms", DEFAULTS["crossfade_ms"]), "crossfade_ms"), 0),
@@ -147,6 +159,19 @@ def problems(edit, duration_s=None):
         if c["start_s"] < prev:
             out.append(f"cut {c['start_s']}-{c['end_s']} overlaps the start trim or another cut")
         prev = max(prev, c["end_s"])
+    last = None
+    for c in e.get("silences") or []:
+        if not SILENCE_S[0] <= c["dur_s"] <= SILENCE_S[1]:
+            out.append(f"silence at {c['at_s']} s: length {c['dur_s']} outside {SILENCE_S[0]}..{SILENCE_S[1]} s")
+        if c["at_s"] < ts:
+            out.append(f"silence at {c['at_s']} s is inside the start trim")
+        if any(k["start_s"] < c["at_s"] < k["end_s"] for k in e.get("cuts") or []):
+            out.append(f"silence at {c['at_s']} s is inside a cut")
+        if last is not None and c["at_s"] == last:
+            out.append(f"two silences at {c['at_s']} s (merge them)")
+        last = c["at_s"]
+        if duration_s is not None and c["at_s"] > duration_s - te:
+            out.append(f"silence at {c['at_s']} s is past the end trim")
     if duration_s is not None:
         end = duration_s - te
         if prev > end:
@@ -167,6 +192,9 @@ def summary(edit):
     if e["cuts"]:
         bits.append(f"{len(e['cuts'])} cut{'s' if len(e['cuts']) > 1 else ''} "
                     f"({sum(c['end_s'] - c['start_s'] for c in e['cuts']):.2f} s)")
+    if e.get("silences"):
+        bits.append(f"+{len(e['silences'])} silence{'s' if len(e['silences']) > 1 else ''} "
+                    f"({sum(c['dur_s'] for c in e['silences']):.2f} s)")
     if e["speed"] != 1:
         bits.append(f"speed ×{e['speed']:g}")
     if e["loudness"]["mode"] == "match_mcc":
@@ -313,6 +341,35 @@ def splice(x, segs, crossfade_samples):
     return out
 
 
+def spliced_position(t, edit, fs=SAMPLE_RATE):
+    """Sample index in the spliced signal (trims and cuts applied) of source time t (not inside a cut)."""
+    pos = int(round(t * fs)) - int(round(edit["trim_start_s"] * fs))
+    for c in edit["cuts"]:
+        s, e = int(round(c["start_s"] * fs)), int(round(c["end_s"] * fs))
+        if e <= int(round(t * fs)):
+            pos -= e - s
+    return max(0, pos)
+
+
+def insert_silences(y, points, fade_samples):
+    """points: [(sample index, length)] ascending. Fades out before / in after each, then zeros."""
+    out, at = [], 0
+    for p, n in points:
+        p = min(max(p, at), len(y))
+        piece = list(y[at:p])
+        h = min(fade_samples, len(piece))
+        for i in range(h):
+            piece[len(piece) - 1 - i] *= _half_cos(i, h)
+        out.extend(piece)
+        out.extend([0.0] * n)
+        at = p
+        h = min(fade_samples, len(y) - p)
+        for i in range(h):
+            y[p + i] *= _half_cos(i, h)
+    out.extend(y[at:])
+    return out
+
+
 def fade(x, fade_in, fade_out):
     n = len(x)
     fi, fo = min(fade_in, n // 2), min(fade_out, n // 2)
@@ -399,6 +456,13 @@ def render(pcm, edit, *, ffmpeg=None, ref_lufs=None, fs=SAMPLE_RATE):
         if not ffmpeg:
             raise EditError("ffmpeg is needed for a speed change")
         y = tempo(y, edit["speed"], ffmpeg, fs)
+    inserted = 0
+    if edit.get("silences"):
+        ratio = len(y) / spliced if spliced else 1.0
+        pts = [(int(round(spliced_position(c["at_s"], edit, fs) * ratio)), int(round(c["dur_s"] * fs)))
+               for c in edit["silences"]]
+        inserted = sum(n for _, n in pts)
+        y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
     measured, method = loudness(y, fs)
     auto = 0.0
     lo = edit["loudness"]
@@ -440,6 +504,7 @@ def render(pcm, edit, *, ffmpeg=None, ref_lufs=None, fs=SAMPLE_RATE):
     stats = {"engine": ENGINE, "source_samples": n, "source_s": round(n / fs, 3),
              "kept_segments_s": [[round(s / fs, 3), round(e / fs, 3)] for s, e in segs],
              "spliced_samples": spliced, "spliced_s": round(spliced / fs, 3),
+             "inserted_silence_s": round(inserted / fs, 3),
              "output_samples": len(final), "output_s": round(len(final) / fs, 3),
              "speed": edit["speed"], "tempo_filter": tempo_filter(edit["speed"]) if edit["speed"] != 1 else None,
              "loudness_method": method, "loudness_before_gain_lufs": _rnd(measured),

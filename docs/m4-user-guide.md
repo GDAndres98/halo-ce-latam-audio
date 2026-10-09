@@ -139,9 +139,9 @@ applies when it builds the bank.
 
 **The screen:**
 - **Top waveform:** the CE source.
-  - Drag on it to **select**. Click to play from that point.
+  - Drag on it to **select**. Click to set the **cursor** (thin line) and play from that point.
   - Drag the black **handles** at the edges to **trim**.
-  - Grey = trimmed, red hatching = cut.
+  - Grey = trimmed, red hatching = cut, green marker = inserted silence (labelled with its length).
 - **Spain** and **Edited, as M6 encodes it** are drawn on one shared time scale, so you can compare
   lengths.
 - **Stats:** durations (source → edited, Spain, Δ), loudness (CE → output, Spain), applied gain,
@@ -156,16 +156,27 @@ applies when it builds the bank.
 | ▶ Spain / ■ | the original MCC recording / stop |
 | ✂ **Cut selection** | removes an interior section. Each junction gets an equal-power **crossfade** (default 20 ms), and exactly the selected length is removed. Overlapping cuts merge. ▶ next to a cut plays the original around it; × removes it. |
 | **Keep only selection** | sets both trims to the selection |
+| **＋ Insert silence** (length in s) | adds that much silence at the cursor, or at the start of the selection. Inserting again at the same point lengthens it. Refused inside a cut or a trimmed part. |
+| **Replace selection with silence** | sets a pause to an exact length: cuts the selection and puts exactly the given silence in its place. Select a pause and enter `0.10` to shorten it to 0.1 s, or a longer value to lengthen it. |
+| Silences list | `+0.25 s @ 0.90 s ×`: × removes one. Cuts and trims drop any silence that ends up inside them. |
 | Trim start / end, Fade in / out, Crossfade | exact values. Trimming an edge for the first time adds a 10 ms fade there; set it to 0 if you don't want one. |
-| **Speed** | pitch- and formant-preserving tempo (ffmpeg `rubberband`). `1.10` = 10 % faster and shorter. **Fit to Spain duration** computes the speed that makes the edited line as long as the Spain one. |
+| **Speed** | pitch- and formant-preserving tempo (ffmpeg `rubberband`). `1.10` = 10 % faster and shorter. **Fit to Spain duration** computes the speed that makes the edited line as long as the Spain one, counting inserted silences at their exact length. |
 | **Match Spain loudness** + offset | automatic gain to the ITU-R BS.1770 loudness of **this slot's original Spain recording**. The offset moves the target (for example −2 dB). |
 | **Gain** | manual gain on top of everything (dB) |
 | **Peak limiter** | on (default): a look-ahead limiter keeps peaks at −1 dBFS, so the loudness match can actually reach Spain's level. CE lines are about 7 dB quieter than the Spain recordings (`a10` survey: 58 of 60 can't reach it with gain alone). Off: the gain is lowered until the peak fits instead. |
 | **Reset edits** | back to the unedited recording |
 
-**Order of operations** (always the same, in M4 and M6): trims and cuts → fades → speed → gain
-(loudness match + manual) → limiter → 16-bit. Recipe times are on the source's timeline (the top
-waveform).
+**Order of operations** (always the same, in M4 and M6): trims and cuts → fades → speed →
+inserted silences → gain (loudness match + manual) → limiter → 16-bit. Recipe times are on the
+source's timeline (the top waveform).
+
+**About inserted silences:**
+- They are added after the speed change, so a 0.30 s silence stays exactly 0.30 s at any speed.
+- The audio on either side gets a short fade (half the crossfade setting, 10 ms by default), so
+  there is no click.
+- The silence is digital silence, not room tone. CE's studio dialogue is normally clean, but listen
+  for an audible "drop" in noisy lines.
+- Loudness gating ignores silence, so adding pauses doesn't change the loudness match.
 
 **Rules:**
 - **Previews are rendered on the server** about 0.4 s after a change. The first render of a line

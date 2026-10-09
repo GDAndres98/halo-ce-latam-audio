@@ -567,18 +567,19 @@ async function save(actions, reworkOnly) {
 // ---------------------------------------------------------------- audio editor (non-destructive recipe)
 // The recipe is part of the audio decision (audio.edit): Save / Approve audio store it, approval locks it,
 // "needs rework" unlocks it. Previews come from the server, rendered by the same code M6 builds with.
-const editDefault = () => ({ trim_start_s: 0, trim_end_s: 0, gap_s: 0, cuts: [], fade_in_ms: 0, fade_out_ms: 0,
+const editDefault = () => ({ trim_start_s: 0, trim_end_s: 0, gap_s: 0, cuts: [], silences: [], fade_in_ms: 0, fade_out_ms: 0,
   crossfade_ms: 20, speed: 1, gain_db: 0, loudness: { mode: "off", offset_db: 0 }, limiter: true });
 function editFrom(stored) {
   const d = editDefault(); if (!stored) return d;
   const e = Object.assign(d, JSON.parse(JSON.stringify(stored)));
   e.loudness = Object.assign({ mode: "off", offset_db: 0 }, stored.loudness || {});
   e.cuts = (stored.cuts || []).map(c => ({ start_s: c.start_s, end_s: c.end_s }));
+  e.silences = (stored.silences || []).map(c => ({ at_s: c.at_s, dur_s: c.dur_s }));
   if (e.limiter === undefined) e.limiter = true;
   return e;
 }
 function editIsIdentity(e) {
-  return !e.trim_start_s && !e.trim_end_s && !e.cuts.length && +e.speed === 1 && !e.gain_db &&
+  return !e.trim_start_s && !e.trim_end_s && !e.cuts.length && !e.silences.length && +e.speed === 1 && !e.gain_db &&
     e.loudness.mode === "off" && !e.fade_in_ms && !e.fade_out_ms;
 }
 function editSummary(e) {   // mirrors audio_edit.summary()
@@ -586,6 +587,7 @@ function editSummary(e) {   // mirrors audio_edit.summary()
   const b = [];
   if (e.trim_start_s || e.trim_end_s) b.push(`trim ${(+e.trim_start_s).toFixed(2)}/${(+e.trim_end_s).toFixed(2)} s`);
   if (e.cuts.length) b.push(`${e.cuts.length} cut${e.cuts.length > 1 ? "s" : ""} (${e.cuts.reduce((a, c) => a + c.end_s - c.start_s, 0).toFixed(2)} s)`);
+  if (e.silences.length) b.push(`+${e.silences.length} silence${e.silences.length > 1 ? "s" : ""} (${e.silences.reduce((a, c) => a + c.dur_s, 0).toFixed(2)} s)`);
   if (+e.speed !== 1) b.push(`speed ×${+e.speed}`);
   if (e.loudness.mode === "match_mcc") b.push("match MCC loudness" + (e.loudness.offset_db ? ` ${e.loudness.offset_db > 0 ? "+" : ""}${e.loudness.offset_db} dB` : ""));
   if (e.gain_db) b.push(`gain ${e.gain_db > 0 ? "+" : ""}${e.gain_db} dB`);
@@ -706,6 +708,13 @@ function drawEditor() {
       for (let x = X(c.start_s) - h; x < X(c.end_s); x += 7) { g.moveTo(Math.max(x, X(c.start_s)), x < X(c.start_s) ? h - (X(c.start_s) - x) : h); g.lineTo(Math.min(x + h, X(c.end_s)), x + h > X(c.end_s) ? h - (X(c.end_s) - x) : 0); }
       g.stroke();
     }
+    g.font = "10px system-ui"; g.textAlign = "center";
+    for (const c of e.silences) {
+      g.fillStyle = cssVar("--ok"); g.fillRect(X(c.at_s) - 1, 0, 3, h);
+      g.beginPath(); g.moveTo(X(c.at_s) - 6, 0); g.lineTo(X(c.at_s) + 6, 0); g.lineTo(X(c.at_s), 9); g.fill();
+      g.fillText("+" + c.dur_s.toFixed(2), X(c.at_s), h - 3);
+    }
+    if (ed.cursor != null) { g.fillStyle = cssVar("--muted"); g.fillRect(X(ed.cursor), 0, 1, h); }
     if (ed.sel) { g.fillStyle = rgba(cssVar("--accent"), .22); g.fillRect(X(ed.sel[0]), 0, X(ed.sel[1]) - X(ed.sel[0]), h); }
     g.fillStyle = cssVar("--ink");
     for (const t of [e.trim_start_s, dur - e.trim_end_s]) { g.fillRect(X(t) - 1, 0, 2, h); g.fillRect(X(t) - 4, 0, 8, 6); g.fillRect(X(t) - 4, h - 6, 8, 6); }
@@ -734,7 +743,7 @@ function renderEditor() {
   box.innerHTML = `<div class="ed ${locked ? "locked" : ""}">
     <div class="row" style="margin-top:0"><b class="small">Audio editor</b> <span class="badge ${editIsIdentity(ce) ? "" : "edited"}" id="edSum">${esc(editSummary(ce))}</span>
       <span class="small muted grow" id="edStatus"></span></div>
-    <div class="lbl"><span>CE source · drag to select · drag the black handles to trim · click to play from there</span><span id="edSel"></span></div>
+    <div class="lbl"><span>CE source · drag to select · drag the black handles to trim · click to set the cursor and play · green = inserted silence</span><span id="edSel"></span></div>
     <canvas class="src" id="wvSrc"></canvas>
     <div class="row">
       <button id="edPlayO" title="original CE recording (O)">▶ Original</button>
@@ -748,8 +757,13 @@ function renderEditor() {
       <button id="edCut" ${dis} title="remove the selected section (crossfaded)">✂ Cut selection</button>
       <button id="edKeep" ${dis} title="trim to the selection">Keep only selection</button>
       <button id="edClear">Clear selection</button>
-      <span id="edCuts"></span>
     </div>
+    <div class="row ctl">
+      <span class="grp" title="length of a silence to insert">Silence <input type="number" id="edSilLen" step="0.05" min="0.01" max="5" value="0.30" ${dis}> s</span>
+      <button id="edSilIns" ${dis} title="insert silence at the cursor (last click) or at the start of the selection">＋ Insert silence</button>
+      <button id="edSilRep" ${dis} title="remove the selection and put exactly this much silence in its place (set a pause length)">Replace selection with silence</button>
+    </div>
+    <div class="row ctl"><span id="edCuts"></span></div>
     <div class="row ctl">
       <span class="grp">Trim start <input type="number" id="edTs" step="0.01" min="0" ${dis}> s</span>
       <span class="grp">Trim end <input type="number" id="edTe" step="0.01" min="0" ${dis}> s</span>
@@ -788,8 +802,12 @@ function fillEditorInputs() {
 }
 function renderCuts() {
   const e = S.edit.audio.edit, locked = edLocked();
-  $("edCuts").innerHTML = e.cuts.length ? "cuts: " + e.cuts.map((c, i) => `<span class="cutchip">${c.start_s.toFixed(2)}–${c.end_s.toFixed(2)} s
-    <button class="play" data-cutplay="${i}" title="play across the cut (original)">▶</button>${locked ? "" : `<button class="play" data-cutrm="${i}" title="remove this cut">×</button>`}</span>`).join("") : "";
+  $("edCuts").innerHTML = ((e.cuts.length ? "cuts: " + e.cuts.map((c, i) => `<span class="cutchip">${c.start_s.toFixed(2)}–${c.end_s.toFixed(2)} s
+    <button class="play" data-cutplay="${i}" title="play across the cut (original)">▶</button>${locked ? "" : `<button class="play" data-cutrm="${i}" title="remove this cut">×</button>`}</span>`).join("") : "") +
+    (e.silences.length ? " silences: " + e.silences.map((c, i) => `<span class="cutchip" style="border-left:3px solid var(--ok)">+${c.dur_s.toFixed(2)} s @ ${c.at_s.toFixed(2)} s
+    ${locked ? "" : `<button class="play" data-silrm="${i}" title="remove this silence">×</button>`}</span>`).join("") : "")) ||
+    '<span class="small muted">no cuts or inserted silences</span>';
+  document.querySelectorAll("[data-silrm]").forEach(b => b.onclick = () => { e.silences.splice(+b.dataset.silrm, 1); edChanged(true); });
   document.querySelectorAll("[data-cutrm]").forEach(b => b.onclick = () => { e.cuts.splice(+b.dataset.cutrm, 1); edChanged(true); });
   document.querySelectorAll("[data-cutplay]").forEach(b => b.onclick = () => { const c = e.cuts[+b.dataset.cutplay]; edPlayOriginal(Math.max(0, c.start_s - 0.6), c.end_s + 0.6); });
 }
@@ -851,6 +869,7 @@ async function renderPreview() {
 function edChanged(structural) {
   const e = S.edit.audio.edit;
   e.cuts.sort((a, b) => a.start_s - b.start_s);
+  e.silences.sort((a, b) => a.at_s - b.at_s);
   setDirty();
   const sum = $("edSum"); if (sum) { sum.textContent = editSummary(e); sum.className = "badge " + (editIsIdentity(e) ? "" : "edited"); }
   if (structural) renderCuts();
@@ -877,7 +896,9 @@ function wireEditor() {
   $("edFit").onclick = () => {
     const sp = S.detail.spanish.duration_s, src = S.ed.srcBuf; if (!sp || !src) return toast("load the audio first", "err");
     const kept = src.duration - e.trim_start_s - e.trim_end_s - e.cuts.reduce((a, c) => a + c.end_s - c.start_s, 0);
-    e.speed = Math.round(Math.max(0.5, Math.min(2, kept / sp)) * 100) / 100; edChanged();
+    const room = sp - e.silences.reduce((a, c) => a + c.dur_s, 0);   // inserted silences keep their length
+    if (room <= 0.05) return toast("the inserted silences alone are longer than the Spain line", "err");
+    e.speed = Math.round(Math.max(0.5, Math.min(2, kept / room)) * 100) / 100; edChanged();
   };
   $("edReset").onclick = () => {
     if (editIsIdentity(e) || confirm("Reset all audio edits for this slot? (Takes effect when you save.)")) {
@@ -893,11 +914,43 @@ function wireEditor() {
   $("edClear").onclick = () => { S.ed.sel = null; $("edSel").textContent = ""; drawEditor(); };
   $("edCut").onclick = () => {
     const s = S.ed.sel; if (!s) return toast("drag on the waveform to select the section to remove");
-    const lo = Math.max(s[0], e.trim_start_s), hi = Math.min(s[1], dur() - e.trim_end_s);
-    if (hi - lo < 0.005) return toast("the selection is outside the kept audio", "err");
-    let cuts = e.cuts.concat([{ start_s: r3(lo), end_s: r3(hi) }]).sort((a, b) => a.start_s - b.start_s), merged = [];
+    if (addCut(s[0], s[1]) == null) return;
+    S.ed.sel = null; $("edSel").textContent = ""; edChanged(true);
+  };
+  // Cut [a, b] (clamped to the kept audio); silences strictly inside it go. -> the cut's start, or null.
+  const addCut = (a, b) => {
+    const lo = r3(Math.max(a, e.trim_start_s)), hi = r3(Math.min(b, dur() - e.trim_end_s));
+    if (hi - lo < 0.005) { toast("the selection is outside the kept audio", "err"); return null; }
+    const cuts = e.cuts.concat([{ start_s: lo, end_s: hi }]).sort((x, y) => x.start_s - y.start_s), merged = [];
     for (const c of cuts) { const m = merged[merged.length - 1]; if (m && c.start_s <= m.end_s) m.end_s = Math.max(m.end_s, c.end_s); else merged.push({ ...c }); }
-    e.cuts = merged; S.ed.sel = null; $("edSel").textContent = ""; edChanged(true);
+    e.cuts = merged;
+    e.silences = e.silences.filter(x => !e.cuts.some(c => c.start_s < x.at_s && x.at_s < c.end_s));
+    return merged.find(c => c.start_s <= lo && lo <= c.end_s).start_s;
+  };
+  const silLen = () => { const v = parseFloat($("edSilLen").value); return isNaN(v) ? null : Math.round(Math.max(0.01, Math.min(5, v)) * 1000) / 1000; };
+  // Insert (or lengthen) a silence at source time t; refused inside a cut or a trimmed part.
+  const addSilence = (t, len) => {
+    t = r3(t);
+    if (t < e.trim_start_s || t > dur() - e.trim_end_s) { toast("the position is in a trimmed part", "err"); return false; }
+    if (e.cuts.some(c => c.start_s < t && t < c.end_s)) { toast("the position is inside a cut", "err"); return false; }
+    const same = e.silences.find(x => x.at_s === t);
+    if (same) same.dur_s = Math.min(5, r3(same.dur_s + len)); else e.silences.push({ at_s: t, dur_s: len });
+    return true;
+  };
+  $("edSilIns").onclick = () => {
+    const len = silLen(), t = S.ed.sel ? S.ed.sel[0] : S.ed.cursor;
+    if (len == null) return toast("enter a silence length", "err");
+    if (t == null) return toast("click on the waveform to place the cursor (or select a range)");
+    if (addSilence(t, len)) edChanged(true);
+  };
+  $("edSilRep").onclick = () => {
+    const len = silLen(), s = S.ed.sel;
+    if (len == null) return toast("enter a silence length", "err");
+    if (!s) return toast("select the pause to replace");
+    const at = addCut(s[0], s[1]); if (at == null) return;
+    e.silences = e.silences.filter(x => x.at_s !== at);
+    addSilence(at, len);
+    S.ed.sel = null; $("edSel").textContent = ""; edChanged(true);
   };
   $("edKeep").onclick = () => {
     const s = S.ed.sel; if (!s) return toast("drag on the waveform to select the part to keep");
@@ -905,6 +958,7 @@ function wireEditor() {
     if (!e.trim_end_s && s[1] < dur() && !e.fade_out_ms) e.fade_out_ms = 10;
     e.trim_start_s = r3(s[0]); e.trim_end_s = r3(Math.max(0, dur() - s[1]));
     e.cuts = e.cuts.filter(c => c.start_s >= e.trim_start_s && c.end_s <= dur() - e.trim_end_s);
+    e.silences = e.silences.filter(x => x.at_s >= e.trim_start_s && x.at_s <= dur() - e.trim_end_s);
     S.ed.sel = null; $("edSel").textContent = ""; edChanged(true);
   };
   // waveform: drag a trim handle (unlocked), drag to select, click to play from there
@@ -932,8 +986,12 @@ function wireEditor() {
         if (dr.mode === "ts" && e.trim_start_s && !e.fade_in_ms) e.fade_in_ms = 10;
         if (dr.mode === "te" && e.trim_end_s && !e.fade_out_ms) e.fade_out_ms = 10;
         e.cuts = e.cuts.filter(c => c.start_s >= e.trim_start_s && c.end_s <= d - e.trim_end_s);
+        e.silences = e.silences.filter(x => x.at_s >= e.trim_start_s && x.at_s <= d - e.trim_end_s);
         edChanged(true);
-      } else if (!dr.moved) { edPlayOriginal(edTimeAt(uv)); }
+      } else if (!dr.moved) {
+        S.ed.cursor = r3(edTimeAt(uv)); S.ed.sel = null; $("edSel").textContent = `cursor ${S.ed.cursor.toFixed(3)} s`;
+        edPlayOriginal(S.ed.cursor);
+      }
     };
     window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
     ev.preventDefault();

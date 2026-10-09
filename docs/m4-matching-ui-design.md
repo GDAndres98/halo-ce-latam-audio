@@ -253,7 +253,8 @@ User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever
   file stays valid and byte-identical:
   - `engine`;
   - `for_source` (the CE line and language it was made for);
-  - `cuts`, `fade_in_ms`/`fade_out_ms`, `crossfade_ms`;
+  - `cuts`, `silences` (`[{at_s, dur_s}]`, inserted after the tempo so their length is exact),
+    `fade_in_ms`/`fade_out_ms`, `crossfade_ms`;
   - `speed`, `gain_db`, `loudness {mode: off|match_mcc, offset_db}`, `limiter`.
 
   All zero is the identity and is stored in the old three-field form.

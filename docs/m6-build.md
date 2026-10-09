@@ -99,8 +99,8 @@ Rules:
 - **The recipe** is the approved `audio.edit` (`audio-edit/1`, `common/audio_edit.py`). It is part of
   the approved audio object, so it can only change through *needs rework*.
 - **The render path:** `audio_pipeline.derive_edited` runs CE WAV → ffmpeg 44.1 kHz → recipe
-  (trims and cuts with crossfades → fades → rubberband speed → gain: loudness match + manual →
-  −1 dBFS look-ahead limiter → 16-bit) → codec padding → CELT `fmod` profile.
+  (trims and cuts with crossfades → fades → rubberband speed → inserted silences → gain: loudness
+  match + manual → −1 dBFS look-ahead limiter → 16-bit) → codec padding → CELT `fmod` profile.
   - This is the same function the M4 preview calls. The preview's *as encoded* audio is the
     libcelt decode of this exact stream.
   - The simulation on `es:A10_010_cryotech#0`: the preview is byte-identical to vgmstream's decode

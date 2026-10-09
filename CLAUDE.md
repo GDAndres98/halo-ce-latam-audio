@@ -162,7 +162,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       preflight/install without the owner's explicit approval for that build.**
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
-      fades, rubberband speed, BS.1770 loudness match to the slot's Spain recording (with a
+      inserted silences (exact length, placed after the speed step), fades, rubberband speed, BS.1770 loudness match to the slot's Spain recording (with a
       −1 dBFS look-ahead limiter) and manual gain.
       - M4 shows waveforms and previews (`common/edit_preview.py`, `work/m4/preview/`). The
         "as encoded" preview is byte-identical to the bank decode.

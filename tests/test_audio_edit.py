@@ -80,11 +80,27 @@ class RecipeTests(unittest.TestCase):
         r = ae.normalize({"cuts": [{"start_s": 1.5, "end_s": 1.9}]}, SRC)
         self.assertTrue(ae.problems(r, 1.6))   # cut past the end
 
+    def test_inserted_silence_rules(self):
+        r = ae.normalize({"silences": [{"at_s": 1.2, "dur_s": 0.3}, {"at_s": 0.4, "dur_s": 0.25}]}, SRC)
+        self.assertEqual([c["at_s"] for c in r["silences"]], [0.4, 1.2])   # sorted
+        self.assertFalse(ae.is_identity(r))
+        self.assertIn("+2 silences (0.55 s)", ae.summary(r))
+        for bad in ({"silences": [{"at_s": 0.5, "dur_s": 9}]}, {"silences": [{"at_s": 0.5}]},
+                    {"silences": [{"at_s": 0.05, "dur_s": 0.2}], "trim_start_s": 0.1},       # inside the start trim
+                    {"silences": [{"at_s": 1.0, "dur_s": 0.2}], "cuts": [{"start_s": 0.9, "end_s": 1.1}]},
+                    {"silences": [{"at_s": 1.0, "dur_s": 0.2}, {"at_s": 1.0, "dur_s": 0.1}]}):
+            with self.assertRaises(ae.EditError, msg=bad):
+                ae.normalize(bad, SRC)
+        ok = ae.normalize({"silences": [{"at_s": 0.9, "dur_s": 0.2}], "cuts": [{"start_s": 0.9, "end_s": 1.1}]}, SRC)
+        self.assertEqual(ae.problems(ok, 2.0), [])   # at a cut's edge is fine (replace a pause)
+        self.assertTrue(ae.problems(ae.normalize({"silences": [{"at_s": 1.9, "dur_s": 0.2}]}, SRC), 1.8))
+
     def test_schema_accepts_recipes_and_old_files_unchanged(self):
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
         edit_schema = schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"]
         r = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.5, "end_s": 0.6}], "speed": 1.1,
+                          "silences": [{"at_s": 0.8, "dur_s": 0.4}],
                           "loudness": {"mode": "match_mcc", "offset_db": -2}}, SRC)
         self.assertEqual(validate(r, {**edit_schema, "$defs": schema["$defs"]}), [])
         self.assertEqual(validate(dict(ae.EDIT_ZERO), {**edit_schema, "$defs": schema["$defs"]}), [])
@@ -115,6 +131,27 @@ class DspTests(unittest.TestCase):
         self.assertEqual(len(y), sum(b - a for a, b in segs))
         self.assertTrue(all(0.25 - 1e-9 <= v <= 0.25 * math.sqrt(2) + 1e-9 for v in y))  # equal-power: <= +3 dB
         self.assertEqual(ae.splice([0.0] * FS, segs, 882), [0.0] * len(y))
+
+    def test_inserted_silence_is_exact_and_in_place(self):
+        x = [0.25] * FS
+        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.3, "end_s": 0.4}], "crossfade_ms": 0,
+                          "silences": [{"at_s": 0.2, "dur_s": 0.05}, {"at_s": 0.6, "dur_s": 0.1}]}, SRC)
+        self.assertEqual(ae.spliced_position(0.2, e), 4410)        # 0.2 - 0.1 trim
+        self.assertEqual(ae.spliced_position(0.6, e), 26460 - 4410 - 4410)  # minus the trim and the cut before it
+        r = ae.render(ae.float_to_pcm16(x), e)
+        y = ae.pcm16_to_float(r["pcm"])
+        kept = FS - int(0.1 * FS) - int(0.1 * FS)
+        self.assertEqual(len(y), kept + int(0.05 * FS) + int(0.1 * FS))
+        self.assertEqual(r["stats"]["inserted_silence_s"], 0.15)
+        self.assertEqual(set(y[4410:4410 + 2205]), {0.0})                 # first silence
+        p2 = 17640 + 2205
+        self.assertEqual(set(y[p2:p2 + 4410]), {0.0})                     # second, after the cut
+        self.assertNotEqual(y[4409], 0.0)
+        self.assertNotEqual(y[4410 + 2205], 0.0)
+        faded = ae.render(ae.float_to_pcm16(x), dict(e, crossfade_ms=20))  # 10 ms fades either side
+        z = ae.pcm16_to_float(faded["pcm"])
+        self.assertLess(abs(z[4409]), 0.01)
+        self.assertLess(abs(z[4410 + 2205]), 0.01)
 
     def test_fades_and_limiter(self):
         y = ae.fade([1.0] * 1000, 100, 50)
@@ -158,6 +195,10 @@ class DspTests(unittest.TestCase):
         self.assertEqual(r1["pcm"], r2["pcm"])
         self.assertLessEqual(abs(r1["stats"]["output_samples"] - round(2.0 * FS / 1.25)), 2)
         self.assertIn("formant=preserved", r1["stats"]["tempo_filter"])
+        sil = ae.render(pcm, ae.normalize({"speed": 1.25, "silences": [{"at_s": 1.0, "dur_s": 0.5}]}, SRC), ffmpeg=FFMPEG)
+        self.assertEqual(sil["stats"]["output_samples"], r1["stats"]["output_samples"] + FS // 2)  # not stretched
+        mid = round(FS / 1.25)
+        self.assertEqual(set(array("h", sil["pcm"])[mid + 50:mid + FS // 2 - 50]), {0})
 
         def zero_cross_rate(p):  # pitch of a steady 440 Hz tone: unchanged when only the tempo changes
             a = array("h", p)[FS // 4:-FS // 4]
@@ -185,7 +226,7 @@ class ParityTests(unittest.TestCase):
 
     def test_edited_preview_equals_m6_build(self):
         e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.8, "end_s": 0.9}], "speed": 1.1,
-                          "fade_in_ms": 10, "loudness": {"mode": "match_mcc", "offset_db": -1}, "gain_db": 0.5}, SRC)
+                          "silences": [{"at_s": 0.5, "dur_s": 0.25}, {"at_s": 0.8, "dur_s": 0.1}], "fade_in_ms": 10, "loudness": {"mode": "match_mcc", "offset_db": -1}, "gain_db": 0.5}, SRC)
         prev = EditPreview(self.root, FFMPEG, Celt011)
         p = prev.render(self.src, e, -15.0)
         built = derive_edited(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived", ref_lufs=-15.0)
