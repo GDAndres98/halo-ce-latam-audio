@@ -60,7 +60,9 @@ class ConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "config").mkdir()
             (Path(tmp) / "config/audio_export.json").write_bytes((ROOT / "config/audio_export.example.json").read_bytes())
-            self.assertEqual(load_export_config(tmp)["global_gain_db"], 3.0)
+            c = load_export_config(tmp)                      # valid; its value is the owner's to choose
+            self.assertEqual(c["source"], "config/audio_export.json")
+            self.assertTrue(-12 <= c["global_gain_db"] <= 12)
 
 
 class GlobalGainTests(unittest.TestCase):

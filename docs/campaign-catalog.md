@@ -102,7 +102,7 @@ There are also standing guards:
 |---|---|---|
 | Levels without mission scope | Only `a10 ↔ M01` is in `mission_map.json`. | Owner adds entries (M4 also searches all missions). |
 | Cutscene scoping | **Resolved:** `mission-map/1` now accepts `x10`–`x70`. No entry was added. | Owner adds entries if wanted. |
-| Generic barks have no CE catalog | CE combat barks live under `Audio/Systemic` (2,280 packages). | **Deferred** to milestone M-SYS (owner, 2026-10-08). |
+| Generic barks have no CE catalog | **Resolved (M-SYS, owner request 2026-10-10):** `build_ce_catalog.py --systemic` catalogues `Audio/Systemic` as the pseudo-mission **SYS**: 28 character folders, 2,279 records, 14,350 variations, 14,349 with es-MX / en / es-ES audio. Barks have no CE subtitles (no transcription), matching MCC's generic tags. | Owner matches them in M4 (scope SYS). |
 | `temp_mocap_VO` (46 packages) not catalogued | It looks like temporary capture audio. | **Kept in the extraction backlog** (owner). |
 | Stereo slots | `x20`: 4, `multiplayer1`: 36. | Visible and playable in M4; **stereo replacement deferred** (owner). |
 | English bank samples without tag | `b40` 4 and `monitor` 5 (English only). | Reported in `<level>_issues.json`; English is reference audio only. |

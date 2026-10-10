@@ -178,9 +178,14 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - The recipe is part of the approved audio object (needs rework to change). The radio flag is
         never applied.
       - Guide: `docs/m4-user-guide.md` §4.1. Owner hands-on test pending.
-    - **Deferred (owner):** milestone M-SYS (CE `Audio/Systemic` barks),
-      `temp_mocap_VO` (backlog), and stereo replacement (stereo slots are
-      only shown and played).
+    - **M-SYS catalogued (owner request, 2026-10-10):** `python
+      scripts/catalog/build_ce_catalog.py --systemic` (also in `--all`) writes
+      `work/ce/catalog/sys.jsonl`, the pseudo-mission `SYS` (`mission` null, `family` systemic).
+      It has 28 character folders, 2,279 records and 14,350 variations, 14,349 with es-MX audio,
+      and no subtitles. M4 defaults generic MCC folders to the SYS scope. M6 builds generic folders
+      only when named with `--level`.
+    - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
+      (stereo slots are only shown and played).
     - **Workshop**
       (WC-1): `docs/workshop-research.md`. No documented Workshop
       override exists for FSB or localization files.

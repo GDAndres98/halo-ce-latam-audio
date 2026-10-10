@@ -35,8 +35,13 @@ campaign `.map` (read-only) for the dialogue tag paths it contains, and writes
   | `a30`–`b40`, `c20`, `c40`, `d20` | none |
 
   `multiplayer1` is used by no campaign map.
-- **Shared generic bark folders** (`marines`, `grunt`, …) appear in many maps. They are reported but
-  never selected (milestone M-SYS, deferred).
+- **Shared generic bark folders** (`marines`, `grunt`, …) appear in many maps, so `--mission` reports
+  them but never selects them.
+  - Their CE source, the systemic voice sets (SYS), is catalogued since 2026-10-10.
+  - Build them by naming them, for example `--level a10 --level x10 --level x20 --level marines
+    --level grunt`.
+  - Remember that one bank holds everything: every installed build must contain all the folders
+    you want to hear.
 
 **One bank for everything.** Every `sound\dialog\…` folder lives in the single
 `sounds_dialogs_spanish.fsb` (`a10` = samples 0–100, `x10` = 5523–5563, `x20` = 5564–5599). A

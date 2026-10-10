@@ -350,8 +350,15 @@ therefore settle the delivery route before full-campaign production.
 Catalogs for every level and mission already exist (`campaign-catalog.md`).
 
 **Extraction backlog (owner, 2026-10-08):**
-- **M-SYS:** a CE `Audio/Systemic` catalog (2,280 packages) for the MCC generic combat barks. It is
-  a separate milestone and not started.
+- **M-SYS ✅ catalogued (2026-10-10, owner request):** `python scripts/catalog/build_ce_catalog.py
+  --systemic` (also part of `--all`) writes `work/ce/catalog/sys.jsonl`, the pseudo-mission **SYS**.
+  - **Contents:** 28 CE character voice sets, 2,279 records, 14,350 variations, 14,349 with
+    es-MX audio.
+  - **Who:** marines, Johnson, crew, civilians, troopers, grunt, jackal, elites, brutes, hunter,
+    Keyes, Master Chief, 343 Guilty Spark.
+  - **Subtitles:** none (CE barks have no transcription).
+  - **Matching** to MCC's generic folders (`marines`, `sargeant`, `sarge2`, `grunt`, `jackal`,
+    `elite`, `hunter`, `crewman`, `captain`, `chief`, `flood`, `monitor`) is owner work in M4.
 - **`temp_mocap_VO`** (46 CE packages): kept in the backlog and not catalogued.
 - **Stereo slots** (`x20` 4, `multiplayer1` 36): visible and playable in M4. Stereo replacement is
   deferred.

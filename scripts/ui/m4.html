@@ -254,9 +254,16 @@ async function loadState(keepLevel) {
   if (lvl && lvl.ce_missions.length) cs.appendChild(new Option(`mapped for ${lvl.level}: ${lvl.ce_missions.join(", ")}`, "mapped"));
   cs.appendChild(new Option("all missions", "all"));
   for (const m of S.state.missions) cs.appendChild(new Option(`${m.mission} (${m.lines} lines)`, m.mission));
-  cs.value = [...cs.options].some(o => o.value === prevScope) && keepLevel ? prevScope : cs.options[0].value;
+  cs.value = [...cs.options].some(o => o.value === prevScope) && keepLevel ? prevScope : defaultScope();
 }
 const curLevel = () => S.state.levels.find(l => l.level === S.level);
+// Default CE scope: the mapped missions; for MCC's generic bark folders (marines, grunt, ...) the CE
+// systemic voice sets (SYS), when catalogued; otherwise all missions. A default filter only, never a match.
+function defaultScope() {
+  const cs = $("cscope"), l = curLevel();
+  if (l && !l.ce_missions.length && l.group === "generic" && [...cs.options].some(o => o.value === "SYS")) return "SYS";
+  return cs.options[0].value;
+}
 function renderProgress() {
   const l = curLevel(); if (!l) return;
   const p = l.progress, n = Math.max(1, p.slots);
@@ -1058,7 +1065,7 @@ $("level").onchange = async () => {
   if (S.dirty && !confirm("Discard unsaved edits on this slot?")) { $("level").value = S.level; return; }
   S.level = $("level").value; S.slotId = null; S.detail = null; S.edit = null; S.dirty = false;
   $("detail").className = "muted"; $("detail").textContent = "Pick a slot on the left.";
-  await loadState(S.level); $("cscope").value = $("cscope").options[0].value; await loadSlots(); await loadCands();
+  await loadState(S.level); $("cscope").value = defaultScope(); await loadSlots(); await loadCands();
 };
 $("sfilter").onchange = loadSlots;
 $("sall").onchange = loadSlots;

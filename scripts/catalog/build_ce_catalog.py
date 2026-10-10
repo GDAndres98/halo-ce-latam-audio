@@ -1,10 +1,12 @@
-"""Build the Campaign Evolved metadata catalog for one mission (milestone M1).
+"""Build the Campaign Evolved metadata catalog for one mission (milestone M1), or for the systemic
+voice sets (milestone M-SYS: marine / crew / civilian chatter, Covenant taunts and combat barks).
 
 Metadata only: reads the installed containers read-only (paths from .env,
 mappings from USMAP_FILEC), hashes the referenced .wem media but decodes
 nothing, and writes only under work/ (git-ignored):
 
     work/ce/catalog/<mission>.jsonl            one ce-voice-asset/3 record per voice asset
+                                               (sys.jsonl = Audio/Systemic, one folder per character)
     work/ce/build.json                         source build identifiers + container pins
     work/ce/reports/<mission>_coverage.json    counts by evidence / class / family / flag
     work/ce/reports/<mission>_unresolved.json  unresolved fields, ambiguities, orphans, skipped
@@ -14,7 +16,11 @@ Never reads or writes mappings/; never matches anything to MCC.
 
 Examples:
     python scripts/catalog/build_ce_catalog.py --mission M01
-    python scripts/catalog/build_ce_catalog.py --all      # every mission found (M01..M14 on this build)
+    python scripts/catalog/build_ce_catalog.py --systemic # Audio/Systemic -> pseudo-mission SYS
+    python scripts/catalog/build_ce_catalog.py --all      # every mission found (M01..M14) plus SYS
+
+SYS records are not tied to a mission: `mission` stays null (unresolved, never guessed) and
+`family` is `systemic`. M4 lists them under the scope "SYS".
 """
 import argparse
 import json
@@ -36,6 +42,7 @@ from common.locres import parse_locres  # noqa: E402
 BUILD_SCHEMA = "ce-build/1"
 WORK = REPO_ROOT / "work" / "ce"
 AUDIO_ROOT = "Meteorite/Content/Audio/"
+SYSTEMIC = "SYS"  # pseudo-mission for Audio/Systemic/<character>/ (milestone M-SYS, owner request 2026-10-10)
 
 
 class GameResolver:
@@ -103,9 +110,17 @@ class GameResolver:
 
 
 def discover_voice_folders(ctx, mission):
-    """{folder_vfs_prefix: [file paths]} for Audio/scripted|cinematic folders named vo_scr_<m>* / vo_cin_<m>*."""
-    m = mission.lower()
+    """{folder_vfs_prefix: [file paths]} for Audio/scripted|cinematic folders named vo_scr_<m>* / vo_cin_<m>*,
+    or, for SYS, every character folder under Audio/Systemic/ (files directly in Systemic/ are not voice sets)."""
     folders = {}
+    if mission == SYSTEMIC:
+        root = f"{AUDIO_ROOT}Systemic/"
+        for p in ctx.list_packages(root):
+            rest = p[len(root):]
+            if "/" in rest:
+                folders.setdefault(f"{root}{rest.split('/', 1)[0]}", []).append(p)
+        return folders
+    m = mission.lower()
     for family, prefix in (("scripted", f"vo_scr_{m}"), ("cinematic", f"vo_cin_{m}")):
         root = f"{AUDIO_ROOT}{family}/"
         for p in ctx.list_packages(root):
@@ -196,11 +211,16 @@ def discover_missions(ctx):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mission", default="M01")
-    ap.add_argument("--all", action="store_true", help="every mission with vo_scr_mNN / vo_cin_mNN voice folders")
+    ap.add_argument("--all", action="store_true", help="every mission with vo_scr_mNN / vo_cin_mNN voice folders, "
+                                                       "plus the systemic voice sets (SYS)")
+    ap.add_argument("--systemic", action="store_true", help="only Audio/Systemic (marines, crew, Covenant, ...)")
     ap.add_argument("--oodle-dll", type=Path)
     args = ap.parse_args()
     ctx = CEContext(oodle_dll=args.oodle_dll)
-    missions = discover_missions(ctx) if args.all else [args.mission.upper()]
+    if args.systemic:
+        missions = [SYSTEMIC]
+    else:
+        missions = discover_missions(ctx) + [SYSTEMIC] if args.all else [args.mission.upper()]
     for mission in missions:
         build_mission(ctx, mission)
 

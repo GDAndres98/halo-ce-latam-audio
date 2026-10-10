@@ -18,9 +18,13 @@ python scripts/ui/m4_server.py            # opens http://127.0.0.1:8765
 **First time only, or after a game update:** build the catalogs.
 
 ```
-python scripts/catalog/build_ce_catalog.py --all
+python scripts/catalog/build_ce_catalog.py --all        # every CE mission + SYS (barks, taunts)
 python scripts/catalog/build_mcc_catalog.py --all --no-audio
 ```
+
+`python scripts/catalog/build_ce_catalog.py --systemic` rebuilds only the CE systemic voice sets
+(about 40 s). They cover marine, crew and civilian chatter, Covenant taunts and combat barks, and
+appear in M4 as the CE scope **SYS**.
 
 **Mapping file version:** if `mappings/manual_mappings.json` is still `manual-mappings/2`, the
 app asks you to run `python scripts/validate/migrate_mappings.py --write`. The repository copy is
@@ -46,7 +50,7 @@ already `/3`.
 | Header | Pick the level (grouped: campaign, cutscene, generic). Progress shows decided / audio approved / subtitle approved / needs rework. Level status sets the workflow step (§5). |
 | Left: MCC slots | Every Spanish slot of the level, in catalog order. See §3 for the filters and search. Badges: **A** / **S** = audio / subtitle approved (red = needs rework), **R** = needs radio effect, **stereo**. |
 | Middle: slot | ▶ Spain and ▶ English recordings, then the **SU** (Latin America), **SP** (Spain) and **EN** (English, with its speaker label) subtitles. Past checks from `verifications.json` (read-only). Then the decision: match, audio, radio flag, subtitle, notes. |
-| Right: CE lines | Campaign Evolved lines in **catalog order**. Scope: the missions mapped for the slot's level, all missions, or one mission. Filter: any subtitle / no es-MX subtitle / has es-MX subtitle. |
+| Right: CE lines | Campaign Evolved lines in **catalog order**. Scope: the missions mapped for the slot's level, all missions, one mission, or **SYS** (systemic barks and taunts, by character folder such as `vo_sys_grunt`). For MCC's generic folders (`marines`, `grunt`, …) the scope starts on SYS. Filter: any subtitle / no es-MX subtitle / has es-MX subtitle. |
 | Footer | The validator's result after the last save. |
 
 Keyboard: `J` / `K` next / previous slot, `Space` plays Spain, `1`–`9` plays candidate 1–9 (es-MX),
