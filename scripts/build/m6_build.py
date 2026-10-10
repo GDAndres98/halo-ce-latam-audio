@@ -24,6 +24,7 @@ Never installs anything, never changes or approves a mapping.
 Example:
     python scripts/build/m6_build.py --level a10
     python scripts/build/m6_build.py --level a10 --level x10 --name a10_x10
+    python scripts/build/m6_build.py --all-mapped     # every folder you have mapped -> work/m6/all_mapped/
 """
 import argparse
 import datetime as dt
@@ -289,6 +290,9 @@ def main():
     ap.add_argument("--level", action="append", help="MCC dialogue folder(s) to build (default a10)")
     ap.add_argument("--mission", help="playable map (e.g. a10): its own folder plus the cinematic folders only "
                                       "it uses, from work/mcc/level_folders.json (build_level_folders.py)")
+    ap.add_argument("--all-mapped", action="store_true",
+                    help="every MCC folder with at least one mapping (levels, cutscenes, generic barks); "
+                         "build folder work/m6/all_mapped/")
     ap.add_argument("--name", help="build folder under work/m6/ (default: the levels joined by '_')")
     ap.add_argument("--inventory-only", action="store_true", help="report mappings and eligibility, build nothing")
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
@@ -301,9 +305,18 @@ def main():
         association = {"mission": args.mission.lower(), **mission_folders(lf, args.mission.lower())}
         print(f"mission {args.mission}: folders {association['selected']} ({association['evidence']}); "
               f"shared, not selected: {association['shared_not_selected']}")
+    mapped = []
+    if args.all_mapped:  # every folder holding at least one of the owner's mappings (any state)
+        app0 = M4App(REPO_ROOT, run_validator=False)
+        doc0, _ = mapping_store.load(REPO_ROOT / "mappings" / "manual_mappings.json")
+        mapped = sorted({app0.slot_index[s["slot_id"]][0] for s in doc0["slots"] if s["slot_id"] in app0.slot_index})
+        print(f"all mapped folders ({len(mapped)}): {', '.join(mapped)}")
     levels = sorted({lv.lower() for lv in (args.level or [])} | set((association or {}).get("selected", []))
-                    or {"a10"})
-    name = args.name or (f"mission_{association['mission']}" if association and not args.level else "_".join(levels))
+                    | set(mapped) or {"a10"})
+    if args.all_mapped and not args.level and not association:
+        name = args.name or "all_mapped"
+    else:
+        name = args.name or (f"mission_{association['mission']}" if association and not args.level else "_".join(levels))
     out = REPO_ROOT / "work" / "m6" / name
     t0 = time.time()
 

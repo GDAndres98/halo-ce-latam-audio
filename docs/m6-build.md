@@ -19,7 +19,12 @@ python scripts/catalog/build_level_folders.py                         # once: wh
 python scripts/build/m6_build.py --mission a10                        # a10 + its cinematics x10, x20, x30
 python scripts/build/m6_build.py --level a10 --level x10 --level x20  # explicit folders -> work/m6/a10_x10_x20/
 python scripts/build/m6_build.py --level a10 --inventory-only         # report only, build nothing
+python scripts/build/m6_build.py --all-mapped                         # every folder you mapped -> work/m6/all_mapped/
 ```
+
+**`--all-mapped`** selects every MCC folder holding at least one mapping: campaign levels,
+cutscenes and generic bark folders such as `marines` or `sarge2`. It is the "everything I have done
+so far" test build. Install it with `--build all_mapped`.
 
 **Which folders belong to a mission (`--mission`).** `build_level_folders.py` scans each installed
 campaign `.map` (read-only) for the dialogue tag paths it contains, and writes
