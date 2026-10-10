@@ -209,7 +209,7 @@ times are on the source's timeline (the top waveform).
 
 ### 4.2 Global export gain (volume for every line)
 
-All Campaign Evolved replacements get one gain at export, **+3 dB by default**. It is the same
+All Campaign Evolved replacements get one gain at export, **+4 dB by default** (raised from +3 dB on 2026-10-10). It is the same
 in the M4 preview and the M6 build.
 - **Applied once:** after the edits and the optional loudness match, and before CELT encoding.
   With loudness matching on, the line is matched to Spain and then gets the global gain on top.
@@ -225,7 +225,7 @@ in the M4 preview and the M6 build.
   ```
 
   - The range is −12 to +12 dB. `0` turns it off.
-  - Delete the file to go back to +3 dB.
+  - Delete the file to go back to the default, +4 dB.
   - The M4 preview picks it up immediately.
   - For M6, **rebuild** the bank (`python scripts/build/m6_build.py …`). Every build records the
     value and its source in `build_manifest.json` (`global_gain`).

@@ -350,7 +350,7 @@ class M4EditTests(AppTestBase):
         before = {p: p.read_bytes() for p in (self.root / "mappings").glob("*")}
         r = app.edit_preview({"slot_id": self.slot, **SRC, "edit": self.edit(loudness={"mode": "off", "offset_db": 0})})
         self.assertFalse(r["identity"])
-        self.assertEqual((r["export_config"]["source"], r["stats"]["global_gain_requested_db"]), ("default", 3.0))
+        self.assertEqual((r["export_config"]["source"], r["stats"]["global_gain_requested_db"]), ("default", 4.0))
         self.assertTrue(app.preview_wav(r["key"], "encoded").is_file())
         self.assertLess(r["stats"]["output_s"], 2.0)
         with self.assertRaises(ApiError):

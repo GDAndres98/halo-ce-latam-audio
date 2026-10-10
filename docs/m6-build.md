@@ -7,7 +7,7 @@
 - Subtitle generation is disabled (§4).
 - **Audio edit recipes (2026-10-09):** approved lines with an M4 edit (trims, cuts, silences,
   loudness) are built from their recipe (§2.1).
-- **Global export gain (2026-10-09):** +3 dB by default on every CE replacement (§2.2). Speed and
+- **Global export gain (2026-10-09):** +4 dB by default on every CE replacement (+3 dB until 2026-10-10) (§2.2). Speed and
   per-line gain were removed. `--mission a10` with the new code: 182 lines, 23/23 checks;
   every unedited line's stream is byte-identical to the earlier build (166/166 compared).
 - Nothing is installed without the owner's explicit approval.
@@ -141,7 +141,7 @@ Rules:
 
 - **The setting:** `global_gain_db` in `config/audio_export.json` (schema `audio-export-config/1`;
   `common/export_config.py`).
-  - **Default +3 dB** when the file doesn't exist.
+  - **Default +4 dB** when the file doesn't exist.
   - Range −12 to +12. Copy `config/audio_export.example.json` to start.
 - **Applied once per line:** to every CE replacement, after the recipe and the optional loudness
   match (whose target ignores it), before CELT.

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "audio-export-config/1",
   "title": "Central audio export settings (config/audio_export.json, optional)",
-  "description": "Read by the M6 build and the M4 preview (scripts/common/export_config.py). Without the file, global_gain_db defaults to +3 dB.",
+  "description": "Read by the M6 build and the M4 preview (scripts/common/export_config.py). Without the file, global_gain_db defaults to +4 dB.",
   "type": "object",
   "required": ["schema"],
   "additionalProperties": false,

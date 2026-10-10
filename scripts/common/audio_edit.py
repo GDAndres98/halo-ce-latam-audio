@@ -29,7 +29,7 @@ Times are seconds on the SOURCE recording's timeline (the editor's waveform). Pr
        -1 dBFS, re-measured with secant steps so the output lands on the target; false -> the match
        gain is lowered until the peak fits. Either way the stats report it; nothing is limited when
        loudness matching is off.
-    3. global export gain (config/audio_export.json, default +3 dB; common/export_config.py), applied
+    3. global export gain (config/audio_export.json, default +4 dB; common/export_config.py), applied
        exactly once, linearly, to every CE replacement. Never limited or compressed: if the peak
        would pass -1 dBFS the gain is reduced to fit (never below 0 dB for a positive setting) and
        the shortfall is reported.

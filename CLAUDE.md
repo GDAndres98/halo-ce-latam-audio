@@ -167,7 +167,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
         migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
         recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.
-      - **Global export gain:** `config/audio_export.json` `global_gain_db`, +3 dB when the file is
+      - **Global export gain:** `config/audio_export.json` `global_gain_db`, +4 dB (since 2026-10-10) when the file is
         absent (`common/export_config.py`). It is applied once to every CE replacement, after the
         optional match, before CELT. It is linear, never limited, and lines that can't take it in
         full are reported.

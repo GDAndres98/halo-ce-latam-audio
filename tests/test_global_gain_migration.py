@@ -41,7 +41,7 @@ class ConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(load_export_config(tmp), {"global_gain_db": DEFAULT_GLOBAL_GAIN_DB, "source": "default",
                                                        "sha256": None})
-            self.assertEqual(DEFAULT_GLOBAL_GAIN_DB, 3.0)
+            self.assertEqual(DEFAULT_GLOBAL_GAIN_DB, 4.0)
             (Path(tmp) / "config").mkdir()
             cfg = Path(tmp) / "config/audio_export.json"
             cfg.write_text(json.dumps({"schema": "audio-export-config/1", "global_gain_db": 1.5}))

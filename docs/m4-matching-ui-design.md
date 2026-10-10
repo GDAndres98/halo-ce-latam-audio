@@ -292,7 +292,7 @@ User guide §4.1. Goal: adjust a CE recording before M6 encodes it, without ever
 - **Speed removed:** the rubberband time stretch sounded unnatural. It is gone from the UI, the
   recipe, the schema and the render.
 - **Per-line manual gain removed.** Volume is now one central setting:
-  - `global_gain_db` in `config/audio_export.json`, +3 dB by default (`common/export_config.py`);
+  - `global_gain_db` in `config/audio_export.json`, +4 dB by default (`common/export_config.py`);
   - applied once, after the recipe and the optional loudness match, before CELT;
   - linear, and reduced (never limited) on lines whose peak would pass −1 dBFS, which are reported.
 

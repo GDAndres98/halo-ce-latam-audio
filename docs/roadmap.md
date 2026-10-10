@@ -276,7 +276,7 @@ recipes in `audio.edit`:
 - trims, interior cuts with crossfades, fades;
 - inserted silences;
 - optional loudness match to the slot's Spain recording;
-- a global export gain (+3 dB default, `config/audio_export.json`).
+- a global export gain (+4 dB default, `config/audio_export.json`).
 
 Speed and per-line manual gain were removed after the owner's test (2026-10-09); saved values were
 cleared by a one-time migration.
