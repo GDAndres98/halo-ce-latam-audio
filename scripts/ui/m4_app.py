@@ -156,6 +156,10 @@ def _fits(m):
     return bool(m and (m.get("different_but_fits") or {}).get("marked"))
 
 
+def _needs_recording(m):
+    return bool(m and (m.get("needs_recording") or {}).get("marked"))
+
+
 def _edited(m):
     return bool(m and not audio_edit.is_identity(m["audio"]["edit"]))
 
@@ -320,6 +324,7 @@ class M4App:
                 "approved": a == "approved" and sub == "approved",
                 "keep_original": bool(m and m["audio"]["source"] == "keep_original"),
                 "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m), "edited": _edited(m),
+                "recording": _needs_recording(m),
                 "stereo": s["channels"] > 1}.get(status, False)
 
     def _subtitle_preview(self, mcc_tag):
@@ -369,7 +374,7 @@ class M4App:
                 "channels": s["channels"], "flags": r["flags"],
                 "decision": self._decision_summary(m),
                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
-                "different_but_fits": _fits(m), "edited": _edited(m),
+                "different_but_fits": _fits(m), "needs_recording": _needs_recording(m), "edited": _edited(m),
                 "preview": self._subtitle_preview(r["mcc_tag"]),
                 "spanish_index": s["index"]}
 
@@ -742,6 +747,17 @@ class M4App:
             elif "different_but_fits" not in slot:
                 slot["different_but_fits"] = cur
 
+        if "needs_recording" in body:  # owner flag: the line needs a new recording; independent of approvals
+            marked = (body["needs_recording"] or {}).get("marked")
+            if not isinstance(marked, bool):
+                raise ApiError(400, "needs_recording.marked must be true or false")
+            cur = slot.get("needs_recording")
+            # Optional field: written only once it is first marked, so saving other changes leaves existing
+            # slots byte-identical.
+            if marked != (cur or {}).get("marked", False):
+                slot["needs_recording"] = {"marked": marked, "set_at": today,
+                                           "revision": cur["revision"] + 1 if cur else 1}
+
         if "notes" in body:
             notes = body["notes"] or ""
             if len(notes) > 2000:
@@ -755,7 +771,7 @@ class M4App:
             slot[f].update(status="approved", approved_at=today,
                            fingerprint=fn(slot, self.ce_idx, self.mcc_idx, new_local))
 
-        if "different_but_fits" in slot and list(slot)[-1] != "notes":
+        if list(slot)[-1] != "notes":  # optional flags are inserted before the notes
             slot["notes"] = slot.pop("notes")
         if idx is None:
             new_doc["slots"].append(slot)

@@ -11,6 +11,7 @@ export interface LevelProgress {
   needs_rework: number;
   radio_effect: number;
   different_but_fits: number;
+  needs_recording: number;
   ready_for_build: boolean;
 }
 
@@ -89,6 +90,8 @@ export interface StoredDecision {
   };
   radio_effect: { needed: boolean; set_at: string | null; revision: number };
   different_but_fits?: { marked: boolean; set_at: string | null; revision: number };
+  /** Optional: written only once first marked (added 2026-10-11). */
+  needs_recording?: { marked: boolean; set_at: string | null; revision: number };
   notes: string;
 }
 
@@ -108,6 +111,7 @@ export interface SlotRow {
   decision: { match: string; audio: string; subtitle: string; audio_source: string | null; subtitle_source: string | null } | null;
   radio_effect: boolean;
   different_but_fits: boolean;
+  needs_recording: boolean;
   edited: boolean;
   preview: string;
   /** Bank index of the Spain sample: what /audio/mcc plays. */
@@ -157,6 +161,8 @@ export interface SlotDetail {
   mapping: StoredDecision | null;
   custom_text: string | null;
   matched_lines: CeLine[];
+  /** The stored recipe in short, and whether the server can render previews (ffmpeg and the encoder). */
+  edit?: { identity: boolean; summary: string; available: boolean; engine: string };
   ce_missions: string[];
   sha256: Hashes;
 }
@@ -170,7 +176,7 @@ export interface CeLine {
   has_source_subtitle: Record<string, boolean>;
   subtitles: Record<string, { text: string | null } | undefined>;
   media: Record<CeLanguage, { count: number; evidence: string; duration_s: number | null }>;
-  used_by: string[];
+  used_by?: string[];
 }
 
 export interface CeResponse {
@@ -208,6 +214,7 @@ export interface SaveBody {
   };
   radio_effect?: { needed: boolean };
   different_but_fits?: { marked: boolean };
+  needs_recording?: { marked: boolean };
   notes?: string;
 }
 

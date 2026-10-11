@@ -162,9 +162,8 @@ async function main() {
     await step("apply a trim and preview the edited recording", async () => {
       await page.getByLabel("Trim start (s)").fill("0.2");
       await page.getByLabel("Trim start (s)").press("Tab"); // number fields apply on change
-      const previewed = page.waitForResponse((r) => r.url().includes("/api/edit/preview") && r.status() === 200, { timeout: 60000 });
-      await page.getByRole("button", { name: "Preview edited recording" }).click();
-      await previewed;
+      // The edited recording is rendered automatically after the change.
+      await page.waitForResponse((r) => r.url().includes("/api/edit/preview") && r.status() === 200, { timeout: 60000 });
     });
     await step("save the trim and approve the audio again", async () => {
       await page.getByRole("button", { name: /Save draft/ }).click();

@@ -138,7 +138,7 @@ async function main() {
       duration = await waveDuration(editorWave());
       const b = await waveDuration(waveB());
       check(near(b, duration, 0.01), `B ${b} differs from the editor ${duration}`);
-      check((await waveB().innerText()).includes("Campaign Evolved LATAM (unedited)"), "B is not labelled as the replacement");
+      check((await waveB().innerText()).includes("Campaign Evolved LATAM (edited)"), "B is not the edited replacement by default");
       return `replacement ${duration.toFixed(3)} s`;
     });
 
@@ -282,11 +282,13 @@ async function main() {
     });
 
     let edited = 0;
-    await step("Preview renders the recipe; B plays the edited recording", async () => {
-      const response = page.waitForResponse((r) => r.url().includes("/api/edit/preview"), { timeout: 90000 });
-      await editor().getByRole("button", { name: "Preview edited recording" }).click();
-      check((await response).status() === 200, "preview failed");
-      await compare().getByText("Campaign Evolved LATAM (edited preview)").waitFor({ timeout: 15000 });
+    await step("the recipe is rendered automatically; B plays the edited recording", async () => {
+      await page.waitForFunction(
+        () => document.querySelector('[data-testid="preview-status"]')?.getAttribute("data-state") === "ready",
+        null,
+        { timeout: 90000 },
+      );
+      await compare().getByText("Campaign Evolved LATAM (edited)").waitFor({ timeout: 15000 });
       await page.waitForFunction(
         (el) => el.dataset.duration && Number(el.dataset.duration) > 0 && Number(el.dataset.duration) < Number(el.dataset.full),
         await (async () => {
@@ -300,7 +302,7 @@ async function main() {
       const expected = await afterEdits();
       // Each cut joins with a 20 ms crossfade, so the render is a little shorter than the plain arithmetic.
       check(near(edited, expected, 0.1), `edited preview ${edited} s, recipe says ${expected} s`);
-      const gain = await editor().getByTestId("gain-report").innerText();
+      const gain = await compare().getByTestId("gain-report").innerText();
       check(/Global gain \+4\.0 dB/.test(gain) || /reduced/.test(gain), `gain report: ${gain}`);
       return `edited ${edited.toFixed(3)} s (recipe ${expected} s); ${gain.split("·")[0].trim()}`;
     });
@@ -338,11 +340,17 @@ async function main() {
       return "A finished, B started";
     });
 
-    await step("a recipe change marks the preview out of date", async () => {
+    await step("a recipe change renders again; the outdated preview is not offered meanwhile", async () => {
       await editor().getByLabel("Fade in (ms)").fill("150");
       await editor().getByLabel("Fade in (ms)").press("Tab");
-      await compare().getByText("out of date").first().waitFor({ timeout: 5000 });
-      return "B labelled out of date";
+      check((await compare().getByTestId("preview-status").getAttribute("data-state")) === "rendering", "not rendering");
+      check(await waveB().getByRole("button", { name: "Play", exact: true }).isDisabled(), "B playable while rendering");
+      await page.waitForFunction(
+        () => document.querySelector('[data-testid="preview-status"]')?.getAttribute("data-state") === "ready",
+        null,
+        { timeout: 90000 },
+      );
+      return "rendering, then ready";
     });
 
     await step("the W key plays the replacement on the editor waveform", async () => {
@@ -355,9 +363,9 @@ async function main() {
 
     await step("typing in a field does not trigger the editing keys", async () => {
       const cuts = await cutCount();
-      await page.getByLabel("Notes").click();
+      await page.getByLabel("Notes", { exact: true }).click();
       await page.keyboard.type("xtwpab");
-      check((await page.getByLabel("Notes").inputValue()).endsWith("xtwpab"), "typed text lost");
+      check((await page.getByLabel("Notes", { exact: true }).inputValue()).endsWith("xtwpab"), "typed text lost");
       check((await cutCount()) === cuts, "typing changed the cuts");
       check(!(await isPlaying(editorWave())) && !(await isPlaying(waveA())), "typing started playback");
       await page.keyboard.press("Control+z"); // the field's own undo, not the editor's
@@ -407,7 +415,7 @@ async function main() {
       await page.locator("h2").first().click();
       await page.keyboard.press("Control+z");
       check((await cutCount()) === cuts, "Ctrl+Z changed approved audio");
-      check((await page.locator(".line-title").getByText("unsaved changes", { exact: true }).count()) === 0, "the approved line became dirty");
+      check((await page.locator(".center .status-row").getByText("unsaved changes", { exact: true }).count()) === 0, "the approved line became dirty");
       const status = await page.evaluate(async (slot) => {
         const current = await (await fetch(`/api/slot?id=${encodeURIComponent(slot)}`)).json();
         const edit = { ...current.mapping.audio.edit, cuts: [] };

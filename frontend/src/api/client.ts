@@ -6,6 +6,7 @@ import type {
   InstallPlan,
   ExportSettings,
   BuildsResponse,
+  CeLine,
   CeResponse,
   DataStatus,
   ImportPreview,
@@ -46,6 +47,9 @@ export const api = {
     request<SlotsResponse>(`/api/slots${query(params)}`),
 
   slot: (id: string) => request<SlotDetail>(`/api/slot${query({ id })}`),
+
+  /** One Campaign Evolved line with its subtitles (for a recording chosen but not saved yet). */
+  ceLine: (ref: string) => request<CeLine>(`/api/ce_line${query({ ref })}`),
 
   builds: () => request<BuildsResponse>("/api/builds"),
 
@@ -134,9 +138,10 @@ export const api = {
     }),
 
   /** Renders an edit as M6 would, for listening only. Writes nothing to the mappings. */
-  editPreview: (body: { slot_id: string; ce_line_ref: string; language: string; edit: AudioEdit }) =>
+  editPreview: (body: { slot_id: string; ce_line_ref: string; language: string; edit: AudioEdit }, signal?: AbortSignal) =>
     request<EditPreviewResponse>("/api/edit/preview", {
       method: "POST",
+      signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),

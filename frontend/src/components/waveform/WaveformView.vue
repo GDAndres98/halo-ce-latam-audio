@@ -37,8 +37,17 @@ const props = withDefaults(
     cuts?: Span[];
     fades?: Fades;
     height?: number;
+    /** Shown when there is no URL (for example while a preview renders). */
+    emptyText?: string;
   }>(),
-  { editable: false, keep: null, cuts: () => [], fades: () => ({ fadeIn: null, fadeOut: null }), height: 96 },
+  {
+    editable: false,
+    keep: null,
+    cuts: () => [],
+    fades: () => ({ fadeIn: null, fadeOut: null }),
+    height: 96,
+    emptyText: "No recording.",
+  },
 );
 
 const emit = defineEmits<{
@@ -112,6 +121,7 @@ onMounted(() => {
   });
   wave.on("ready", (seconds) => {
     loading.value = false;
+    if (!props.url) return; // the blank left by empty(): nothing to play
     duration.value = seconds;
     emit("duration", seconds);
     drawRegions();
@@ -207,7 +217,10 @@ async function load(url: string | null) {
   lastPlayed = null;
   setSelection(null);
   regions?.clearRegions();
-  if (!url || !wave) return;
+  if (!url || !wave) {
+    wave?.empty(); // nothing outdated stays drawn (or playable)
+    return;
+  }
   loading.value = true;
   try {
     await wave.load(url);
@@ -381,7 +394,7 @@ defineExpose({
       data-testid="wave-host"
     ></div>
     <p v-if="loading" class="small muted wave-status">Loading the recording…</p>
-    <p v-else-if="!url" class="small muted wave-status">No recording.</p>
+    <p v-else-if="!url" class="small muted wave-status">{{ emptyText }}</p>
     <p v-if="error" class="error small" role="alert">{{ error }}</p>
 
     <div class="wave-transport" role="toolbar" :aria-label="`${fullLabel}: playback`">

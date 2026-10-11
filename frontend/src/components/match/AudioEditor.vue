@@ -2,16 +2,16 @@
 // Non-destructive editing of the replacement recording, on its waveform.
 //
 // What the user can do: drag across the waveform to select, drag the two handles of the kept part (trims),
-// keep or cut the selection (several cuts are allowed), remove cuts, set fades, match the loudness of Spain's
-// recording, and preview the result as the build renders it. Every change goes through editRecipe.ts and can
-// be undone. The original WAV is never changed; the recipe is saved with the audio decision (Save draft), and
+// keep or cut the selection (several cuts are allowed), remove cuts, set fades and match the loudness of Spain's
+// recording. Every change goes through editRecipe.ts and can be undone. The result is rendered automatically
+// as the build renders it and heard as B under "Listen and compare" (composables/useEditPreview.ts). The original WAV is never changed; the recipe is saved with the audio decision (Save draft), and
 // approved audio must be marked Needs rework first (the server refuses the change otherwise).
 //
 // Speed and per-line gain do not exist here (removed 2026-10-09); volume is the global export gain.
 
 import { computed, ref, watch } from "vue";
-import { Crop, Headphones, RotateCcw, Scissors, SlidersHorizontal, Trash2, TrendingDown, TrendingUp, Undo2 } from "lucide-vue-next";
-import { api, ApiError, audioUrl } from "../../api/client";
+import { Crop, RotateCcw, Scissors, SlidersHorizontal, Trash2, TrendingDown, TrendingUp, Undo2 } from "lucide-vue-next";
+import { audioUrl } from "../../api/client";
 import type { AudioEdit } from "../../api/types";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
@@ -31,15 +31,7 @@ import {
 import type { Draft } from "../../matching/draft";
 import WaveformView from "../waveform/WaveformView.vue";
 
-export interface EditPreview {
-  edited: string;
-  encoded: string;
-  /** The recipe the preview was rendered from (JSON), to tell when it is out of date. */
-  recipe: string;
-}
-
-const props = defineProps<{ draft: Draft; locked: boolean; slotId: string }>();
-const emit = defineEmits<{ preview: [preview: EditPreview | null] }>();
+const props = defineProps<{ draft: Draft; locked: boolean }>();
 
 const replacement = ref<InstanceType<typeof WaveformView> | null>(null);
 const duration = ref(0);
@@ -47,10 +39,6 @@ const selection = ref<Span | null>(null);
 const history = new EditHistory();
 const undoDepth = ref(0); // EditHistory is not reactive; this mirrors its depth for the Undo button
 const editError = ref("");
-const previewError = ref<string[]>([]);
-const previewing = ref(false);
-const stats = ref<Record<string, number> | null>(null);
-const previewRecipe = ref<string | null>(null);
 
 const usesCe = computed(() => props.draft.audioSource === "ce" && Boolean(props.draft.audioRef));
 const replacementUrl = computed(() =>
@@ -63,19 +51,14 @@ const cuts = computed<Span[]>(() => props.draft.edit.cuts.map((c) => ({ start: c
 const fades = computed(() => fadeSpans(props.draft.edit, duration.value));
 const afterEdits = computed(() => (duration.value ? editedSeconds(props.draft.edit, duration.value) : null));
 const recipeKey = computed(() => JSON.stringify(props.draft.edit));
-const previewStale = computed(() => previewRecipe.value !== null && previewRecipe.value !== recipeKey.value);
 
-// A new recording starts with an empty history and no preview.
+// A new recording starts with an empty history.
 watch(replacementUrl, () => {
   history.clear();
   undoDepth.value = 0;
   duration.value = 0;
   selection.value = null;
-  stats.value = null;
-  previewRecipe.value = null;
   editError.value = "";
-  previewError.value = [];
-  emit("preview", null);
 });
 
 /** Applies a recipe change: the current recipe is saved first, so Undo can return to it. */
@@ -160,49 +143,12 @@ function removeSilence(index: number) {
   attempt(() => ({ ...props.draft.edit, silences: props.draft.edit.silences.filter((_, i) => i !== index) }));
 }
 
-async function renderPreview() {
-  if (!props.draft.audioRef || previewing.value) return;
-  previewing.value = true;
-  previewError.value = [];
-  const recipe = recipeKey.value;
-  try {
-    const result = await api.editPreview({
-      slot_id: props.slotId,
-      ce_line_ref: props.draft.audioRef,
-      language: props.draft.audioLanguage,
-      edit: props.draft.edit,
-    });
-    stats.value = result.stats as Record<string, number>;
-    previewRecipe.value = recipe;
-    emit("preview", { edited: result.urls.edited, encoded: result.urls.encoded, recipe });
-  } catch (e) {
-    previewError.value = e instanceof ApiError && e.details.length ? e.details : [e instanceof Error ? e.message : String(e)];
-  } finally {
-    previewing.value = false;
-  }
-}
-
-/** The gain report: the global gain is applied in full unless the peak would pass −1 dBFS (then it is
- * reduced and the shortfall reported). */
-const gainReport = computed(() => {
-  const s = stats.value;
-  if (!s) return null;
-  const shortfall = Number(s.global_gain_shortfall_db ?? 0);
-  return {
-    applied: Number(s.global_gain_applied_db ?? 0),
-    shortfall,
-    peak: Number(s.output_peak_dbfs ?? 0),
-    reduced: shortfall > 0.05,
-  };
-});
-
 // Editing keys; they only act on an editable recording and never fire while typing in a field.
 useShortcuts({
   w: () => replacement.value?.togglePlay(),
   x: cutSelection,
   t: keepSelection,
   "ctrl+z": undo,
-  p: () => usesCe.value && void renderPreview(),
 });
 </script>
 
@@ -231,11 +177,6 @@ useShortcuts({
         <button type="button" class="icon-label" :disabled="!editable" title="Remove all trims, cuts, silences and fades" @click="reset">
           <RotateCcw :size="16" aria-hidden="true" /> Reset edits
         </button>
-        <span class="sep" aria-hidden="true"></span>
-        <button type="button" class="icon-label primary-soft" :disabled="previewing" title="Render the recipe as the build would (P)" @click="renderPreview">
-          <Headphones :size="16" aria-hidden="true" />
-          {{ previewing ? "Rendering…" : "Preview edited recording" }}
-        </button>
       </div>
 
       <p v-if="editError" class="error small" role="alert">{{ editError }}</p>
@@ -254,8 +195,8 @@ useShortcuts({
       />
       <p v-if="editable" class="small muted hint">
         Click to move the playhead. Drag across the waveform to select, then trim to it or cut it. Drag the cyan
-        handles at the ends to trim. <kbd>W</kbd> play · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo ·
-        <kbd>P</kbd> preview
+        handles at the ends to trim. <kbd>W</kbd> play · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.
+        The edited result is rendered automatically and heard as B under “Listen and compare”.
       </p>
 
       <dl class="durations compact">
@@ -342,16 +283,6 @@ useShortcuts({
           </li>
         </ul>
       </div>
-
-      <ul v-if="previewError.length" class="problems">
-        <li v-for="p in previewError" :key="p">{{ p }}</li>
-      </ul>
-      <p v-if="gainReport" class="small" :class="gainReport.reduced ? 'warn' : 'muted'" role="status" data-testid="gain-report">
-        <span v-if="previewStale" class="warn">Out of date: the recipe changed since this preview. </span>
-        Global gain {{ gainReport.applied >= 0 ? "+" : "" }}{{ gainReport.applied.toFixed(1) }} dB applied once
-        <span v-if="gainReport.reduced">· reduced by {{ gainReport.shortfall.toFixed(1) }} dB so the peak stays at or below −1 dBFS</span>
-        · output peak {{ gainReport.peak.toFixed(1) }} dBFS. Hear it as B under “Listen and compare”.
-      </p>
     </template>
   </section>
 </template>

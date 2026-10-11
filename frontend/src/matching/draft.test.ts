@@ -9,7 +9,10 @@ import {
   draftFrom,
   draftProblems,
   isDirty,
+  proposeSubtitle,
+  subtitleDirty,
 } from "./draft";
+import type { CeLine } from "../api/types";
 
 const HASHES = { mappings: "m".repeat(64), local: "l".repeat(64), progress: "p".repeat(64) };
 
@@ -172,5 +175,75 @@ describe("problems shown before any request", () => {
     const baseline = draftFrom(detail);
     expect(isDirty(baseline, draftFrom(detail))).toBe(false);
     expect(isDirty({ ...baseline, radio: true }, baseline)).toBe(true);
+  });
+});
+
+function ceLine(ref: string, latam: string | null): CeLine {
+  return {
+    ce_line_ref: ref,
+    mission: "M01",
+    display_key: ref,
+    family: "scripted",
+    folder: "",
+    has_source_subtitle: { "es-MX": Boolean(latam) },
+    subtitles: { "es-MX": { text: latam } },
+    media: {} as CeLine["media"],
+  };
+}
+
+describe("needs recording flag", () => {
+  it("is read from the stored decision and always sent", () => {
+    const detail = slot(decision({ needs_recording: { marked: true, set_at: "2026-10-11", revision: 1 } }));
+    const draft = draftFrom(detail);
+    expect(draft.recording).toBe(true);
+    expect(buildSaveBody(detail, draft, draft).needs_recording).toEqual({ marked: true });
+    expect(draftFrom(slot(decision())).recording).toBe(false);
+  });
+});
+
+describe("proposing the subtitle of a chosen recording", () => {
+  it("offers the LATAM subtitle when the subtitle is still MCC's default", () => {
+    const detail = slot(null);
+    const baseline = draftFrom(detail);
+    const draft = draftFrom(detail);
+    expect(proposeSubtitle(draft, baseline, null, ceLine("a#0", "Hola"), null)).toBe("proposed");
+    expect([draft.subtitleSource, draft.subtitleRef, draft.subtitleCulture]).toEqual(["ce_locres", "a#0", "es-MX"]);
+    expect(subtitleDirty(draft, baseline)).toBe(true);
+  });
+
+  it("follows the user to another recording while the proposal is unchanged", () => {
+    const detail = slot(null);
+    const baseline = draftFrom(detail);
+    const draft = draftFrom(detail);
+    proposeSubtitle(draft, baseline, null, ceLine("a#0", "Hola"), null);
+    expect(proposeSubtitle(draft, baseline, null, ceLine("b#0", "Adiós"), "a#0")).toBe("proposed");
+    expect(draft.subtitleRef).toBe("b#0");
+    // A recording without a LATAM subtitle withdraws the proposal and asks for a manual choice.
+    expect(proposeSubtitle(draft, baseline, null, ceLine("c#0", null), "b#0")).toBe("missing");
+    expect(draft.subtitleSource).toBe("keep_original");
+  });
+
+  it("never replaces a saved, edited or approved subtitle", () => {
+    const saved = slot(decision({ subtitle: { status: "draft", source: "custom", ce_locres: null, custom_ref: "c-000001", approved_at: null, revision: 1 } }), "Mi texto");
+    const savedDraft = draftFrom(saved);
+    expect(proposeSubtitle(savedDraft, draftFrom(saved), saved.mapping, ceLine("a#0", "Hola"), null)).toBe("kept");
+    expect(savedDraft.subtitleSource).toBe("custom");
+
+    const fresh = slot(null);
+    const edited = draftFrom(fresh);
+    edited.subtitleSource = "none"; // chosen by the user in this session
+    expect(proposeSubtitle(edited, draftFrom(fresh), null, ceLine("a#0", "Hola"), null)).toBe("kept");
+
+    const approved = slot(decision({ subtitle: { status: "approved", source: "keep_original", ce_locres: null, custom_ref: null, approved_at: "2026-10-11", revision: 1 } }));
+    const approvedDraft = draftFrom(approved);
+    expect(proposeSubtitle(approvedDraft, draftFrom(approved), approved.mapping, ceLine("a#0", "Hola"), null)).toBe("kept");
+    expect(approvedDraft.subtitleSource).toBe("keep_original");
+
+    // The user changed the proposal to their own text: choosing another recording keeps it.
+    const own = draftFrom(fresh);
+    proposeSubtitle(own, draftFrom(fresh), null, ceLine("a#0", "Hola"), null);
+    own.subtitleSource = "custom";
+    own.customText = "Texto propio";
+    expect(proposeSubtitle(own, draftFrom(fresh), null, ceLine("b#0", "Adiós"), "a#0")).toBe("kept");
   });
 });

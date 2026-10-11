@@ -439,7 +439,7 @@ def level_progress(level_slot_ids, mappings_doc):
     by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
            "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0,
-           "different_but_fits": 0}
+           "different_but_fits": 0, "needs_recording": 0}
     for sid in level_slot_ids:
         s = by_slot.get(sid)
         if not s:
@@ -453,6 +453,7 @@ def level_progress(level_slot_ids, mappings_doc):
         out["subtitle_approved"] += s["subtitle"]["status"] == "approved"
         out["radio_effect"] += bool((s.get("radio_effect") or {}).get("needed"))
         out["different_but_fits"] += bool((s.get("different_but_fits") or {}).get("marked"))
+        out["needs_recording"] += bool((s.get("needs_recording") or {}).get("marked"))
         out["needs_rework"] += "needs_rework" in (s["audio"]["status"], s["subtitle"]["status"])
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out

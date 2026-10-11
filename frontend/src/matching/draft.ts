@@ -8,6 +8,7 @@
 import type {
   AudioEdit,
   CeLanguage,
+  CeLine,
   MatchStatus,
   SaveAction,
   SaveBody,
@@ -34,8 +35,12 @@ export interface Draft {
   customText: string;
   radio: boolean;
   fits: boolean;
+  recording: boolean;
   notes: string;
 }
+
+/** The culture of the subtitle the build writes (LATAM Spanish). */
+export const LATAM_CULTURE = "es-MX";
 
 export const DEFAULT_LANGUAGE: CeLanguage = "Spanish(Mexico)";
 
@@ -90,6 +95,7 @@ export function draftFrom(detail: SlotDetail): Draft {
     customText: detail.custom_text ?? "",
     radio: m?.radio_effect.needed ?? false,
     fits: m?.different_but_fits?.marked ?? false,
+    recording: m?.needs_recording?.marked ?? false,
     notes: m?.notes ?? "",
   };
 }
@@ -103,27 +109,99 @@ export function isDirty(draft: Draft, baseline: Draft): boolean {
   return draftKey(draft) !== draftKey(baseline);
 }
 
+/**
+ * A draft restored from the browser session, completed with the fields added since it was written (a draft
+ * saved before the Needs recording flag existed has no `recording`).
+ */
+export function completeDraft(restored: Partial<Draft>, fresh: Draft): Draft {
+  return { ...fresh, ...restored };
+}
+
+/** Which subtitle fields of a draft describe the subtitle decision. */
+const subtitleOf = (d: Draft) => [d.subtitleSource, d.subtitleRef, d.subtitleCulture, d.customText];
+
+/** Whether the subtitle part of the draft differs from what is saved. */
+export function subtitleDirty(draft: Draft, baseline: Draft): boolean {
+  return JSON.stringify(subtitleOf(draft)) !== JSON.stringify(subtitleOf(baseline));
+}
+
+/** What happened to the subtitle when a recording was chosen. */
+export type SubtitleProposal = "proposed" | "missing" | "kept";
+
+/**
+ * Offers the LATAM subtitle of the recording the user just chose, as an unsaved selection they can change.
+ * This is a default to save typing, not a match: it follows the user's own choice of recording.
+ *
+ * It never replaces a decision: only a subtitle that is still MCC's own text (the default) and unchanged in
+ * this session, or the previous proposal (the user then picked another recording), is replaced. An approved
+ * subtitle is never touched. When the recording has no LATAM subtitle, a previous proposal is withdrawn
+ * (the saved subtitle comes back) and "missing" asks the user to choose one.
+ */
+export function proposeSubtitle(
+  draft: Draft,
+  baseline: Draft,
+  stored: StoredDecision | null,
+  line: CeLine | null,
+  previousProposal: string | null,
+): SubtitleProposal {
+  if (stored?.subtitle.status === "approved") return "kept";
+  const untouchedDefault =
+    draft.subtitleSource === "keep_original" && baseline.subtitleSource === "keep_original" && !subtitleDirty(draft, baseline);
+  const showingProposal =
+    previousProposal !== null &&
+    draft.subtitleSource === "ce_locres" &&
+    draft.subtitleRef === previousProposal &&
+    draft.subtitleCulture === LATAM_CULTURE;
+  if (!untouchedDefault && !showingProposal) return "kept";
+  if (!line?.subtitles[LATAM_CULTURE]?.text) {
+    if (showingProposal) {
+      draft.subtitleSource = baseline.subtitleSource;
+      draft.subtitleRef = baseline.subtitleRef;
+      draft.subtitleCulture = baseline.subtitleCulture;
+    }
+    return "missing";
+  }
+  draft.subtitleSource = "ce_locres";
+  draft.subtitleRef = line.ce_line_ref;
+  draft.subtitleCulture = LATAM_CULTURE;
+  return "proposed";
+}
+
+/** Problems with the audio choice that would make the server refuse the draft. */
+function audioProblems(draft: Draft): string[] {
+  if (draft.audioSource !== "ce") return [];
+  if (!draft.audioRef) return ["Choose the Campaign Evolved recording to use, or keep Spain's audio."];
+  if (!draft.ceRefs.includes(draft.audioRef)) return ["The replacement must be one of the matched lines."];
+  return [];
+}
+
+/** Problems with the subtitle choice that would make the server refuse the draft. */
+function subtitleProblems(draft: Draft): string[] {
+  if (draft.subtitleSource === "ce_locres" && !draft.subtitleRef) return ["Choose a Campaign Evolved subtitle."];
+  if (draft.subtitleSource === "custom" && !draft.customText.trim()) {
+    return ["Write the subtitle text, or choose another subtitle source."];
+  }
+  return [];
+}
+
+/** Flags that the validator refuses in this state (they never block an approval: they are saved first). */
+function flagProblems(draft: Draft): string[] {
+  const problems: string[] = [];
+  if (draft.radio && draft.audioSource !== "ce") {
+    problems.push("Needs radio effect applies to a chosen Campaign Evolved replacement; untick it to keep Spain's audio.");
+  }
+  if (draft.fits && !draft.ceRefs.length) problems.push("Different but fits needs a Campaign Evolved line in the match.");
+  return problems;
+}
+
 /** Problems that would make the server refuse the draft. Shown next to the controls, before any request. */
 export function draftProblems(draft: Draft): string[] {
-  const problems: string[] = [];
-  if (draft.audioSource === "ce") {
-    if (!draft.audioRef) problems.push("Choose the Campaign Evolved recording to use, or keep Spain's audio.");
-    else if (!draft.ceRefs.includes(draft.audioRef)) problems.push("The replacement must be one of the matched lines.");
-  }
-  if (draft.subtitleSource === "ce_locres" && !draft.subtitleRef) {
-    problems.push("Choose a Campaign Evolved subtitle.");
-  }
-  if (draft.subtitleSource === "custom" && !draft.customText.trim()) {
-    problems.push("Write the subtitle text, or choose another subtitle source.");
-  }
-  return problems;
+  return [...audioProblems(draft), ...subtitleProblems(draft), ...flagProblems(draft)];
 }
 
 /** Problems for one field only, so the approval button for audio is not blocked by a subtitle issue. */
 export function fieldProblems(draft: Draft, field: ApprovalField): string[] {
-  return draftProblems(draft).filter((p) =>
-    field === "audio" ? /recording|matched lines/.test(p) : /subtitle/i.test(p),
-  );
+  return field === "audio" ? audioProblems(draft) : subtitleProblems(draft);
 }
 
 export interface ApprovalCheck {
@@ -175,6 +253,7 @@ export function buildSaveBody(detail: SlotDetail, draft: Draft, baseline: Draft,
     match: { status: draft.matchStatus, ce_line_refs: [...draft.ceRefs] },
     radio_effect: { needed: draft.radio },
     different_but_fits: { marked: draft.fits },
+    needs_recording: { marked: draft.recording },
     notes: draft.notes,
   };
   if (stored?.audio.status !== "approved") body.audio = audioSection(draft, baseline);

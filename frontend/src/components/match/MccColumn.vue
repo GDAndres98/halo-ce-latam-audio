@@ -12,6 +12,7 @@ import AudioButton from "../AudioButton.vue";
 import { markFor } from "../../matching/status";
 import StatusBadge from "../StatusBadge.vue";
 import StateMessage from "../ui/StateMessage.vue";
+import { FLAGS, FLAG_ORDER, type FlagName } from "./flags";
 
 const props = defineProps<{ levels: string[]; selectedId: string | null }>();
 const emit = defineEmits<{ select: [slotId: string] }>();
@@ -35,8 +36,9 @@ const STATUS_OPTIONS: [string, string][] = [
   ["approved", "Approved (both)"],
   ["needs_rework", "Needs rework"],
   ["keep_original", "Keep Spain audio"],
-  ["radio", "Needs radio effect"],
-  ["fits", "Different but fits"],
+  ["radio", FLAGS.radio.label],
+  ["recording", FLAGS.recording.label],
+  ["fits", FLAGS.fits.label],
   ["stereo", "Stereo"],
 ];
 
@@ -113,6 +115,21 @@ function decisionOf(row: SlotRow) {
   return row.decision ?? UNDECIDED;
 }
 
+/** The owner flags set on a row, in the usual order. */
+function rowFlags(row: SlotRow) {
+  const set: Record<FlagName, boolean> = {
+    radio: row.radio_effect,
+    recording: Boolean(row.needs_recording),
+    fits: row.different_but_fits,
+  };
+  return FLAG_ORDER.filter((name) => set[name]).map((name) => FLAGS[name]);
+}
+
+/** A flag button of the filter row: shows only the lines with that flag, or all lines again. */
+function toggleFlagFilter(name: FlagName) {
+  status.value = status.value === FLAGS[name].filter ? "" : FLAGS[name].filter;
+}
+
 function mccAudio(row: SlotRow) {
   return audioUrl.mcc(row.level, "spanish", row.spanish_index);
 }
@@ -136,6 +153,21 @@ function mccAudio(row: SlotRow) {
           <option v-for="[value, label] in STATUS_OPTIONS" :key="value" :value="value">{{ label }}</option>
         </select>
       </label>
+      <div class="flag-filters wide" role="group" aria-label="Show only lines with a flag">
+        <button
+          v-for="name in FLAG_ORDER"
+          :key="name"
+          type="button"
+          class="icon-label small-button flag-filter"
+          :class="`flag-${name}`"
+          :aria-pressed="status === FLAGS[name].filter"
+          :title="`Show only: ${FLAGS[name].label}`"
+          :data-testid="`flag-filter-${name}`"
+          @click="toggleFlagFilter(name)"
+        >
+          <component :is="FLAGS[name].icon" :size="14" aria-hidden="true" /> {{ FLAGS[name].label }}
+        </button>
+      </div>
       <label class="wide">Search ID, speaker or subtitle
         <input ref="searchBox" v-model="query" type="search" placeholder="Accents and case ignored (/)" />
       </label>
@@ -181,7 +213,15 @@ function mccAudio(row: SlotRow) {
                 :aria-label="`audio: ${markFor(decisionOf(row).audio).word}`">A{{ markFor(decisionOf(row).audio).glyph }}</span>
           <span class="pill" :class="markFor(decisionOf(row).subtitle).tone" :title="`subtitle: ${markFor(decisionOf(row).subtitle).word}`"
                 :aria-label="`subtitle: ${markFor(decisionOf(row).subtitle).word}`">S{{ markFor(decisionOf(row).subtitle).glyph }}</span>
-          <span v-if="row.radio_effect" class="pill radio" title="needs radio effect" aria-label="needs radio effect">R</span>
+          <span
+            v-for="flag in rowFlags(row)"
+            :key="flag.name"
+            class="pill flag-pill"
+            :class="`flag-${flag.name}`"
+            :title="flag.label"
+            :aria-label="flag.label"
+            :data-flag="flag.name"
+          ><component :is="flag.icon" :size="12" aria-hidden="true" /></span>
         </div>
       </li>
       <li v-if="!data.slots.length" class="empty-list"><StateMessage kind="empty">No lines match these filters.</StateMessage></li>

@@ -32,7 +32,7 @@ from .jsonschema_lite import load_schema, validate
 UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework
 SCHEMA_ID = "manual-mappings/3"
 SCHEMA_NAME = "manual-mappings-3"
-OWNER_FLAGS = ("radio_effect", "different_but_fits")  # slot-level flags outside the approved objects
+OWNER_FLAGS = ("radio_effect", "different_but_fits", "needs_recording")  # slot-level flags outside the approved objects
 DB_MANAGED = "manual_mappings.json"  # the decisions file: SQLite is its writer, this JSON is the export
 DOCUMENT_FILES = ("manual_mappings.local.json", "mission_progress.json")  # user files stored as documents
 

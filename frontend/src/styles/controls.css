@@ -349,6 +349,36 @@ kbd {
 .pill.muted { color: var(--muted); }
 .pill.radio { color: var(--radio); }
 
+/* ---- Owner flags (components/match/flags.ts): one icon per flag, always with a label or a tooltip. */
+.flag-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.05rem 0.25rem;
+}
+
+.flag-radio { color: var(--radio); }
+.flag-recording { color: var(--warn); }
+.flag-fits { color: var(--menu); }
+
+.flag-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.flag-filter[aria-pressed="true"] {
+  border-color: currentColor;
+  background: rgba(77, 163, 255, 0.16);
+}
+
+.flag-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 /* ---- HUD meters (HudMeter.vue and the MCC list's level progress): segmented bars, slanted like the
    original's shield meter. The fill and the track are the same segments, lit and unlit. */
 .progressbar {

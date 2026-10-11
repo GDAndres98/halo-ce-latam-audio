@@ -194,6 +194,17 @@
             "revision": {"type": "integer", "minimum": 1}
           }
         },
+        "needs_recording": {
+          "type": "object",
+          "description": "Optional owner flag (added 2026-10-11, no migration needed): the line needs a new recording (for example, no Campaign Evolved line fits). Independent of the audio and subtitle approvals; every change bumps its revision. Written only once first marked; missing = not marked.",
+          "required": ["marked", "set_at", "revision"],
+          "additionalProperties": false,
+          "properties": {
+            "marked": {"type": "boolean"},
+            "set_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+            "revision": {"type": "integer", "minimum": 1}
+          }
+        },
         "notes": {"type": "string", "maxLength": 2000}
       }
     }

@@ -105,20 +105,17 @@ async function saveAndNext() {
   if (!mccColumn.value?.nextUnmatched()) match.message.value = "Saved. No unmatched line left in this list.";
 }
 
-// ---- Candidates. Choosing one is always an explicit action (the "Use" button or the s key).
-function useCandidate(ref: string) {
-  const current = match.detail.value?.mapping;
-  if (current?.audio.status === "approved") {
-    match.error.value = "The audio decision is approved. Mark it Needs rework before choosing another recording.";
-    return;
-  }
-  const draft = match.draft;
-  draft.audioSource = "ce";
-  draft.audioRef = ref;
-  if (!draft.ceRefs.includes(ref)) draft.ceRefs.push(ref);
-  draft.matchStatus = "matched";
+// ---- Candidates. Choosing one is always an explicit action (the "Use" button or the s key). Its LATAM
+// subtitle is then offered as an unsaved subtitle, unless the subtitle was already decided.
+async function useCandidate(ref: string) {
   focusedRef.value = ref;
-  match.message.value = "Recording chosen. Save the draft to keep it.";
+  if (!(await match.chooseRecording(ref))) return;
+  match.message.value =
+    match.proposal.value === "proposed"
+      ? "Recording chosen; its LATAM subtitle is proposed. Save the draft to keep both."
+      : match.proposal.value === "missing"
+        ? "Recording chosen. It has no LATAM subtitle: choose the subtitle manually, then save."
+        : "Recording chosen. Save the draft to keep it.";
 }
 
 const mccUrl = computed(() =>
@@ -141,7 +138,7 @@ useShortcuts({
   ArrowUp: () => ceColumn.value?.move(-1),
   e: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "Spanish(Mexico)")),
   n: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "English(US)")),
-  s: () => focusedRef.value && useCandidate(focusedRef.value),
+  s: () => focusedRef.value && void useCandidate(focusedRef.value),
   "1": () => ceColumn.value?.playNth(0),
   "2": () => ceColumn.value?.playNth(1),
   "3": () => ceColumn.value?.playNth(2),
@@ -185,7 +182,7 @@ onMounted(async () => {
       <li><kbd>S</kbd> use</li>
       <li><kbd>E</kbd> es-MX · <kbd>N</kbd> EN</li>
       <li><kbd>A</kbd> A/B · <kbd>B</kbd> A then B</li>
-      <li><kbd>W</kbd> play edit · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>P</kbd> preview</li>
+      <li><kbd>W</kbd> play edit · <kbd>T</kbd> trim · <kbd>X</kbd> cut</li>
       <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo edit</li>
       <li><kbd>Esc</kbd> stop</li>
       <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save</li>
@@ -212,7 +209,7 @@ onMounted(async () => {
       @drag-start="layout.startDrag('left', $event)"
       @step="(direction, coarse) => layout.step('left', direction, coarse)"
     />
-    <MatchPanel :match="match" @save-next="saveAndNext" />
+    <MatchPanel :match="match" :slot-id="selectedSlot" @save-next="saveAndNext" />
     <SplitHandle
       side="right"
       :width="layout.widths.value.right"

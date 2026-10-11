@@ -1,16 +1,28 @@
 <script setup lang="ts">
 // Subtitle choice for one MCC line: the LATAM text that the build will write (SU), with the other texts
-// shown for comparison. Independent of the audio decision: no audio match is needed to choose a subtitle.
+// shown for comparison. Independent of the audio decision: no audio match is needed to choose a subtitle,
+// and a recording chosen but not saved yet can already give its subtitle (both are saved together).
 //
 // "Missing" (MCC has no text for this line) and "omitted" (the user chose no subtitle) are shown
 // differently on purpose: a missing text is a problem to look at, an omitted one is a decision.
 
-import { Captions } from "lucide-vue-next";
+import { Captions, Sparkles } from "lucide-vue-next";
 import { computed } from "vue";
 import type { CeLine, SlotDetail, SubtitleSource } from "../../api/types";
-import type { Draft } from "../../matching/draft";
+import { LATAM_CULTURE, subtitleDirty, type Draft } from "../../matching/draft";
+import StatusBadge from "../StatusBadge.vue";
 
-const props = defineProps<{ draft: Draft; locked: boolean; detail: SlotDetail }>();
+const props = defineProps<{
+  draft: Draft;
+  /** What is saved, to tell an unsaved choice apart. */
+  baseline: Draft | null;
+  locked: boolean;
+  detail: SlotDetail;
+  /** The Campaign Evolved lines of the draft's match, saved or not (in match order). */
+  lines: CeLine[];
+  /** The CE line whose subtitle was proposed when its recording was chosen (unsaved). */
+  proposedRef: string | null;
+}>();
 
 const SOURCES: { value: SubtitleSource; label: string }[] = [
   { value: "keep_original", label: "Keep MCC's LATAM text (SU)" },
@@ -19,7 +31,7 @@ const SOURCES: { value: SubtitleSource; label: string }[] = [
   { value: "none", label: "No subtitle (intentionally omitted)" },
 ];
 
-const CULTURES = ["es-MX", "en", "es-ES"];
+const CULTURES = [LATAM_CULTURE, "en", "es-ES"];
 
 const mccText = (key: string): { text: string | null; missing: boolean } => {
   const entry = props.detail.mcc_subtitles[key];
@@ -29,19 +41,46 @@ const su = computed(() => mccText("SU"));
 const sp = computed(() => mccText("SP"));
 const en = computed(() => mccText("EN"));
 
-/** Campaign Evolved lines matched to this MCC line that have a subtitle in the chosen language. */
-const ceOptions = computed<{ line: CeLine; ref: string }[]>(() =>
-  props.detail.matched_lines
-    .filter((line) => Boolean(line.subtitles[props.draft.subtitleCulture]?.text))
-    .map((line) => ({ line, ref: line.ce_line_ref })),
-);
-
 const noSubtitleAtAll = (line: CeLine) => !Object.values(line.subtitles).some((s) => s?.text);
+
+const unsaved = computed(() => (props.baseline ? subtitleDirty(props.draft, props.baseline) : false));
+/** The shown subtitle is the proposal made when the recording was chosen, and is not saved yet. */
+const isProposal = computed(
+  () =>
+    unsaved.value &&
+    props.proposedRef !== null &&
+    props.draft.subtitleSource === "ce_locres" &&
+    props.draft.subtitleRef === props.proposedRef,
+);
+/** The chosen replacement recording has no LATAM subtitle: the subtitle has to be chosen by hand. */
+const chosenWithoutLatam = computed(() => {
+  if (props.draft.audioSource !== "ce" || !props.draft.audioRef) return false;
+  const line = props.lines.find((l) => l.ce_line_ref === props.draft.audioRef);
+  return Boolean(line) && !line?.subtitles[LATAM_CULTURE]?.text;
+});
+
+/** The text the game will show, as chosen now (saved or not). */
+const preview = computed<{ text: string | null; note: string }>(() => {
+  const d = props.draft;
+  switch (d.subtitleSource) {
+    case "keep_original":
+      return { text: su.value.text, note: su.value.missing ? "MCC has no LATAM text for this line." : "MCC's LATAM text (unchanged)" };
+    case "ce_locres": {
+      const line = props.lines.find((l) => l.ce_line_ref === d.subtitleRef);
+      const text = line?.subtitles[d.subtitleCulture]?.text ?? null;
+      return { text, note: d.subtitleRef ? `Campaign Evolved ${d.subtitleCulture} · ${d.subtitleRef}` : "Choose a Campaign Evolved subtitle." };
+    }
+    case "custom":
+      return { text: d.customText.trim() || null, note: "Your own LATAM Spanish text" };
+    default:
+      return { text: null, note: "No subtitle: shown without text (a decision, not a missing value)." };
+  }
+});
 </script>
 
 <template>
-  <section class="block">
-    <h3><Captions :size="15" aria-hidden="true" /> Subtitle</h3>
+  <section class="block" aria-label="Subtitles" data-section="subtitles">
+    <h3><Captions :size="15" aria-hidden="true" /> Subtitles</h3>
     <p v-if="locked" class="note">Approved. Mark it Needs rework to change the subtitle.</p>
 
     <dl class="texts">
@@ -69,14 +108,18 @@ const noSubtitleAtAll = (line: CeLine) => !Object.values(line.subtitles).some((s
       </label>
     </fieldset>
 
+    <p v-if="chosenWithoutLatam && !locked" class="note small" data-testid="subtitle-manual-needed">
+      The chosen recording has no LATAM Spanish subtitle. Choose the subtitle manually.
+    </p>
+
     <div v-if="draft.subtitleSource === 'ce_locres'" class="ce-subtitle">
       <label class="inline">Language
         <select v-model="draft.subtitleCulture" :disabled="locked">
           <option v-for="c in CULTURES" :key="c" :value="c">{{ c }}</option>
         </select>
       </label>
-      <ul v-if="detail.matched_lines.length">
-        <li v-for="line in detail.matched_lines" :key="line.ce_line_ref">
+      <ul v-if="lines.length">
+        <li v-for="line in lines" :key="line.ce_line_ref">
           <label class="opt">
             <input v-model="draft.subtitleRef" type="radio" name="subtitle-ref" :value="line.ce_line_ref"
                    :disabled="locked || !line.subtitles[draft.subtitleCulture]?.text" />
@@ -87,7 +130,7 @@ const noSubtitleAtAll = (line: CeLine) => !Object.values(line.subtitles).some((s
           </label>
         </li>
       </ul>
-      <p v-else class="small muted">Match a recording first; its subtitle can then be used.</p>
+      <p v-else class="small muted">Use a recording from the right-hand list; its subtitle can then be chosen here.</p>
     </div>
 
     <div v-if="draft.subtitleSource === 'custom'" class="custom-subtitle">
@@ -97,8 +140,18 @@ const noSubtitleAtAll = (line: CeLine) => !Object.values(line.subtitles).some((s
       <p class="small muted">{{ draft.customText.length }} characters</p>
     </div>
 
-    <p v-if="draft.subtitleSource === 'none'" class="small muted">
-      The line is shown without subtitles. This is a decision, not a missing value.
-    </p>
+    <figure class="subtitle-preview" data-testid="subtitle-preview">
+      <figcaption class="small">
+        <span>Subtitle preview</span>
+        <StatusBadge v-if="isProposal" label="proposed from the chosen recording · unsaved" tone="info" />
+        <StatusBadge v-else-if="unsaved" label="unsaved" tone="warn" />
+        <Sparkles v-if="isProposal" :size="13" class="muted" aria-hidden="true" />
+      </figcaption>
+      <p v-if="preview.text" class="subtitle-text" data-testid="subtitle-preview-text">{{ preview.text }}</p>
+      <p v-else class="subtitle-text missing">(no text)</p>
+      <p class="small muted">{{ preview.note }}</p>
+    </figure>
+
+    <slot />
   </section>
 </template>

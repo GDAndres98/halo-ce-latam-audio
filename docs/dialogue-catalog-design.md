@@ -406,6 +406,17 @@ migration):**
 - **Why optional:** the owner was actively mapping `a10`, and an optional field avoided rewriting
   the file.
 
+**Optional `needs_recording: {marked, set_at, revision}` (added to `/3` on 2026-10-11, no
+migration):**
+- **What it is:** the owner's note that the line needs a new recording (for example, no
+  Campaign Evolved line fits).
+- **Rules:** independent of approvals; every change bumps its own revision
+  (`mapping_store.OWNER_FLAGS`). Unlike the other flags it has no validity rule: it is useful on
+  a line that keeps Spain's audio or has no match.
+- **Written only once first marked:** saving other changes leaves existing slots byte-identical;
+  a slot without it counts as unmarked.
+- **Build:** metadata only; M6 ignores it.
+
 **`manual-mappings/2` as implemented** (changes from the §5.1 sketch):
 - The top level is `{"schema": "manual-mappings/2", "pins":
   {ce_build, mcc_steam_buildid, mcc_spanish_fsb_sha256}, "slots": []}`.

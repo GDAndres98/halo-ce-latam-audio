@@ -13,6 +13,7 @@ import HudMeter from "../components/ui/HudMeter.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
+import { FLAGS } from "../components/match/flags";
 import { levelTitle } from "../matching/levelNames";
 
 const state = ref<StateResponse | null>(null);
@@ -135,8 +136,12 @@ async function onListKey(event: KeyboardEvent) {
             <dt>No equivalent</dt><dd>{{ current.progress.no_equivalent }}</dd>
             <dt>Deferred</dt><dd>{{ current.progress.deferred }}</dd>
             <dt>Needs rework</dt><dd :class="{ bad: current.progress.needs_rework > 0 }">{{ current.progress.needs_rework }}</dd>
-            <dt>Radio effect</dt><dd>{{ current.progress.radio_effect }}</dd>
-            <dt>Different but fits</dt><dd>{{ current.progress.different_but_fits }}</dd>
+            <dt class="flag-term"><component :is="FLAGS.radio.icon" :size="14" aria-hidden="true" /> {{ FLAGS.radio.label }}</dt>
+            <dd>{{ current.progress.radio_effect }}</dd>
+            <dt class="flag-term"><component :is="FLAGS.recording.icon" :size="14" aria-hidden="true" /> {{ FLAGS.recording.label }}</dt>
+            <dd>{{ current.progress.needs_recording ?? 0 }}</dd>
+            <dt class="flag-term"><component :is="FLAGS.fits.icon" :size="14" aria-hidden="true" /> {{ FLAGS.fits.label }}</dt>
+            <dd>{{ current.progress.different_but_fits }}</dd>
           </dl>
 
           <p>

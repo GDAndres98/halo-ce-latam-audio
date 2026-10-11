@@ -70,26 +70,42 @@ npm run dev          # starts the API and the Vite dev server together
 Open **Matching**. The screen has three columns.
 
 - **Left: MCC lines.** Pick a level, filter (unmatched, draft, approved, needs rework, keep Spain audio,
-  radio, different-but-fits), and search by ID, speaker or subtitle text. Accents and case are ignored;
+  radio, needs recording, different-but-fits), and search by ID, speaker or subtitle text. Accents and case are ignored;
   partial words work. Play a line with its play button.
-- **Centre: the decision for the selected line.** First **Listen and compare**: two waveform players,
-  **A** (the original MCC Spain recording, read-only) and **B** (the Campaign Evolved replacement: unedited,
-  the edited preview, or the preview as encoded for the game). Each can be played, stopped, replayed and
-  seeked by clicking. **A / B** switches between them at the same position; **A then B** plays the original
-  and then the replacement; the durations and their difference are shown. Then:
-  1. **Replacement audio:** keep Spain's audio, or use one of the matched Campaign Evolved recordings.
-  2. **Audio editing**, on the replacement's waveform: click to move the playhead, drag across it to
+- **Centre: the decision for the selected line**, in working order. The save bar stays in view at the
+  bottom.
+  1. **Replacement audio.** At the top, the **MCC original** key of the selected line (for example
+     `es:A10_010_cryotech#0`, with a copy button), shown as soon as you select the line. Below it, the
+     chosen **Campaign Evolved replacement** and its key, the choice between keeping Spain's audio and a
+     matched recording, the replacement's language, and the audio approval.
+  2. **Flags & notes:** *Needs radio effect* (radio tower; a flag only, no processing), *Needs recording*
+     (microphone; no suitable recording exists yet), *Different but fits* (puzzle piece), and notes. The
+     same icons are used in the MCC list, its flag filters and the Dashboard. Flags are independent of
+     approvals.
+  3. **Audio editing**, on the replacement's waveform: click to move the playhead, drag across it to
      select (drag the selection's edges to adjust it), **Trim to selection**, **Cut selection** (as many
      cuts as needed, each crossfaded), drag the cyan handles at the ends to trim, set fades (up to 500 ms),
      optionally match Spain's loudness, zoom in to place edits precisely, **Undo** and **Reset edits**.
-     **Preview edited recording** renders the recipe with the same code as the build and plays it as B; a
-     preview made before a later change is marked out of date. Edits are a recipe saved with the draft; the
-     original WAV is never changed, and approved audio is read-only until marked *Needs rework*.
-  3. **Subtitle:** Spain's, Campaign Evolved's (es-MX or EN where it exists), your own LATAM Spanish text,
-     or none (a decision to show no subtitle, shown differently from a missing text).
-  4. **Flags and notes:** radio effect (a flag only; no processing) and "different but fits".
-  5. **Save and approve:** save the draft, then approve audio and subtitle separately. Approval is always
-     a button press with a confirmation. An approved decision is read-only until you mark it *Needs rework*.
+     Edits are a recipe saved with the draft; the original WAV is never changed, and approved audio is
+     read-only until marked *Needs rework*.
+  4. **Listen and compare:** **A** (the original MCC Spain recording, read-only) and **B** (by default the
+     edited replacement; also the unedited recording or the edit as encoded for the game). The edited
+     recording is rendered **automatically** with the same code as the build: at once when you choose a
+     recording, and again shortly after each edit stops. While it renders, B shows "Rendering the latest
+     edits…" and cannot play, so an outdated render is never heard as current. Nothing plays by itself.
+     **A / B** switches at the same position, **A then B** plays one after the other, and the durations
+     and their difference are shown, with the global gain report (a build setting).
+  5. **Subtitles:** MCC's LATAM text (SU), a Campaign Evolved subtitle (es-MX or EN where it exists), your
+     own LATAM Spanish text, or none (a decision to show no subtitle, shown differently from a missing
+     text). A preview shows the text the game will display, and the subtitle approval sits here. When you
+     choose a recording, its LATAM subtitle is **proposed** (marked "proposed · unsaved") if the subtitle
+     is still MCC's default text; a subtitle you already chose or saved, or an approved one, is never
+     replaced. A recording with no LATAM subtitle says so, and you choose the subtitle yourself.
+
+  **Save draft** writes everything for the line in one request: the audio choice and its editing, the
+  subtitle, the flags and the notes. The subtitle can be chosen before anything is saved. Saving never
+  approves. Approve audio and subtitle separately (a button press with a confirmation); an approved
+  decision is read-only until you mark it *Needs rework*.
 - **Right: Campaign Evolved candidates.** Search by ID, English or LATAM text, pick a mission, hide
   recordings already used elsewhere. Results stay in catalog order. Nothing is selected for you: use
   **Use this recording** to choose one. A recording with no subtitle says so.
@@ -114,7 +130,6 @@ first.
 | `b` | play the original, then the replacement |
 | `w` | play or pause the replacement on the editing waveform (the selection, if there is one) |
 | `t` / `x` | trim to the selection / cut the selection |
-| `p` | preview the edited recording |
 | `Ctrl+Z` | undo the last edit (in a text field it stays the field's own undo) |
 | `Ctrl+S` | save the draft |
 | `Ctrl+Enter` | save the draft and open the next unmatched line (never approves; also works in a text field) |

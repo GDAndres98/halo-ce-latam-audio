@@ -169,7 +169,7 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
         <div class="badges">
           <StatusBadge :label="hasText(line, 'es-MX') ? 'es-MX subtitle' : 'no es-MX subtitle'" :tone="hasText(line, 'es-MX') ? 'ok' : 'warn'" />
           <StatusBadge :label="hasText(line, 'en') ? 'EN subtitle' : 'no EN subtitle'" :tone="hasText(line, 'en') ? 'ok' : 'muted'" />
-          <StatusBadge v-if="line.used_by.length" :label="`used by ${line.used_by.length}`" tone="muted" />
+          <StatusBadge v-if="line.used_by?.length" :label="`used by ${line.used_by.length}`" tone="muted" />
           <StatusBadge v-if="chosenRefs.includes(line.ce_line_ref)" label="matched here" tone="ok" />
           <button type="button" class="use icon-label primary-soft" @click.stop="emit('use', line.ce_line_ref)"><CircleCheck :size="15" aria-hidden="true" /> Use this recording (s)</button>
         </div>

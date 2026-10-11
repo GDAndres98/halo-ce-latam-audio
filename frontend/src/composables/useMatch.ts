@@ -4,11 +4,25 @@
 // An unsaved draft also survives a page reload, for the same stored version of the decision only
 // (sessionStorage, per viewer). The server copy is the only one that counts; the session copy only
 // protects typing against accidents.
+//
+// The audio and subtitle decisions are edited together and saved by one request (the server writes both
+// atomically), so a subtitle can be chosen for a recording that is not saved yet. `lines` holds the
+// Campaign Evolved lines of the draft, saved or not, so their subtitles can be shown and chosen.
 
 import { reactive, ref, watch } from "vue";
 import { api, ApiError } from "../api/client";
-import type { ApprovalField, SaveAction, SaveResponse, SlotDetail } from "../api/types";
-import { buildReworkBody, buildSaveBody, draftFrom, draftKey, isDirty, type Draft } from "../matching/draft";
+import type { ApprovalField, CeLine, SaveAction, SaveResponse, SlotDetail } from "../api/types";
+import {
+  buildReworkBody,
+  buildSaveBody,
+  completeDraft,
+  draftFrom,
+  draftKey,
+  isDirty,
+  proposeSubtitle,
+  type Draft,
+  type SubtitleProposal,
+} from "../matching/draft";
 
 const sessionKey = (slotId: string) => `studio.draft.${slotId}`;
 
@@ -20,6 +34,12 @@ export function useMatch() {
   const saving = ref(false);
   const message = ref("");
   const error = ref("");
+  /** Campaign Evolved lines by ref: the saved matches (from /api/slot) and recordings chosen since. */
+  const lines = reactive(new Map<string, CeLine>());
+  const pendingLines = new Map<string, Promise<CeLine | null>>();
+  /** The CE line whose subtitle was offered when its recording was chosen (unsaved), and the outcome. */
+  const proposedSubtitle = ref<string | null>(null);
+  const proposal = ref<SubtitleProposal | null>(null);
   // Called with the server's answer after every successful save or rework (the list updates that row).
   const savedListeners: ((response: SaveResponse) => void)[] = [];
   const onSaved = (listener: (response: SaveResponse) => void) => savedListeners.push(listener);
@@ -30,19 +50,91 @@ export function useMatch() {
     const fresh = draftFrom(next);
     detail.value = next;
     baseline.value = fresh;
-    if (!keepTyping) Object.assign(draft, restoreSession(next) ?? fresh);
+    next.matched_lines.forEach((line) => lines.set(line.ce_line_ref, line));
+    if (!keepTyping) {
+      const restored = restoreSession(next);
+      Object.assign(draft, restored ? completeDraft(restored, fresh) : fresh);
+      // What is shown now is saved (or the user's own restored draft): nothing is a proposal any more.
+      proposedSubtitle.value = null;
+      proposal.value = null;
+    }
   }
 
+  /** The CE line with its subtitles, from the cache or /api/ce_line. Null when it cannot be read. */
+  function ensureLine(ref: string): Promise<CeLine | null> {
+    const known = lines.get(ref);
+    if (known) return Promise.resolve(known);
+    let pending = pendingLines.get(ref);
+    if (!pending) {
+      pending = api
+        .ceLine(ref)
+        .then((line) => {
+          lines.set(ref, line);
+          return line;
+        })
+        .catch(() => null)
+        .finally(() => pendingLines.delete(ref));
+      pendingLines.set(ref, pending);
+    }
+    return pending;
+  }
+
+  /**
+   * The user chose a Campaign Evolved recording as the replacement (always an explicit action). The
+   * recording's LATAM subtitle is then offered as the subtitle, unsaved, unless the user already decided
+   * the subtitle (see proposeSubtitle). Returns false when the audio is approved and cannot change.
+   */
+  async function chooseRecording(ref: string): Promise<boolean> {
+    if (!detail.value || !baseline.value) return false;
+    if (detail.value.mapping?.audio.status === "approved") {
+      error.value = "The audio decision is approved. Mark it Needs rework before choosing another recording.";
+      return false;
+    }
+    draft.audioSource = "ce";
+    draft.audioRef = ref;
+    if (!draft.ceRefs.includes(ref)) draft.ceRefs.push(ref);
+    draft.matchStatus = "matched";
+    const slotId = detail.value.slot_id;
+    const line = await ensureLine(ref);
+    // The user may have moved on while the line was read: propose only for the choice still on screen.
+    if (detail.value?.slot_id !== slotId || draft.audioRef !== ref || !baseline.value) return true;
+    const outcome = proposeSubtitle(draft, baseline.value, detail.value.mapping, line, proposedSubtitle.value);
+    if (outcome === "proposed") proposedSubtitle.value = ref;
+    else if (outcome === "missing") proposedSubtitle.value = null;
+    proposal.value = outcome;
+    return true;
+  }
+
+  /** Removes a CE line from the match. A replacement or subtitle that used it goes back to the default. */
+  function removeMatch(ref: string) {
+    draft.ceRefs = draft.ceRefs.filter((r) => r !== ref);
+    if (draft.audioRef === ref) {
+      draft.audioRef = null;
+      draft.audioSource = "keep_original";
+    }
+    if (draft.subtitleSource === "ce_locres" && draft.subtitleRef === ref && detail.value?.mapping?.subtitle.status !== "approved") {
+      draft.subtitleSource = "keep_original";
+      draft.subtitleRef = null;
+    }
+    if (proposedSubtitle.value === ref) proposedSubtitle.value = null;
+  }
+
+  // Lines selected in quick succession: only the answer for the latest selection is shown (an older answer
+  // arriving late would otherwise put another line's decision under the selected key).
+  let latestLoad = 0;
+
   async function load(slotId: string) {
+    const request = ++latestLoad;
     loading.value = true;
     error.value = "";
     message.value = "";
     try {
-      adopt(await api.slot(slotId), false);
+      const next = await api.slot(slotId);
+      if (request === latestLoad) adopt(next, false);
     } catch (e) {
-      error.value = describe(e);
+      if (request === latestLoad) error.value = describe(e);
     } finally {
-      loading.value = false;
+      if (request === latestLoad) loading.value = false;
     }
   }
 
@@ -101,6 +193,12 @@ export function useMatch() {
     }
   }
 
+  // Recordings restored from a session draft also need their subtitles.
+  watch(
+    () => [...(draft.ceRefs ?? [])],
+    (refs) => refs.forEach((ref) => void ensureLine(ref)),
+  );
+
   watch(
     () => draftKey(draft),
     () => {
@@ -108,7 +206,26 @@ export function useMatch() {
     },
   );
 
-  return { detail, baseline, draft, loading, saving, message, error, load, save, rework, reloadKeepingDraft, dirty, onSaved };
+  return {
+    detail,
+    baseline,
+    draft,
+    lines,
+    proposedSubtitle,
+    proposal,
+    loading,
+    saving,
+    message,
+    error,
+    load,
+    save,
+    rework,
+    reloadKeepingDraft,
+    dirty,
+    onSaved,
+    chooseRecording,
+    removeMatch,
+  };
 }
 
 /** The object returned by useMatch(), passed to the components of the matching workspace. */
@@ -133,11 +250,11 @@ function writeSession(slotId: string, sha: string, draft: Draft) {
   }
 }
 
-function restoreSession(next: SlotDetail): Draft | null {
+function restoreSession(next: SlotDetail): Partial<Draft> | null {
   try {
     const raw = sessionStorage.getItem(sessionKey(next.slot_id));
     if (!raw) return null;
-    const stored = JSON.parse(raw) as { sha: string; draft: Draft };
+    const stored = JSON.parse(raw) as { sha: string; draft: Partial<Draft> };
     return stored.sha === next.sha256.mappings ? stored.draft : null;
   } catch {
     return null;

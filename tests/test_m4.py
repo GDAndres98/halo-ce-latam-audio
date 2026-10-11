@@ -605,6 +605,35 @@ class DifferentButFitsTests(AppTestBase):
         self.assertEqual(self.doc()["slots"][0]["different_but_fits"]["revision"], 1)
 
 
+class NeedsRecordingTests(AppTestBase):
+    def test_flag_is_optional_independent_and_filterable(self):
+        self.match_a()
+        self.save(actions=[{"action": "approve", "field": "audio"}, {"action": "approve", "field": "subtitle"}])
+        approved = copy.deepcopy(self.doc()["slots"][0])
+        self.save(notes="unrelated edit")                         # not marked: the field is not written
+        self.assertNotIn("needs_recording", self.doc()["slots"][0])
+        self.save(needs_recording={"marked": False})              # unchanged: still not written
+        self.assertNotIn("needs_recording", self.doc()["slots"][0])
+        self.save(needs_recording={"marked": True})               # allowed while both parts are approved
+        s = self.doc()["slots"][0]
+        self.assertEqual(s["needs_recording"], {"marked": True, "set_at": "2026-10-09", "revision": 1})
+        self.assertEqual((s["audio"], s["subtitle"]), (approved["audio"], approved["subtitle"]))
+        self.assertEqual(list(s)[-1], "notes")
+        self.assertEqual(validate(self.doc(), load_schema("manual-mappings-3")), [])
+        app2 = M4App(self.root, run_validator=False)
+        self.assertEqual([x["slot_id"] for x in app2.slots("z10", status="recording")["slots"]], [self.slot])
+        self.assertTrue(app2.slots("z10")["slots"][0]["needs_recording"])
+        self.assertEqual(app2.state()["levels"][0]["progress"]["needs_recording"], 1)
+        self.save(needs_recording={"marked": False})
+        self.assertEqual(self.doc()["slots"][0]["needs_recording"]["revision"], 2)
+        with self.assertRaises(ApiError):
+            self.save(needs_recording={"marked": "yes"})
+
+    def test_allowed_without_a_match(self):
+        self.save(match={"status": "no_equivalent", "ce_line_refs": []}, needs_recording={"marked": True})
+        self.assertTrue(self.doc()["slots"][0]["needs_recording"]["marked"])
+
+
 class MigrationTests(unittest.TestCase):
     def test_v2_to_v3_moves_the_flag_and_keeps_approvals(self):
         from common import mapping_store
