@@ -143,6 +143,25 @@ async function main() {
       return "clipboard = key";
     });
 
+    await step("12. the shortcuts legend is replaced by a button that opens the list", async () => {
+      check((await page.locator("ul.keys").count()) === 0, "the old legend is still shown");
+      const dialog = page.getByTestId("shortcuts-dialog");
+      check(!(await dialog.isVisible()), "the list is open before clicking");
+      await page.getByTestId("shortcuts-button").click();
+      await dialog.waitFor({ state: "visible", timeout: 5000 });
+      const text = await dialog.innerText();
+      check(/Save the draft/.test(text) && /Next \/ previous MCC line/.test(text), "the list is incomplete");
+      const before = await center().getByTestId("mcc-key").innerText();
+      await page.keyboard.press("j"); // shortcuts are paused while the list is open
+      check((await center().getByTestId("mcc-key").innerText()) === before, "a shortcut fired behind the list");
+      await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "hidden", timeout: 5000 });
+      await page.getByTestId("shortcuts-button").click();
+      await dialog.getByRole("button", { name: "Close" }).click();
+      await dialog.waitFor({ state: "hidden", timeout: 5000 });
+      return "button opens it; Esc and Close close it; shortcuts paused meanwhile";
+    });
+
     // ---- 5. Section order.
     await step("5. the centre panel follows the requested section order", async () => {
       const labels = await center().evaluate((el) =>

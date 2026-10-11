@@ -107,7 +107,7 @@ export class Services {
  */
 export function handleConfirms(page, decide = () => true) {
   const state = { decide, messages: [], active: true };
-  const dialog = page.locator("dialog.confirm-dialog[open]");
+  const dialog = page.locator("dialog.confirm-dialog:not(.shortcuts-dialog)[open]");
   (async () => {
     while (state.active && !page.isClosed()) {
       try {

@@ -5,9 +5,9 @@
 .layout-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1rem;
+  gap: 0.5rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 0.6rem;
   padding: 0.35rem 0.6rem;
   border: 1px solid var(--frame-dim);
@@ -15,18 +15,35 @@
   background: rgba(2, 8, 24, 0.8);
 }
 
-/* Keyboard legend: the original's controller prompts ("PRESS (A) TO CONTINUE"). */
-.keys {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem 0.95rem;
-  list-style: none;
+/* Keyboard shortcuts dialog (ShortcutsButton.vue): key caps on the left, what they do on the right. */
+.shortcuts-dialog .body {
+  overflow: auto;
+}
+
+.shortcuts-dialog h3 {
+  margin: 0.8rem 0 0.35rem;
+  font-size: 0.8rem;
+  color: var(--menu);
+}
+
+.shortcut-list {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr; /* the same key column in every group */
+  gap: 0.3rem 1rem;
   margin: 0;
-  padding: 0;
-  font-size: 0.78rem;
-  color: var(--muted);
+}
+
+.shortcut-list dt {
+  white-space: nowrap;
+}
+
+.shortcut-list dd {
+  margin: 0;
+}
+
+.shortcuts-dialog .action-band {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .workspace {
@@ -573,9 +590,5 @@ span.source-key {
 @media (max-width: 640px) {
   .controls {
     grid-template-columns: 1fr;
-  }
-
-  .keys {
-    display: none;
   }
 }

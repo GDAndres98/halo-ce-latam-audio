@@ -3,7 +3,7 @@
 // Evolved candidates (right). The selected line and every filter are kept in the URL, so reloading or
 // going back returns to the same place.
 
-import { Keyboard, LayoutTemplate } from "lucide-vue-next";
+import { LayoutTemplate } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
@@ -13,6 +13,7 @@ import { stopCurrent } from "../audio/transport";
 import CeColumn from "../components/match/CeColumn.vue";
 import MccColumn from "../components/match/MccColumn.vue";
 import MatchPanel from "../components/match/MatchPanel.vue";
+import ShortcutsButton from "../components/match/ShortcutsButton.vue";
 import { confirmAction } from "../composables/useConfirm";
 import { useMatch } from "../composables/useMatch";
 import { useShortcuts } from "../composables/useShortcuts";
@@ -175,21 +176,7 @@ onMounted(async () => {
 
 <template>
   <div class="layout-bar">
-    <Keyboard :size="16" class="muted" aria-hidden="true" />
-    <ul class="keys" aria-label="Keyboard shortcuts">
-      <li><kbd>J</kbd>/<kbd>K</kbd> line</li>
-      <li><kbd>Space</kbd> Spain</li>
-      <li><kbd>1</kbd>–<kbd>9</kbd> candidate</li>
-      <li><kbd>↑</kbd>/<kbd>↓</kbd> highlight</li>
-      <li><kbd>S</kbd> use</li>
-      <li><kbd>E</kbd> es-MX · <kbd>N</kbd> EN</li>
-      <li><kbd>A</kbd> A/B · <kbd>B</kbd> A then B</li>
-      <li><kbd>W</kbd> play edit · <kbd>T</kbd> trim · <kbd>X</kbd> cut</li>
-      <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo edit</li>
-      <li><kbd>Esc</kbd> stop</li>
-      <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save</li>
-      <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> save &amp; next · <kbd>U</kbd> next unmatched</li>
-    </ul>
+    <ShortcutsButton />
     <button type="button" class="icon-label" :disabled="layout.isDefault.value" @click="layout.reset()">
       <LayoutTemplate :size="15" aria-hidden="true" /> Reset layout
     </button>
