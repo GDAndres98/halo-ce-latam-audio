@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "scripts" / "ui"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from common import mapping_db, mapping_store  # noqa: E402
 from common.jsonschema_lite import load_schema, validate  # noqa: E402
 from common.mcc_catalog import parse_slot_id, slot_id_for  # noqa: E402
 from common.mcc_loc import SPEAKER_SEP, loc_key  # noqa: E402
@@ -89,8 +90,8 @@ def make_root(tmp):
     (root / "work/ce/build.json").write_text(json.dumps({"source_build": {"exe_file_version": "ce-1"}}))
     (root / "work/mcc/build.json").write_text(json.dumps({"source_build": {"steam_buildid": "9"},
                                                           "files": {"spanish.fsb": {"sha256": H["c"]}}}))
-    (root / "mappings/manual_mappings.json").write_text(json.dumps(
-        {"schema": "manual-mappings/3", "pins": PINS, "slots": []}, indent=2) + "\n", encoding="utf-8")
+    (root / "mappings/manual_mappings.json").write_bytes(mapping_db.serialize(
+        {"schema": "manual-mappings/3", "pins": PINS, "slots": []}))
     keys = {loc_key(T + "z10_010_keyes"): ("Despierte, Jefe Maestro.", "Despierta, jefe maestro.",
                                            f"cor&idKEYES{SPEAKER_SEP}Wake up, Master Chief."),
             loc_key(T + "z10_020_cortana"): ("¿Qué pasó?", "¿Qué ha pasado?", "What happened?")}
@@ -103,6 +104,7 @@ def make_root(tmp):
     (root / "mappings/mission_map.json").write_text(json.dumps(
         {"schema": "mission-map/1", "entries": [{"mcc_level": "z10", "ce_missions": ["M99"],
                                                   "decided_at": "2026-10-08", "note": "test"}]}))
+    mapping_store.load(root / "mappings/manual_mappings.json")  # the cutover: creates manual_mappings.db
     return root
 
 
@@ -576,7 +578,10 @@ class DifferentButFitsTests(AppTestBase):
         self.match_a()
         doc = self.doc()
         del doc["slots"][0]["different_but_fits"]                 # as written by the previous app version
-        (self.root / "mappings/manual_mappings.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        # Simulates a file written by an older app version: no database existed then, so drop it
+        # (the Studio refuses a JSON edited behind the database's back).
+        (self.root / "mappings/manual_mappings.db").unlink()
+        (self.root / "mappings/manual_mappings.json").write_bytes(mapping_db.serialize(doc))
         self.assertEqual(validate(doc, load_schema("manual-mappings-3")), [])
         self.assertFalse(self.app.slots("z10")["slots"][0]["different_but_fits"])
         self.save(notes="unrelated edit")                         # an edit without the flag doesn't add it

@@ -25,12 +25,14 @@ import os
 from collections import namedtuple
 from pathlib import Path
 
+from . import mapping_db
 from .jsonschema_lite import load_schema, validate
 
 UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework
 SCHEMA_ID = "manual-mappings/3"
 SCHEMA_NAME = "manual-mappings-3"
 OWNER_FLAGS = ("radio_effect", "different_but_fits")  # slot-level flags outside the approved objects
+DB_MANAGED = "manual_mappings.json"  # the decisions file: SQLite is its writer, this JSON is the export
 
 
 class StoreError(Exception):
@@ -46,8 +48,84 @@ class ProtectedError(StoreError):
 
 
 def load(path):
-    data = Path(path).read_bytes()
+    data = _current(path)
     return json.loads(data.decode("utf-8")), hashlib.sha256(data).hexdigest()
+
+
+def _current(path):
+    """Bytes of a store-managed file as the store sees them. For manual_mappings.json that is the
+    export of mappings/manual_mappings.db, created from the file on first use (the same import that
+    scripts/validate/migrate_mappings_db.py verifies). Other files are read as they are.
+
+    A JSON file that differs from the database is refused, not overwritten: it was edited outside the
+    Studio, and the owner decides what to keep."""
+    path = Path(path)
+    if path.name != DB_MANAGED:
+        return path.read_bytes() if path.exists() else b""
+    db = mapping_db.db_path_for(path)
+    if not db.exists():
+        if not path.exists():
+            return b""
+        raw = path.read_bytes()
+        try:
+            _create_database(path, db)
+        except mapping_db.MappingDbError:
+            # Not a valid current-schema file (an older schema, or pre-migration fields). Return it as
+            # it is: the migration tools read and upgrade it, and the database is created afterwards.
+            return raw
+    conn = mapping_db.open_existing(db)
+    try:
+        data = mapping_db.export_bytes(conn)
+        if mapping_db.meta_get(conn, "pending_json_write") == "1":
+            # The database committed a save but the JSON write did not finish: finish it now.
+            _atomic_write(path, data)
+            mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+        on_disk = path.read_bytes() if path.exists() else None
+        if on_disk != data:
+            raise StoreError(f"{path.name} differs from {db.name}: it was edited outside the Studio. "
+                             "Restore it from git or mappings/.history/ and reload.")
+        return data
+    finally:
+        conn.close()
+
+
+def _create_database(path, db):
+    raw = path.read_bytes()
+    conn = mapping_db.create(db)
+    try:
+        mapping_db.import_document(conn, json.loads(raw.decode("utf-8")), mapping_db.sha256(raw))
+        if mapping_db.export_bytes(conn) != raw:
+            raise StoreError(f"{path.name} is not in the canonical format the Studio writes "
+                             "(key order, indentation or line endings differ); nothing was imported")
+    except Exception:
+        conn.close()
+        db.unlink()  # never leave a half-built database behind
+        raise
+    conn.close()
+
+
+def _atomic_write(path, data):
+    """Temp file, fsync, then rename: the file is either the old bytes or the new bytes."""
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "wb") as f:
+        f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _write_database_backed(path, data, now):
+    """Save the decisions: commit SQLite first (with slot history), then write the JSON export."""
+    doc = json.loads(data.decode("utf-8"))
+    changed_at = (now or dt.datetime.now()).isoformat(timespec="microseconds")
+    conn = mapping_db.open_existing(mapping_db.db_path_for(path))
+    try:
+        mapping_db.replace_slots(conn, doc, changed_at)
+        _atomic_write(path, data)
+        mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+    finally:
+        conn.close()
+    return mapping_db.sha256(data)
 
 
 def check_transition(old_doc, new_doc, user_actions=()):
@@ -93,7 +171,7 @@ def check_transition(old_doc, new_doc, user_actions=()):
 
 def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now=None, schema=None):
     path = Path(path)
-    current = path.read_bytes() if path.exists() else b""
+    current = _current(path)
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded; reload and re-apply your edit")
     old_doc = json.loads(current.decode("utf-8")) if current else {"slots": []}
@@ -110,18 +188,18 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
 def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None):
     """Back up the previous bytes to .history/, then write atomically. -> new sha256.
     raw: exact bytes to write instead of serializing new_doc (restore)."""
+    data = raw if raw is not None else mapping_db.serialize(new_doc)
     history = Path(history_dir) if history_dir else path.parent / ".history"
-    if current:
+    if current:  # every save keeps the previous bytes (M3 rule 5), also for the decisions file
         history.mkdir(parents=True, exist_ok=True)
         stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
         (history / f"{path.stem}.{stamp}.{loaded_sha256[:12]}.json").write_bytes(current)
-    data = raw if raw is not None else (json.dumps(new_doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-    tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "wb") as f:
-        f.write(data)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
+    if path.name == DB_MANAGED and mapping_db.db_path_for(path).exists():
+        # Database first (with per-slot history), then the JSON export. Without a database yet (the
+        # schema migration, or a brand-new file) the JSON is written directly; its database is
+        # created from it on the next read.
+        return _write_database_backed(path, data, now)
+    _atomic_write(path, data)
     return hashlib.sha256(data).hexdigest()
 
 
@@ -132,7 +210,7 @@ def save_user_file(path, new_doc, loaded_sha256, schema_name, *, history_dir=Non
     """Same stale-check, schema check, backup and atomic write for the other user-owned files
     (manual_mappings.local.json, mission_progress.json). They hold no approvals."""
     path = Path(path)
-    current = path.read_bytes() if path.exists() else b""
+    current = _current(path)
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded; reload and re-apply your edit")
     errs = validate(new_doc, load_schema(schema_name))
@@ -216,7 +294,7 @@ def reset_removed_edit_fields(path, loaded_sha256, *, history_dir=None, now=None
     and atomic write as every save. Refuses unless the result provably differs only in those fields.
     -> (new sha256 or None when there is nothing to do, changes)."""
     path = Path(path)
-    current = path.read_bytes()
+    current = _current(path)
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded")
     old = json.loads(current.decode("utf-8"))
@@ -237,7 +315,7 @@ def migrate(path, loaded_sha256, *, history_dir=None, now=None):
     Refuses if any approved object would differ (other than the dropped audio.fx_request).
     -> (new sha256 or None if already current, number of slots)."""
     path = Path(path)
-    current = path.read_bytes()
+    current = _current(path)
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded")
     old = json.loads(current.decode("utf-8"))
@@ -260,7 +338,7 @@ def restore(path, data, loaded_sha256, *, history_dir=None, now=None):
     """Put back exact earlier bytes (a migration rollback): stale check, .history/ backup of the current
     file, atomic write. The caller proves `data` is the backup it means to restore. -> new sha256."""
     path = Path(path)
-    current = path.read_bytes()
+    current = _current(path)
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded")
     return _write(path, current, None, loaded_sha256, history_dir, now, raw=data)

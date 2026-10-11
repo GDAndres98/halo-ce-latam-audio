@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "ui"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import audio_edit as ae  # noqa: E402
-from common import mapping_store  # noqa: E402
+from common import mapping_db, mapping_store  # noqa: E402
 from common.export_config import DEFAULT_GLOBAL_GAIN_DB, ConfigError, load_export_config  # noqa: E402
 from test_audio_edit import SRC, speech  # noqa: E402
 from test_m4 import AppTestBase  # noqa: E402
@@ -127,7 +127,9 @@ class MigrationTests(AppTestBase):
                                                                   "language": "Spanish(Mexico)"},
                                                 speed=1, gain_db=-2.5)                          # draft
         self.path = self.root / "mappings/manual_mappings.json"
-        self.path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        # The file as an older app version left it: written by hand, before the database existed.
+        (self.root / "mappings/manual_mappings.db").unlink(missing_ok=True)
+        self.path.write_bytes(mapping_db.serialize(doc))
         self.before = self.path.read_bytes()
         self.local_before = (self.root / "mappings/manual_mappings.local.json").read_bytes()
         self.other = {p.name: p.read_bytes() for p in (self.root / "mappings").glob("*.json")

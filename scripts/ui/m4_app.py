@@ -39,7 +39,7 @@ from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.mapping_store import (  # noqa: E402
     EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
-    save as save_mappings, save_user_file)
+    load as load_mappings, save as save_mappings, save_user_file)
 from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
@@ -211,9 +211,12 @@ class M4App:
         return json.loads(data.decode("utf-8")), _sha(data)
 
     def _mappings(self):
-        doc, sha = self._read_user(MAPPINGS)
-        if doc is None:
+        if not (self.root / MAPPINGS).is_file():
             raise ApiError(500, f"{MAPPINGS} is missing; create it from the template (design §5.1)")
+        try:
+            doc, sha = load_mappings(self.root / MAPPINGS)
+        except StoreError as e:  # the file and the database disagree: refuse, never guess
+            raise ApiError(409, str(e))
         if doc.get("schema") != SCHEMA_ID:
             raise ApiError(409, f"{MAPPINGS} is {doc.get('schema')}; run python scripts/validate/migrate_mappings.py "
                                 "--write first")

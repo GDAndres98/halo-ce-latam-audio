@@ -1,0 +1,106 @@
+"""The decisions file is backed by SQLite: saves, history, refusals and crash recovery.
+
+Works on a copy of the first two slots of the live file (read-only use) in a temporary folder.
+"""
+import copy
+import hashlib
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from common import mapping_db, mapping_store  # noqa: E402
+
+LIVE = ROOT / "mappings" / "manual_mappings.json"
+
+
+class DatabaseBackedStoreTests(unittest.TestCase):
+    def setUp(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file as a valid v3 template")
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+        doc["slots"] = doc["slots"][:2]
+        self.path = self.root / "manual_mappings.json"
+        self.path.write_bytes(mapping_db.serialize(doc))
+        self.db = mapping_db.db_path_for(self.path)
+        self.doc, self.sha = mapping_store.load(self.path)  # creates the database
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def edited_notes(self, text):
+        new = copy.deepcopy(self.doc)
+        new["slots"][1]["notes"] = text  # notes are not part of any approved object
+        return new
+
+    def db_export(self):
+        conn = mapping_db.open_existing(self.db)
+        try:
+            return mapping_db.export_bytes(conn), mapping_db.check_derived_columns(conn)
+        finally:
+            conn.close()
+
+    def history_rows(self):
+        conn = mapping_db.open_existing(self.db)
+        try:
+            return conn.execute("SELECT mapping_id, before_body IS NULL, after_body FROM slot_history").fetchall()
+        finally:
+            conn.close()
+
+    def test_save_updates_database_history_and_json_together(self):
+        new = self.edited_notes("nota de prueba")
+        new_sha = mapping_store.save(self.path, new, self.sha, history_dir=self.root / "h")
+        data = mapping_db.serialize(new)
+        self.assertEqual(self.path.read_bytes(), data)
+        self.assertEqual(new_sha, hashlib.sha256(data).hexdigest())
+        self.assertEqual(self.db_export(), (data, []))
+        rows = self.history_rows()
+        self.assertEqual([(mid, added) for mid, added, _ in rows], [(self.doc["slots"][1]["mapping_id"], 0)])
+        self.assertIn("nota de prueba", rows[0][2])
+        self.assertEqual(len(list((self.root / "h").glob("manual_mappings.*.json"))), 1)  # file backup kept
+
+    def test_a_hand_edit_is_refused_not_overwritten(self):
+        edited = mapping_db.serialize(self.edited_notes("editado a mano"))
+        self.path.write_bytes(edited)
+        with self.assertRaises(mapping_store.StoreError):
+            mapping_store.load(self.path)
+        with self.assertRaises(mapping_store.StoreError):
+            mapping_store.save(self.path, self.edited_notes("otra"), self.sha)
+        self.assertEqual(self.path.read_bytes(), edited)  # the owner's bytes are left alone
+
+    def test_an_interrupted_json_write_is_finished_on_the_next_read(self):
+        # The database committed the save, then the process stopped before the JSON write.
+        new = self.edited_notes("guardado antes del corte")
+        conn = mapping_db.open_existing(self.db)
+        try:
+            mapping_db.replace_slots(conn, new, "2026-10-10T12:00:00")
+        finally:
+            conn.close()
+        doc, sha = mapping_store.load(self.path)
+        self.assertEqual(doc, new)
+        self.assertEqual(self.path.read_bytes(), mapping_db.serialize(new))
+        self.assertEqual(sha, hashlib.sha256(mapping_db.serialize(new)).hexdigest())
+
+    def test_a_stale_save_is_refused(self):
+        mapping_store.save(self.path, self.edited_notes("uno"), self.sha)
+        with self.assertRaises(mapping_store.StaleError):
+            mapping_store.save(self.path, self.edited_notes("dos"), self.sha)
+
+    def test_a_non_canonical_file_is_never_imported(self):
+        other = Path(self.root / "b")
+        other.mkdir()
+        path = other / "manual_mappings.json"
+        path.write_text(json.dumps(self.doc, indent=4), encoding="utf-8")  # 4-space indent: not the Studio format
+        with self.assertRaises(mapping_store.StoreError):
+            mapping_store.load(path)
+        self.assertFalse(mapping_db.db_path_for(path).exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from common import mapping_store  # noqa: E402
+from common import mapping_db, mapping_store  # noqa: E402
 from common.jsonschema_lite import UnsupportedKeyword, load_schema, validate  # noqa: E402
 from common.mapping_store import ProtectedError, StaleError, StoreError, UserAction  # noqa: E402
 from common.project_validation import (  # noqa: E402
@@ -285,7 +285,7 @@ class StoreTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name) / "manual_mappings.json"
-        self.path.write_text(json.dumps(doc(slot())), encoding="utf-8")
+        self.path.write_bytes(mapping_db.serialize(doc(slot())))
         self.hist = Path(self.tmp.name) / ".history"
 
     def tearDown(self):

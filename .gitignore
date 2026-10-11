@@ -25,3 +25,8 @@
 # Python artifacts
 __pycache__/
 *.pyc
+
+# SQLite decision store (mapping_store is its only writer). The JSON is its export.
+/mappings/*.db
+/mappings/*.db-journal
+/mappings/*.tmp

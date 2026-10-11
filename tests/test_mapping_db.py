@@ -36,7 +36,7 @@ class MappingDbTests(unittest.TestCase):
         path = self.tmp / name
         conn = mapping_db.create(path)
         try:
-            mapping_db.import_document(conn, doc)
+            mapping_db.import_document(conn, doc, mapping_db.sha256(mapping_db.serialize(doc)))
         finally:
             conn.close()
         return path
@@ -97,12 +97,15 @@ class MappingDbTests(unittest.TestCase):
         bad = copy.deepcopy(doc)
         bad["schema"] = "manual-mappings/2"
         conn = mapping_db.create(self.tmp / "a.sqlite")
-        with self.assertRaises(mapping_db.MappingDbError):
-            mapping_db.import_document(conn, bad)
-        mapping_db.import_document(conn, doc)
-        with self.assertRaises(mapping_db.MappingDbError):
-            mapping_db.import_document(conn, doc)  # never merge into an existing database
-        conn.close()
+        sha = mapping_db.sha256(mapping_db.serialize(doc))
+        try:
+            with self.assertRaises(mapping_db.MappingDbError):
+                mapping_db.import_document(conn, bad, sha)
+            mapping_db.import_document(conn, doc, sha)
+            with self.assertRaises(mapping_db.MappingDbError):
+                mapping_db.import_document(conn, doc, sha)  # never merge into an existing database
+        finally:
+            conn.close()
 
     def test_refuses_to_overwrite_and_checks_version(self):
         _, doc = self.synthetic_doc()
