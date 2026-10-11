@@ -43,6 +43,7 @@ from common.edit_preview import EditPreview  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from build_api import BuildBoard  # noqa: E402
+from common.export_config import ConfigError, load_export_config, save_global_gain  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -121,6 +122,8 @@ def make_handler(app, quiet=False, builds=None):
                     return self._wav(app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)))
                 if u.path == "/audio/ce":
                     return self._wav(app.ce_wav(q.get("ref", ""), q.get("lang", ""), q.get("k", 0)))
+                if u.path == "/api/settings/export":
+                    return self._json(200, load_export_config(app.root))
                 if u.path == "/api/builds":
                     return self._json(200, builds.list_builds())
                 if u.path == "/api/job":
@@ -138,6 +141,12 @@ def make_handler(app, quiet=False, builds=None):
                     body = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
                 except ValueError:
                     raise ApiError(400, "invalid JSON")
+                if u.path == "/api/settings/export":
+                    try:
+                        saved = save_global_gain(app.root, body.get("global_gain_db"), body.get("loaded_sha256"))
+                    except (ConfigError, TypeError, ValueError) as e:
+                        raise ApiError(409 if "changed since" in str(e) else 400, str(e))
+                    return self._json(200, saved)
                 if u.path == "/api/builds/dry-run":
                     return self._json(202, builds.start_dry_run(body.get("levels") or [], body.get("name")))
                 if u.path == "/api/save":

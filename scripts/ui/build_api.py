@@ -4,8 +4,9 @@ Nothing here touches the MCC install. Dry runs write only under work/m6/ through
 scripts/build/m6_build.py. Deploying and restoring stay in scripts/build/m6_install.py, which needs the
 owner's explicit approval for each build; the dashboard does not call it.
 
-A build is stale when the decisions it was made from are not the decisions on disk now. The build
-manifest records the hash of manual_mappings.json at build time, so comparing hashes is enough.
+A build is stale when the decisions it was made from are not the decisions on disk now, or when the global
+audio gain it was made with is not the gain configured now. The manifest records both, so comparing them is
+enough. Stale builds are reported, never rebuilt or deployed automatically.
 """
 import datetime as dt
 import hashlib
@@ -17,6 +18,7 @@ import threading
 import uuid
 from pathlib import Path
 
+from common.export_config import ConfigError, load_export_config
 from m4_app import ApiError
 
 NAME_RE = re.compile(r"^[a-z0-9_]{1,40}$")
@@ -43,6 +45,7 @@ class BuildBoard:
     # ----------------------------------------------------------------- listings
     def list_builds(self):
         current = hashlib.sha256(self.decisions.read_bytes()).hexdigest() if self.decisions.is_file() else None
+        gain_now = load_export_config(self.root)["global_gain_db"]
         builds = []
         for folder in sorted(p for p in self.build_root.glob("*") if p.is_dir()):
             manifest = _read_json(folder / "build_manifest.json")
@@ -50,6 +53,13 @@ class BuildBoard:
                 continue  # logs, caches and the like are not builds
             report = _read_json(folder / "validation_report.json") or {}
             built_from = manifest.get("inputs", {}).get("mappings_sha256")
+            built_gain = (manifest.get("global_gain") or {}).get("configured_db")
+            reasons = []
+            if built_from is not None and built_from != current:
+                reasons.append("decisions changed since the build")
+            if built_gain is None or built_gain != gain_now:
+                reasons.append("export gain changed since the build" if built_gain is not None
+                               else "build does not record the export gain")
             builds.append({
                 "name": folder.name,
                 "levels": manifest.get("levels", []),
@@ -57,7 +67,9 @@ class BuildBoard:
                 "counts": manifest.get("counts", {}),
                 "subtitles": manifest.get("subtitles", {}),
                 "validation_ok": report.get("ok"),
-                "stale": built_from is not None and built_from != current,
+                "stale": bool(reasons),
+                "stale_reasons": reasons,
+                "built_gain_db": built_gain,
                 "built_from_sha256": built_from,
                 "candidate_sha256": report.get("candidate_sha256"),
             })

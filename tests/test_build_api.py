@@ -24,7 +24,8 @@ def write_build(root, name, mappings_sha, ok=True):
     folder.mkdir(parents=True)
     (folder / "build_manifest.json").write_text(json.dumps({
         "schema": "m6-build-manifest/1", "name": name, "levels": [name], "built_at": "2026-10-10T10:00:00",
-        "inputs": {"mappings_sha256": mappings_sha}, "counts": {"audio": 3}, "subtitles": {"enabled": False}}))
+        "inputs": {"mappings_sha256": mappings_sha}, "counts": {"audio": 3}, "subtitles": {"enabled": False},
+        "global_gain": {"configured_db": 4.0}}))  # the default gain: these tests are about the decisions only
     (folder / "validation_report.json").write_text(json.dumps({"ok": ok, "candidate_sha256": "c" * 64}))
 
 

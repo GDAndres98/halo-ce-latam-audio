@@ -37,3 +37,7 @@ frontend/dist/
 
 # End-to-end test output: screenshots show game text and the report holds local paths
 frontend/e2e/out/
+
+# Local settings written by the Studio (global audio gain) and their history
+/config/audio_export.json
+/config/.history/

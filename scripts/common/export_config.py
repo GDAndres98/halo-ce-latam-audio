@@ -38,3 +38,31 @@ def load_export_config(root):
         raise ConfigError(f"{CONFIG}: " + "; ".join(errs[:3]))
     return {"global_gain_db": float(doc.get("global_gain_db", DEFAULT_GLOBAL_GAIN_DB)), "source": CONFIG,
             "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def save_global_gain(root, gain_db, loaded_sha256, *, now=None):
+    """Writes config/audio_export.json with a new global gain. The Studio's only way to change it.
+
+    loaded_sha256 is the hash of the file the caller read (None for "no file yet"): a file that changed
+    since is refused, as for the decisions. The previous file is kept in config/.history/. Returns the
+    new settings as load_export_config reports them."""
+    gain = float(gain_db)
+    if not (GAIN_RANGE_DB[0] <= gain <= GAIN_RANGE_DB[1]):
+        raise ConfigError(f"global gain must be between {GAIN_RANGE_DB[0]:g} and {GAIN_RANGE_DB[1]:g} dB")
+    path = Path(root) / CONFIG
+    current = path.read_bytes() if path.is_file() else None
+    current_sha = hashlib.sha256(current).hexdigest() if current is not None else None
+    if current_sha != loaded_sha256:
+        raise ConfigError(f"{CONFIG} changed since it was loaded; reload the settings and try again")
+    data = (json.dumps({"schema": "audio-export-config/1", "global_gain_db": gain}, indent=2) + "\n").encode("utf-8")
+    if current is not None:
+        import datetime as dt
+        history = path.parent / ".history"
+        history.mkdir(parents=True, exist_ok=True)
+        stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
+        (history / f"audio_export.{stamp}.{current_sha[:12]}.json").write_bytes(current)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(path)
+    return load_export_config(root)
