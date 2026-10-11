@@ -136,13 +136,63 @@ def cutover(source, backup_root, now):
     return report
 
 
+def cutover_documents(folder, backup_root, now):
+    """One-time: store the user files (custom subtitles, mission progress) in the database. Each file is
+    backed up first, imported through mapping_store (canonical check) and read back. A file already in
+    the database is refused. Missing files are skipped. -> (report, ok)."""
+    from common import mapping_store
+
+    folder = Path(folder)
+    backup = Path(backup_root) / f"cutover-documents-{now:%Y%m%dT%H%M%S}"
+    backup.mkdir(parents=True, exist_ok=True)
+    db = mapping_db.db_path_for(folder / "manual_mappings.json")
+    if not db.exists():
+        raise SystemExit("refusing: run the decisions cutover first (no database yet)")
+    documents = {}
+    for name in mapping_store.DOCUMENT_FILES:
+        path = folder / name
+        if not path.exists():
+            documents[name] = {"skipped": "no file"}
+            continue
+        conn = mapping_db.open_existing(db)
+        try:
+            if mapping_db.document_get(conn, name) is not None:
+                raise SystemExit(f"refusing: {name} is already in the database")
+        finally:
+            conn.close()
+        raw = path.read_bytes()
+        (backup / name).write_bytes(raw)
+        mapping_store.load_or_default(path, {})  # imports it: canonical check, then stored
+        conn = mapping_db.open_existing(db)
+        try:
+            stored = mapping_db.document_get(conn, name)
+        finally:
+            conn.close()
+        documents[name] = {"source_sha256": sha256(raw), "stored_equals_file": stored is not None and stored[0] == raw,
+                           "file_unchanged": sha256(path.read_bytes()) == sha256(raw)}
+    ok = all(d.get("stored_equals_file", True) and d.get("file_unchanged", True) for d in documents.values())
+    report = {"tool": "migrate_mappings_db --cutover-documents", "at": now.isoformat(timespec="seconds"),
+              "database": db.as_posix(), "backup": backup.as_posix(), "documents": documents, "ok": ok}
+    (backup / "cutover_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    return report
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", type=Path, default=SOURCE)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--cutover", action="store_true",
                     help="one-time: make SQLite the writer of mappings/manual_mappings.json (backs up the JSON first)")
+    ap.add_argument("--cutover-documents", action="store_true",
+                    help="one-time: store the user files (custom subtitles, mission progress) in the database")
     args = ap.parse_args()
+
+    if args.cutover_documents:
+        report = cutover_documents(SOURCE.parent, REPO_ROOT / "work" / "backup", dt.datetime.now())
+        for name, d in report["documents"].items():
+            print(f"{name}: {d}")
+        print(f"database={report['database']}  backup={report['backup']}")
+        return 0 if report["ok"] else 1
 
     if args.cutover:
         report = cutover(args.source, REPO_ROOT / "work" / "backup", dt.datetime.now())

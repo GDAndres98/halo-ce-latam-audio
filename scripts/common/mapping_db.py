@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .jsonschema_lite import load_schema, validate
 
-DB_SCHEMA_VERSION = 2
+DB_SCHEMA_VERSION = 3
 SOURCE_SCHEMA = "manual-mappings/3"
 
 DDL = """
@@ -58,16 +58,36 @@ CREATE TABLE slot_history (
     after_body  TEXT                                -- NULL when the slot was removed
 );
 CREATE INDEX slot_history_mapping ON slot_history (mapping_id);
+CREATE TABLE documents (
+    name               TEXT PRIMARY KEY,            -- e.g. manual_mappings.local.json
+    body               TEXT NOT NULL,               -- exact file text (canonical JSON): the source of truth
+    export_sha256      TEXT NOT NULL,               -- hash of the file the store last wrote or verified
+    pending_json_write INTEGER NOT NULL             -- 1 between a database commit and its JSON write
+);
+CREATE TABLE document_history (
+    id          INTEGER PRIMARY KEY,
+    changed_at  TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    before_body TEXT,                               -- NULL on the first import
+    after_body  TEXT
+);
 """
+
+# Version 2 -> 3 only adds the two document tables. Nothing existing is touched.
+DDL_V3_DOCUMENTS = DDL[DDL.index("CREATE TABLE documents"):]
 
 
 class MappingDbError(Exception):
     pass
 
 
-def db_path_for(json_path):
-    """manual_mappings.json -> manual_mappings.db next to it (git-ignored)."""
-    return Path(json_path).with_suffix(".db")
+DB_FILE = "manual_mappings.db"
+
+
+def db_path_for(path):
+    """The one database of the mapping folder, whichever file of it is asked about (git-ignored).
+    Every user file lives in the same database, so the name must not follow the file's own name."""
+    return Path(path).with_name(DB_FILE)
 
 
 def serialize(doc):
@@ -113,10 +133,32 @@ def create(path):
 def open_existing(path):
     conn = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=rw", uri=True)
     version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version == 2:
+        upgrade_v2_to_v3(conn)
+        version = DB_SCHEMA_VERSION
     if version != DB_SCHEMA_VERSION:
         conn.close()
         raise MappingDbError(f"{path}: database schema {version}, this build expects {DB_SCHEMA_VERSION}")
     return conn
+
+
+def upgrade_v2_to_v3(conn):
+    """Adds the documents tables (user files: custom subtitles, mission progress). Additive only."""
+    conn.executescript(DDL_V3_DOCUMENTS.replace("CREATE TABLE documents", "CREATE TABLE IF NOT EXISTS documents")
+                       .replace("CREATE TABLE document_history", "CREATE TABLE IF NOT EXISTS document_history"))
+    conn.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
+    conn.commit()
+
+
+def is_imported(path):
+    """True when the decisions have been imported into this database (it may exist before that)."""
+    if not Path(path).exists():
+        return False
+    conn = open_existing(path)
+    try:
+        return meta_get(conn, "source_schema") is not None
+    finally:
+        conn.close()
 
 
 def meta_get(conn, key):
@@ -216,3 +258,42 @@ def check_derived_columns(conn):
         if tuple(columns) != slot_columns(json.loads(body)):
             bad.append(position)
     return bad
+
+
+# --------------------------------------------------------------------------- user documents
+# Small user-owned files (custom subtitles, mission progress). Same contract as the decisions:
+# the row body is the source, the file is an export, and every change is recorded in document_history.
+
+def document_get(conn, name):
+    """-> (body bytes, export sha256, pending flag) or None when the document was never stored."""
+    row = conn.execute("SELECT body, export_sha256, pending_json_write FROM documents WHERE name = ?",
+                       (name,)).fetchone()
+    if row is None:
+        return None
+    return row[0].encode("utf-8"), row[1], row[2] == 1
+
+
+def document_put(conn, name, data, changed_at, *, pending):
+    """Store the exact file bytes in one transaction, with a history row when they change.
+    pending=True means the JSON file still has to be written (document_mark_synced)."""
+    body = data.decode("utf-8")
+    old = conn.execute("SELECT body FROM documents WHERE name = ?", (name,)).fetchone()
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            "INSERT INTO documents (name, body, export_sha256, pending_json_write) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(name) DO UPDATE SET body = excluded.body, export_sha256 = excluded.export_sha256, "
+            "pending_json_write = excluded.pending_json_write",
+            (name, body, sha256(data), 1 if pending else 0))
+        if old is None or old[0] != body:
+            conn.execute("INSERT INTO document_history (changed_at, name, before_body, after_body) "
+                         "VALUES (?, ?, ?, ?)", (changed_at, name, None if old is None else old[0], body))
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+
+
+def document_mark_synced(conn, name):
+    conn.execute("UPDATE documents SET pending_json_write = 0 WHERE name = ?", (name,))
+    conn.commit()

@@ -39,7 +39,7 @@ from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common.mapping_store import (  # noqa: E402
     EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
-    load as load_mappings, save as save_mappings, save_user_file)
+    load as load_mappings, load_or_default, save as save_mappings, save_user_file)
 from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
@@ -222,12 +222,20 @@ class M4App:
                                 "--write first")
         return doc, sha
 
+    def _read_document(self, rel, default):
+        """User documents (custom subtitles, mission progress) are read through the store, which checks
+        them against the database."""
+        try:
+            return load_or_default(self.root / rel, default)
+        except StoreError as e:
+            raise ApiError(409, str(e))
+
     def _local(self):
-        return self._read_user(LOCAL, {"schema": "manual-mappings-local/1", "custom_subtitles": {},
-                                       "user_recordings": {}})
+        return self._read_document(LOCAL, {"schema": "manual-mappings-local/1", "custom_subtitles": {},
+                                           "user_recordings": {}})
 
     def _progress(self):
-        return self._read_user(PROGRESS, {"schema": "mission-progress/1", "levels": []})
+        return self._read_document(PROGRESS, {"schema": "mission-progress/1", "levels": []})
 
     def _verifications(self):
         return self._read_user(VERIFICATIONS, {"verifications": []})[0]

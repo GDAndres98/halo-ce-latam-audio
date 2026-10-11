@@ -119,6 +119,21 @@ class MappingDbTests(unittest.TestCase):
         with self.assertRaises(mapping_db.MappingDbError):
             mapping_db.open_existing(path)
 
+    def test_a_version_2_database_is_upgraded_in_place(self):
+        _, doc = self.synthetic_doc()
+        path = self.build(doc)
+        raw = sqlite3.connect(path)
+        raw.executescript("DROP TABLE document_history; DROP TABLE documents; PRAGMA user_version = 2;")
+        raw.commit()
+        raw.close()
+        conn = mapping_db.open_existing(path)  # upgrades: adds the two tables, keeps every slot
+        try:
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], mapping_db.DB_SCHEMA_VERSION)
+            self.assertEqual(mapping_db.export_document(conn), doc)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0], 0)
+        finally:
+            conn.close()
+
     def synthetic_doc(self):
         """Two-slot document in the real v3 shape. Built from the live file when present."""
         if LIVE.exists():

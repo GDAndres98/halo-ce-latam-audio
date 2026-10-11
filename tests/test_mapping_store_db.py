@@ -3,6 +3,7 @@
 Works on a copy of the first two slots of the live file (read-only use) in a temporary folder.
 """
 import copy
+import datetime as dt
 import hashlib
 import json
 import sys
@@ -109,6 +110,82 @@ class DatabaseBackedStoreTests(unittest.TestCase):
         with self.assertRaises(mapping_store.StoreError):
             mapping_store.load(path)
         self.assertFalse(mapping_db.db_path_for(path).exists())
+
+
+class UserDocumentTests(unittest.TestCase):
+    """mission_progress.json and manual_mappings.local.json: stored in the database, same guarantees."""
+
+    def setUp(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file to create the database")
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        (self.root / "mappings").mkdir()
+        doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+        doc["slots"] = doc["slots"][:2]
+        self.decisions = self.root / "mappings" / "manual_mappings.json"
+        self.decisions.write_bytes(mapping_db.serialize(doc))
+        mapping_store.load(self.decisions)  # decisions first, as at the cutover
+        self.progress = self.root / "mappings" / "mission_progress.json"
+        self.db = mapping_db.db_path_for(self.decisions)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def level_doc(self, status):
+        return {"schema": "mission-progress/1",
+                "levels": [{"mcc_level": "a10", "status": status, "updated_at": "2026-10-10",
+                            "verification": None, "note": ""}]}
+
+    def test_missing_file_loads_as_the_default(self):
+        doc, sha = mapping_store.load_or_default(self.progress, {"schema": "mission-progress/1", "levels": []})
+        self.assertEqual(doc["levels"], [])
+        self.assertEqual(sha, mapping_store.EMPTY_SHA256)
+        self.assertFalse(self.progress.exists())  # reading creates nothing on disk
+
+    def test_save_writes_the_database_history_and_the_file(self):
+        doc, sha = mapping_store.load_or_default(self.progress, {"schema": "mission-progress/1", "levels": []})
+        new = self.level_doc("in_progress")
+        mapping_store.save_user_file(self.progress, new, sha, "mission-progress-1",
+                                     history_dir=self.root / "h", now=dt.datetime(2026, 10, 10, 12))
+        self.assertEqual(self.progress.read_bytes(), mapping_db.serialize(new))
+        conn = mapping_db.open_existing(self.db)
+        try:
+            body, export_sha, pending = mapping_db.document_get(conn, "mission_progress.json")
+            history = conn.execute("SELECT COUNT(*) FROM document_history WHERE name = 'mission_progress.json'").fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(body, mapping_db.serialize(new))
+        self.assertEqual(export_sha, mapping_db.sha256(mapping_db.serialize(new)))
+        self.assertFalse(pending)
+        self.assertEqual(history, 1)
+
+    def test_a_stale_user_save_is_refused(self):
+        _doc, sha = mapping_store.load_or_default(self.progress, {"schema": "mission-progress/1", "levels": []})
+        mapping_store.save_user_file(self.progress, self.level_doc("in_progress"), sha, "mission-progress-1")
+        with self.assertRaises(mapping_store.StaleError):
+            mapping_store.save_user_file(self.progress, self.level_doc("reviewed"), sha, "mission-progress-1")
+
+    def test_a_hand_edited_user_file_is_refused(self):
+        _doc, sha = mapping_store.load_or_default(self.progress, {"schema": "mission-progress/1", "levels": []})
+        mapping_store.save_user_file(self.progress, self.level_doc("in_progress"), sha, "mission-progress-1")
+        edited = mapping_db.serialize(self.level_doc("reviewed"))
+        self.progress.write_bytes(edited)
+        with self.assertRaises(mapping_store.StoreError):
+            mapping_store.load(self.progress)
+        self.assertEqual(self.progress.read_bytes(), edited)
+
+    def test_an_interrupted_user_file_write_is_finished_on_the_next_read(self):
+        new = self.level_doc("in_progress")
+        conn = mapping_db.open_existing(self.db)
+        try:
+            mapping_db.document_put(conn, "mission_progress.json", mapping_db.serialize(new),
+                                    "2026-10-10T12:00:00", pending=True)
+        finally:
+            conn.close()
+        doc, _sha = mapping_store.load(self.progress)
+        self.assertEqual(doc, new)
+        self.assertEqual(self.progress.read_bytes(), mapping_db.serialize(new))
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ schema check, backup and atomic write. Guarantees (docs/dialogue-catalog-design.
 """
 import datetime as dt
 import hashlib
+import copy
 import json
 import os
 from collections import namedtuple
@@ -33,6 +34,7 @@ SCHEMA_ID = "manual-mappings/3"
 SCHEMA_NAME = "manual-mappings-3"
 OWNER_FLAGS = ("radio_effect", "different_but_fits")  # slot-level flags outside the approved objects
 DB_MANAGED = "manual_mappings.json"  # the decisions file: SQLite is its writer, this JSON is the export
+DOCUMENT_FILES = ("manual_mappings.local.json", "mission_progress.json")  # user files stored as documents
 
 
 class StoreError(Exception):
@@ -52,23 +54,35 @@ def load(path):
     return json.loads(data.decode("utf-8")), hashlib.sha256(data).hexdigest()
 
 
-def _current(path):
-    """Bytes of a store-managed file as the store sees them. For manual_mappings.json that is the
-    export of mappings/manual_mappings.db, created from the file on first use (the same import that
-    scripts/validate/migrate_mappings_db.py verifies). Other files are read as they are.
+def load_or_default(path, default):
+    """Like load(), but a file that does not exist yet loads as `default` (sha of empty bytes)."""
+    data = _current(path)
+    if not data:
+        return copy.deepcopy(default), EMPTY_SHA256
+    return json.loads(data.decode("utf-8")), hashlib.sha256(data).hexdigest()
 
-    A JSON file that differs from the database is refused, not overwritten: it was edited outside the
-    Studio, and the owner decides what to keep."""
+
+def _current(path):
+    """Bytes of a store-managed file as the store sees them.
+
+    manual_mappings.json: the export of the decisions in mappings/manual_mappings.db.
+    manual_mappings.local.json and mission_progress.json: documents stored in the same database.
+    Created from the file on first use, after the canonical-format check. Other files are read as they are.
+
+    A file that differs from what the database holds is refused, not overwritten: it was edited outside
+    the Studio, and the owner decides what to keep."""
     path = Path(path)
-    if path.name != DB_MANAGED:
+    if path.name not in (DB_MANAGED, *DOCUMENT_FILES):
         return path.read_bytes() if path.exists() else b""
     db = mapping_db.db_path_for(path)
-    if not db.exists():
+    if path.name in DOCUMENT_FILES:
+        return _document_current(path, db)
+    if not mapping_db.is_imported(db):
         if not path.exists():
             return b""
         raw = path.read_bytes()
         try:
-            _create_database(path, db)
+            _import_decisions(path, db, raw)
         except mapping_db.MappingDbError:
             # Not a valid current-schema file (an older schema, or pre-migration fields). Return it as
             # it is: the migration tools read and upgrade it, and the database is created afterwards.
@@ -83,28 +97,78 @@ def _current(path):
             return data
         # Compare hashes, not a fresh export: the database stored the export's hash in the same
         # transaction as the rows. Re-serialising 536 slots on every read cost ~50 ms per request.
-        on_disk = path.read_bytes() if path.exists() else None
-        if on_disk is None or mapping_db.sha256(on_disk) != mapping_db.meta_get(conn, "export_sha256"):
-            raise StoreError(f"{path.name} differs from {db.name}: it was edited outside the Studio. "
-                             "Restore it from git or mappings/.history/ and reload.")
-        return on_disk
+        return _verified_file(path, mapping_db.meta_get(conn, "export_sha256"), db)
     finally:
         conn.close()
 
 
-def _create_database(path, db):
-    raw = path.read_bytes()
-    conn = mapping_db.create(db)
+def _document_current(path, db):
+    if not db.exists() and not path.exists():
+        return b""  # nothing stored and nothing on disk: don't create a database just to say so
+    conn = _open_or_create(db)
     try:
-        mapping_db.import_document(conn, json.loads(raw.decode("utf-8")), mapping_db.sha256(raw))
-        if mapping_db.export_bytes(conn) != raw:
-            raise StoreError(f"{path.name} is not in the canonical format the Studio writes "
-                             "(key order, indentation or line endings differ); nothing was imported")
-    except Exception:
+        row = mapping_db.document_get(conn, path.name)
+        if row is None:
+            if not path.exists():
+                return b""
+            raw = path.read_bytes()
+            _check_document_schema(path, raw)
+            mapping_db.document_put(conn, path.name, raw, _now_stamp(None), pending=False)
+            return raw
+        data, expected_sha, pending = row
+        if pending:
+            _atomic_write(path, data)
+            mapping_db.document_mark_synced(conn, path.name)
+            return data
+        return _verified_file(path, expected_sha, db)
+    finally:
         conn.close()
-        db.unlink()  # never leave a half-built database behind
-        raise
-    conn.close()
+
+
+def _verified_file(path, expected_sha, db):
+    on_disk = path.read_bytes() if path.exists() else None
+    if on_disk is None or mapping_db.sha256(on_disk) != expected_sha:
+        raise StoreError(f"{path.name} differs from {db.name}: it was edited outside the Studio. "
+                         "Restore it from git or mappings/.history/ and reload.")
+    return on_disk
+
+
+def _check_document_schema(path, raw):
+    name = {"manual_mappings.local.json": "manual-mappings-local-1", "mission_progress.json": "mission-progress-1"}
+    try:
+        doc = json.loads(raw.decode("utf-8"))
+    except ValueError as e:
+        raise StoreError(f"{path.name} is not valid JSON: {e}")
+    errs = validate(doc, load_schema(name[path.name]))
+    if errs:
+        raise StoreError(f"{path.name} schema: " + "; ".join(errs[:5]))
+    if mapping_db.serialize(doc) != raw:
+        raise StoreError(f"{path.name} is not in the canonical format the Studio writes; nothing was imported")
+
+
+def _open_or_create(db):
+    return mapping_db.open_existing(db) if db.exists() else mapping_db.create(db)
+
+
+def _now_stamp(now):
+    return (now or dt.datetime.now()).isoformat(timespec="microseconds")
+
+
+def _import_decisions(path, db, raw):
+    """First use of manual_mappings.json: import it into the database (the same import that
+    scripts/validate/migrate_mappings_db.py verifies). Nothing is written unless the canonical check
+    passes first."""
+    doc = json.loads(raw.decode("utf-8"))
+    if doc.get("schema") != mapping_db.SOURCE_SCHEMA:  # an older file: the caller's migration handles it
+        raise mapping_db.MappingDbError(f"{path.name} is {doc.get('schema')}, not {mapping_db.SOURCE_SCHEMA}")
+    if mapping_db.serialize(doc) != raw:
+        raise StoreError(f"{path.name} is not in the canonical format the Studio writes "
+                         "(key order, indentation or line endings differ); nothing was imported")
+    conn = _open_or_create(db)
+    try:
+        mapping_db.import_document(conn, doc, mapping_db.sha256(raw))
+    finally:
+        conn.close()
 
 
 def _atomic_write(path, data):
@@ -126,6 +190,18 @@ def _write_database_backed(path, data, now):
         mapping_db.replace_slots(conn, doc, changed_at)
         _atomic_write(path, data)
         mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+    finally:
+        conn.close()
+    return mapping_db.sha256(data)
+
+
+def _write_document(path, data, now):
+    """Save a user document: database first (with history), then the file, then clear the pending flag."""
+    conn = _open_or_create(mapping_db.db_path_for(path))
+    try:
+        mapping_db.document_put(conn, path.name, data, _now_stamp(now), pending=True)
+        _atomic_write(path, data)
+        mapping_db.document_mark_synced(conn, path.name)
     finally:
         conn.close()
     return mapping_db.sha256(data)
@@ -197,10 +273,12 @@ def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None):
         history.mkdir(parents=True, exist_ok=True)
         stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
         (history / f"{path.stem}.{stamp}.{loaded_sha256[:12]}.json").write_bytes(current)
-    if path.name == DB_MANAGED and mapping_db.db_path_for(path).exists():
-        # Database first (with per-slot history), then the JSON export. Without a database yet (the
-        # schema migration, or a brand-new file) the JSON is written directly; its database is
-        # created from it on the next read.
+    if path.name in DOCUMENT_FILES:
+        return _write_document(path, data, now)
+    if path.name == DB_MANAGED and mapping_db.is_imported(mapping_db.db_path_for(path)):
+        # Database first (with per-slot history), then the JSON export. Without an imported decisions
+        # table (the schema migration, or a brand-new file) the JSON is written directly; the import
+        # happens on the next read.
         return _write_database_backed(path, data, now)
     _atomic_write(path, data)
     return hashlib.sha256(data).hexdigest()
