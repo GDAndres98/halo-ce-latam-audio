@@ -474,6 +474,7 @@ class SearchTests(AppTestBase):
         self.assertEqual(self.ids(status="approved"), [])     # nothing approved yet
         row = {x["slot_id"]: x for x in self.app.slots("z10")["slots"]}
         self.assertTrue(row[k]["preview"].startswith("Despierte"))   # Latin American text shown in the list
+        self.assertEqual(row[k]["spanish_index"], self.app.slot(k)["spanish"]["index"])  # plays the Spain sample
 
     def test_hide_lines_already_used(self):
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]})            # slot 1 uses line_a

@@ -352,7 +352,8 @@ class M4App:
                                 "decision": self._decision_summary(m),
                                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
                                 "different_but_fits": _fits(m), "edited": _edited(m),
-                                "preview": self._subtitle_preview(r["mcc_tag"])})
+                                "preview": self._subtitle_preview(r["mcc_tag"]),
+                                "spanish_index": s["index"]})
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
