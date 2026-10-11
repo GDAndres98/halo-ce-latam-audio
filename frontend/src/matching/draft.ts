@@ -55,6 +55,14 @@ export function defaultEdit(gapS = 0): AudioEdit {
   };
 }
 
+/** A stored recipe with every field present: missing fields get the defaults, and a partial loudness
+ * setting keeps its mode and gets the default offset. */
+function completeEdit(stored: AudioEdit): AudioEdit {
+  const edit = editWithoutBinding(stored);
+  const defaults = defaultEdit(stored.gap_s ?? 0);
+  return { ...defaults, ...edit, loudness: { ...defaults.loudness, ...(edit.loudness ?? {}) } };
+}
+
 /** The recipe as the editor works on it. `for_source` records which recording the recipe was made for; the
  * server recomputes it from the audio choice, so it is never sent back. */
 function editWithoutBinding(edit: AudioEdit): AudioEdit {
@@ -75,7 +83,7 @@ export function draftFrom(detail: SlotDetail): Draft {
     audioLanguage: firstSource?.language ?? DEFAULT_LANGUAGE,
     // The server stores only the fields that were set (a new line has just the trims and gap), so the
     // missing ones are filled with the defaults, as the classic page does.
-    edit: m ? { ...defaultEdit(m.audio.edit.gap_s ?? 0), ...editWithoutBinding(m.audio.edit) } : defaultEdit(),
+    edit: m ? completeEdit(m.audio.edit) : defaultEdit(),
     subtitleSource: m?.subtitle.source ?? "keep_original",
     subtitleRef: m?.subtitle.ce_locres?.ce_line_ref ?? null,
     subtitleCulture: m?.subtitle.ce_locres?.culture ?? "es-MX",

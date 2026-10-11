@@ -9,9 +9,11 @@ import { onBeforeUnmount, onMounted } from "vue";
 export type ShortcutMap = Record<string, () => void>;
 
 export function useShortcuts(shortcuts: ShortcutMap) {
+  // Names are compared in lower case, so "ArrowDown" and "arrowdown" are the same binding.
+  const actions = Object.fromEntries(Object.entries(shortcuts).map(([name, action]) => [name.toLowerCase(), action]));
   const onKeyDown = (event: KeyboardEvent) => {
     const name = shortcutName(event);
-    const action = shortcuts[name];
+    const action = actions[name];
     if (!action) return;
     if (isTyping(event.target) && !name.startsWith("ctrl+")) return;
     event.preventDefault();

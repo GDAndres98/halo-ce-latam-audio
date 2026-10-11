@@ -8,6 +8,7 @@ import { api, ApiError, audioUrl } from "../../api/client";
 import { useDebounced } from "../../composables/useDebounced";
 import type { SlotRow, SlotsResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
+import { markFor } from "../../matching/status";
 import StatusBadge from "../StatusBadge.vue";
 
 const props = defineProps<{ levels: string[]; selectedId: string | null }>();
@@ -96,6 +97,7 @@ function mccAudio(row: SlotRow) {
       <label>Level
         <select v-model="level">
           <option v-for="l in levels" :key="l" :value="l">{{ l }}</option>
+          <option value="all">All levels (search)</option>
         </select>
       </label>
       <label>Show
@@ -108,6 +110,10 @@ function mccAudio(row: SlotRow) {
       </label>
     </div>
 
+    <div v-if="data?.progress" class="progressbar" role="progressbar" aria-label="Level progress"
+         :aria-valuenow="data.progress.decided" aria-valuemin="0" :aria-valuemax="data.progress.slots">
+      <span :style="{ width: `${data.progress.slots ? (100 * data.progress.decided) / data.progress.slots : 0}%` }"></span>
+    </div>
     <p v-if="data?.progress" class="progress small">
       Decided {{ data.progress.decided }} / {{ data.progress.slots }} ·
       audio approved {{ data.progress.audio_approved }} ·
@@ -137,10 +143,13 @@ function mccAudio(row: SlotRow) {
         </div>
         <div class="preview small" :title="row.preview">{{ row.preview || "(no subtitle text)" }}</div>
         <div class="badges">
-          <StatusBadge :label="`match: ${decisionOf(row).match}`" :tone="matchTone(decisionOf(row).match)" />
-          <StatusBadge :label="`audio: ${decisionOf(row).audio}`" :tone="tone(decisionOf(row).audio)" />
-          <StatusBadge :label="`subtitle: ${decisionOf(row).subtitle}`" :tone="tone(decisionOf(row).subtitle)" />
-          <StatusBadge v-if="row.radio_effect" label="radio" tone="warn" />
+          <span class="pill" :class="markFor(decisionOf(row).match).tone" :title="`match: ${markFor(decisionOf(row).match).word}`"
+                :aria-label="`match: ${markFor(decisionOf(row).match).word}`">M{{ markFor(decisionOf(row).match).glyph }}</span>
+          <span class="pill" :class="markFor(decisionOf(row).audio).tone" :title="`audio: ${markFor(decisionOf(row).audio).word}`"
+                :aria-label="`audio: ${markFor(decisionOf(row).audio).word}`">A{{ markFor(decisionOf(row).audio).glyph }}</span>
+          <span class="pill" :class="markFor(decisionOf(row).subtitle).tone" :title="`subtitle: ${markFor(decisionOf(row).subtitle).word}`"
+                :aria-label="`subtitle: ${markFor(decisionOf(row).subtitle).word}`">S{{ markFor(decisionOf(row).subtitle).glyph }}</span>
+          <span v-if="row.radio_effect" class="pill warn" title="needs radio effect" aria-label="needs radio effect">R</span>
         </div>
       </li>
       <li v-if="!data.slots.length" class="muted">No lines match these filters.</li>

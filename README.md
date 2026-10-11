@@ -91,24 +91,58 @@ line and every filter, so reloading or using Back returns you to the same place.
 in the browser session for the same stored version of the line; leaving a line with unsaved changes asks
 first.
 
-**Keyboard** (not while typing in a field):
+**Keyboard** (not while typing in a field). The keys follow the classic M4 page where it had them:
 
 | Key | Action |
 |---|---|
-| `m` | play the MCC recording |
-| `e` / `n` | play the highlighted (or chosen) recording in es-MX / English |
-| `j` / `k` | move the highlight through the candidates (selects nothing) |
+| `j` / `k` | next / previous MCC line |
+| `Space` (or `m`) | play Spain's recording |
+| `1` to `9` | play the first nine candidates (es-MX); plays only, selects nothing |
+| `↑` / `↓` | move the candidate highlight; selects nothing |
 | `s` | use the highlighted recording as the replacement |
-| `[` / `]` | previous / next MCC line |
+| `e` / `n` | play the highlighted (or chosen) recording in es-MX / English |
 | `/` / `\` | focus the MCC search / the candidate search |
 | `Ctrl+S` | save the draft |
 | `Esc` | stop playback |
 
 Approval has no shortcut.
 
+**Panels.** Drag the dividers between the three panels, or focus a divider and use the arrow keys (Shift for
+bigger steps). Each side panel has a minimum width, and the centre panel keeps at least 420 px. Widths are
+kept on the computer and restored on the next visit; *Reset layout* returns to the defaults. On a narrow
+window the panels stack and the dividers are hidden.
+
 **Concurrency.** Every save sends the hashes the page was loaded from. If another window changed the
 line, the save is refused with nothing written, and your edits stay on screen: use *Reload and keep my
 edits*, check them, and save again.
+
+## Global audio gain
+
+Build & Test has a *Global audio gain* card. It is one number for every Campaign Evolved replacement,
+applied once when a build is exported. The default is **+4 dB**, the range is −12 to +12 dB, and *Reset to
+default* returns to +4 dB. The value is saved in `config/audio_export.json` (git-ignored; the previous file is
+kept in `config/.history/`).
+
+Changing the gain does not rebuild anything. Every build made with another gain is marked **stale**, with the
+reason, and stays as it is until you rebuild it.
+
+Processing order for each replacement, as the build applies it:
+
+1. Sources are converted to 44.1 kHz mono.
+2. The edit recipe: trims, cuts, fades and inserted silences.
+3. Optional loudness match to Spain's recording (only where chosen on the line).
+4. The global gain, applied once, linearly and never limited. A line that would peak above −1 dBFS gets less,
+   and the build reports it.
+5. Rounding to 16-bit, then encoding for the game (CELT).
+
+Previews in the editor use the same steps, so what you hear is what the build writes.
+
+## Theme
+
+Colours, fonts and radii are defined once, in `frontend/src/theme/tokens.ts`. The palette is original and
+inspired by the interfaces of Halo: Combat Evolved (dark navy and charcoal, olive accents, a restrained cyan
+focus ring). No Halo artwork, fonts or logos are used. Unit tests check the contrast of every text colour
+against its surface (WCAG AA), and the browser checks run the same test on the live pages.
 
 ## Building and restoring the game files
 
@@ -133,7 +167,9 @@ cd frontend
 npm run typecheck                             # Vue and TypeScript
 npm test                                      # unit tests of the matching rules
 npm run build                                 # type check and production build
-npm run test:e2e                              # browser test (needs Microsoft Edge)
+npm run test:e2e                              # browser test of the workflow (needs Microsoft Edge)
+npm run test:ux                               # browser checks: panels, gain, theme, responsive, keyboard
+npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```
 
 The browser test starts its own API server and Vite server on a copy of your mapping data (made by
@@ -151,6 +187,8 @@ decision; a file that "differs from the database" was edited outside the Studio.
 - Audio editing covers trims and cuts. Silences and fades remain in the classic page.
 - The candidate list shows the mission and folder, not a speaker: the Campaign Evolved catalogue does not
   record speakers.
+- Silences, the validation footer, level status and several recordings for one subtitle are on the classic
+  page only (see docs/studio-ux-comparison.md).
 - The line list shows up to 300 lines per page ("show more"), not virtual scrolling.
 - Radio effects are only flagged; no processing is applied yet.
 - Subtitle deployment is disabled, and installs are not started from the Studio.

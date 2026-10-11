@@ -170,6 +170,36 @@ const seconds = (s: number | null) => (s === null ? "—" : `${s.toFixed(2)} s`)
         </label>
       </fieldset>
 
+      <fieldset :disabled="locked" class="edit-grid">
+        <label>Fade in (ms)
+          <input v-model.number="draft.edit.fade_in_ms" type="number" min="0" max="5000" step="10" />
+        </label>
+        <label>Fade out (ms)
+          <input v-model.number="draft.edit.fade_out_ms" type="number" min="0" max="5000" step="10" />
+        </label>
+      </fieldset>
+
+      <fieldset :disabled="locked" class="loudness">
+        <label class="inline">Loudness
+          <select v-model="draft.edit.loudness.mode">
+            <option value="off">Keep the source level</option>
+            <option value="match_mcc">Match Spain's recording</option>
+          </select>
+        </label>
+        <template v-if="draft.edit.loudness.mode === 'match_mcc'">
+          <label class="inline">Offset (dB)
+            <input v-model.number="draft.edit.loudness.offset_db" type="number" min="-12" max="12" step="0.5" />
+          </label>
+          <label class="opt">
+            <input v-model="draft.edit.limiter" type="checkbox" />
+            Limit peaks (look-ahead limiter at -1 dBFS)
+          </label>
+        </template>
+      </fieldset>
+      <p v-if="draft.edit.loudness.mode === 'match_mcc'" class="small muted">
+        The gain to Spain's loudness is applied before the global gain (see Build &amp; Test). Previews show the result.
+      </p>
+
       <div class="cuts">
         <p class="small muted">Cuts remove a part of the recording (times are from the original start):</p>
         <div v-for="(cut, i) in draft.edit.cuts" :key="i" class="row">

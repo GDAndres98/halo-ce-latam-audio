@@ -20,6 +20,10 @@ interface ColumnHandle {
   focusSearch: () => void;
 }
 
+interface CandidateHandle extends ColumnHandle {
+  playNth: (index: number) => void;
+}
+
 const route = useRoute();
 const router = useRouter();
 const match = useMatch();
@@ -30,7 +34,7 @@ const focusedRef = ref<string | null>(null);
 const mccColumn = ref<ColumnHandle | null>(null);
 const workspaceEl = ref<HTMLElement | null>(null);
 const layout = useWorkspaceLayout(workspaceEl);
-const ceColumn = ref<ColumnHandle | null>(null);
+const ceColumn = ref<CandidateHandle | null>(null);
 
 // ---- URL state: everything the user can change is reflected in the address.
 const param = (name: string, fallback: string) => String(route.query[name] ?? fallback);
@@ -50,6 +54,7 @@ const mccStatus = computed({ get: () => param("status", ""), set: (v: string) =>
 const mccQuery = computed({ get: () => param("q", ""), set: (v: string) => setQuery({ q: v }) });
 const ceMission = computed({ get: () => param("cm", "all"), set: (v: string) => setQuery({ cm: v }) });
 const ceQuery = computed({ get: () => param("cq", ""), set: (v: string) => setQuery({ cq: v }) });
+const ceSubtitles = computed({ get: () => param("cs", ""), set: (v: string) => setQuery({ cs: v }) });
 const ceHideUsed = computed({ get: () => route.query.ch === "1", set: (v: boolean) => setQuery({ ch: v ? "1" : undefined }) });
 
 // ---- Selecting a line. Leaving a line with unsaved changes asks first. The draft is also kept for this
@@ -92,15 +97,28 @@ const mccUrl = computed(() =>
 const candidateRef = computed(() => focusedRef.value ?? match.draft.audioRef ?? null);
 
 // ---- Keyboard. Single keys; none of them fire while typing (see useShortcuts).
+// The keys follow the classic M4 page where it had them: j and k step through the MCC lines, Space plays
+// Spain's recording, and 1 to 9 play the candidates. Arrow keys move the candidate highlight.
+const playMcc = () => mccUrl.value && togglePlay(mccUrl.value);
 useShortcuts({
-  m: () => mccUrl.value && togglePlay(mccUrl.value),
+  " ": playMcc,
+  m: playMcc,
+  j: () => mccColumn.value?.move(1),
+  k: () => mccColumn.value?.move(-1),
+  ArrowDown: () => ceColumn.value?.move(1),
+  ArrowUp: () => ceColumn.value?.move(-1),
   e: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "Spanish(Mexico)")),
   n: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "English(US)")),
-  j: () => ceColumn.value?.move(1),
-  k: () => ceColumn.value?.move(-1),
   s: () => focusedRef.value && useCandidate(focusedRef.value),
-  "[": () => mccColumn.value?.move(-1),
-  "]": () => mccColumn.value?.move(1),
+  "1": () => ceColumn.value?.playNth(0),
+  "2": () => ceColumn.value?.playNth(1),
+  "3": () => ceColumn.value?.playNth(2),
+  "4": () => ceColumn.value?.playNth(3),
+  "5": () => ceColumn.value?.playNth(4),
+  "6": () => ceColumn.value?.playNth(5),
+  "7": () => ceColumn.value?.playNth(6),
+  "8": () => ceColumn.value?.playNth(7),
+  "9": () => ceColumn.value?.playNth(8),
   "/": () => mccColumn.value?.focusSearch(),
   "\\": () => ceColumn.value?.focusSearch(),
   "ctrl+s": () => void match.save(),
@@ -121,7 +139,15 @@ onMounted(async () => {
 
 <template>
   <div class="layout-bar">
-    <span class="muted small">Drag the dividers to resize the panels. Widths are kept on this computer.</span>
+    <ul class="keys" aria-label="Keyboard shortcuts">
+      <li><kbd>J</kbd>/<kbd>K</kbd> line</li>
+      <li><kbd>Space</kbd> Spain</li>
+      <li><kbd>1</kbd>–<kbd>9</kbd> candidate</li>
+      <li><kbd>↑</kbd>/<kbd>↓</kbd> highlight</li>
+      <li><kbd>S</kbd> use</li>
+      <li><kbd>E</kbd> es-MX · <kbd>N</kbd> EN</li>
+      <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save</li>
+    </ul>
     <button type="button" :disabled="layout.isDefault.value" @click="layout.reset()">Reset layout</button>
   </div>
   <div ref="workspaceEl" class="workspace" :class="{ resizing: layout.dragging.value !== null }">
@@ -154,6 +180,7 @@ onMounted(async () => {
       v-model:mission="ceMission"
       v-model:query="ceQuery"
       v-model:hide-used="ceHideUsed"
+      v-model:subtitles="ceSubtitles"
       :missions="missions"
       :slot-id="selectedSlot"
       :focused-ref="focusedRef"

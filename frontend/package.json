@@ -11,7 +11,9 @@
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:e2e": "node e2e/run.mjs"
+    "test:e2e": "node e2e/run.mjs",
+    "compare:m4": "node e2e/compare-m4.mjs",
+    "test:ux": "node e2e/ux.mjs"
   },
   "dependencies": {
     "vue": "^3.5.43",

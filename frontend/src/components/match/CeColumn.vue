@@ -7,6 +7,7 @@
 
 import { onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
+import { togglePlay } from "../../audio/player";
 import { useDebounced } from "../../composables/useDebounced";
 import { highlightSegments } from "../../matching/text";
 import type { CeLine, CeResponse } from "../../api/types";
@@ -19,6 +20,8 @@ const emit = defineEmits<{ focus: [ref: string]; use: [ref: string] }>();
 const mission = defineModel<string>("mission", { default: "all" });
 const query = defineModel<string>("query", { default: "" });
 const hideUsed = defineModel<boolean>("hideUsed", { default: false });
+/** "" = any, "missing" = no es-MX source subtitle, "present" = has one (the server's own values). */
+const subtitles = defineModel<string>("subtitles", { default: "" });
 const debouncedQuery = useDebounced(query, 250);
 
 const PAGE = 100;
@@ -37,6 +40,7 @@ async function load() {
       q: debouncedQuery.value,
       limit: limit.value,
       hide_used: hideUsed.value,
+      subs: subtitles.value || undefined,
       keep_slot: props.slotId ?? undefined,
     });
     if (request === latest) data.value = res;
@@ -45,7 +49,7 @@ async function load() {
   }
 }
 
-watch([mission, debouncedQuery, hideUsed], () => {
+watch([mission, debouncedQuery, hideUsed, subtitles], () => {
   limit.value = PAGE;
   load();
 });
@@ -72,7 +76,13 @@ function focusSearch() {
   searchBox.value?.focus();
 }
 
-defineExpose({ move, focusSearch });
+/** Plays the es-MX recording of the n-th visible candidate (keys 1 to 9). Plays only; selects nothing. */
+function playNth(index: number) {
+  const line = data.value?.lines[index];
+  if (line && line.media["Spanish(Mexico)"]?.count) togglePlay(audioUrl.ce(line.ce_line_ref, "Spanish(Mexico)"));
+}
+
+defineExpose({ move, focusSearch, playNth });
 
 const terms = (): string[] => data.value?.terms ?? [];
 const hasText = (line: CeLine, culture: string) => Boolean(line.subtitles[culture]?.text);
@@ -92,6 +102,13 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
       </label>
       <label class="wide">Search ID, English or LATAM Spanish text
         <input ref="searchBox" v-model="query" type="search" placeholder="Partial words and &quot;phrases&quot; work (\)" />
+      </label>
+      <label>es-MX subtitle
+        <select v-model="subtitles">
+          <option value="">Any</option>
+          <option value="present">Has one</option>
+          <option value="missing">None (no source subtitle)</option>
+        </select>
       </label>
       <label class="check"><input v-model="hideUsed" type="checkbox" /> Hide recordings already used elsewhere</label>
     </div>
