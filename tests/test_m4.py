@@ -462,6 +462,19 @@ class SearchTests(AppTestBase):
         self.assertEqual(line["media"]["Spanish(Mexico)"]["count"], 1)   # still playable
         self.assertNotIn("score", json.dumps(self.app.ce("all", q="primero")))
 
+    def test_status_filters_for_draft_approved_and_keep_original(self):
+        k, c = "es:Z10_010_keyes#0", "es:Z10_020_cortana#0"
+        self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
+                  audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}]})
+        self.assertIn(k, self.ids(status="draft"))            # a draft audio object
+        self.assertNotIn(k, self.ids(status="keep_original"))
+        self.slot = c
+        self.save(match={"status": "deferred", "ce_line_refs": []}, audio={"source": "keep_original", "sources": []})
+        self.assertEqual(self.ids(status="keep_original"), [c])
+        self.assertEqual(self.ids(status="approved"), [])     # nothing approved yet
+        row = {x["slot_id"]: x for x in self.app.slots("z10")["slots"]}
+        self.assertTrue(row[k]["preview"].startswith("Despierte"))   # Latin American text shown in the list
+
     def test_hide_lines_already_used(self):
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]})            # slot 1 uses line_a
         self.slot = "es:Z10_020_cortana#0"

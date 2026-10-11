@@ -271,6 +271,17 @@ class M4EditTests(AppTestBase):
         self.wav = write_wav(self.root / "work/test/ce.wav", speech(2.0))
         self.app = M4App(self.root, ce_audio=StubCe(self.wav), today=lambda: "2026-10-09", run_validator=False)
 
+    def test_an_audio_save_without_an_edit_keeps_the_stored_trim(self):
+        # The Studio omits `edit` unless the user changes it. Sending an identity recipe instead would
+        # reset a saved trim (the server treats an identity edit as "reset"), so this must hold.
+        self.slot = "es:Z10_010_keyes#0"
+        self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
+                  audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}],
+                         "edit": {"trim_start_s": 0.05, "trim_end_s": 0, "gap_s": 0}})
+        self.assertEqual(self.app.slot(self.slot)["mapping"]["audio"]["edit"]["trim_start_s"], 0.05)
+        self.save(audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}]})
+        self.assertEqual(self.app.slot(self.slot)["mapping"]["audio"]["edit"]["trim_start_s"], 0.05)
+
     def edit(self, **kw):
         return dict({"trim_start_s": 0.1, "cuts": [{"start_s": 1.0, "end_s": 1.2}], "fade_in_ms": 10,
                      "loudness": {"mode": "match_mcc", "offset_db": 0}}, **kw)

@@ -309,9 +309,18 @@ class M4App:
         return {None: True, "": True, "undecided": st == "unreviewed",
                 "matched": st == "matched", "no_equivalent": st == "no_equivalent", "deferred": st == "deferred",
                 "needs_rework": "needs_rework" in (a, sub), "audio_pending": a != "approved",
-                "subtitle_pending": sub != "approved",
+                "subtitle_pending": sub != "approved", "draft": "draft" in (a, sub),
+                "approved": a == "approved" and sub == "approved",
+                "keep_original": bool(m and m["audio"]["source"] == "keep_original"),
                 "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m), "edited": _edited(m),
                 "stereo": s["channels"] > 1}.get(status, False)
+
+    def _subtitle_preview(self, mcc_tag):
+        """The first words of the LATAM Spanish subtitle (Spain's if there is none): enough to recognise a
+        line in the list without loading the full text."""
+        texts = self._mcc_text(mcc_tag)
+        text = (texts.get("SU") or texts.get("SP") or {}).get("text") or ""
+        return text if len(text) <= 90 else text[:87].rstrip() + "…"
 
     def slots(self, level, status=None, q=None, limit=1500):
         """level may be 'all' (search every level). Catalog order; the query and status only filter."""
@@ -342,7 +351,8 @@ class M4App:
                                 "channels": s["channels"], "flags": r["flags"],
                                 "decision": self._decision_summary(m),
                                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
-                                "different_but_fits": _fits(m), "edited": _edited(m)})
+                                "different_but_fits": _fits(m), "edited": _edited(m),
+                                "preview": self._subtitle_preview(r["mcc_tag"])})
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
