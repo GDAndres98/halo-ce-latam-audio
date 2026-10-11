@@ -859,6 +859,58 @@ own marker, and the user-reported configuration is the baseline.
 | Speaker label | expected in data (colour tables exist) | inline `&id` prefix (EN only) |
 | Readable now? | needs FModel JSON or Oodle | yes (structure partly decoded) |
 
+### B.13 Variable-length writing — VERIFIED offline (2026-10-11); runtime check pending
+
+**For:** the owner and later sessions. **Status:** the writer works offline on the shipped tables; MCC
+loading a table whose size changed has **not** been tested in game.
+
+**Two serialisation rules**, found on the hash-verified copies in `work/mcc/loc/copies/` and true for every
+table with sorted keys (21 of 25: all `*_Halo1`, `*_Debug`, `DBG_*`, `PR_Global`):
+
+1. **String-data length.** `L` (header `0x7C`) = Σ(UTF-8 bytes + 1 NUL) over the n strings **plus one byte
+   per LF** in them. The extra bytes are zeros right after the last string. `SU_Halo1` has 500 LFs and 500
+   slack bytes, `SP_Halo1` 539 and 539, `EN_Halo1` 534 and 534. The original tool evidently counted each LF
+   as CRLF. B.4 called this "zero filler inside L".
+2. **Padding.** After those `L` bytes, zeros pad the file to a multiple of 8 (SU: 4 bytes, SP: 1).
+
+The derived header fields then follow from B.4: `0x04` = `0x08` = file size − 16; `0x68` = 8 + 4n + L;
+`0x7C` = L. Everything else in the header is copied. Keys and their order never change, so string i stays
+with key i. A model built from these rules re-serialises all 21 sorted tables **byte for byte**. The four
+`*_Global` tables, with unsorted keys, are refused.
+
+**The writer:** `scripts/common/mcc_loc_writer.py` (`mcc-loc-writer/1`, pure functions on bytes).
+- `table_model` refuses any input its own serialiser does not reproduce exactly, so an unexpected structure
+  is never rewritten.
+- `write_table(data, {key: text})` replaces only the given entries:
+  - the key must already exist (keys are never added);
+  - text is normalised CRLF/CR → LF and to NFC;
+  - NUL, control characters other than TAB/LF, the speaker separator U+E900 and entries over 2,048 UTF-8
+    bytes are refused (the longest shipped entry is 811);
+  - the empty string is allowed: about 60 shipped entries are empty, and it represents an approved
+    "no subtitle".
+- `verify_table` checks a candidate independently of the writer with `mcc_loc.parse_mcc_loc`: magic, name and
+  name hash; fixed header bytes; the size fields; rule 1; rule 2; zero padding; keys identical and in order;
+  every written entry equal to the expected text; **every other entry byte-identical**; valid UTF-8; and
+  re-serialisation.
+
+**Results on the shipped tables** (`tests/test_mcc_loc_writer.py`):
+- identity rebuilds of SU and SP;
+- a four-entry edit on each table: the first entry emptied, `a10_350` with `¡ ¿ Ñ ü — « » …` and CJK, a
+  middle entry shortened, the last entry made 400 bytes with LFs;
+- every check passes, and the edits are deterministic and independent of order.
+
+**Real build** (M6, `--mission a10 --kind subtitles`, 2026-10-11):
+- 190 approved entries written into each table (variable length: SU 166, SP 172);
+- SU 203,848 → 204,840 B, SP 204,128 → 205,072 B;
+- 45/45 checks; byte-identical across two separate runs.
+
+**Still unverified (runtime):**
+- that MCC loads a table whose size changed, and shows the longer and shorter lines in full;
+- what MCC shows for an empty entry.
+
+The same-length test (B.12 step 3) is the only in-game evidence so far. The first variable-length install
+is the runtime check: `test_report.md` in each build lists what to look at.
+
 ---
 
 ## Sources

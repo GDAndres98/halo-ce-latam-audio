@@ -285,6 +285,144 @@ details.order ol {
   padding: 0.15rem 0;
 }
 
+/* Scope preview: what a build of the chosen scope would contain, before building. */
+.scope-preview {
+  margin: 0.5rem 0;
+  padding: 0.45rem 0.75rem;
+  border-left: 2px solid var(--frame-dim);
+  background: rgba(2, 8, 24, 0.35);
+}
+
+.scope-preview p {
+  margin: 0.15rem 0;
+}
+
+.preview-counts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 0.75rem;
+  margin: 0.35rem 0;
+  font-size: 0.86rem;
+}
+
+.preview-counts dt {
+  font-weight: 700;
+  color: var(--menu);
+}
+
+.preview-counts dt svg {
+  vertical-align: -0.15em;
+}
+
+.preview-counts dd {
+  margin: 0;
+}
+
+.preview-counts .badges {
+  display: inline-flex;
+  margin-left: 0.3rem;
+}
+
+.scope-preview details ul,
+.build-detail details ul {
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0.35rem 0;
+}
+
+.builds-view .build-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.runtime-note {
+  margin-top: 0.45rem;
+}
+
+.builds-view .link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  box-shadow: none;
+  min-height: 0;
+}
+
+.builds-view .link-button:not(:disabled):hover {
+  color: #ffffff;
+  background: none;
+}
+
+.builds-view .kind {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tr.detail-row,
+tr.detail-row:hover {
+  background: rgba(2, 8, 24, 0.55);
+}
+
+.build-detail {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.build-detail h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--menu);
+}
+
+.build-detail h4 svg {
+  vertical-align: -0.15em;
+}
+
+.build-detail details {
+  margin-top: 0.4rem;
+}
+
+table.compact {
+  width: auto;
+  max-width: 100%;
+  margin: 0.3rem 0;
+  font-size: 0.84rem;
+}
+
+table.compact th,
+table.compact td {
+  padding: 0.3rem 0.55rem;
+}
+
+.build-detail details table.compact {
+  display: block;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.deploy-history {
+  margin: 0.6rem 0;
+}
+
+.deploy-history summary svg {
+  vertical-align: -0.15em;
+}
+
+.deploy-history ul {
+  max-height: 12rem;
+  overflow: auto;
+  margin: 0.35rem 0;
+}
+
+.deploy-history li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
 /* ---- Data. */
 .data-view .panel {
   margin: 0 0 1rem;

@@ -30,11 +30,17 @@ API (all JSON unless noted):
     POST /api/data/import/preview                 what importing the file would change (read-only)
     POST /api/data/import                         {file_sha256, db_export_sha256, confirm: true}
     POST /api/data/export                         {file_sha256, confirm: true}: database over the file
-    POST /api/builds/start                        {kind: audio, scope: mission|levels|all_mapped, mission, levels}
+    POST /api/builds/start                        {kind: audio|subtitles|both, scope: mission|levels|all_mapped,
+                                                  mission, levels, name}
+    POST /api/builds/preview                      {scope, mission, levels}: what a build would contain (read-only)
+    GET  /api/builds/detail?name=                 a build's subtitle entries, exclusions, conflicts, checks
+    GET  /api/builds/log?name=                    a build's log (builds started from the Studio)
     GET  /api/deploy/status                       the MCC folder and what it holds (original / build / unknown)
     GET  /api/deploy/plan?build=                  what installing a build would change (for the confirmation)
+    GET  /api/deploy/history                      install / restore history (newest first)
     POST /api/deploy/install                      {build, confirm: true}: m6_install preflight + install
-    POST /api/deploy/restore                      {build?, confirm: true}: m6_install rollback
+    POST /api/deploy/restore                      {build?, confirm: true}: m6_install rollback (every installed
+                                                  build when none is named)
     POST /api/settings/mcc                        {mcc_folder}: saved to config/mcc_install.json
 """
 import argparse
@@ -64,7 +70,7 @@ MAX_BODY = 1 << 20
 
 
 def make_handler(app, quiet=False, builds=None):
-    builds = builds or BuildBoard(app.root, lambda: set(app.levels))
+    builds = builds or BuildBoard(app.root, lambda: set(app.levels), app=app)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "M4/1"
@@ -153,6 +159,12 @@ def make_handler(app, quiet=False, builds=None):
                     return self._json(200, builds.deploy_status())
                 if u.path == "/api/deploy/plan":
                     return self._json(200, builds.install_plan(q.get("build", "")))
+                if u.path == "/api/deploy/history":
+                    return self._json(200, builds.history())
+                if u.path == "/api/builds/detail":
+                    return self._json(200, builds.build_detail(q.get("name", "")))
+                if u.path == "/api/builds/log":
+                    return self._json(200, builds.build_log(q.get("name", "")))
                 if u.path == "/audio/preview":
                     return self._wav(app.preview_wav(q.get("key", ""), q.get("kind", "")))
                 raise ApiError(404, "not found")
@@ -174,6 +186,8 @@ def make_handler(app, quiet=False, builds=None):
                     return self._json(200, saved)
                 if u.path == "/api/builds/start":
                     return self._json(202, builds.start_build(body))
+                if u.path == "/api/builds/preview":
+                    return self._json(200, builds.preview(body))
                 if u.path == "/api/deploy/install":
                     return self._json(202, builds.start_install(body))
                 if u.path == "/api/deploy/restore":
@@ -247,7 +261,8 @@ def main():
     if not app.levels or not app.missions:
         raise SystemExit("no catalogs under work/; build them first (docs/m4-user-guide.md §1)")
     threading.Thread(target=app.validate, daemon=True).start()
-    builds = BuildBoard(app.root, lambda: set(app.levels), mcc_root=args.mcc_root, deploy_state=args.deploy_state)
+    builds = BuildBoard(app.root, lambda: set(app.levels), mcc_root=args.mcc_root, deploy_state=args.deploy_state,
+                        app=app)
     httpd = ThreadingHTTPServer((HOST, args.port), make_handler(app, builds=builds))
     url = f"http://{HOST}:{args.port}/"
     print(f"M4 matching UI on {url}  ({len(app.levels)} MCC levels, {len(app.missions)} CE missions; Ctrl+C stops)")

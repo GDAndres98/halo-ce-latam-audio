@@ -1,4 +1,4 @@
-"""M6 batch-build tests: eligibility planning from M4 decisions, the subtitle dry run, and
+"""M6 batch-build tests: eligibility planning from M4 decisions, the subtitle plan, and
 multi-sample bank replacement. Synthetic data only (temporary roots, fake banks).
 
 Run: python -m unittest discover -s tests
@@ -139,7 +139,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan["conflicts"][0]["code"], "duplicate_mapping_for_slot")
         self.assertEqual(plan["entries"][0]["action"], "not_eligible")
 
-    def test_subtitle_dry_run_is_independent_and_reports_lengths(self):
+    def test_subtitle_plan_is_independent_and_reports_lengths(self):
         k = "es:Z10_010_keyes#0"
         self.save(k, match={"status": "matched", "ce_line_refs": ["line_a#0"]},
                   subtitle={"source": "ce_locres", "ce_locres": {"ce_line_ref": "line_a#0", "culture": "es-MX"}},
@@ -151,7 +151,7 @@ class PlanTests(unittest.TestCase):
         self.assertTrue(row["SU"]["key_found"] and row["SP"]["key_found"])
         self.assertEqual(row["new_utf8_bytes"], len("Jefe Maestro, despierte".encode()))
         self.assertFalse(row["SU"]["same_length"])
-        self.assertEqual(s["summary"]["generation"], "disabled")
+        self.assertEqual(s["summary"]["generation"], "enabled")
         self.assertEqual(s["summary"]["variable_length"], {"SU": 1, "SP": 1})
 
 

@@ -215,33 +215,59 @@ the Studio's own dialog, not the browser's.
 
 Everything is on **Build & Test**; no command line is needed.
 
-1. **Build:** choose a scope, then **Build audio**:
+1. **Choose a scope:**
    - a *mission* (its folder plus the cinematics only it uses);
    - *chosen folders*;
    - *every folder with a mapping*.
 
-   The bank is built from your approved audio decisions, their edit recipes and the global gain into
-   `work/m6/<name>/`, with progress, the log and the validation result on the page. Existing builds are
-   never rebuilt for you; a **stale** build (older decisions or another gain) says so.
-2. **Install to MCC** (on a build's row): the page lists the exact files, the game folder and the backup
+   Below the scope, a preview counts what a build would contain, from your current **approved** decisions:
+   - the audio replacements;
+   - the approved subtitle decisions and the SU/SP entries they become;
+   - how many are excluded, and why;
+   - conflicts.
+2. **Build:**
+   - **Build audio**: the Spanish dialogue bank, from the approved audio decisions, their edit recipes and the
+     global gain.
+   - **Build subtitles**: `SU_Halo1.bin` (LATAM) and `SP_Halo1.bin` (Spain), from the approved subtitle
+     decisions. Both get the same LATAM text (Campaign Evolved es-MX or English, your own text, or an
+     approved "no subtitle"). Only the approved lines change; every other entry stays byte for byte MCC's.
+     Takes a few seconds.
+   - **Build audio + subtitles**: all three files, installed and restored together.
+
+   Builds go to `work/m6/<name>/`, with progress, the log and the validation result on the page. A button
+   is disabled when its scope has nothing approved for it. Existing builds are never rebuilt for you; a
+   **stale** build says why (decisions, custom text or the gain changed).
+3. **Review:** open a build's row (the arrow by its name) for:
+   - its files and validation checks;
+   - for subtitles: each table's entries and size, every entry written (before and after), and the
+     excluded lines and conflicts;
+   - the build log.
+4. **Install to MCC** (on a build's row): the page lists the exact files, the game folder and the backup
    location, and installs only after you confirm.
+   - Only builds that passed validation can be installed.
    - The installer (`scripts/build/m6_install.py`) refuses while MCC or its anti-cheat runs, checks the
      Steam build and every original's hash, backs up the originals outside the game and verifies them,
      copies and verifies the build, and checks that nothing else changed.
-   - Any failure restores the originals.
-   - A build whose replaced lines are no longer approved is refused.
-3. Launch MCC yourself (anti-cheat off) and test. The Studio never starts it.
-4. **Restore originals:** close MCC, then click it. Every replaced file is copied back from its verified
-   backup and checked; backups are kept.
+   - A combined build is one operation: any failure restores every original.
+   - A build whose replaced lines or written subtitles are no longer approved is refused.
+5. Launch MCC yourself (anti-cheat off) and test, following the build's `test_report.md`. The Studio never
+   starts it.
+6. **Restore originals:** close MCC, then click it. Every replaced file of every installed build is copied
+   back from its verified backup and checked; backups are kept.
 
-The page always shows which build, if any, is installed.
+The page always shows which build, if any, is installed, and an **install history** (every install, failed
+install and restore; `work/m6/deploy_history.jsonl`).
+
+**Subtitle tables of a new size are validated offline only.** Only same-length edits have been tried in MCC
+(B1). The first install of a subtitle build is the runtime check
+([docs/subtitle-research.md](docs/subtitle-research.md) B.13).
 
 The game folder comes from `.env` `HALO_MCC_FOLDER`, or the Steam library, or a folder you set on the page
-(`config/mcc_install.json`, git-ignored). **Build subtitles / Build both are disabled**: the
-variable-length SU/SP writer has not been validated in the game (see [docs/m6-build.md](docs/m6-build.md) §4).
+(`config/mcc_install.json`, git-ignored).
 
-The same steps still work from the command line: `python scripts/build/m6_build.py --mission a10`, then
-`python scripts/build/m6_install.py --build <name> preflight|install|rollback|status`.
+The same steps still work from the command line: `python scripts/build/m6_build.py --mission a10 --kind both`
+(`audio`, `subtitles` or `both`), then `python scripts/build/m6_install.py --build <name>
+preflight|install|rollback|status`. See [docs/m6-build.md](docs/m6-build.md).
 
 ## Testing
 
@@ -257,6 +283,8 @@ npm run test:editor                           # browser test of the waveform edi
 npm run test:data                             # browser test of the Data page: CRLF, outside edits, import, export
 npm run test:navigation                       # browser test of the matching loop: in-place updates, save & next, caching
 npm run test:deploy                           # Build & Test: build, install, restore into a throw-away game folder (~2 min)
+npm run test:subtitles                        # subtitle and combined builds: preview, build, details, install, restore,
+                                              # automatic restore after a simulated failure (throw-away folder, ~4 min)
 npm run test:theme                            # browser checks of the theme: every screen, dialog, fonts, contrast, motion, widths
 npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
@@ -289,7 +317,9 @@ decision; a file that "differs from the database" was edited outside the Studio.
   page only (see docs/studio-ux-comparison.md).
 - The line list shows up to 300 lines per page ("show more"), not virtual scrolling.
 - Radio effects are only flagged; no processing is applied yet.
-- Subtitle deployment is disabled, and installs are not started from the Studio.
+- Subtitle tables of a different size have not been loaded by MCC yet (validated offline only). What MCC
+  shows for an approved empty ("no subtitle") entry is also unverified.
+- Lines that have no entry in SU/SP (3 in the current data) cannot get a subtitle: keys are never added.
 - The per-save file copies in `mappings/.history/` grow by about 1.3 MB per save. Pruning is a decision
   for the owner.
 - Publishing to Steam Workshop is out of scope and needs separate approval (see CLAUDE.md).

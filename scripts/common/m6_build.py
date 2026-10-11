@@ -16,9 +16,8 @@ Audio eligibility (per mapping in the selected levels):
                   gap on one line) / invalid (drift, unresolved media, test event, bad recipe) -> sample
                   preserved, reason
                   reported. Nothing is approved or changed to make it eligible.
-Subtitles are planned independently of audio (`subtitle_plan`) as a DRY RUN: this build writes no
-subtitle table, because mcc_loc_patch only supports same-length replacement and variable-length
-tables are unvalidated (docs/m6-build.md §4).
+Subtitles are planned independently of audio (`subtitle_plan`): approved decisions only, key by key, for
+SU and SP separately; common/mcc_loc_writer writes the tables (variable length, docs/m6-build.md §4).
 """
 import json
 from collections import Counter, defaultdict
@@ -26,7 +25,7 @@ from collections import Counter, defaultdict
 from . import audio_edit
 from .fsb5_lib import parse_header
 from .fsb5_writer import ALIGN, build, decompose, replace_sample, sample_spans
-from .mcc_loc import loc_key
+from .mcc_loc import loc_key, parse_mcc_loc
 from .project_validation import audio_fingerprint, subtitle_fingerprint
 
 PLAN_SCHEMA = "m6-build-plan/1"
@@ -196,67 +195,180 @@ def mission_folders(level_folders, mission):
             "evidence": lv["evidence"], "map_sha256": lv["map_sha256"]}
 
 
-def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, tables):
-    """Dry run of approved subtitle decisions against each table independently.
+SUBTITLE_TABLES = ("SU", "SP")  # SU = Latin America, SP = Spain: both get the same canonical text (B1 plan)
+SUBTITLE_PLAN_SCHEMA = "m6-subtitle-plan/2"
+# The build baseline: hash-verified copies of the shipped tables (MCC Steam build 19905945; the same pins as
+# scripts/discovery/b1_build_poc_candidates.py). Builds never read the installed files.
+SUBTITLE_COPY = "work/mcc/loc/copies/{table}_Halo1.bin"
+SUBTITLE_INSTALL = "Data/ui/localization/{table}_Halo1.bin"
+SUBTITLE_PINS = {"SU": "247d25298af3d5f990cd20ff5177e05078173347b7bdf395c3995a59c60244d0",
+                 "SP": "794deac326d401a1fb6f5de50f8979f921159a412b095a368ef5424ed4342dda"}
+BUILD_KINDS = ("audio", "subtitles", "both")
 
-    tables: {"SU": entries dict, "SP": entries dict} (mcc_loc.parse_mcc_loc(...)["entries"]).
-    -> {"rows": [...], "conflicts": [...], "summary": {...}}. Writes nothing."""
+
+def build_tables(originals, plan):
+    """originals: {"SU": bytes, "SP": bytes} -> {table: (candidate bytes, writer info, checks)}.
+
+    Each table is written from the plan (common/mcc_loc_writer), written a second time with the changes in
+    reverse order (determinism, order independence), and verified independently of the writer."""
+    from .mcc_loc_writer import verify_table, write_table
+    out = {}
+    for t, original in originals.items():
+        changes = table_changes(plan, t)
+        cand, info = write_table(original, changes)
+        again, _ = write_table(original, dict(reversed(list(changes.items()))))
+        checks = verify_table(original, cand, changes)
+        checks["deterministic"] = cand == again
+        baseline = parse_mcc_loc(original)["entries"]  # the plan must have been made from these very bytes
+        checks["planned_old_text_matches_baseline"] = all(
+            k["tables"][t]["old_text"] == baseline.get(k["key"]) for k in plan["keys"]
+            if k["action"] == "write" and k["tables"][t]["write"])
+        out[t] = (cand, info, checks)
+    return out
+
+
+def _approved_text(m, ce_lines, local):
+    """The text an approved, changing subtitle decision asks for; None if it cannot be found."""
+    s = m["subtitle"]
+    if s["source"] == "ce_locres":
+        ref, cul = s["ce_locres"]["ce_line_ref"], s["ce_locres"]["culture"]
+        line = ce_lines.get(ref)
+        return ((line[2]["subtitles"].get(cul) or {}).get("text")) if line else None
+    if s["source"] == "custom":
+        return ((local or {}).get("custom_subtitles", {}).get(s["custom_ref"]) or {}).get("text")
+    return ""  # "none": the owner approved showing no subtitle -> an empty entry
+
+
+def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, tables):
+    """Approved subtitle decisions -> what each table gets, key by key. Writes nothing.
+
+    tables: {"SU": parsed entries dict or None, "SP": ...} (mcc_loc.parse_mcc_loc(...)["entries"]).
+    Only mappings in `levels` count. Per mapping (`rows`, `category`):
+      excluded     subtitle draft / needs_rework (never applied), approved fingerprint drift, approved text
+                   not found, a text a table cannot hold (NUL, control characters, too long)
+      keep         approved "keep MCC text": the entry stays byte for byte
+      write        approved CE es-MX / EN / custom text, or "none" (an empty entry)
+      conflict     the takes of one line disagree (see below)
+      missing_key  the line has no entry in SU or SP
+    Several slots (takes) share one key, the tag path. All approved decisions for a key must agree: different
+    texts, or a text next to an approved "keep", is a conflict and the key is left unchanged (reported, never
+    guessed). Keys are looked up in each table independently; a key a table lacks is never added.
+    Nothing is approved, changed or chosen here."""
+    from .mcc_loc_writer import normalize_text, text_problems
     rows, conflicts = [], []
     by_key = defaultdict(list)
-    for m in doc["slots"]:
+    for m in sorted(doc["slots"], key=lambda m: m["slot_id"]):
         hit = slot_index.get(m["slot_id"])
         if not hit or hit[0] not in levels:
             continue
         s = m["subtitle"]
-        row = {"slot_id": m["slot_id"], "mapping_id": m["mapping_id"], "mcc_tag": hit[1]["mcc_tag"],
-               "status": s["status"], "source": s["source"], "change": False}
+        tag = hit[1]["mcc_tag"]
+        key = loc_key(tag)
+        row = {"slot_id": m["slot_id"], "mapping_id": m["mapping_id"], "level": hit[0], "mcc_tag": tag,
+               "key": key, "key_evidence": "derived:mcc_loc_key_crc32_tag_path", "status": s["status"],
+               "source": s["source"], "change": False, "category": "excluded"}
         if s["status"] != "approved":
             row["result"] = f"not applied: subtitle {s['status']}"
         elif s["source"] == "keep_original":
-            row["result"] = "approved: keep MCC text (no change)"
+            row.update(category="keep", result="approved: keep MCC text (no change)")
         elif s["fingerprint"] != subtitle_fingerprint(m, ce_idx, mcc_idx, local):
-            row["result"] = "invalid: approved fingerprint drift"
+            row["result"] = "invalid: approved fingerprint drift; rework it"
         else:
-            if s["source"] == "ce_locres":
-                ref, cul = s["ce_locres"]["ce_line_ref"], s["ce_locres"]["culture"]
-                text = ((ce_lines.get(ref) or (None, None, {"subtitles": {}}))[2]["subtitles"].get(cul) or {}).get("text")
-            elif s["source"] == "custom":
-                text = ((local or {}).get("custom_subtitles", {}).get(s["custom_ref"]) or {}).get("text")
-            else:  # "none": an empty subtitle
-                text = ""
-            key = loc_key(hit[1]["mcc_tag"])
-            row.update(key=key, key_evidence="derived:mcc_loc_key_crc32_tag_path", change=text is not None)
-            if text is None:
+            raw = _approved_text(m, ce_lines, local)
+            if raw is None:
                 row["result"] = "invalid: approved text not found"
-                row["change"] = False
             else:
-                new = text.encode("utf-8")
-                row["new_utf8_bytes"] = len(new)
-                row["text_ok"] = b"\0" not in new
-                for t, tbl in tables.items():
-                    old = None if tbl is None else tbl.get(key)
-                    row[t] = {"key_found": old is not None,
-                              "old_utf8_bytes": None if old is None else len(old.encode("utf-8")),
-                              "same_length": old is not None and len(old.encode("utf-8")) == len(new),
-                              "unchanged_text": old == text}
-                row["result"] = "planned (not generated in this build)"
-                by_key[key].append((m["slot_id"], text))
+                text, notes = normalize_text(raw)
+                problems = text_problems(text)
+                if problems:
+                    row["result"] = "invalid text: " + "; ".join(problems)
+                else:
+                    row.update(category="write", change=True, text=text, normalised=notes,
+                               new_utf8_bytes=len(text.encode("utf-8")),
+                               result="no subtitle (approved empty entry)" if text == "" else "approved text")
+        if row["category"] in ("keep", "write"):
+            by_key[key].append(row)
         rows.append(row)
-    for key, items in by_key.items():
-        if len({t for _, t in items}) > 1:
-            conflicts.append({"code": "different_texts_for_one_subtitle_key", "key": key,
-                              "slots": [sid for sid, _ in items]})
-    changes = [r for r in rows if r["change"]]
-    summary = {"approved_text_changes": len(changes),
-               "keys_found": {t: sum(1 for r in changes if r[t]["key_found"]) for t in tables},
-               "same_length": {t: sum(1 for r in changes if r[t]["same_length"]) for t in tables},
-               "variable_length": {t: sum(1 for r in changes if r[t]["key_found"] and not r[t]["same_length"])
-                                   for t in tables},
-               "text_ok": all(r.get("text_ok", True) for r in changes),
-               "generation": "disabled",
-               "reason": "mcc_loc_patch supports same-byte-length replacement only; variable-length tables "
-                         "are not validated offline or in game (B1 residual, docs/m6-build.md §4)"}
-    return {"rows": rows, "conflicts": conflicts, "summary": summary}
+
+    keys = {}
+    for key, items in sorted(by_key.items()):
+        outcomes = {("keep", None) if r["category"] == "keep" else ("write", r["text"]) for r in items}
+        entry = {"key": key, "key_hex": f"0x{key:08X}", "mcc_tag": items[0]["mcc_tag"], "level": items[0]["level"],
+                 "slots": [r["slot_id"] for r in items], "mapping_ids": [r["mapping_id"] for r in items]}
+        if not any(tbl is not None and key in tbl for tbl in tables.values()):
+            for r in items:
+                r.update(category="missing_key", change=False,
+                         result="excluded: this line has no subtitle entry in SU or SP (keys are never added)")
+            keys[key] = dict(entry, action="missing_key", tables={t: {"key_found": False, "write": False}
+                                                                  for t in tables})
+            continue
+        if len(outcomes) > 1:
+            code =("keep_and_change_for_one_subtitle_key" if ("keep", None) in outcomes
+                    else "different_texts_for_one_subtitle_key")
+            conflicts.append({"code": code, "key": key, "key_hex": entry["key_hex"], "mcc_tag": entry["mcc_tag"],
+                              "slots": entry["slots"]})
+            for r in items:
+                r.update(category="conflict", change=False,
+                         result="conflict: the takes of this line have different approved subtitles; unchanged")
+            keys[key] = dict(entry, action="conflict")
+            continue
+        kind, text = next(iter(outcomes))
+        if kind == "keep":
+            keys[key] = dict(entry, action="keep")
+            continue
+        per = {}
+        for t, tbl in tables.items():
+            old = None if tbl is None else tbl.get(key)
+            per[t] = {"key_found": old is not None, "write": old is not None, "old_text": old,
+                      "old_utf8_bytes": None if old is None else len(old.encode("utf-8")),
+                      "same_length": old is not None and len(old.encode("utf-8")) == len(text.encode("utf-8")),
+                      "unchanged_text": old == text}
+        keys[key] = dict(entry, action="write", text=text, new_utf8_bytes=len(text.encode("utf-8")), tables=per)
+        for r in items:
+            for t in tables:
+                r[t] = {k: per[t][k] for k in ("key_found", "old_utf8_bytes", "same_length", "unchanged_text")}
+
+    written = [k for k in keys.values() if k["action"] == "write"]
+    by_cat = Counter(r["category"] for r in rows)
+    summary = {
+        "approved_subtitles": sum(1 for r in rows if r["status"] == "approved"),
+        "approved_text_changes": sum(1 for r in rows if r["change"]),  # slots whose subtitle text is written
+        "rows": dict(sorted(by_cat.items())),
+        "keys_to_write": len(written),
+        "keys_written": {t: sum(1 for k in written if k["tables"][t]["write"]) for t in tables},
+        "keys_found": {t: sum(1 for k in written if k["tables"][t]["key_found"]) for t in tables},
+        "missing_keys": {t: sum(1 for k in keys.values() if k.get("tables") and not k["tables"][t]["key_found"])
+                         for t in tables},
+        "same_length": {t: sum(1 for k in written if k["tables"][t]["same_length"]) for t in tables},
+        "variable_length": {t: sum(1 for k in written if k["tables"][t]["write"] and not k["tables"][t]["same_length"])
+                            for t in tables},
+        "empty_entries": sum(1 for k in written if k["text"] == ""),
+        "conflicts": len(conflicts),
+        "excluded": sum(1 for r in rows if r["category"] in ("excluded", "conflict", "missing_key")),
+        "text_ok": True,  # texts a table cannot hold are excluded per row above
+        "generation": "enabled",
+        "writer": "mcc-loc-writer/1 (variable length, docs/m6-build.md §4)",
+    }
+    return {"schema": SUBTITLE_PLAN_SCHEMA, "rows": rows, "keys": [keys[k] for k in sorted(keys)],
+            "conflicts": conflicts, "summary": summary}
+
+
+def table_changes(plan, table):
+    """{key: text} that `table` gets from a subtitle plan (keys it holds, decisions that agree)."""
+    return {k["key"]: k["text"] for k in plan["keys"] if k["action"] == "write" and k["tables"][table]["write"]}
+
+
+def compare_subtitle_plans(built, current):
+    """Keys a subtitle build wrote vs the current plan. -> {"changed_or_revoked": [...], "newly_eligible": [...]}.
+    A key the build wrote whose current approved text differs (or is no longer approved) means the build no
+    longer matches the decisions (do not install; rebuild); keys approved since are only missing from it."""
+    def written(plan):
+        return {(t, k["key"]): k["text"] for k in plan.get("keys", []) if k.get("action") == "write"
+                for t, p in k["tables"].items() if p["write"]}
+    b, c = written(built), written(current)
+    changed = sorted({f"{t}:0x{k:08X}" for (t, k), text in b.items() if c.get((t, k)) != text})
+    new = sorted({f"{t}:0x{k:08X}" for (t, k) in c if (t, k) not in b})
+    return {"changed_or_revoked": changed, "newly_eligible": new}
 
 
 def assemble(original, replacements):

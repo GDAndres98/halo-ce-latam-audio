@@ -1,7 +1,11 @@
 import type {
   AudioEdit,
+  BuildDetail,
   BuildJob,
+  BuildKind,
+  BuildPreview,
   BuildScope,
+  DeployEvent,
   DeployStatus,
   InstallPlan,
   ExportSettings,
@@ -53,13 +57,25 @@ export const api = {
 
   builds: () => request<BuildsResponse>("/api/builds"),
 
-  /** Starts an audio build (m6_build.py) in the background; poll job(). */
-  startBuild: (body: { scope: BuildScope; mission?: string; levels?: string[]; name?: string }) =>
+  /** Starts a build (m6_build.py --kind) in the background; poll job(). */
+  startBuild: (body: { kind?: BuildKind; scope: BuildScope; mission?: string; levels?: string[]; name?: string }) =>
     request<BuildJob>("/api/builds/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "audio", ...body }),
     }),
+
+  /** What a build of this scope would contain, from the current approved decisions. Builds nothing. */
+  buildPreview: (body: { scope: BuildScope; mission?: string; levels?: string[] }) =>
+    request<BuildPreview>("/api/builds/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  buildDetail: (name: string) => request<BuildDetail>(`/api/builds/detail${query({ name })}`),
+  buildLog: (name: string) => request<{ name: string; log: string }>(`/api/builds/log${query({ name })}`),
+  deployHistory: () => request<{ events: DeployEvent[] }>("/api/deploy/history"),
 
   deployStatus: () => request<DeployStatus>("/api/deploy/status"),
   installPlan: (build: string) => request<InstallPlan>(`/api/deploy/plan${query({ build })}`),
@@ -72,7 +88,7 @@ export const api = {
       body: JSON.stringify({ build, confirm: true }),
     }),
 
-  /** Restores the original game files from the verified backups. */
+  /** Restores the original game files from the verified backups (every installed build when none is named). */
   restore: (build?: string) =>
     request<BuildJob>("/api/deploy/restore", {
       method: "POST",

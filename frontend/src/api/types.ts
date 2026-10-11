@@ -247,31 +247,123 @@ export interface ExportSettings {
   sha256: string | null;
 }
 
+/** What a build contains: the Spanish dialogue bank, the SU/SP subtitle tables, or all three. */
+export type BuildKind = "audio" | "subtitles" | "both";
+
+/** Counts of a subtitle plan (common/m6_build.subtitle_plan "summary"). */
+export interface SubtitleSummary {
+  approved_subtitles: number;
+  approved_text_changes: number;
+  rows: Record<string, number>;
+  keys_to_write: number;
+  keys_written: Record<string, number>;
+  missing_keys: Record<string, number>;
+  variable_length: Record<string, number>;
+  same_length: Record<string, number>;
+  empty_entries: number;
+  conflicts: number;
+  excluded: number;
+}
+
+export interface SubtitleTableInfo {
+  candidate: string;
+  candidate_sha256: string;
+  original_sha256: string;
+  entries: number;
+  entries_written: number;
+  entries_identical_to_before: number;
+  size_before: number;
+  size_after: number;
+}
+
+export interface SubtitleConflict {
+  code: string;
+  key_hex: string;
+  mcc_tag: string;
+  slots: string[];
+}
+
+export interface ExcludedSubtitle {
+  slot_id: string;
+  status: string;
+  category: "excluded" | "conflict" | "missing_key";
+  result: string;
+  mcc_tag?: string;
+  source?: string;
+}
+
 export interface BuildSummary {
   name: string;
+  kind: BuildKind;
   levels: string[];
   built_at: string | null;
   counts: Record<string, number>;
-  subtitles: Record<string, unknown>;
+  subtitles: {
+    enabled: boolean;
+    summary: SubtitleSummary | null;
+    tables: Record<string, SubtitleTableInfo> | null;
+    warnings: string[];
+    conflicts: number;
+  };
+  failed_checks: string[];
+  has_log: boolean;
   validation_ok: boolean | null;
   stale: boolean;
   stale_reasons: string[];
   built_gain_db: number | null;
   built_from_sha256: string | null;
   candidate_sha256: string | null;
-  install_files: { install_rel: string; candidate_sha256: string }[];
+  install_files: { install_rel: string; candidate: string | null; candidate_sha256: string; size: number | null }[];
 }
 
 export interface BuildsResponse {
   builds: BuildSummary[];
   decisions_sha256: string | null;
-  /** Why subtitle builds are not offered yet. */
-  subtitles_disabled: string;
+  kinds: BuildKind[];
+  /** What is still unverified in the game about rewritten subtitle tables. */
+  runtime_note: string;
   /** Playable maps a mission build can target (its folder plus its cinematics). */
   missions: string[];
 }
 
 export type BuildScope = "mission" | "levels" | "all_mapped";
+
+/** What a build of a scope would contain (POST /api/builds/preview). Read-only. */
+export interface BuildPreview {
+  levels: string[];
+  scope: string;
+  audio: { replace: number; keep_original: number; not_eligible: number; conflicts: number };
+  subtitles: SubtitleSummary & { excluded_rows: ExcludedSubtitle[]; conflict_list: SubtitleConflict[] };
+}
+
+/** One build in detail (GET /api/builds/detail). */
+export interface BuildDetail {
+  name: string;
+  kind: BuildKind;
+  levels: string[];
+  subtitles_enabled: boolean;
+  summary: SubtitleSummary | null;
+  tables: Record<string, SubtitleTableInfo> | null;
+  written: { key_hex: string; mcc_tag: string; level: string; slots: string[]; text: string; before: Record<string, string | null> }[];
+  excluded: ExcludedSubtitle[];
+  conflicts: SubtitleConflict[];
+  warnings: string[];
+  checks: Record<string, boolean>;
+  ok: boolean | null;
+  install_files: { install_rel: string; candidate: string; candidate_sha256: string; original_sha256: string; size: number; growth_bytes: number }[];
+  not_written: string[];
+}
+
+/** One install / restore event from the installer's append-only history. */
+export interface DeployEvent {
+  at: string;
+  action: "install" | "rollback";
+  result: "ok" | "failed";
+  build: string;
+  kind: BuildKind;
+  message: string;
+  files: { install_rel: string; installed_sha256: string | null; original_sha256: string; candidate_sha256: string }[];
+}
 
 /** The MCC folder and what it holds now (GET /api/deploy/status). */
 export interface DeployStatus {
@@ -303,12 +395,16 @@ export interface InstallPlan {
     candidate_sha256: string;
     backup_folder: string;
   }[];
+  kind: BuildKind;
   subtitles: string;
+  audio: string;
 }
 
 export interface BuildJob {
   id: string;
   kind: "build" | "install" | "restore";
+  /** For builds: the scope, the kind and the builder arguments. */
+  detail?: Record<string, unknown>;
   name: string;
   state: "running" | "done" | "failed";
   started: string;

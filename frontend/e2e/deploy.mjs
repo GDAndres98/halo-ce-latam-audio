@@ -104,13 +104,13 @@ async function main() {
       check((await card.innerText()).includes("test override"), "the folder source is not the test override");
       check((await page.getByLabel("MCC folder").count()) === 0, "the folder can be changed in test mode");
       check(await page.getByRole("button", { name: /Restore originals/ }).isDisabled(), "restore offered with nothing installed");
-      check(await page.getByRole("button", { name: /Build subtitles/ }).isDisabled(), "subtitle build offered");
+      check(!(await page.getByRole("button", { name: /Build subtitles/ }).isDisabled()), "subtitle build not offered");
     });
 
     await step("Build audio for the a10 folder from the page", async () => {
       await page.getByLabel("Chosen folders").check();
       await page.getByLabel("Build name").fill(BUILD);
-      await page.getByRole("button", { name: /Build audio/ }).click();
+      await page.getByRole("button", { name: "Build audio", exact: true }).click();
       const { state: s, log } = await waitJob("build", 15 * 60 * 1000);
       check(s === "done", `build ${s}: ${log.slice(-300)}`);
       const row = page.locator(`tr[data-build="${BUILD}"]`);

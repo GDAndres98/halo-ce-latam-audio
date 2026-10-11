@@ -148,8 +148,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - **M6 limited PoC (2026-10-08):** `python scripts/build/m6_build.py
       --level a10` builds an **audio-only** candidate bank from approved M4
       decisions into `work/m6/a10/` (90 lines, 24/24 checks, deterministic,
-      candidate `7d8ac2ef…`). Subtitle tables are **not** generated:
-      variable-length writing is unvalidated (`docs/m6-build.md` §4).
+      candidate `7d8ac2ef…`). Subtitles: see "M6 subtitles" below.
       Multi-folder builds: `--level a10 --level x10 --level x20` (one bank;
       all dialogue is in `sounds_dialogs_spanish.fsb`), or `--mission a10`
       (own folder plus the cinematics only that map uses, from
@@ -162,6 +161,21 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       preflight/install without the owner's explicit approval for that build.**
       The Studio's Build & Test page (2026-10-11) runs build/install/rollback through the same scripts only
       when the owner clicks and confirms; never drive it, or the install API, yourself against the real game.
+    - **M6 subtitles (owner request, 2026-10-11):** `m6_build.py --kind audio|subtitles|both`.
+      - `subtitles` writes `SU_Halo1.bin` + `SP_Halo1.bin` from the approved subtitle decisions through
+        `scripts/common/mcc_loc_writer.py`, a variable-length writer. Its layout rules (LF slack inside `L`,
+        8-byte padding) reproduce all 21 sorted shipped tables byte for byte (`docs/subtitle-research.md`
+        B.13).
+      - Drafts, needs-rework, drift, takes that disagree (conflicts) and lines without a key are excluded and
+        listed, never guessed. Keys are never added.
+      - Baseline: the pinned copies in `work/mcc/loc/copies/`.
+      - `both` = bank + tables, installed and restored as one operation.
+      - Studio: Build subtitles / Build audio + subtitles, a scope preview, build details, install history,
+        and Restore restores every installed build.
+      - `m6_install.py`: any failure restores every original. `--simulate-failure-after` is for throw-away
+        folders only.
+      - **Validated offline only. MCC loading a table whose size changed is the pending runtime check;**
+        don't claim it works in game until the owner reports it.
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
       inserted silences and fades. **No per-line level control:** loudness matching to Spain's
@@ -493,8 +507,10 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
 - Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, M-SYS (CE `Systemic` catalog), stereo replacement, v1.1 radio effects. Audio processing (resample,
-  trims, FX), FSB repacking, map changes, bulk subtitle editing, any
-  install change, packaging and any upload are still not approved.
+  trims, FX), FSB repacking, map changes, any install change,
+  packaging and any upload are still not approved (beyond M6 builds the
+  owner installs from the Studio; M6 subtitle generation was requested
+  by the owner on 2026-10-11).
 - ⚠ The user's goal uses CE es-MX audio/subtitles as the source. That
   conflicts with 343i's MCC asset FAQ (feasibility §7).
   - Development stays local.

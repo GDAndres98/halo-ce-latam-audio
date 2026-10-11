@@ -1,23 +1,30 @@
 <script setup lang="ts">
-// Build & Test: build the audio bank, install it into MCC, restore the originals.
+// Build & Test: build the audio bank, the subtitle tables or both, install a build into MCC, restore the
+// originals.
 //
-// Builds run scripts/build/m6_build.py and write only under work/m6/. Install and restore run
-// scripts/build/m6_install.py (MCC must be closed; originals are hash-checked and backed up outside the
-// game; any failure restores them) and only after you confirm the exact files. Nothing launches MCC.
+// Builds run scripts/build/m6_build.py --kind audio|subtitles|both and write only under work/m6/. Only approved
+// decisions are used; the scope preview shows, before building, what each kind would contain and what is
+// excluded. Install and restore run scripts/build/m6_install.py (MCC must be closed; originals are
+// hash-checked and backed up outside the game; any failure restores every file of the build) and only after
+// you confirm the exact files. Nothing launches MCC.
 
-import { FileAudio, Folder, Hammer, HardDriveDownload, Layers, Lock, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { Captions, ChevronDown, ChevronRight, FileAudio, Folder, Hammer, HardDriveDownload, Layers, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
+import BuildDetails from "../components/build/BuildDetails.vue";
+import DeployHistory from "../components/build/DeployHistory.vue";
 import GainSetting from "../components/build/GainSetting.vue";
+import ScopePreview from "../components/build/ScopePreview.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
 import { confirmAction } from "../composables/useConfirm";
-import type { BuildJob, BuildScope, BuildsResponse, DeployStatus } from "../api/types";
+import type { BuildJob, BuildKind, BuildPreview, BuildScope, BuildsResponse, DeployEvent, DeployStatus } from "../api/types";
 
 const builds = ref<BuildsResponse | null>(null);
 const deploy = ref<DeployStatus | null>(null);
+const history = ref<DeployEvent[]>([]);
 const levels = ref<string[]>([]);
 const scope = ref<BuildScope>("mission");
 const mission = ref("a10");
@@ -26,30 +33,87 @@ const name = ref("");
 const job = ref<BuildJob | null>(null);
 const error = ref("");
 const folderInput = ref("");
+const preview = ref<BuildPreview | null>(null);
+const previewError = ref("");
+const previewLoading = ref(false);
+const open = ref<string | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined;
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+let previewSeq = 0;
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const running = computed(() => job.value?.state === "running");
 const gameRunning = computed(() => Boolean(deploy.value?.game_running.length));
 const canDeploy = computed(() => Boolean(deploy.value?.valid) && !gameRunning.value && !running.value);
 const scopeReady = computed(() => (scope.value === "levels" ? chosen.value.length > 0 : scope.value === "mission" ? Boolean(mission.value) : true));
+const scopeBody = () => ({
+  scope: scope.value,
+  mission: scope.value === "mission" ? mission.value : undefined,
+  levels: scope.value === "levels" ? chosen.value : undefined,
+});
+// What each kind needs from the scope; a kind with nothing approved to build says so instead of failing later.
+const nothing = computed(() => ({
+  audio: preview.value ? preview.value.audio.replace === 0 : false,
+  subtitles: preview.value ? preview.value.subtitles.keys_to_write === 0 : false,
+}));
+const blocked = (kind: BuildKind) =>
+  running.value || !scopeReady.value || (kind !== "subtitles" && nothing.value.audio) || (kind !== "audio" && nothing.value.subtitles);
+const blockedReason = (kind: BuildKind) =>
+  kind !== "subtitles" && nothing.value.audio
+    ? "No approved Campaign Evolved audio in this scope"
+    : kind !== "audio" && nothing.value.subtitles
+      ? "No approved subtitle text in this scope"
+      : "";
 
 async function refresh() {
-  [builds.value, deploy.value] = await Promise.all([api.builds(), api.deployStatus()]);
+  const [b, d, h] = await Promise.all([api.builds(), api.deployStatus(), api.deployHistory()]);
+  builds.value = b;
+  deploy.value = d;
+  history.value = h.events;
   if (deploy.value && !folderInput.value) folderInput.value = deploy.value.mcc_folder ?? "";
 }
+
+async function loadPreview() {
+  if (!scopeReady.value) {
+    preview.value = null;
+    return;
+  }
+  const seq = ++previewSeq;
+  previewLoading.value = true;
+  previewError.value = "";
+  try {
+    const p = await api.buildPreview(scopeBody());
+    if (seq === previewSeq) preview.value = p;
+  } catch (e) {
+    if (seq === previewSeq) {
+      preview.value = null;
+      previewError.value = message(e);
+    }
+  } finally {
+    if (seq === previewSeq) previewLoading.value = false;
+  }
+}
+
+watch([scope, mission, chosen], () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(loadPreview, 200);
+});
 
 onMounted(async () => {
   try {
     levels.value = (await api.state()).levels.map((l) => l.level);
     await refresh();
     if (builds.value?.missions.length && !builds.value.missions.includes(mission.value)) mission.value = builds.value.missions[0];
+    await loadPreview();
   } catch (e) {
     error.value = message(e);
   }
 });
 
-onBeforeUnmount(() => clearTimeout(timer));
+onBeforeUnmount(() => {
+  clearTimeout(timer);
+  clearTimeout(previewTimer);
+});
 
 function toggleLevel(level: string) {
   chosen.value = chosen.value.includes(level) ? chosen.value.filter((l) => l !== level) : [...chosen.value, level];
@@ -65,18 +129,11 @@ async function run(start: () => Promise<BuildJob>) {
   }
 }
 
-function buildAudio() {
-  void run(() =>
-    api.startBuild({
-      scope: scope.value,
-      mission: scope.value === "mission" ? mission.value : undefined,
-      levels: scope.value === "levels" ? chosen.value : undefined,
-      name: name.value.trim() || undefined,
-    }),
-  );
+function startBuild(kind: BuildKind) {
+  void run(() => api.startBuild({ kind, ...scopeBody(), name: name.value.trim() || undefined }));
 }
 
-const mb = (bytes: number | null) => (bytes === null ? "?" : `${(bytes / 1048576).toFixed(1)} MB`);
+const mb = (bytes: number | null) => (bytes === null ? "?" : bytes > 4 * 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1024).toFixed(1)} KB`);
 
 async function install(build: string) {
   error.value = "";
@@ -86,15 +143,15 @@ async function install(build: string) {
       (f) => `• ${f.install_rel} (${mb(f.candidate_bytes)})\n   original ${f.original_sha256.slice(0, 12)}… → build ${f.candidate_sha256.slice(0, 12)}…`,
     );
     const warnings = [
-      plan.validation_ok ? "" : "⚠ The build's validation report is not OK; the installer will refuse it.",
+      plan.validation_ok ? "" : "⚠ The build's validation report is not OK; it cannot be installed.",
       plan.stale ? `⚠ Stale: ${plan.stale_reasons.join("; ")}. Lines no longer approved make the installer refuse; newer approvals are simply not included.` : "",
     ].filter(Boolean);
     const ok = await confirmAction({
       title: `Install build ${build}`,
       message:
-        `Install build "${build}" into MCC?\n\nGame folder: ${plan.mcc_folder}\n\nFiles replaced:\n${lines.join("\n")}\n\n` +
-        `Subtitles: ${plan.subtitles}.\nOriginals are verified and backed up to ${plan.files[0]?.backup_folder} first; ` +
-        `any failure restores them. MCC must stay closed until it finishes.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}`,
+        `Install build "${build}" into MCC?\n\nGame folder: ${plan.mcc_folder}\n\nFiles replaced, as one operation:\n${lines.join("\n")}\n\n` +
+        `Audio: ${plan.audio}.\nSubtitles: ${plan.subtitles}\n\nOriginals are verified and backed up to ${plan.files[0]?.backup_folder} first; ` +
+        `any failure restores every one of them. MCC must stay closed until it finishes.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}`,
       confirmLabel: "Install build",
       tone: "warning",
     });
@@ -106,11 +163,12 @@ async function install(build: string) {
 
 async function restore() {
   const active = deploy.value?.active_builds.join(", ") || "the installed build";
+  const files = deploy.value?.files.filter((f) => f.state !== "original").map((f) => `• ${f.install_rel}`) ?? [];
   const ok = await confirmAction({
     title: "Restore original game files",
     message:
-      `Restore the original game files?\n\nInstalled: ${active}\nEach replaced file is copied back from its verified backup ` +
-      "and checked. Backups are kept. MCC must be closed.",
+      `Restore the original game files?\n\nInstalled: ${active}\n${files.join("\n")}\n\nEach replaced file is copied back from its ` +
+      "verified backup and checked; audio and subtitle files are restored together. Backups are kept. MCC must be closed.",
     confirmLabel: "Restore now",
     tone: "warning",
   });
@@ -134,7 +192,7 @@ function poll() {
     try {
       job.value = await api.job(job.value.id);
       if (job.value.state === "running") poll();
-      else await refresh();
+      else await Promise.all([refresh(), loadPreview()]);
     } catch (e) {
       error.value = message(e);
     }
@@ -142,12 +200,19 @@ function poll() {
 }
 
 const JOB_TEXT = { build: "Building", install: "Installing", restore: "Restoring" } as const;
+const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
+const jobKind = computed(() => (job.value?.detail as { kind?: BuildKind } | undefined)?.kind);
 const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.includes(build));
+const fileName = (rel: string) => rel.split("/").pop();
 </script>
 
 <template>
   <section class="builds-view">
-    <PageHeader title="Build & Test" :icon="Hammer" lead="Build the Spanish dialogue bank from approved decisions, install it to try it in MCC, then restore the originals." />
+    <PageHeader
+      title="Build & Test"
+      :icon="Hammer"
+      lead="Build the Spanish dialogue bank and the LATAM subtitle tables from approved decisions, install them to try them in MCC, then restore the originals."
+    />
     <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
 
     <div class="builds-grid">
@@ -156,8 +221,9 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
       <section class="panel build-panel" aria-labelledby="build-title">
         <PanelHeader title="Build" title-id="build-title" :icon="FileAudio" code="M6" />
         <p class="muted small">
-          Builds the Spanish dialogue bank from your <strong>approved</strong> audio decisions, their edit recipes and the
-          global gain, into <code>work/m6/NAME</code>. Nothing in the game changes until you install a build.
+          Builds from your <strong>approved</strong> decisions only, into <code>work/m6/NAME</code>: the Spanish dialogue
+          bank (audio, with edit recipes and the global gain), <code>SU_Halo1.bin</code> + <code>SP_Halo1.bin</code>
+          (subtitles), or all three. Nothing in the game changes until you install a build.
         </p>
         <fieldset class="scope" :disabled="running">
           <legend>Scope</legend>
@@ -173,24 +239,28 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
           </div>
           <label class="check"><input v-model="scope" type="radio" value="all_mapped" /> Every folder with a mapping</label>
         </fieldset>
+        <ScopePreview :preview="preview" :loading="previewLoading" :error="previewError" />
         <div class="row">
           <input v-model="name" class="grow-input" placeholder="Build name (optional)" aria-label="Build name" />
-          <button type="button" class="primary icon-label" :disabled="running || !scopeReady" @click="buildAudio">
-            <Hammer :size="16" aria-hidden="true" /> Build audio
+        </div>
+        <div class="row build-actions">
+          <button type="button" class="primary icon-label" :disabled="blocked('audio')" :title="blockedReason('audio')" @click="startBuild('audio')">
+            <FileAudio :size="16" aria-hidden="true" /> Build audio
           </button>
-          <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
-            <Lock :size="14" aria-hidden="true" /> Build subtitles
+          <button type="button" class="primary icon-label" :disabled="blocked('subtitles')" :title="blockedReason('subtitles')" @click="startBuild('subtitles')">
+            <Captions :size="16" aria-hidden="true" /> Build subtitles
           </button>
-          <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
-            <Lock :size="14" aria-hidden="true" /> Build both
+          <button type="button" class="primary icon-label" :disabled="blocked('both')" :title="blockedReason('both')" @click="startBuild('both')">
+            <Layers :size="16" aria-hidden="true" /> Build audio + subtitles
           </button>
         </div>
-        <p class="small muted"><Lock :size="12" aria-hidden="true" /> {{ builds?.subtitles_disabled }}</p>
+        <p class="small muted runtime-note"><TriangleAlert :size="12" aria-hidden="true" /> {{ builds?.runtime_note }}</p>
 
         <div v-if="job" class="job" data-testid="job" :data-state="job.state" :data-kind="job.kind" :data-id="job.id">
           <p class="small job-line">
             <span v-if="job.state === 'running'" class="loader" aria-hidden="true"><i></i><i></i><i></i></span>
-            {{ JOB_TEXT[job.kind] }} <strong>{{ job.name }}</strong>:
+            {{ JOB_TEXT[job.kind] }}<template v-if="job.kind === 'build' && jobKind"> ({{ KIND_TEXT[jobKind].toLowerCase() }})</template>
+            <strong>{{ job.name }}</strong>:
             <StatusBadge :label="job.state" :tone="job.state === 'done' ? 'ok' : job.state === 'failed' ? 'bad' : 'warn'" />
             <span v-if="job.state === 'running'" class="muted"> (started {{ job.started }}; this page keeps checking)</span>
           </p>
@@ -223,7 +293,7 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
           <StatusBadge v-else label="modified files that match no build" tone="bad" />
         </p>
         <ul class="small plain file-states">
-          <li v-for="f in deploy.files" :key="f.install_rel">
+          <li v-for="f in deploy.files" :key="f.install_rel" :data-file="f.install_rel" :data-state="f.state">
             <code>{{ f.install_rel }}</code>: {{ f.state === "original" ? "original" : f.state === "build" ? `build ${f.builds.join(", ")}` : "unknown content" }}
           </li>
         </ul>
@@ -233,6 +303,7 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
             <Undo2 :size="16" aria-hidden="true" /> Restore originals
           </button>
         </div>
+        <DeployHistory :events="history" />
         <p class="small muted"><TriangleAlert :size="12" aria-hidden="true" /> The Studio never starts MCC. After installing, launch it yourself (anti-cheat off), test, close it, then restore here.</p>
       </div>
       <StateMessage v-else-if="!error" kind="loading">Checking the game folder…</StateMessage>
@@ -243,38 +314,70 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
       <div v-if="builds" class="table-frame">
         <table>
           <thead>
-            <tr><th>Build</th><th>Folders</th><th>Built</th><th>Counts</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
+            <tr><th>Build</th><th>Contents</th><th>Folders</th><th>Built</th><th>Counts</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
           </thead>
           <tbody>
-            <tr v-for="b in builds.builds" :key="b.name" :data-build="b.name">
-              <td class="mono">{{ b.name }}</td>
-              <td>{{ b.levels.join(", ") }}</td>
-              <td class="small">{{ b.built_at ?? "—" }}</td>
-              <td class="small">{{ Object.entries(b.counts).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—" }}</td>
-              <td>
-                <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
-                <StatusBadge v-else-if="b.validation_ok === false" label="failed" tone="bad" />
-                <StatusBadge v-else label="not validated" tone="muted" />
-              </td>
-              <td>
-                <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
-                <StatusBadge v-else label="current" tone="ok" />
-              </td>
-              <td>
-                <StatusBadge v-if="isInstalled(b.name)" label="installed" tone="warn" />
-                <button
-                  v-else
-                  type="button"
-                  class="icon-label small-button"
-                  :disabled="!canDeploy || b.validation_ok !== true || !b.install_files.length || deploy?.mod_installed"
-                  :title="deploy?.mod_installed ? 'Restore the originals first' : 'Install this build into MCC'"
-                  @click="install(b.name)"
-                >
-                  <HardDriveDownload :size="14" aria-hidden="true" /> Install to MCC
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!builds.builds.length"><td colspan="7"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
+            <template v-for="b in builds.builds" :key="b.name">
+              <tr :data-build="b.name" :data-kind="b.kind">
+                <td class="mono">
+                  <button
+                    type="button"
+                    class="link-button icon-label"
+                    :aria-expanded="open === b.name"
+                    :aria-label="`Details of ${b.name}`"
+                    @click="open = open === b.name ? null : b.name"
+                  >
+                    <ChevronDown v-if="open === b.name" :size="14" aria-hidden="true" />
+                    <ChevronRight v-else :size="14" aria-hidden="true" />{{ b.name }}
+                  </button>
+                </td>
+                <td class="small">
+                  <span class="icon-label kind">
+                    <FileAudio v-if="b.kind !== 'subtitles'" :size="14" aria-hidden="true" />
+                    <Captions v-if="b.kind !== 'audio'" :size="14" aria-hidden="true" />
+                    {{ KIND_TEXT[b.kind] }}
+                  </span>
+                  <div class="muted">{{ b.install_files.map((f) => fileName(f.install_rel)).join(", ") }}</div>
+                </td>
+                <td>{{ b.levels.join(", ") }}</td>
+                <td class="small">{{ b.built_at ?? "—" }}</td>
+                <td class="small">
+                  <template v-if="b.kind !== 'subtitles'">replace {{ b.counts.replace ?? 0 }} · keep {{ b.counts.keep_original ?? 0 }}</template>
+                  <template v-if="b.kind === 'both'"><br /></template>
+                  <template v-if="b.subtitles.enabled && b.subtitles.summary">
+                    subtitles {{ b.subtitles.summary.keys_to_write }}
+                    <span :class="{ warn: b.subtitles.summary.excluded }">· excluded {{ b.subtitles.summary.excluded }}</span>
+                    <span :class="{ error: b.subtitles.conflicts }">· conflicts {{ b.subtitles.conflicts }}</span>
+                  </template>
+                </td>
+                <td>
+                  <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
+                  <StatusBadge v-else-if="b.validation_ok === false" :label="`failed (${b.failed_checks.length})`" tone="bad" />
+                  <StatusBadge v-else label="not validated" tone="muted" />
+                </td>
+                <td>
+                  <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
+                  <StatusBadge v-else label="current" tone="ok" />
+                </td>
+                <td>
+                  <StatusBadge v-if="isInstalled(b.name)" label="installed" tone="warn" />
+                  <button
+                    v-else
+                    type="button"
+                    class="icon-label small-button"
+                    :disabled="!canDeploy || b.validation_ok !== true || !b.install_files.length || deploy?.mod_installed"
+                    :title="deploy?.mod_installed ? 'Restore the originals first' : b.validation_ok !== true ? 'Only validated builds can be installed' : 'Install this build into MCC'"
+                    @click="install(b.name)"
+                  >
+                    <HardDriveDownload :size="14" aria-hidden="true" /> Install to MCC
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="open === b.name" class="detail-row">
+                <td colspan="8"><BuildDetails :name="b.name" :has-log="b.has_log" /></td>
+              </tr>
+            </template>
+            <tr v-if="!builds.builds.length"><td colspan="8"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
           </tbody>
         </table>
       </div>

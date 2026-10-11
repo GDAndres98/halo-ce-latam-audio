@@ -1,21 +1,26 @@
 """Build & Test backend: builds, deployment to MCC and restore, driven from the Studio.
 
 Everything here runs the existing tools as subprocesses, one job at a time:
-  build    scripts/build/m6_build.py   (audio bank from the approved decisions, recipes and global gain)
+  build    scripts/build/m6_build.py --kind audio|subtitles|both (the Spanish bank from the approved audio
+           decisions, recipes and global gain; SU_Halo1.bin + SP_Halo1.bin from the approved subtitle
+           decisions; or all three)
   install  scripts/build/m6_install.py preflight, then install (MCC closed, Steam build pinned, every
            original hash-checked and backed up outside the game, snapshot diff, originals restored on any
            failure)
-  restore  scripts/build/m6_install.py rollback (verified backups; backups are kept)
+  restore  scripts/build/m6_install.py rollback (verified backups; backups are kept), for every build whose
+           files are installed, in one job
 Install and restore only run after the owner confirms them in the page (confirm: true), for the build they
-picked. Nothing here launches MCC, and nothing runs on its own.
+picked. Nothing here launches MCC, and nothing runs on its own. A combined build's three files are one
+install: the installer restores all of them if any step fails.
 
 The MCC folder: a test override given to the server (--mcc-root, a throw-away copy), else the folder saved
 from the page (config/mcc_install.json, git-ignored), else HALO_MCC_FOLDER in .env, else the default Steam
 libraries. It must contain halo1/sound/pc/sounds_dialogs_spanish.fsb.
 
-A build is stale when the decisions it was made from are not the decisions on disk now, or when the global
-audio gain it was made with is not the gain configured now. Stale builds are reported, never rebuilt
-automatically; the installer itself refuses a build whose replaced lines are no longer approved.
+A build is stale when the decisions it was made from are not the decisions on disk now, when the custom
+subtitle text it was made with changed (subtitle builds), or when the global audio gain it was made with is
+not the gain configured now (audio builds). Stale builds are reported, never rebuilt automatically; the
+installer itself refuses a build whose replaced lines or written subtitles are no longer approved.
 """
 import datetime as dt
 import hashlib
@@ -32,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discovery"))
 from b2_bank_install import running_game_processes  # noqa: E402
 from common.env import load_env  # noqa: E402
 from common.export_config import load_export_config  # noqa: E402
+from common.m6_build import BUILD_KINDS, SUBTITLE_TABLES, mission_folders, plan_audio, subtitle_plan  # noqa: E402
 from m4_app import ApiError  # noqa: E402
 
 NAME_RE = re.compile(r"^[a-z0-9_]{1,40}$")
@@ -44,9 +50,15 @@ MCC_CONFIG = Path("config/mcc_install.json")
 BANK_REL = "halo1/sound/pc/sounds_dialogs_spanish.fsb"
 STEAM_DEFAULTS = [Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Steam"]
 MCC_DIR_NAME = "Halo The Master Chief Collection"
-SUBTITLES_DISABLED = ("Subtitle tables are not generated yet: rewriting SU/SP with longer or shorter text "
-                      "(variable-length) has not been validated in the game (docs/m6-build.md §4). "
-                      "Audio builds keep MCC's original subtitles.")
+LOCAL = Path("mappings/manual_mappings.local.json")
+KIND_SUFFIX = {"audio": "", "subtitles": "_subs", "both": "_both"}
+RUNTIME_NOTE = ("Subtitle tables are rewritten with longer or shorter text (variable length). The files pass "
+                "every offline structural and content check; MCC loading a table of a different size is "
+                "still to be confirmed in the game (only same-length edits were tested in game, B1).")
+
+
+def _sha_file(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
 def _read_json(path):
@@ -60,7 +72,7 @@ def _is_mcc(folder):
 
 
 class BuildBoard:
-    def __init__(self, root, known_levels, runner=None, mcc_root=None, deploy_state=None):
+    def __init__(self, root, known_levels, runner=None, mcc_root=None, deploy_state=None, app=None):
         self.root = Path(root)
         self.build_root = self.root / "work" / "m6"
         self.decisions = self.root / "mappings" / "manual_mappings.json"
@@ -69,6 +81,7 @@ class BuildBoard:
         # Test sandbox: a throw-away game folder and its own backups/state (never the real install).
         self.mcc_override = Path(mcc_root) if mcc_root else None
         self.deploy_state = Path(deploy_state) if deploy_state else None
+        self.app = app  # the M4App (catalogs, decisions) for scope previews; None in unit tests
         self._lock = threading.Lock()
         self._jobs = {}
         self._hash_cache = {}
@@ -76,6 +89,7 @@ class BuildBoard:
     # ----------------------------------------------------------------- listings
     def list_builds(self):
         current = hashlib.sha256(self.decisions.read_bytes()).hexdigest() if self.decisions.is_file() else None
+        local_now = _sha_file(self.root / LOCAL)
         gain_now = load_export_config(self.root)["global_gain_db"]
         builds = []
         for folder in sorted(p for p in self.build_root.glob("*") if p.is_dir()):
@@ -83,31 +97,114 @@ class BuildBoard:
             if manifest is None:
                 continue  # logs, caches and the like are not builds
             report = _read_json(folder / "validation_report.json") or {}
-            built_from = manifest.get("inputs", {}).get("mappings_sha256")
+            kind = manifest.get("kind", "audio")
+            audio, subs = kind in ("audio", "both"), kind in ("subtitles", "both")
+            inputs = manifest.get("inputs", {})
+            built_from = inputs.get("mappings_sha256")
             built_gain = (manifest.get("global_gain") or {}).get("configured_db")
             reasons = []
             if built_from is not None and built_from != current:
                 reasons.append("decisions changed since the build")
-            if built_gain is None or built_gain != gain_now:
+            if subs and inputs.get("local_sha256") != local_now:
+                reasons.append("custom subtitle text changed since the build")
+            if audio and (built_gain is None or built_gain != gain_now):
                 reasons.append("export gain changed since the build" if built_gain is not None
                                else "build does not record the export gain")
+            sub = manifest.get("subtitles") or {}
             builds.append({
                 "name": folder.name,
+                "kind": kind,
                 "levels": manifest.get("levels", []),
                 "built_at": manifest.get("built_at"),
                 "counts": manifest.get("counts", {}),
-                "subtitles": manifest.get("subtitles", {}),
+                "subtitles": {"enabled": bool(sub.get("enabled")), "summary": sub.get("summary"),
+                              "tables": sub.get("tables"), "warnings": sub.get("warnings", []),
+                              "conflicts": len(sub.get("conflicts", []))},
+                "failed_checks": [k for k, v in (report.get("checks") or {}).items() if not v],
                 "validation_ok": report.get("ok"),
                 "stale": bool(reasons),
                 "stale_reasons": reasons,
                 "built_gain_db": built_gain,
                 "built_from_sha256": built_from,
                 "candidate_sha256": report.get("candidate_sha256"),
-                "install_files": [{"install_rel": f["install_rel"], "candidate_sha256": f["candidate_sha256"]}
+                "install_files": [{"install_rel": f["install_rel"], "candidate": f.get("candidate"),
+                                   "candidate_sha256": f["candidate_sha256"], "size": f.get("size")}
                                   for f in manifest.get("install_files", [])],
+                "has_log": (self.build_root / f"{folder.name}_build.log").is_file(),
             })
-        return {"builds": builds, "decisions_sha256": current, "subtitles_disabled": SUBTITLES_DISABLED,
-                "missions": self.missions()}
+        return {"builds": builds, "decisions_sha256": current, "kinds": list(BUILD_KINDS),
+                "runtime_note": RUNTIME_NOTE, "missions": self.missions()}
+
+    def build_detail(self, name):
+        """One build's subtitle entries, exclusions, conflicts and checks, for the page's details view."""
+        m = _read_json(self.build_root / name / "build_manifest.json") if NAME_RE.match(name or "") else None
+        if not m:
+            raise ApiError(404, f"no build {name!r}")
+        report = _read_json(self.build_root / name / "validation_report.json") or {}
+        sub = m.get("subtitles") or {}
+        written = [{"key_hex": k["key_hex"], "mcc_tag": k["mcc_tag"], "level": k["level"], "slots": k["slots"],
+                    "text": k["text"], "before": {t: (k["tables"].get(t) or {}).get("old_text") for t in SUBTITLE_TABLES}}
+                   for k in sub.get("keys", []) if k.get("action") == "write"] if sub.get("enabled") else []
+        excluded = [{k: r.get(k) for k in ("slot_id", "mcc_tag", "status", "source", "category", "result")}
+                    for r in sub.get("rows", []) if r.get("category") in ("excluded", "conflict", "missing_key")]
+        return {"name": name, "kind": m.get("kind", "audio"), "levels": m.get("levels", []),
+                "subtitles_enabled": bool(sub.get("enabled")), "summary": sub.get("summary"),
+                "tables": sub.get("tables"), "written": written, "excluded": excluded,
+                "conflicts": sub.get("conflicts", []), "warnings": sub.get("warnings", []),
+                "checks": report.get("checks", {}), "ok": report.get("ok"),
+                "install_files": m.get("install_files", []), "not_written": m.get("not_written", [])}
+
+    def build_log(self, name):
+        if not NAME_RE.match(name or ""):
+            raise ApiError(400, "bad build name")
+        p = self.build_root / f"{name}_build.log"
+        if not p.is_file():
+            raise ApiError(404, f"no log for {name!r} (builds made outside the Studio log to the console)")
+        return {"name": name, "log": p.read_text(encoding="utf-8", errors="replace")[-200000:]}
+
+    # ----------------------------------------------------------------- scope preview
+    def scope_levels(self, body):
+        """The MCC folders a scope selects (the same rule as m6_build.py). -> (levels, description)."""
+        scope = body.get("scope", "levels")
+        if scope == "mission":
+            mission = (body.get("mission") or "").lower()
+            if mission not in self.missions():
+                raise ApiError(400, f"unknown mission {mission!r}")
+            lf = _read_json(self.root / "work" / "mcc" / "level_folders.json")
+            return mission_folders(lf, mission)["selected"], f"mission {mission}"
+        if scope == "levels":
+            levels = body.get("levels") or []
+            if not levels or any(not LEVEL_RE.match(lv) or lv not in self.known_levels() for lv in levels):
+                raise ApiError(400, f"unknown MCC folder(s) {levels}")
+            return sorted(set(levels)), "chosen folders"
+        if scope == "all_mapped":
+            if self.app is None:
+                raise ApiError(409, "no catalogs loaded")
+            doc, _ = self.app._mappings()
+            idx = self.app.slot_index
+            return sorted({idx[s["slot_id"]][0] for s in doc["slots"] if s["slot_id"] in idx}), "every mapped folder"
+        raise ApiError(400, f"unknown build scope {scope!r}")
+
+    def preview(self, body):
+        """What a build of this scope would contain, from the current decisions. Read-only, nothing is built."""
+        if self.app is None:
+            raise ApiError(409, "no catalogs loaded")
+        levels, label = self.scope_levels(body)
+        app = self.app
+        doc, _ = app._mappings()
+        local, _ = app._local()
+        idx = dict(slot_index=app.slot_index, ce_lines=app.ce_lines, ce_idx=app.ce_idx, mcc_idx=app.mcc_idx)
+        audio = plan_audio(doc, levels, local=local, **idx)
+        subs = subtitle_plan(doc, set(levels), local=local, tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)
+        acts = {}
+        for e in audio["entries"]:
+            acts[e["action"]] = acts.get(e["action"], 0) + 1
+        excluded = [{k: r.get(k) for k in ("slot_id", "status", "category", "result")}
+                    for r in subs["rows"] if r["category"] in ("excluded", "conflict", "missing_key")]
+        return {"levels": levels, "scope": label,
+                "audio": {"replace": acts.get("replace", 0), "keep_original": acts.get("keep_original", 0),
+                          "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},
+                "subtitles": {**subs["summary"], "excluded_rows": excluded, "conflict_list": subs["conflicts"]}}
 
     def missions(self):
         """Playable maps that have a folder association (a mission build = its folder + its cinematics)."""
@@ -116,9 +213,10 @@ class BuildBoard:
 
     # ----------------------------------------------------------------- builds
     def start_build(self, body):
-        """body: {kind: audio, scope: mission|levels|all_mapped, mission?, levels?, name?}"""
-        if body.get("kind", "audio") != "audio":
-            raise ApiError(400, SUBTITLES_DISABLED)
+        """body: {kind: audio|subtitles|both, scope: mission|levels|all_mapped, mission?, levels?, name?}"""
+        kind = body.get("kind", "audio")
+        if kind not in BUILD_KINDS:
+            raise ApiError(400, f"unknown build kind {kind!r} (audio, subtitles or both)")
         scope = body.get("scope", "levels")
         args, default_name = [], None
         if scope == "mission":
@@ -135,14 +233,17 @@ class BuildBoard:
             args, default_name = ["--all-mapped"], "all_mapped"
         else:
             raise ApiError(400, f"unknown build scope {scope!r}")
-        name = body.get("name") or f"{default_name}_{dt.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        args += ["--kind", kind]
+        name = body.get("name") or f"{default_name}{KIND_SUFFIX[kind]}_{dt.datetime.now().strftime('%Y%m%d%H%M%S')}"
         if not NAME_RE.match(name):
             raise ApiError(400, "build name: lowercase letters, digits and _ only (up to 40)")
         if (self.build_root / name).exists():
             raise ApiError(409, f"work/m6/{name} already exists; choose another name (existing builds are kept)")
-        return self._start("build", name, lambda: self.runner(args, name), detail={"scope": scope, "args": args})
+        return self._start("build", name, lambda: self.runner(args, name),
+                           detail={"scope": scope, "kind": kind, "args": args})
 
     def start_dry_run(self, levels, name=None):  # the earlier API; same as a folders-scope audio build
+        # (the runner receives "--kind audio" too)
         return self.start_build({"kind": "audio", "scope": "levels", "levels": levels, "name": name})
 
     def _run_m6_build(self, args, name):
@@ -241,6 +342,8 @@ class BuildBoard:
             raise ApiError(404, f"no installable build {name!r}")
         report = _read_json(self.build_root / name / "validation_report.json") or {}
         build = next((b for b in self.list_builds()["builds"] if b["name"] == name), {})
+        kind = m.get("kind", "audio")
+        sub = (m.get("subtitles") or {}).get("summary") or {}
         folder, _ = self.mcc_folder()
         backups = (self.deploy_state / "backup") if self.deploy_state else self.root / "work" / "mcc" / "backup"
         return {"build": name, "mcc_folder": str(folder) if folder else None, "validation_ok": report.get("ok"),
@@ -251,23 +354,52 @@ class BuildBoard:
                            if (self.root / f["candidate"]).is_file() else None,
                            "original_sha256": f["original_sha256"], "candidate_sha256": f["candidate_sha256"],
                            "backup_folder": str(backups)} for f in m["install_files"]],
-                "subtitles": "not changed (audio-only build)"}
+                "kind": kind,
+                "subtitles": (f"SU and SP rewritten: {sub.get('keys_to_write', 0)} entr(ies) each at most; "
+                              f"{sub.get('excluded', 0)} excluded, {sub.get('conflicts', 0)} conflict(s). "
+                              + RUNTIME_NOTE) if kind in ("subtitles", "both")
+                else "not changed (audio-only build)",
+                "audio": "Spanish dialogue bank replaced" if kind in ("audio", "both") else "not changed (subtitle-only build)"}
 
     def _install_args(self, name):
         folder, _ = self.mcc_folder()
         if not _is_mcc(folder):
             raise ApiError(409, "set the MCC folder first")
-        args = ["--build", name, "--mcc-root", str(folder)]
+        args = ["--build", name, "--mcc-root", str(folder), "--history", str(self.history_path())]
         if self.deploy_state:
             args += ["--backup-root", str(self.deploy_state / "backup"), "--state-dir", str(self.deploy_state / name)]
         return args
 
+    def history_path(self):
+        return (self.deploy_state / "deploy_history.jsonl") if self.deploy_state \
+            else self.build_root / "deploy_history.jsonl"
+
+    def history(self, limit=30):
+        """The latest install / restore events (newest first) from the installer's append-only history."""
+        p = self.history_path()
+        if not p.is_file():
+            return {"events": []}
+        events = []
+        for line in p.read_text(encoding="utf-8").splitlines():
+            try:
+                events.append(json.loads(line))
+            except ValueError:
+                continue
+        return {"events": events[::-1][:limit]}
+
     def start_install(self, body):
-        """body: {build, confirm: true}. preflight (checks + verified backups + snapshot), then install."""
+        """body: {build, confirm: true}. preflight (checks + verified backups + snapshot), then install.
+        simulate_failure_after: N is accepted only in test mode (--mcc-root), to prove the automatic restore."""
         name = body.get("build") or ""
+        fail_after = body.get("simulate_failure_after")
+        if fail_after is not None and (not self.mcc_override or not isinstance(fail_after, int) or fail_after < 0):
+            raise ApiError(400, "simulate_failure_after is only for the test server's throw-away game folder")
+        install_extra = ["--simulate-failure-after", str(fail_after)] if fail_after is not None else []
         if body.get("confirm") is not True:
             raise ApiError(400, "installing changes game files; it needs confirm: true")
-        self.install_plan(name)  # 404 for unknown builds
+        plan = self.install_plan(name)  # 404 for unknown builds
+        if plan["validation_ok"] is not True:
+            raise ApiError(409, "this build did not pass validation; rebuild it")
         if running_game_processes():
             raise ApiError(409, "MCC (or its anti-cheat) is running; close it completely first")
         args = self._install_args(name)
@@ -277,27 +409,38 @@ class BuildBoard:
             code, log = self._run([sys.executable, script, *args, "preflight"])
             if code != 0:
                 return code, log + "\nInstall not started: the preflight stopped (nothing in the game changed)."
-            code2, log2 = self._run([sys.executable, script, *args, "install"])
+            code2, log2 = self._run([sys.executable, script, *args, *install_extra, "install"])
             return code2, log + "\n" + log2
         return self._start("install", name, work)
 
     def start_restore(self, body):
-        """body: {build?, confirm: true}. Restores every file of that build (default: the installed one)
-        from its verified backup."""
+        """body: {build?, confirm: true}. Restores every file of that build from its verified backup; without a
+        build, every installed build (for example an audio build and a subtitle build installed one after the
+        other), one after another in one job. Stops at the first failure."""
         if body.get("confirm") is not True:
             raise ApiError(400, "restoring changes game files; it needs confirm: true")
         status = self.deploy_status()
-        name = body.get("build") or (status["active_builds"][0] if status["active_builds"] else None)
-        if not name:
+        names = [body["build"]] if body.get("build") else status["active_builds"]
+        if not names:
             if not status["mod_installed"]:
                 raise ApiError(409, "the game files are already the originals")
             raise ApiError(409, "the installed files match no build here; name the build to restore with, "
                                 "or use Steam's 'Verify integrity of game files'")
-        self.install_plan(name)
+        for name in names:
+            self.install_plan(name)
         if running_game_processes():
             raise ApiError(409, "MCC (or its anti-cheat) is running; close it completely first")
-        args = self._install_args(name)
-        return self._start("restore", name, lambda: self._run([sys.executable, str(M6_INSTALL), *args, "rollback"]))
+        runs = [(name, self._install_args(name)) for name in names]
+
+        def work():
+            logs = []
+            for name, args in runs:
+                code, log = self._run([sys.executable, str(M6_INSTALL), *args, "rollback"])
+                logs.append(f"[{name}]\n{log}")
+                if code != 0:
+                    return code, "\n".join(logs)
+            return 0, "\n".join(logs)
+        return self._start("restore", ", ".join(names), work)
 
     # ----------------------------------------------------------------- jobs
     def _start(self, kind, name, work, detail=None):

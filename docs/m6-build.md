@@ -4,7 +4,9 @@
 - Builds so far: `a10`; then `a10` + `x10` + `x20` (165 lines, 23/23 checks, candidate
   `053c9741…`).
 - `a10` builds **audio-only**: 90 approved CE lines, 24/24 checks.
-- Subtitle generation is disabled (§4).
+- **Subtitles (2026-10-11):** `--kind subtitles` writes `SU_Halo1.bin` and `SP_Halo1.bin` from the
+  approved subtitle decisions, with any text length (§4); `--kind both` builds the bank and the two tables
+  together. Validated offline only: MCC loading a table whose size changed is still to be checked in game.
 - **From the Studio (2026-10-11):** Build & Test runs these builds, then install and rollback through
   `m6_install.py`, after the owner confirms the listed files (README, "Building and restoring the game
   files"). The safeguards are the script's own. `--mcc-root/--backup-root/--state-dir` exist for the
@@ -24,7 +26,12 @@ python scripts/build/m6_build.py --mission a10                        # a10 + it
 python scripts/build/m6_build.py --level a10 --level x10 --level x20  # explicit folders -> work/m6/a10_x10_x20/
 python scripts/build/m6_build.py --level a10 --inventory-only         # report only, build nothing
 python scripts/build/m6_build.py --all-mapped                         # every folder you mapped -> work/m6/all_mapped/
+python scripts/build/m6_build.py --mission a10 --kind subtitles       # SU_Halo1.bin + SP_Halo1.bin only (seconds)
+python scripts/build/m6_build.py --mission a10 --kind both            # the bank and both tables, installed together
 ```
+
+`--kind audio` (the default) builds the bank, `subtitles` the two tables, `both` all three files. The scope
+options are the same for every kind.
 
 **`--all-mapped`** selects every MCC folder holding at least one mapping: campaign levels,
 cutscenes and generic bark folders such as `marines` or `sarge2`. It is the "everything I have done
@@ -174,27 +181,61 @@ Rules:
 - **Stability:** `.lst` not written. Edits made in M4 during the build are reported; the install
   tool guards against stale builds (§1).
 
-## 4. Subtitles: disabled for now
+## 4. Subtitles (`--kind subtitles` or `both`)
 
-- **The need:** the dry run (`subtitle_plan`) found **91 approved `a10` subtitle changes**. Their
-  keys are present in both tables, and the text is valid UTF-8 without NUL.
-- **The problem:** only **9 (SU) / 5 (SP)** are the same byte length as the current entry.
-- `common/mcc_loc_patch.py` only patches **same-length** entries; that is what B1 verified in game.
-- Its general `rebuild()` recomputes the size fields, but it has never been used on a real table,
-  and MCC loading a size-changed table is an open B1 residual.
-- **What this build does:** it writes **no** subtitle table. It doesn't truncate, pad or apply only
-  the same-length subset. The plan, with lengths per table, is in `build_manifest.json`
-  `subtitles`.
-- **Next step** (needs approval):
-  - validate variable-length writing offline: rebuild, re-parse, every other key byte-identical;
-  - then run a one-entry in-game test (B1 §B.12 style);
-  - then enable SU+SP generation in this builder;
-  - `m6_install.py` already supports several files.
+**Status (2026-10-11):** works offline; the runtime check in MCC is pending (subtitle-research.md B.13).
+
+**Planning** (`common/m6_build.subtitle_plan`, read-only). For every mapping in the selected folders:
+
+| Subtitle decision | Build action |
+|---|---|
+| Approved CE es-MX / EN text, or approved custom text | **write** it into the entry for the line's key, in SU and in SP |
+| Approved "no subtitle" (`none`) | **write** an empty entry |
+| Approved "keep MCC text" | keep the entry byte for byte |
+| Draft, needs rework | **excluded**: MCC's text stays; listed |
+| Approved, but its fingerprint drifted, its text is missing, or the text can't go into a table (NUL, control characters, over 2,048 bytes) | **excluded** as invalid; listed |
+| The takes of one line (one key) disagree: different texts, or a text next to an approved keep | **conflict**: the key stays unchanged; listed. Never guessed |
+| The line has no entry in SU/SP (3 lines in the current data) | **excluded** (keys are never added); listed |
+
+- **The key** is the tag path's CRC-32/MPEG-2 (`derived:mcc_loc_key_crc32_tag_path`, B.6). It is looked up
+  in each table separately; the same canonical LATAM text goes into both (B.11.2).
+- **Text** is stored as LF only and NFC.
+- **Characters** not used anywhere in MCC's SU/SP/EN tables are reported as a warning, because the game font
+  may lack them.
+- The plan is part of `build_manifest.json` (`subtitles`):
+  - `rows`, one per mapping, with its `category` and `result`;
+  - `keys`, one per key, with the text, the old text in each table and the slots;
+  - `conflicts`, `summary`, `tables` and `warnings`.
+- The Studio shows the same plan for the selected scope before you build.
+
+**Writing** (`common/mcc_loc_writer`, B.13):
+- Baseline: the hash-verified copies `work/mcc/loc/copies/{SU,SP}_Halo1.bin` (pins in
+  `common/m6_build.SUBTITLE_PINS`, Steam build 19905945). The installed files are never read by a build.
+- Only the planned entries change. Every other entry, the keys and their order stay byte for byte.
+- `L`, the size fields and the 8-byte padding are recomputed.
+- Outputs: `work/m6/<name>/SU_Halo1.bin` and `SP_Halo1.bin`.
+
+**Checks** (per table, in `validation_report.json` as `SU:<check>` / `SP:<check>`):
+- the copy matches its pin;
+- the plan's "before" text equals the baseline entry (the plan was made from the same bytes);
+- `verify_table`: header, LF slack, padding, keys, every written entry, every other entry byte-identical,
+  UTF-8 and re-serialisation;
+- written twice in reverse order → identical bytes;
+- the file on disk equals what was verified.
+
+The `a10` mission (`a10`, `x10`, `x20`, `x30`): 190 entries per table, 45/45 checks, identical across runs.
+
+**Stale builds:** a subtitle build is stale when the decisions or the custom-text file changed. The global
+gain only affects audio builds. `m6_install.py` refuses to install a build when a subtitle it wrote is no
+longer the approved text (`compare_subtitle_plans`).
 
 ## 5. Install and rollback (only after the owner approves)
 
-`scripts/build/m6_install.py` reads the install file list from the build manifest. An audio-only
-build replaces one file; a later build may also list `SU`/`SP`.
+`scripts/build/m6_install.py` reads the install file list from the build manifest:
+- an audio build replaces the bank;
+- a subtitle build replaces `Data/ui/localization/SU_Halo1.bin` and `SP_Halo1.bin`;
+- a combined build replaces all three, **as one operation**: if any step fails, every file of the build is
+  restored.
 
 ```
 python scripts/build/m6_install.py --build a10 check       # read-only
@@ -216,14 +257,22 @@ python scripts/build/m6_install.py --build a10 rollback
 
 **Safety:**
 - Every step refuses to run while MCC/EAC is open.
-- Any failure during install restores the originals.
+- Any failure during install restores every original: a hash mismatch, an error while copying, or an
+  unexpected change. `--simulate-failure-after N` proves this in tests. It is refused unless `--mcc-root`
+  names a throw-away folder.
+- Only builds whose validation passed can be installed, from the Studio or the script.
+- Every install, failed install and rollback is appended to `work/m6/deploy_history.jsonl`
+  (`--history`), shown on Build & Test.
+- **Restore originals** in the Studio rolls back every installed build, for example an audio build and a
+  subtitle build installed one after the other.
 - Last resort: Steam "Verify integrity of game files".
 
 ## 6. Code and tests
 
 - **Code:**
-  - `scripts/common/m6_build.py`: `plan_audio`, `subtitle_plan`, `assemble`,
-    `multi_structural_checks`;
+  - `scripts/common/m6_build.py`: `plan_audio`, `subtitle_plan`, `table_changes`, `build_tables`,
+    `compare_subtitle_plans`, `assemble`, `multi_structural_checks`;
+  - `scripts/common/mcc_loc_writer.py`: the variable-length table writer (B.13);
   - `scripts/common/audio_edit.py` (recipes, rendering), `common/export_config.py` (global gain) and `audio_pipeline.derive_processed`;
   - `scripts/build/m6_build.py`;
   - `scripts/build/m6_install.py`.
@@ -235,4 +284,12 @@ python scripts/build/m6_install.py --build a10 rollback
   - order-independence and determinism;
   - collateral-change detection;
   - eligibility categories: draft, stereo, drift, `ce_concat`, duplicate mapping;
-  - the subtitle dry run.
+  - the subtitle plan.
+- **Subtitle tests:**
+  - `tests/test_mcc_loc_writer.py`: the writer, on synthetic tables and on the shipped copies;
+  - `tests/test_m6_subtitles.py`: approved and unapproved decisions, needs rework, drift, custom and empty
+    text, takes that agree or conflict, missing keys, the install guard, and both tables from one plan;
+  - `tests/test_m6_install.py`: a combined install and restore in a throw-away folder, failures part-way,
+    refusals;
+  - `tests/test_build_api.py`: kinds, staleness, coordinated restore, test-only failure simulation;
+  - `npm run test:subtitles`: the whole flow in the browser.
