@@ -127,10 +127,19 @@ def _document_current(path, db):
 
 def _verified_file(path, expected_sha, db):
     on_disk = path.read_bytes() if path.exists() else None
-    if on_disk is None or mapping_db.sha256(on_disk) != expected_sha:
-        raise StoreError(f"{path.name} differs from {db.name}: it was edited outside the Studio. "
-                         "Restore it from git or mappings/.history/ and reload.")
-    return on_disk
+    if on_disk is not None and mapping_db.sha256(on_disk) == expected_sha:
+        return on_disk
+    if on_disk is not None and mapping_db.sha256(_lf(on_disk)) == expected_sha:
+        # Same content, Windows line endings (git checkout with core.autocrlf, or an editor). Not an
+        # edit: read the canonical bytes. The next save writes the file back with LF.
+        return _lf(on_disk)
+    raise StoreError(f"{path.name} differs from {db.name}: it was changed outside the Studio. Nothing was "
+                     "overwritten. Open Data in the Studio (or run python scripts/validate/mapping_sync.py "
+                     "status) to see the differences, then import the file or export the database over it.")
+
+
+def _lf(data):
+    return data.replace(b"\r\n", b"\n")
 
 
 def _check_document_schema(path, raw):
@@ -423,3 +432,189 @@ def restore(path, data, loaded_sha256, *, history_dir=None, now=None):
     if hashlib.sha256(current).hexdigest() != loaded_sha256:
         raise StaleError(f"{path.name} changed since it was loaded")
     return _write(path, current, None, loaded_sha256, history_dir, now, raw=data)
+
+
+# --------------------------------------------------------------------------- explicit JSON sync
+# SQLite is the source of truth for the decisions. The JSON file is its export. When the file is changed
+# outside the Studio, nothing reads it back automatically; the owner picks one of two explicit actions:
+#   import_json  the file's decisions replace the database's (after preview_import shows every change)
+#   export_json  the database is written over the file (the external file is kept in .history/ first)
+# Both take the hashes the owner saw, so a file or database that changed in between is refused.
+
+def sync_status(path):
+    """How manual_mappings.json relates to the database. Read-only.
+    state: in_sync | line_endings (same content, CRLF) | external_edit | missing | not_imported | pending."""
+    path = Path(path)
+    db = mapping_db.db_path_for(path)
+    on_disk = path.read_bytes() if path.exists() else None
+    out = {"file": path.name, "database": db.name,
+           "file_sha256": None if on_disk is None else mapping_db.sha256(on_disk)}
+    if not mapping_db.is_imported(db):
+        return {**out, "state": "not_imported", "db_export_sha256": None, "last_import": None}
+    conn = mapping_db.open_existing(db)
+    try:
+        expected = mapping_db.meta_get(conn, "export_sha256")
+        pending = mapping_db.meta_get(conn, "pending_json_write") == "1"
+        last_import = mapping_db.meta_get(conn, "last_import")
+    finally:
+        conn.close()
+    out.update(db_export_sha256=expected, last_import=json.loads(last_import) if last_import else None)
+    if pending:
+        return {**out, "state": "pending"}
+    if on_disk is None:
+        return {**out, "state": "missing"}
+    if mapping_db.sha256(on_disk) == expected:
+        return {**out, "state": "in_sync"}
+    if mapping_db.sha256(_lf(on_disk)) == expected:
+        return {**out, "state": "line_endings"}
+    return {**out, "state": "external_edit"}
+
+
+def _slot_summary(slot):
+    return {"match": slot["match"]["status"], "ce_line_refs": slot["match"]["ce_line_refs"],
+            "audio": slot["audio"]["status"], "audio_source": slot["audio"]["source"],
+            "audio_revision": slot["audio"]["revision"], "subtitle": slot["subtitle"]["status"],
+            "subtitle_source": slot["subtitle"]["source"], "subtitle_revision": slot["subtitle"]["revision"],
+            "radio": slot["radio_effect"]["needed"], "notes": slot.get("notes", "")}
+
+
+def _read_import_candidate(path):
+    """The file as an import candidate: canonical JSON (CRLF accepted), current schema, valid, no repeats."""
+    if not path.exists():
+        raise StoreError(f"{path.name} does not exist; there is nothing to import")
+    raw = path.read_bytes()
+    data = _lf(raw)
+    try:
+        doc = json.loads(data.decode("utf-8"))
+    except ValueError as e:
+        raise StoreError(f"{path.name} is not valid JSON: {e}")
+    if doc.get("schema") != SCHEMA_ID:
+        raise StoreError(f"{path.name} is {doc.get('schema')!r}; only {SCHEMA_ID} can be imported")
+    errs = validate(doc, load_schema(SCHEMA_NAME))
+    if errs:
+        raise StoreError(f"{path.name} fails the schema: " + "; ".join(errs[:5]))
+    if mapping_db.serialize(doc) != data:
+        raise StoreError(f"{path.name} is not in the canonical format the Studio writes (key order or "
+                         "indentation); nothing can be imported from it")
+    ids = [x["slot_id"] for x in doc["slots"]]
+    mids = [x["mapping_id"] for x in doc["slots"]]
+    if len(set(ids)) != len(ids) or len(set(mids)) != len(mids):
+        raise StoreError(f"{path.name} repeats a slot_id or mapping_id")
+    return raw, data, doc
+
+
+def preview_import(path):
+    """What import_json would change, slot by slot. Read-only. The two hashes in the result are the
+    confirmation import_json requires."""
+    path = Path(path)
+    raw, _data, doc = _read_import_candidate(path)
+    conn = mapping_db.open_existing(mapping_db.db_path_for(path))
+    try:
+        current = mapping_db.export_document(conn)
+        db_sha = mapping_db.meta_get(conn, "export_sha256")
+    finally:
+        conn.close()
+    old = {x["mapping_id"]: x for x in current["slots"]}
+    new = {x["mapping_id"]: x for x in doc["slots"]}
+    changes = []
+    for mid in sorted(old.keys() | new.keys()):
+        a, b = old.get(mid), new.get(mid)
+        if a == b:
+            continue
+        changes.append({"mapping_id": mid, "slot_id": (b or a)["slot_id"],
+                        "kind": "added" if a is None else "removed" if b is None else "changed",
+                        "fields": sorted(k for k in (a or {}).keys() | (b or {}).keys()
+                                         if (a or {}).get(k) != (b or {}).get(k)),
+                        "database": _slot_summary(a) if a else None, "file": _slot_summary(b) if b else None})
+
+    def approvals(d):
+        return {(x["mapping_id"], f) for x in d["slots"] for f in ("audio", "subtitle") if x[f]["status"] == "approved"}
+
+    return {"file_sha256": mapping_db.sha256(raw), "db_export_sha256": db_sha,
+            "line_endings": "CRLF" if b"\r\n" in raw else "LF",
+            "slots_in_file": len(doc["slots"]), "slots_in_database": len(current["slots"]),
+            "pins_change": doc["pins"] != current["pins"], "changes": changes,
+            "approvals_added": sorted("/".join(k) for k in approvals(doc) - approvals(current)),
+            "approvals_removed": sorted("/".join(k) for k in approvals(current) - approvals(doc))}
+
+
+def _backup_database(db, history, stamp):
+    """Consistent copy of the database (SQLite online backup, integrity-checked) into .history/."""
+    import sqlite3
+    history.mkdir(parents=True, exist_ok=True)
+    out = history / f"{db.stem}.{stamp}.before-import.db"
+    src = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+    dst = sqlite3.connect(out)
+    try:
+        src.backup(dst)
+        if dst.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise StoreError(f"the database backup {out.name} failed its integrity check; nothing was imported")
+    finally:
+        src.close()
+        dst.close()
+    return out
+
+
+def import_json(path, file_sha256, db_export_sha256, *, history_dir=None, now=None):
+    """Explicit, owner-confirmed import: the file's decisions replace the database's.
+
+    The owner confirms with the two hashes preview_import returned; if the file or the database changed
+    since, nothing happens. The database is backed up to .history/ first, every changed slot gets a
+    slot_history row with reason "import:<file sha256>", and the file is then rewritten in the canonical
+    LF form (same content; CRLF bytes, if any, are kept in .history/). This may replace approved decisions
+    only because the owner asked for exactly this file; ordinary saves keep every check_transition rule.
+    -> {"imported_sha256", "changed_slots", "database_backup"}"""
+    path = Path(path)
+    db = mapping_db.db_path_for(path)
+    raw, data, doc = _read_import_candidate(path)
+    if mapping_db.sha256(raw) != file_sha256:
+        raise StaleError(f"{path.name} changed since the preview; preview again")
+    stamp_dt = now or dt.datetime.now()
+    stamp = stamp_dt.strftime("%Y%m%dT%H%M%S%f")
+    history = Path(history_dir) if history_dir else path.parent / ".history"
+    conn = mapping_db.open_existing(db)
+    try:
+        if mapping_db.meta_get(conn, "export_sha256") != db_export_sha256:
+            raise StaleError(f"{db.name} changed since the preview; preview again")
+        backup = _backup_database(db, history, stamp)
+        changed = mapping_db.replace_slots(conn, doc, stamp_dt.isoformat(timespec="microseconds"),
+                                           reason=f"import:{file_sha256}")
+        if raw != data:
+            (history / f"{path.stem}.{stamp}.{file_sha256[:12]}.imported.json").write_bytes(raw)
+        _atomic_write(path, data)
+        mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+        conn.execute("INSERT INTO meta (key, value) VALUES ('last_import', ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                     (json.dumps({"at": stamp_dt.isoformat(timespec="seconds"), "file_sha256": file_sha256,
+                                  "changed_slots": changed, "database_backup": backup.name}),))
+        conn.commit()
+    finally:
+        conn.close()
+    return {"imported_sha256": mapping_db.sha256(data), "changed_slots": changed, "database_backup": str(backup)}
+
+
+def export_json(path, file_sha256, *, history_dir=None, now=None):
+    """Explicit, owner-confirmed export: write the database's decisions over the file.
+    file_sha256: hash of the file the owner saw (None when it is missing). A file that differs from the
+    database is kept in .history/ first. -> new file sha256."""
+    path = Path(path)
+    db = mapping_db.db_path_for(path)
+    on_disk = path.read_bytes() if path.exists() else None
+    seen = None if on_disk is None else mapping_db.sha256(on_disk)
+    if seen != file_sha256:
+        raise StaleError(f"{path.name} changed since you looked at it; check again")
+    conn = mapping_db.open_existing(db)
+    try:
+        data = mapping_db.export_bytes(conn)
+        if mapping_db.sha256(data) != mapping_db.meta_get(conn, "export_sha256"):
+            raise StoreError(f"{db.name}: its rows do not match the export hash it recorded; not exporting")
+        if on_disk is not None and on_disk != data:
+            history = Path(history_dir) if history_dir else path.parent / ".history"
+            history.mkdir(parents=True, exist_ok=True)
+            stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
+            (history / f"{path.stem}.{stamp}.{seen[:12]}.replaced-by-export.json").write_bytes(on_disk)
+        _atomic_write(path, data)
+        mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+    finally:
+        conn.close()
+    return mapping_db.sha256(data)

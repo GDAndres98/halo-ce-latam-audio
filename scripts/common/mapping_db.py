@@ -15,7 +15,13 @@ Why this shape:
   writes, so a crash in that window is repaired on the next read instead of being
   mistaken for a hand edit.
 - `PRAGMA user_version` is the database schema version. A later version adds
-  tables through explicit migrations here; it never reshapes rows silently.
+  tables or columns through explicit migrations here; it never reshapes rows silently.
+  v2 -> v3: the documents tables. v3 -> v4: slot_history.reason (why a row was written:
+  NULL for an ordinary Studio save, "import:<sha256>" for an explicit JSON import).
+- SQLite is the source of truth. The JSON file is rewritten from it after every save; a file
+  that differs (a git checkout, an editor) is never read back silently. The owner either
+  re-exports the database over it or imports it explicitly (mapping_store.preview_import /
+  import_json), which shows the differences first and records every changed slot here.
 
 This module does not check approval rules. Those stay in scripts/common/mapping_store.py.
 """
@@ -26,7 +32,7 @@ from pathlib import Path
 
 from .jsonschema_lite import load_schema, validate
 
-DB_SCHEMA_VERSION = 3
+DB_SCHEMA_VERSION = 4
 SOURCE_SCHEMA = "manual-mappings/3"
 
 DDL = """
@@ -55,7 +61,8 @@ CREATE TABLE slot_history (
     changed_at  TEXT NOT NULL,
     mapping_id  TEXT NOT NULL,
     before_body TEXT,                               -- NULL when the slot was added
-    after_body  TEXT                                -- NULL when the slot was removed
+    after_body  TEXT,                               -- NULL when the slot was removed
+    reason      TEXT                                -- NULL: Studio save; "import:<sha256>": JSON import
 );
 CREATE INDEX slot_history_mapping ON slot_history (mapping_id);
 CREATE TABLE documents (
@@ -135,7 +142,10 @@ def open_existing(path):
     version = conn.execute("PRAGMA user_version").fetchone()[0]
     if version == 2:
         upgrade_v2_to_v3(conn)
-        version = DB_SCHEMA_VERSION
+        version = 3
+    if version == 3:
+        upgrade_v3_to_v4(conn)
+        version = 4
     if version != DB_SCHEMA_VERSION:
         conn.close()
         raise MappingDbError(f"{path}: database schema {version}, this build expects {DB_SCHEMA_VERSION}")
@@ -146,7 +156,16 @@ def upgrade_v2_to_v3(conn):
     """Adds the documents tables (user files: custom subtitles, mission progress). Additive only."""
     conn.executescript(DDL_V3_DOCUMENTS.replace("CREATE TABLE documents", "CREATE TABLE IF NOT EXISTS documents")
                        .replace("CREATE TABLE document_history", "CREATE TABLE IF NOT EXISTS document_history"))
-    conn.execute(f"PRAGMA user_version = {DB_SCHEMA_VERSION}")
+    conn.execute("PRAGMA user_version = 3")
+    conn.commit()
+
+
+def upgrade_v3_to_v4(conn):
+    """Adds slot_history.reason. Additive only: existing history rows keep NULL (ordinary saves)."""
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(slot_history)")]
+    if "reason" not in columns:
+        conn.execute("ALTER TABLE slot_history ADD COLUMN reason TEXT")
+    conn.execute("PRAGMA user_version = 4")
     conn.commit()
 
 
@@ -197,17 +216,17 @@ def import_document(conn, doc, json_sha256):
     conn.commit()
 
 
-def replace_slots(conn, doc, changed_at):
+def replace_slots(conn, doc, changed_at, reason=None):
     """Replace the whole document in one transaction and record each changed slot in slot_history.
     Sets pending_json_write=1: the caller must write the JSON file and then call mark_json_synced().
-    Unchanged slots keep their rows, so their history is untouched."""
+    Unchanged slots keep their rows, so their history is untouched. reason: see slot_history.reason."""
     old = {mid: body for mid, body in conn.execute("SELECT mapping_id, body FROM slots")}
     new = {slot["mapping_id"]: body_of(slot) for slot in doc["slots"]}
     history = []
     for mid in old.keys() | new.keys():
         before, after = old.get(mid), new.get(mid)
         if before != after:
-            history.append((changed_at, mid, before, after))
+            history.append((changed_at, mid, before, after, reason))
     try:
         conn.execute("BEGIN")
         conn.execute("DELETE FROM slots")
@@ -216,8 +235,8 @@ def replace_slots(conn, doc, changed_at):
             "subtitle_status, radio_needed, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [(position, *slot_columns(slot), body_of(slot)) for position, slot in enumerate(doc["slots"])],
         )
-        conn.executemany("INSERT INTO slot_history (changed_at, mapping_id, before_body, after_body) "
-                         "VALUES (?, ?, ?, ?)", history)
+        conn.executemany("INSERT INTO slot_history (changed_at, mapping_id, before_body, after_body, reason) "
+                         "VALUES (?, ?, ?, ?, ?)", history)
         _write_meta(conn, [
             ("source_schema", doc["schema"]),
             ("pins", json.dumps(doc["pins"], ensure_ascii=False)),

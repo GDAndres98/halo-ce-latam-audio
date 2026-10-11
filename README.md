@@ -126,6 +126,12 @@ bigger steps). Each side panel has a minimum width, and the centre panel keeps a
 kept on the computer and restored on the next visit; *Reset layout* returns to the defaults. On a narrow
 window the panels stack and the dividers are hidden.
 
+**Data.** Decisions live in `mappings/manual_mappings.db`; `mappings/manual_mappings.json` is the export every
+save writes. If the file is changed outside the Studio, the Studio refuses to read it and the **Data** page
+shows the differences, with *Import from JSON* (preview, confirm, database backed up first) and *Export
+database to JSON* (the replaced file is kept). Line-ending-only changes from git are not treated as edits. See
+[docs/mapping-storage.md](docs/mapping-storage.md).
+
 **Concurrency.** Every save sends the hashes the page was loaded from. If another window changed the
 line, the save is refused with nothing written, and your edits stay on screen: use *Reload and keep my
 edits*, check them, and save again.
@@ -184,6 +190,7 @@ npm run build                                 # type check and production build
 npm run test:e2e                              # browser test of the workflow (needs Microsoft Edge)
 npm run test:ux                               # browser checks: panels, gain, theme, responsive, keyboard
 npm run test:editor                           # browser test of the waveform editor and the A/B players
+npm run test:data                             # browser test of the Data page: CRLF, outside edits, import, export
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```
 

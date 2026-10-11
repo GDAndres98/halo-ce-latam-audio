@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import BuildsView from "./views/BuildsView.vue";
+import DataView from "./views/DataView.vue";
 import DashboardView from "./views/DashboardView.vue";
 import MatchView from "./views/MatchView.vue";
 
@@ -13,5 +14,6 @@ export const router = createRouter({
     { path: "/match", name: "match", component: MatchView },
     { path: "/dialogues", redirect: "/match" },
     { path: "/builds", name: "builds", component: BuildsView },
+    { path: "/data", name: "data", component: DataView },
   ],
 });

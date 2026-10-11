@@ -25,6 +25,11 @@ API (all JSON unless noted):
     POST /api/save                                see M4App.save; 409 = stale or protected
     POST /api/progress                            {level, status, note, verification, confirm, loaded_sha256}
     POST /api/validate                            run the read-only validator
+    GET  /api/data/status                         manual_mappings.json vs the database (in_sync, line_endings,
+                                                  external_edit, missing, pending)
+    POST /api/data/import/preview                 what importing the file would change (read-only)
+    POST /api/data/import                         {file_sha256, db_export_sha256, confirm: true}
+    POST /api/data/export                         {file_sha256, confirm: true}: database over the file
 """
 import argparse
 import json
@@ -124,6 +129,8 @@ def make_handler(app, quiet=False, builds=None):
                     return self._wav(app.ce_wav(q.get("ref", ""), q.get("lang", ""), q.get("k", 0)))
                 if u.path == "/api/settings/export":
                     return self._json(200, load_export_config(app.root))
+                if u.path == "/api/data/status":
+                    return self._json(200, app.data_status())
                 if u.path == "/api/builds":
                     return self._json(200, builds.list_builds())
                 if u.path == "/api/job":
@@ -149,6 +156,12 @@ def make_handler(app, quiet=False, builds=None):
                     return self._json(200, saved)
                 if u.path == "/api/builds/dry-run":
                     return self._json(202, builds.start_dry_run(body.get("levels") or [], body.get("name")))
+                if u.path == "/api/data/import/preview":
+                    return self._json(200, app.data_preview_import())
+                if u.path == "/api/data/import":
+                    return self._json(200, app.data_import(body))
+                if u.path == "/api/data/export":
+                    return self._json(200, app.data_export(body))
                 if u.path == "/api/save":
                     return self._json(200, app.save(body))
                 if u.path == "/api/edit/preview":

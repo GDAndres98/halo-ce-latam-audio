@@ -4,6 +4,8 @@ import type {
   ExportSettings,
   BuildsResponse,
   CeResponse,
+  DataStatus,
+  ImportPreview,
   EditPreviewResponse,
   SaveBody,
   SaveResponse,
@@ -73,6 +75,32 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ global_gain_db: globalGainDb, loaded_sha256: loadedSha256 }),
+    }),
+
+  /** How manual_mappings.json relates to the database (the source of truth). Read-only. */
+  dataStatus: () => request<DataStatus>("/api/data/status"),
+
+  /** What importing manual_mappings.json would change in the database. Read-only. */
+  dataPreviewImport: () => request<ImportPreview>("/api/data/import/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    }),
+
+  /** The file's decisions replace the database's. The hashes come from the preview the owner confirmed. */
+  dataImport: (fileSha256: string, dbExportSha256: string) =>
+    request<{ changed_slots: number; database_backup: string; status: DataStatus }>("/api/data/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_sha256: fileSha256, db_export_sha256: dbExportSha256, confirm: true }),
+    }),
+
+  /** The database is written over the file (a differing file is kept in mappings/.history/ first). */
+  dataExport: (fileSha256: string | null) =>
+    request<{ exported_sha256: string; status: DataStatus }>("/api/data/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_sha256: fileSha256, confirm: true }),
     }),
 
   /** Renders an edit as M6 would, for listening only. Writes nothing to the mappings. */

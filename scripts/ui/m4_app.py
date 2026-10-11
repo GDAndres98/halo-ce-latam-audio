@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import audio_edit  # noqa: E402
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
+from common import mapping_store  # noqa: E402
 from common.mapping_store import (  # noqa: E402
     EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
     load as load_mappings, load_or_default, save as save_mappings, save_user_file)
@@ -809,6 +810,45 @@ class M4App:
             except StoreError as e:
                 raise ApiError(422, str(e))
         return {"saved": True, "sha256": new_sha, "entry": entry, "validation": self.validate()}
+
+    # ------------------------------------------------------------------ data (JSON <-> SQLite)
+    # The database is the source of truth; the JSON file is its export. These are the owner's explicit
+    # recovery actions when the file was changed outside the Studio. Nothing here runs on its own.
+    def data_status(self):
+        return mapping_store.sync_status(self.root / MAPPINGS)
+
+    def data_preview_import(self):
+        try:
+            return mapping_store.preview_import(self.root / MAPPINGS)
+        except StoreError as e:
+            raise ApiError(422, str(e))
+
+    def data_import(self, body):
+        """body: {file_sha256, db_export_sha256, confirm: true} - the hashes shown in the preview."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "an import replaces decisions in the database; it needs confirm: true")
+        with self._save_lock:
+            try:
+                result = mapping_store.import_json(self.root / MAPPINGS, body.get("file_sha256"),
+                                                   body.get("db_export_sha256"))
+            except StaleError as e:
+                raise ApiError(409, str(e))
+            except StoreError as e:
+                raise ApiError(422, str(e))
+        return {**result, "status": self.data_status()}
+
+    def data_export(self, body):
+        """body: {file_sha256 (as shown by the status; null when the file is missing), confirm: true}."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "an export writes over manual_mappings.json; it needs confirm: true")
+        with self._save_lock:
+            try:
+                sha = mapping_store.export_json(self.root / MAPPINGS, body.get("file_sha256"))
+            except StaleError as e:
+                raise ApiError(409, str(e))
+            except StoreError as e:
+                raise ApiError(422, str(e))
+        return {"exported_sha256": sha, "status": self.data_status()}
 
     # ------------------------------------------------------------------ validator
     def validate(self):

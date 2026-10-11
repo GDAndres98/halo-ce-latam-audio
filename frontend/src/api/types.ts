@@ -259,3 +259,46 @@ export interface BuildJob {
   returncode: number | null;
   log_tail: string;
 }
+
+/** manual_mappings.json against the database (GET /api/data/status). */
+export interface DataStatus {
+  file: string;
+  database: string;
+  state: "in_sync" | "line_endings" | "external_edit" | "missing" | "pending" | "not_imported";
+  file_sha256: string | null;
+  db_export_sha256: string | null;
+  last_import: { at: string; file_sha256: string; changed_slots: number; database_backup: string } | null;
+}
+
+export interface SlotSummary {
+  match: string;
+  ce_line_refs: string[];
+  audio: string;
+  audio_source: string;
+  audio_revision: number;
+  subtitle: string;
+  subtitle_source: string;
+  subtitle_revision: number;
+  radio: boolean;
+  notes: string;
+}
+
+/** What importing manual_mappings.json would change (POST /api/data/import/preview). */
+export interface ImportPreview {
+  file_sha256: string;
+  db_export_sha256: string;
+  line_endings: "CRLF" | "LF";
+  slots_in_file: number;
+  slots_in_database: number;
+  pins_change: boolean;
+  changes: {
+    mapping_id: string;
+    slot_id: string;
+    kind: "added" | "removed" | "changed";
+    fields: string[];
+    database: SlotSummary | null;
+    file: SlotSummary | null;
+  }[];
+  approvals_added: string[];
+  approvals_removed: string[];
+}

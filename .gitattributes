@@ -1,0 +1,5 @@
+# The Studio stores its decisions in mappings/manual_mappings.db and writes the JSON files in mappings/ as
+# exact LF exports; it checks their SHA-256 on every read. With core.autocrlf=true, a git checkout, stash or
+# "discard changes" would rewrite them with CRLF, which looked like an outside edit (2026-10-10 incident,
+# docs/studio-performance.md). Keep them byte-for-byte as the Studio wrote them.
+mappings/*.json text eol=lf
