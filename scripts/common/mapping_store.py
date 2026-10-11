@@ -75,16 +75,19 @@ def _current(path):
             return raw
     conn = mapping_db.open_existing(db)
     try:
-        data = mapping_db.export_bytes(conn)
         if mapping_db.meta_get(conn, "pending_json_write") == "1":
             # The database committed a save but the JSON write did not finish: finish it now.
+            data = mapping_db.export_bytes(conn)
             _atomic_write(path, data)
             mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
+            return data
+        # Compare hashes, not a fresh export: the database stored the export's hash in the same
+        # transaction as the rows. Re-serialising 536 slots on every read cost ~50 ms per request.
         on_disk = path.read_bytes() if path.exists() else None
-        if on_disk != data:
+        if on_disk is None or mapping_db.sha256(on_disk) != mapping_db.meta_get(conn, "export_sha256"):
             raise StoreError(f"{path.name} differs from {db.name}: it was edited outside the Studio. "
                              "Restore it from git or mappings/.history/ and reload.")
-        return data
+        return on_disk
     finally:
         conn.close()
 

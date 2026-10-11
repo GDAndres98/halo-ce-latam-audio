@@ -65,6 +65,15 @@ class DatabaseBackedStoreTests(unittest.TestCase):
         self.assertIn("nota de prueba", rows[0][2])
         self.assertEqual(len(list((self.root / "h").glob("manual_mappings.*.json"))), 1)  # file backup kept
 
+    def test_the_stored_export_hash_matches_the_export(self):
+        # Reads trust meta.export_sha256 instead of re-exporting; this keeps that value honest.
+        conn = mapping_db.open_existing(self.db)
+        try:
+            self.assertEqual(mapping_db.meta_get(conn, "export_sha256"),
+                             mapping_db.sha256(mapping_db.export_bytes(conn)))
+        finally:
+            conn.close()
+
     def test_a_hand_edit_is_refused_not_overwritten(self):
         edited = mapping_db.serialize(self.edited_notes("editado a mano"))
         self.path.write_bytes(edited)
