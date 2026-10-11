@@ -1,0 +1,229 @@
+/* Waveforms and the audio editor (components/waveform, components/match/AudioEditor.vue): a recessed
+   holographic display with a faint measuring grid, the playback controls beneath it. */
+
+.wave-view {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.65rem 0.45rem;
+  background:
+    repeating-linear-gradient(90deg, rgba(47, 140, 255, 0.06) 0 1px, transparent 1px 48px),
+    linear-gradient(180deg, rgba(47, 140, 255, 0.06), transparent 40%),
+    var(--well);
+  border: 1px solid var(--frame-dim);
+  border-radius: var(--radius-control);
+}
+
+.wave-view.editable {
+  border: var(--frame-width) solid var(--line-strong);
+}
+
+.wave-view[data-playing="true"] {
+  border-color: var(--focus);
+  box-shadow: 0 0 12px rgba(127, 227, 255, 0.3);
+}
+
+.wave-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.84rem;
+  margin-bottom: 0.3rem;
+}
+
+.wave-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  color: var(--menu);
+}
+
+.wave-label svg {
+  flex: none;
+}
+
+/* The A / B channel tag at the start of each comparison label. */
+.wave-label .channel {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  color: #03091a;
+  background: var(--menu);
+  border-radius: 4px;
+}
+
+.wave-times {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-host {
+  min-height: 2rem;
+}
+
+.wave-host ::part(region-handle) {
+  border-color: var(--focus);
+}
+
+.wave-status {
+  margin: 0.2rem 0;
+}
+
+.wave-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.4rem;
+}
+
+.wave-transport button,
+.compare .toolbar button,
+.editor .toolbar button {
+  padding: 0.28rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.wave-transport .icon-only {
+  padding: 0.28rem 0.4rem;
+}
+
+.wave-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.15rem 0.1rem 0.45rem;
+  border: 1px solid var(--frame-dim);
+  border-radius: 6px;
+  color: var(--menu);
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-transport .zoom {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.compare-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.compare-head h3 {
+  margin: 0;
+}
+
+.compare-head .toolbar {
+  margin: 0;
+}
+
+.compare-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  align-items: center;
+}
+
+.compare-source label {
+  color: var(--menu);
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0.3rem 0;
+}
+
+.edit-grid {
+  border: none;
+  padding: 0;
+  margin: 0.45rem 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--menu);
+}
+
+.edit-grid label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.edit-grid input {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.loudness {
+  border: none;
+  padding: 0;
+  margin: 0.4rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  align-items: center;
+}
+
+.loudness label.inline {
+  color: var(--menu);
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.loudness input[type="number"] {
+  width: 6rem;
+}
+
+.cut-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cut-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid rgba(255, 143, 128, 0.35);
+  border-radius: 6px;
+  background: rgba(2, 8, 24, 0.5);
+}
+
+.cut-list li svg {
+  flex: none;
+}
+
+.cut-list p {
+  margin: 0.4rem 0 0.1rem;
+}
+
+@media (max-width: 1280px) {
+  .edit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .edit-grid {
+    grid-template-columns: 1fr;
+  }
+}

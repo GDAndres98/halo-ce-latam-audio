@@ -1,0 +1,337 @@
+/* Screen layouts: the dashboard's campaign menu, Build & Test and Data. */
+
+/* ---- HUD meter (HudMeter.vue): label and numbers above a segmented bar. */
+.hud-meter {
+  min-width: 0;
+}
+
+.hud-meter-text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.2rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.hud-meter-label {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  color: var(--menu);
+}
+
+.hud-meter-value {
+  font-size: 0.8rem;
+}
+
+/* ---- Dashboard: totals, then the menu screen (level list + connected description panel). */
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.1rem;
+}
+
+.menu-screen {
+  display: grid;
+  grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
+  align-items: start;
+  margin-bottom: 1.25rem;
+}
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: calc(100vh - 17rem);
+  min-height: 22rem;
+  overflow: auto;
+  padding: 0.2rem 0 0.4rem 0.2rem;
+}
+
+.menu-group {
+  margin: 0.7rem 0 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.menu-group:first-child {
+  margin-top: 0.2rem;
+}
+
+/* A menu item: menu-blue words; highlighted, it is framed and its words turn near-white. The highlighted
+   item overlaps the description panel's left edge, so the two read as one shape (as in the original). */
+.menu-item {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: 0.85rem;
+  padding: 0.42rem 0.75rem;
+  color: var(--menu);
+  text-decoration: none;
+  border: var(--frame-width) solid transparent;
+  border-radius: var(--radius-control);
+}
+
+.menu-item .code {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.menu-item .name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-item .figure {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.menu-item:hover {
+  transition: color var(--fast) ease, border-color var(--fast) ease;
+  color: var(--text);
+  border-color: var(--frame-dim);
+}
+
+.menu-item.highlighted {
+  color: #ffffff;
+  margin-right: calc(-1 * var(--frame-width));
+  border-color: var(--frame);
+  border-right-color: var(--panel);
+  border-radius: var(--radius-control) 0 0 var(--radius-control);
+  background: linear-gradient(90deg, rgba(47, 140, 255, 0.22), var(--panel) 85%);
+  box-shadow: -4px 0 10px -4px var(--frame-glow);
+}
+
+.menu-item.highlighted .figure {
+  color: var(--text);
+}
+
+.menu-detail {
+  position: sticky;
+  top: 5rem;
+  display: grid;
+  gap: 0.7rem;
+  min-height: 22rem;
+  padding: 1rem 1.25rem 1.1rem;
+  background: var(--panel);
+  border: var(--frame-width) solid var(--frame);
+  border-radius: var(--radius);
+  box-shadow: 0 0 14px rgba(47, 140, 255, 0.3), inset 0 0 30px rgba(47, 140, 255, 0.07);
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--frame-dim);
+}
+
+.detail-head svg {
+  flex: none;
+  color: var(--menu);
+  filter: drop-shadow(0 0 6px rgba(47, 140, 255, 0.6));
+}
+
+.detail-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--menu);
+}
+
+.detail-head p {
+  margin: 0.15rem 0 0;
+}
+
+.figures {
+  grid-template-columns: repeat(3, max-content 1fr);
+  font-size: 0.88rem;
+}
+
+.figures dd {
+  font-family: var(--font-mono);
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin: 0.2rem -1.25rem -1.1rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(1, 5, 16, 0.7);
+  border-top: 1px solid var(--frame-dim);
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
+.missions {
+  margin-top: 0.5rem;
+}
+
+/* ---- Build & Test. */
+.builds-view > .panel,
+.builds-grid > .panel {
+  margin-bottom: 1rem;
+}
+
+.builds-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 0 1rem;
+  align-items: start;
+}
+
+.gain-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin: 0.55rem 0;
+}
+
+.gain-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--menu);
+}
+
+.gain-row input {
+  width: 8rem;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gain-value {
+  margin-right: 0.35rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: #ffffff;
+}
+
+details.order {
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+}
+
+details.order ol {
+  padding-left: 1.2rem;
+}
+
+.builds-view .scope {
+  margin: 0.5rem 0;
+  border: 1px solid var(--frame-dim);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 0.75rem 0.65rem;
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  background: rgba(2, 8, 24, 0.5);
+}
+
+.builds-view .scope legend {
+  padding: 0 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--menu);
+}
+
+.builds-view .level-picks {
+  max-height: 9rem;
+  overflow: auto;
+}
+
+.builds-view .grow-input {
+  flex: 1 1 220px;
+}
+
+.builds-view .job {
+  margin: 0.5rem 0;
+}
+
+.job-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.builds-view p svg,
+.deploy-status p svg {
+  vertical-align: -0.15em;
+}
+
+.file-states li {
+  padding: 0.15rem 0;
+}
+
+/* ---- Data. */
+.data-view .panel {
+  margin: 0 0 1rem;
+}
+
+@media (max-width: 900px) {
+  .menu-screen,
+  .builds-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-list {
+    max-height: 22rem;
+    min-height: 0;
+  }
+
+  .menu-item {
+    margin-right: 0;
+  }
+
+  .menu-item.highlighted {
+    margin-right: 0;
+    border-radius: var(--radius-control);
+    border-right-color: var(--frame);
+  }
+
+  .menu-detail {
+    position: static;
+    margin-top: 0.75rem;
+    min-height: 0;
+  }
+
+  .figures {
+    grid-template-columns: max-content 1fr max-content 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .totals {
+    grid-template-columns: 1fr;
+  }
+
+  .figures {
+    grid-template-columns: max-content 1fr;
+  }
+
+  table {
+    font-size: 0.85rem;
+  }
+}

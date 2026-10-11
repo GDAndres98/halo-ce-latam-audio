@@ -10,7 +10,7 @@
 // Speed and per-line gain do not exist here (removed 2026-10-09); volume is the global export gain.
 
 import { computed, ref, watch } from "vue";
-import { Crop, Headphones, RotateCcw, Scissors, Trash2, TrendingDown, TrendingUp, Undo2 } from "lucide-vue-next";
+import { Crop, Headphones, RotateCcw, Scissors, SlidersHorizontal, Trash2, TrendingDown, TrendingUp, Undo2 } from "lucide-vue-next";
 import { api, ApiError, audioUrl } from "../../api/client";
 import type { AudioEdit } from "../../api/types";
 import { formatSeconds } from "../../audio/format";
@@ -209,7 +209,7 @@ useShortcuts({
 <template>
   <section class="block editor" aria-label="Audio editing">
     <header class="block-head">
-      <h3>Audio editing</h3>
+      <h3><SlidersHorizontal :size="15" aria-hidden="true" /> Audio editing</h3>
       <span v-if="usesCe" class="small muted">Edits are a recipe; the original recording is never changed.</span>
     </header>
     <p v-if="!usesCe" class="note">Editing applies to a Campaign Evolved recording. Choose one to edit it.</p>

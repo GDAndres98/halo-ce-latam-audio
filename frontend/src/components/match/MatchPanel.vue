@@ -2,9 +2,11 @@
 // Centre column: the decision for the selected MCC line. The two recordings first (listen and compare),
 // then the audio choice, the audio editing, the subtitle, the flags and the approval controls.
 
+import { Flag, ListChecks, RadioTower, Puzzle } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { audioUrl } from "../../api/client";
 import StatusBadge from "../StatusBadge.vue";
+import StateMessage from "../ui/StateMessage.vue";
 import AudioCompare from "../waveform/AudioCompare.vue";
 import AudioDecision from "./AudioDecision.vue";
 import AudioEditor, { type EditPreview } from "./AudioEditor.vue";
@@ -32,22 +34,27 @@ const replacement = computed(() => {
   const unedited = d && d.audioSource === "ce" && d.audioRef ? audioUrl.ce(d.audioRef, d.audioLanguage) : null;
   return { unedited, edited: unedited ? preview.value?.edited ?? null : null, encoded: unedited ? preview.value?.encoded ?? null : null };
 });
+const statusTone = (status: string | undefined) =>
+  status === "approved" ? "ok" : status === "needs_rework" ? "bad" : status ? "warn" : "muted";
 const previewStale = computed(() => preview.value !== null && preview.value.recipe !== JSON.stringify(draft.value.edit));
 </script>
 
 <template>
-  <section class="column center">
+  <section class="column center sections">
     <template v-if="detail && draft">
       <header class="line-title">
         <h2>{{ detail.tag_name }}</h2>
-        <p class="muted small mono">{{ detail.slot_id }} · speaker {{ detail.speaker_from_name || "—" }}</p>
-        <StatusBadge v-if="match.dirty()" label="unsaved changes" tone="warn" />
+        <p class="ident">
+          <span class="muted small mono">{{ detail.slot_id }} · speaker {{ detail.speaker_from_name || "—" }}</span>
+          <StatusBadge v-if="match.dirty()" label="unsaved changes" tone="warn" />
+        </p>
       </header>
 
       <div class="status-row">
         <StatusBadge :label="`match: ${draft.matchStatus}`" :tone="draft.matchStatus === 'matched' ? 'ok' : 'muted'" />
-        <StatusBadge :label="`audio: ${stored?.audio.status ?? 'not decided'}`" :tone="stored?.audio.status === 'approved' ? 'ok' : 'warn'" />
-        <StatusBadge :label="`subtitle: ${stored?.subtitle.status ?? 'not decided'}`" :tone="stored?.subtitle.status === 'approved' ? 'ok' : 'warn'" />
+        <StatusBadge :label="`audio: ${stored?.audio.status ?? 'not decided'}`" :tone="statusTone(stored?.audio.status)" />
+        <StatusBadge :label="`subtitle: ${stored?.subtitle.status ?? 'not decided'}`" :tone="statusTone(stored?.subtitle.status)" />
+        <StatusBadge v-if="draft.radio" label="radio effect" tone="info" />
       </div>
 
       <AudioCompare :key="detail.slot_id" :mcc-url="mccUrl" :replacement="replacement" :preview-stale="previewStale" />
@@ -62,15 +69,19 @@ const previewStale = computed(() => preview.value !== null && preview.value.reci
       <SubtitleDecision :draft="draft" :locked="subtitleLocked" :detail="detail" />
 
       <section class="block">
-        <h3>Flags and notes</h3>
-        <label class="opt">
-          <input v-model="draft.radio" type="checkbox" />
-          Needs radio effect (flag only: no processing is applied yet)
-        </label>
-        <label class="opt">
-          <input v-model="draft.fits" type="checkbox" />
-          Different but fits
-        </label>
+        <h3><Flag :size="15" aria-hidden="true" /> Flags and notes</h3>
+        <div class="flag-list">
+          <label class="opt">
+            <input v-model="draft.radio" type="checkbox" />
+            <RadioTower :size="16" class="muted" aria-hidden="true" />
+            Needs radio effect (flag only: no processing is applied yet)
+          </label>
+          <label class="opt">
+            <input v-model="draft.fits" type="checkbox" />
+            <Puzzle :size="16" class="muted" aria-hidden="true" />
+            Different but fits
+          </label>
+        </div>
         <label class="block-label">Notes
           <textarea v-model="draft.notes" rows="2" maxlength="2000"></textarea>
         </label>
@@ -79,8 +90,12 @@ const previewStale = computed(() => preview.value !== null && preview.value.reci
       <ApprovalBar :match="match" @save-next="emit('saveNext')" />
     </template>
 
-    <p v-else-if="match.loading.value" class="muted">Loading line…</p>
-    <p v-else-if="match.error.value" class="error">{{ match.error.value }}</p>
-    <p v-else class="muted">Choose an MCC line on the left to start matching.</p>
+    <StateMessage v-else-if="match.loading.value" kind="loading">Loading line…</StateMessage>
+    <StateMessage v-else-if="match.error.value" kind="error">{{ match.error.value }}</StateMessage>
+    <div v-else class="center-empty">
+      <ListChecks :size="56" aria-hidden="true" />
+      <p>Choose an MCC line on the left to start matching.</p>
+      <p class="small"><kbd>J</kbd> / <kbd>K</kbd> step through the lines · <kbd>U</kbd> next unmatched</p>
+    </div>
   </section>
 </template>

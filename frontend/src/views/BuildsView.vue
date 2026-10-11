@@ -5,11 +5,15 @@
 // scripts/build/m6_install.py (MCC must be closed; originals are hash-checked and backed up outside the
 // game; any failure restores them) and only after you confirm the exact files. Nothing launches MCC.
 
-import { FileAudio, Folder, Hammer, HardDriveDownload, Lock, RefreshCw, Undo2 } from "lucide-vue-next";
+import { FileAudio, Folder, Hammer, HardDriveDownload, Layers, Lock, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { api } from "../api/client";
 import GainSetting from "../components/build/GainSetting.vue";
 import StatusBadge from "../components/StatusBadge.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
+import PanelHeader from "../components/ui/PanelHeader.vue";
+import StateMessage from "../components/ui/StateMessage.vue";
+import { confirmAction } from "../composables/useConfirm";
 import type { BuildJob, BuildScope, BuildsResponse, DeployStatus } from "../api/types";
 
 const builds = ref<BuildsResponse | null>(null);
@@ -85,11 +89,15 @@ async function install(build: string) {
       plan.validation_ok ? "" : "⚠ The build's validation report is not OK; the installer will refuse it.",
       plan.stale ? `⚠ Stale: ${plan.stale_reasons.join("; ")}. Lines no longer approved make the installer refuse; newer approvals are simply not included.` : "",
     ].filter(Boolean);
-    const ok = window.confirm(
-      `Install build "${build}" into MCC?\n\nGame folder: ${plan.mcc_folder}\n\nFiles replaced:\n${lines.join("\n")}\n\n` +
+    const ok = await confirmAction({
+      title: `Install build ${build}`,
+      message:
+        `Install build "${build}" into MCC?\n\nGame folder: ${plan.mcc_folder}\n\nFiles replaced:\n${lines.join("\n")}\n\n` +
         `Subtitles: ${plan.subtitles}.\nOriginals are verified and backed up to ${plan.files[0]?.backup_folder} first; ` +
         `any failure restores them. MCC must stay closed until it finishes.${warnings.length ? `\n\n${warnings.join("\n")}` : ""}`,
-    );
+      confirmLabel: "Install build",
+      tone: "warning",
+    });
     if (ok) await run(() => api.install(build));
   } catch (e) {
     error.value = message(e);
@@ -98,10 +106,14 @@ async function install(build: string) {
 
 async function restore() {
   const active = deploy.value?.active_builds.join(", ") || "the installed build";
-  const ok = window.confirm(
-    `Restore the original game files?\n\nInstalled: ${active}\nEach replaced file is copied back from its verified backup ` +
+  const ok = await confirmAction({
+    title: "Restore original game files",
+    message:
+      `Restore the original game files?\n\nInstalled: ${active}\nEach replaced file is copied back from its verified backup ` +
       "and checked. Backups are kept. MCC must be closed.",
-  );
+    confirmLabel: "Restore now",
+    tone: "warning",
+  });
   if (ok) await run(() => api.restore());
 }
 
@@ -135,124 +147,138 @@ const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.inclu
 
 <template>
   <section class="builds-view">
-    <h1>Build &amp; Test</h1>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <PageHeader title="Build & Test" :icon="Hammer" lead="Build the Spanish dialogue bank from approved decisions, install it to try it in MCC, then restore the originals." />
+    <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
 
-    <GainSetting @saved="refresh" />
+    <div class="builds-grid">
+      <GainSetting @saved="refresh" />
 
-    <h2><FileAudio :size="18" aria-hidden="true" /> Build</h2>
-    <p class="muted small">
-      Builds the Spanish dialogue bank from your <strong>approved</strong> audio decisions, their edit recipes and the
-      global gain, into <code>work/m6/NAME</code>. Nothing in the game changes until you install a build.
-    </p>
-    <fieldset class="scope" :disabled="running">
-      <legend class="small muted">Scope</legend>
-      <label class="check"><input v-model="scope" type="radio" value="mission" /> Mission (its folder and the cinematics only it uses)</label>
-      <select v-if="scope === 'mission'" v-model="mission" aria-label="Mission">
-        <option v-for="m in builds?.missions ?? []" :key="m" :value="m">{{ m }}</option>
-      </select>
-      <label class="check"><input v-model="scope" type="radio" value="levels" /> Chosen folders</label>
-      <div v-if="scope === 'levels'" class="row level-picks">
-        <label v-for="l in levels" :key="l" class="check">
-          <input type="checkbox" :checked="chosen.includes(l)" @change="toggleLevel(l)" /> {{ l }}
-        </label>
-      </div>
-      <label class="check"><input v-model="scope" type="radio" value="all_mapped" /> Every folder with a mapping</label>
-    </fieldset>
-    <div class="row">
-      <input v-model="name" placeholder="Build name (optional)" aria-label="Build name" />
-      <button type="button" class="primary icon-label" :disabled="running || !scopeReady" @click="buildAudio">
-        <Hammer :size="16" aria-hidden="true" /> Build audio
-      </button>
-      <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
-        <Lock :size="14" aria-hidden="true" /> Build subtitles
-      </button>
-      <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
-        <Lock :size="14" aria-hidden="true" /> Build both
-      </button>
+      <section class="panel build-panel" aria-labelledby="build-title">
+        <PanelHeader title="Build" title-id="build-title" :icon="FileAudio" code="M6" />
+        <p class="muted small">
+          Builds the Spanish dialogue bank from your <strong>approved</strong> audio decisions, their edit recipes and the
+          global gain, into <code>work/m6/NAME</code>. Nothing in the game changes until you install a build.
+        </p>
+        <fieldset class="scope" :disabled="running">
+          <legend>Scope</legend>
+          <label class="check"><input v-model="scope" type="radio" value="mission" /> Mission (its folder and the cinematics only it uses)</label>
+          <select v-if="scope === 'mission'" v-model="mission" aria-label="Mission">
+            <option v-for="m in builds?.missions ?? []" :key="m" :value="m">{{ m }}</option>
+          </select>
+          <label class="check"><input v-model="scope" type="radio" value="levels" /> Chosen folders</label>
+          <div v-if="scope === 'levels'" class="row level-picks">
+            <label v-for="l in levels" :key="l" class="check">
+              <input type="checkbox" :checked="chosen.includes(l)" @change="toggleLevel(l)" /> {{ l }}
+            </label>
+          </div>
+          <label class="check"><input v-model="scope" type="radio" value="all_mapped" /> Every folder with a mapping</label>
+        </fieldset>
+        <div class="row">
+          <input v-model="name" class="grow-input" placeholder="Build name (optional)" aria-label="Build name" />
+          <button type="button" class="primary icon-label" :disabled="running || !scopeReady" @click="buildAudio">
+            <Hammer :size="16" aria-hidden="true" /> Build audio
+          </button>
+          <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
+            <Lock :size="14" aria-hidden="true" /> Build subtitles
+          </button>
+          <button type="button" class="icon-label" disabled :title="builds?.subtitles_disabled">
+            <Lock :size="14" aria-hidden="true" /> Build both
+          </button>
+        </div>
+        <p class="small muted"><Lock :size="12" aria-hidden="true" /> {{ builds?.subtitles_disabled }}</p>
+
+        <div v-if="job" class="job" data-testid="job" :data-state="job.state" :data-kind="job.kind" :data-id="job.id">
+          <p class="small job-line">
+            <span v-if="job.state === 'running'" class="loader" aria-hidden="true"><i></i><i></i><i></i></span>
+            {{ JOB_TEXT[job.kind] }} <strong>{{ job.name }}</strong>:
+            <StatusBadge :label="job.state" :tone="job.state === 'done' ? 'ok' : job.state === 'failed' ? 'bad' : 'warn'" />
+            <span v-if="job.state === 'running'" class="muted"> (started {{ job.started }}; this page keeps checking)</span>
+          </p>
+          <pre v-if="job.log_tail" class="log">{{ job.log_tail }}</pre>
+        </div>
+      </section>
     </div>
-    <p class="small muted">{{ builds?.subtitles_disabled }}</p>
 
-    <div v-if="job" class="job" data-testid="job" :data-state="job.state" :data-kind="job.kind" :data-id="job.id">
-      <p class="small">
-        {{ JOB_TEXT[job.kind] }} <strong>{{ job.name }}</strong>:
-        <StatusBadge :label="job.state" :tone="job.state === 'done' ? 'ok' : job.state === 'failed' ? 'bad' : 'warn'" />
-        <span v-if="job.state === 'running'" class="muted"> (started {{ job.started }}; this page keeps checking)</span>
-      </p>
-      <pre v-if="job.log_tail" class="log">{{ job.log_tail }}</pre>
-    </div>
-
-    <h2><HardDriveDownload :size="18" aria-hidden="true" /> Install to MCC</h2>
-    <div v-if="deploy" class="sync-card" data-testid="deploy-status">
-      <p class="small">
-        <Folder :size="14" aria-hidden="true" /> Game folder:
-        <code>{{ deploy.mcc_folder ?? "not found" }}</code> <span class="muted">({{ deploy.source }})</span>
-        <StatusBadge v-if="!deploy.valid" label="not an MCC install" tone="bad" />
-      </p>
-      <div v-if="!deploy.fixed" class="row">
-        <input v-model="folderInput" class="grow-input" aria-label="MCC folder" placeholder="…\steamapps\common\Halo The Master Chief Collection" />
-        <button type="button" class="icon-label" @click="saveFolder"><Folder :size="15" aria-hidden="true" /> Use this folder</button>
-      </div>
-      <p class="small">
-        Installed now:
-        <StatusBadge v-if="!deploy.valid" label="unknown" tone="muted" />
-        <StatusBadge v-else-if="!deploy.mod_installed" label="original game files" tone="ok" />
-        <StatusBadge v-else-if="deploy.active_builds.length" :label="`build ${deploy.active_builds.join(', ')}`" tone="warn" />
-        <StatusBadge v-else label="modified files that match no build" tone="bad" />
-      </p>
-      <ul class="small plain">
-        <li v-for="f in deploy.files" :key="f.install_rel">
-          <code>{{ f.install_rel }}</code>: {{ f.state === "original" ? "original" : f.state === "build" ? `build ${f.builds.join(", ")}` : "unknown content" }}
-        </li>
-      </ul>
-      <p v-if="gameRunning" class="warn small">MCC appears to be running ({{ deploy.game_running.join(", ") }}). Close it to install or restore.</p>
-      <div class="row">
-        <button type="button" class="icon-label" :disabled="!canDeploy || !deploy.mod_installed" @click="restore">
-          <Undo2 :size="16" aria-hidden="true" /> Restore originals
+    <section class="panel" aria-labelledby="install-title">
+      <PanelHeader title="Install to MCC" title-id="install-title" :icon="HardDriveDownload">
+        <button type="button" class="icon-label small-button" :disabled="running" @click="refresh">
+          <RefreshCw :size="14" aria-hidden="true" /> Check again
         </button>
-        <button type="button" class="icon-label" :disabled="running" @click="refresh">
-          <RefreshCw :size="15" aria-hidden="true" /> Check again
-        </button>
+      </PanelHeader>
+      <div v-if="deploy" class="deploy-status" data-testid="deploy-status">
+        <p class="small">
+          <Folder :size="14" aria-hidden="true" /> Game folder:
+          <code>{{ deploy.mcc_folder ?? "not found" }}</code> <span class="muted">({{ deploy.source }})</span>
+          <StatusBadge v-if="!deploy.valid" label="not an MCC install" tone="bad" />
+        </p>
+        <div v-if="!deploy.fixed" class="row">
+          <input v-model="folderInput" class="grow-input" aria-label="MCC folder" placeholder="…\steamapps\common\Halo The Master Chief Collection" />
+          <button type="button" class="icon-label" @click="saveFolder"><Folder :size="15" aria-hidden="true" /> Use this folder</button>
+        </div>
+        <p class="small installed">
+          Installed now:
+          <StatusBadge v-if="!deploy.valid" label="unknown" tone="muted" />
+          <StatusBadge v-else-if="!deploy.mod_installed" label="original game files" tone="ok" />
+          <StatusBadge v-else-if="deploy.active_builds.length" :label="`build ${deploy.active_builds.join(', ')}`" tone="warn" />
+          <StatusBadge v-else label="modified files that match no build" tone="bad" />
+        </p>
+        <ul class="small plain file-states">
+          <li v-for="f in deploy.files" :key="f.install_rel">
+            <code>{{ f.install_rel }}</code>: {{ f.state === "original" ? "original" : f.state === "build" ? `build ${f.builds.join(", ")}` : "unknown content" }}
+          </li>
+        </ul>
+        <StateMessage v-if="gameRunning" kind="warning">MCC appears to be running ({{ deploy.game_running.join(", ") }}). Close it to install or restore.</StateMessage>
+        <div class="row">
+          <button type="button" class="caution icon-label" :disabled="!canDeploy || !deploy.mod_installed" @click="restore">
+            <Undo2 :size="16" aria-hidden="true" /> Restore originals
+          </button>
+        </div>
+        <p class="small muted"><TriangleAlert :size="12" aria-hidden="true" /> The Studio never starts MCC. After installing, launch it yourself (anti-cheat off), test, close it, then restore here.</p>
       </div>
-      <p class="small muted">The Studio never starts MCC. After installing, launch it yourself (anti-cheat off), test, close it, then restore here.</p>
-    </div>
+      <StateMessage v-else-if="!error" kind="loading">Checking the game folder…</StateMessage>
+    </section>
 
-    <h2>Builds</h2>
-    <table v-if="builds">
-      <thead>
-        <tr><th>Build</th><th>Folders</th><th>Built</th><th>Counts</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="b in builds.builds" :key="b.name" :data-build="b.name">
-          <td class="mono">{{ b.name }}</td>
-          <td>{{ b.levels.join(", ") }}</td>
-          <td class="small">{{ b.built_at ?? "—" }}</td>
-          <td class="small">{{ Object.entries(b.counts).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—" }}</td>
-          <td>
-            <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
-            <StatusBadge v-else-if="b.validation_ok === false" label="failed" tone="bad" />
-            <StatusBadge v-else label="not validated" tone="muted" />
-          </td>
-          <td>
-            <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
-            <StatusBadge v-else label="current" tone="ok" />
-          </td>
-          <td>
-            <StatusBadge v-if="isInstalled(b.name)" label="installed" tone="warn" />
-            <button
-              v-else
-              type="button"
-              class="icon-label small-button"
-              :disabled="!canDeploy || b.validation_ok !== true || !b.install_files.length || deploy?.mod_installed"
-              :title="deploy?.mod_installed ? 'Restore the originals first' : 'Install this build into MCC'"
-              @click="install(b.name)"
-            >
-              <HardDriveDownload :size="14" aria-hidden="true" /> Install to MCC
-            </button>
-          </td>
-        </tr>
-        <tr v-if="!builds.builds.length"><td colspan="7" class="muted">No builds yet.</td></tr>
-      </tbody>
-    </table>
+    <section class="panel quiet" aria-labelledby="builds-title">
+      <PanelHeader title="Builds" title-id="builds-title" :icon="Layers" />
+      <div v-if="builds" class="table-frame">
+        <table>
+          <thead>
+            <tr><th>Build</th><th>Folders</th><th>Built</th><th>Counts</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in builds.builds" :key="b.name" :data-build="b.name">
+              <td class="mono">{{ b.name }}</td>
+              <td>{{ b.levels.join(", ") }}</td>
+              <td class="small">{{ b.built_at ?? "—" }}</td>
+              <td class="small">{{ Object.entries(b.counts).map(([k, v]) => `${k}: ${v}`).join(" · ") || "—" }}</td>
+              <td>
+                <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
+                <StatusBadge v-else-if="b.validation_ok === false" label="failed" tone="bad" />
+                <StatusBadge v-else label="not validated" tone="muted" />
+              </td>
+              <td>
+                <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
+                <StatusBadge v-else label="current" tone="ok" />
+              </td>
+              <td>
+                <StatusBadge v-if="isInstalled(b.name)" label="installed" tone="warn" />
+                <button
+                  v-else
+                  type="button"
+                  class="icon-label small-button"
+                  :disabled="!canDeploy || b.validation_ok !== true || !b.install_files.length || deploy?.mod_installed"
+                  :title="deploy?.mod_installed ? 'Restore the originals first' : 'Install this build into MCC'"
+                  @click="install(b.name)"
+                >
+                  <HardDriveDownload :size="14" aria-hidden="true" /> Install to MCC
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!builds.builds.length"><td colspan="7"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <StateMessage v-else-if="!error" kind="loading">Loading builds…</StateMessage>
+    </section>
   </section>
 </template>

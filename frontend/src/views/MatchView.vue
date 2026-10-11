@@ -3,7 +3,7 @@
 // Evolved candidates (right). The selected line and every filter are kept in the URL, so reloading or
 // going back returns to the same place.
 
-import { LayoutTemplate } from "lucide-vue-next";
+import { Keyboard, LayoutTemplate } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
@@ -13,6 +13,7 @@ import { stopCurrent } from "../audio/transport";
 import CeColumn from "../components/match/CeColumn.vue";
 import MccColumn from "../components/match/MccColumn.vue";
 import MatchPanel from "../components/match/MatchPanel.vue";
+import { confirmAction } from "../composables/useConfirm";
 import { useMatch } from "../composables/useMatch";
 import { useShortcuts } from "../composables/useShortcuts";
 import SplitHandle from "../layout/SplitHandle.vue";
@@ -67,9 +68,20 @@ const ceHideUsed = computed({ get: () => route.query.ch === "1", set: (v: boolea
 
 // ---- Selecting a line. Leaving a line with unsaved changes asks first. The draft is also kept for this
 // stored version in the browser session, so answering "leave" does not lose it entirely.
-function selectSlot(slotId: string) {
+async function selectSlot(slotId: string) {
   if (slotId === selectedSlot.value) return;
-  if (match.dirty() && !window.confirm("This line has unsaved changes. Leave it without saving?")) return;
+  if (match.dirty()) {
+    const leave = await confirmAction({
+      title: "Unsaved changes",
+      message:
+        "This line has unsaved changes. Leave it without saving?\n\n" +
+        "The draft is kept in this browser session for this version of the line.",
+      confirmLabel: "Leave without saving",
+      cancelLabel: "Stay on this line",
+      tone: "warning",
+    });
+    if (!leave) return;
+  }
   setQuery({ slot: slotId });
 }
 
@@ -164,6 +176,7 @@ onMounted(async () => {
 
 <template>
   <div class="layout-bar">
+    <Keyboard :size="16" class="muted" aria-hidden="true" />
     <ul class="keys" aria-label="Keyboard shortcuts">
       <li><kbd>J</kbd>/<kbd>K</kbd> line</li>
       <li><kbd>Space</kbd> Spain</li>

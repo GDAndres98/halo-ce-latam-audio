@@ -1,0 +1,148 @@
+/* The application shell: the fixed atmospheric backdrop, the top band with the emblem and the menu-style
+   navigation, and the main area. */
+
+/* ---- Backdrop (AppBackdrop.vue): space, a planet's rim light, a faint ring and a holographic reticle.
+   Fixed, behind everything, never takes the pointer, and static (painted once). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict; /* its own layer: painted once, never invalidated by the page */
+  background:
+    radial-gradient(ellipse 60% 45% at 92% 112%, rgba(47, 140, 255, 0.32), transparent 62%),
+    radial-gradient(ellipse 50% 40% at 10% -8%, rgba(29, 78, 143, 0.4), transparent 65%),
+    linear-gradient(180deg, #030b1f 0%, #01040c 78%);
+}
+
+.backdrop svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Top band. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 2rem;
+  padding: 0.55rem 1.25rem;
+  background: linear-gradient(180deg, rgba(4, 14, 38, 0.97), rgba(2, 8, 24, 0.95));
+  border-bottom: 2px solid var(--frame);
+  box-shadow: 0 2px 14px -4px var(--frame-glow);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-decoration: none;
+  color: var(--menu);
+}
+
+.brand .emblem {
+  flex: none;
+  filter: drop-shadow(0 0 5px rgba(47, 140, 255, 0.7));
+}
+
+.brand .wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand .wordmark strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--menu);
+  text-shadow: 0 0 10px rgba(47, 140, 255, 0.5);
+}
+
+.brand .wordmark span {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Menu-style navigation: blue uppercase items; the current screen is framed and turns near-white, as the
+   highlighted item does in the original menus. */
+.top nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.top nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.38rem 0.8rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--menu);
+  border: var(--frame-width) solid transparent;
+  border-radius: var(--radius-control);
+}
+
+.top nav a:hover {
+  transition: color var(--fast) ease, border-color var(--fast) ease;
+  color: var(--text);
+  border-color: var(--frame-dim);
+}
+
+.top nav a.router-link-active {
+  color: #ffffff;
+  border-color: var(--frame);
+  background: linear-gradient(180deg, rgba(47, 140, 255, 0.22), rgba(47, 140, 255, 0.06));
+  box-shadow: 0 0 10px var(--frame-glow);
+}
+
+.top nav a.classic {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.1rem 1.25rem 2rem;
+}
+
+/* The matching workspace uses the whole window (App.vue sets .wide on its route). */
+main.wide {
+  max-width: none;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .top {
+    position: static;
+    padding: 0.55rem 1rem;
+  }
+
+  .top nav a {
+    padding: 0.32rem 0.55rem;
+    font-size: 0.66rem;
+  }
+
+  main {
+    padding: 0.75rem 1rem 1.5rem;
+  }
+}

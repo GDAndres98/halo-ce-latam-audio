@@ -3,7 +3,7 @@
 // Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
-import { ChevronsDown } from "lucide-vue-next";
+import { ChevronsDown, ListMusic } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { useDebounced } from "../../composables/useDebounced";
@@ -11,6 +11,7 @@ import type { LevelProgress, SlotRow, SlotsResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
 import { markFor } from "../../matching/status";
 import StatusBadge from "../StatusBadge.vue";
+import StateMessage from "../ui/StateMessage.vue";
 
 const props = defineProps<{ levels: string[]; selectedId: string | null }>();
 const emit = defineEmits<{ select: [slotId: string] }>();
@@ -119,7 +120,10 @@ function mccAudio(row: SlotRow) {
 
 <template>
   <section class="column mcc">
-    <h2>MCC dialogue</h2>
+    <h2>
+      <ListMusic :size="16" aria-hidden="true" /> MCC dialogue
+      <span v-if="data" class="count">{{ data.slots.length }}/{{ data.total }}</span>
+    </h2>
     <div class="controls">
       <label>Level
         <select v-model="level">
@@ -147,8 +151,9 @@ function mccAudio(row: SlotRow) {
       subtitles approved {{ data.progress.subtitle_approved }}
       <StatusBadge v-if="data.progress.ready_for_build" label="ready to build" tone="ok" />
     </p>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="data" class="muted small">
+    <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
+    <StateMessage v-else-if="!data" kind="loading">Loading lines…</StateMessage>
+    <p v-if="data" class="muted small list-meta">
       {{ data.slots.length }} of {{ data.total }} lines<span v-if="data.truncated"> · more below</span>
     </p>
 
@@ -176,10 +181,10 @@ function mccAudio(row: SlotRow) {
                 :aria-label="`audio: ${markFor(decisionOf(row).audio).word}`">A{{ markFor(decisionOf(row).audio).glyph }}</span>
           <span class="pill" :class="markFor(decisionOf(row).subtitle).tone" :title="`subtitle: ${markFor(decisionOf(row).subtitle).word}`"
                 :aria-label="`subtitle: ${markFor(decisionOf(row).subtitle).word}`">S{{ markFor(decisionOf(row).subtitle).glyph }}</span>
-          <span v-if="row.radio_effect" class="pill warn" title="needs radio effect" aria-label="needs radio effect">R</span>
+          <span v-if="row.radio_effect" class="pill radio" title="needs radio effect" aria-label="needs radio effect">R</span>
         </div>
       </li>
-      <li v-if="!data.slots.length" class="muted">No lines match these filters.</li>
+      <li v-if="!data.slots.length" class="empty-list"><StateMessage kind="empty">No lines match these filters.</StateMessage></li>
     </ul>
 
     <button v-if="data?.truncated" type="button" class="more icon-label" @click="showMore"><ChevronsDown :size="15" aria-hidden="true" /> Show more lines</button>

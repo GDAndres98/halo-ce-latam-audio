@@ -5,7 +5,7 @@
 // (j / k) is only a cursor, and a recording becomes the replacement only when the user presses "Use this
 // recording" (s).
 
-import { ChevronsDown, CircleCheck } from "lucide-vue-next";
+import { ChevronsDown, CircleCheck, Library } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { togglePlay } from "../../audio/player";
@@ -14,6 +14,7 @@ import { highlightSegments } from "../../matching/text";
 import type { CeLine, CeResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
 import StatusBadge from "../StatusBadge.vue";
+import StateMessage from "../ui/StateMessage.vue";
 
 const props = defineProps<{ missions: string[]; slotId: string | null; focusedRef: string | null; chosenRefs: string[] }>();
 const emit = defineEmits<{ focus: [ref: string]; use: [ref: string] }>();
@@ -97,7 +98,10 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
 
 <template>
   <section class="column ce">
-    <h2>Campaign Evolved candidates</h2>
+    <h2>
+      <Library :size="16" aria-hidden="true" /> Campaign Evolved candidates
+      <span v-if="data" class="count">{{ data.lines.length }}/{{ data.total }}</span>
+    </h2>
     <div class="controls">
       <label>Mission
         <select v-model="mission">
@@ -118,8 +122,9 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
       <label class="check"><input v-model="hideUsed" type="checkbox" /> Hide recordings already used elsewhere</label>
     </div>
 
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="data" class="muted small">
+    <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
+    <StateMessage v-else-if="!data" kind="loading">Loading recordings…</StateMessage>
+    <p v-if="data" class="muted small list-meta">
       {{ data.lines.length }} of {{ data.total }} recordings
       <span v-if="data.hidden_used"> · {{ data.hidden_used }} hidden as already used</span>
     </p>
@@ -136,7 +141,7 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
         @click="emit('focus', line.ce_line_ref)"
       >
         <div class="line-head">
-          <strong class="mono small">{{ line.ce_line_ref }}</strong>
+          <strong class="tag mono small">{{ line.ce_line_ref }}</strong>
           <span class="muted small">{{ line.mission }} · {{ line.folder }}</span>
         </div>
         <div class="line-head">
@@ -166,10 +171,10 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
           <StatusBadge :label="hasText(line, 'en') ? 'EN subtitle' : 'no EN subtitle'" :tone="hasText(line, 'en') ? 'ok' : 'muted'" />
           <StatusBadge v-if="line.used_by.length" :label="`used by ${line.used_by.length}`" tone="muted" />
           <StatusBadge v-if="chosenRefs.includes(line.ce_line_ref)" label="matched here" tone="ok" />
-          <button type="button" class="use icon-label" @click.stop="emit('use', line.ce_line_ref)"><CircleCheck :size="15" aria-hidden="true" /> Use this recording (s)</button>
+          <button type="button" class="use icon-label primary-soft" @click.stop="emit('use', line.ce_line_ref)"><CircleCheck :size="15" aria-hidden="true" /> Use this recording (s)</button>
         </div>
       </li>
-      <li v-if="!data.lines.length" class="muted">No recordings match.</li>
+      <li v-if="!data.lines.length" class="empty-list"><StateMessage kind="empty">No recordings match.</StateMessage></li>
     </ul>
 
     <button v-if="data && data.lines.length < data.total" type="button" class="more icon-label" @click="showMore"><ChevronsDown :size="15" aria-hidden="true" /> Show more recordings</button>

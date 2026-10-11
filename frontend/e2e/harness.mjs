@@ -98,3 +98,35 @@ export class Services {
     await stopProcess(this.api);
   }
 }
+
+/**
+ * Answers the Studio's confirmation dialogs (components/ui/ConfirmDialog.vue) by clicking their buttons, the
+ * way a person does. `decide(message)` returns true to confirm, false to cancel; by default everything is
+ * confirmed. Every message seen is kept in `messages`. Replaces page.on("dialog") now that the Studio no
+ * longer uses the browser's own confirm().
+ */
+export function handleConfirms(page, decide = () => true) {
+  const state = { decide, messages: [], active: true };
+  const dialog = page.locator("dialog.confirm-dialog[open]");
+  (async () => {
+    while (state.active && !page.isClosed()) {
+      try {
+        if (await dialog.count()) {
+          const text = await dialog.locator(".body").innerText({ timeout: 1000 });
+          state.messages.push(text);
+          const yes = await state.decide(text);
+          await dialog.locator(`[data-confirm="${yes ? "yes" : "no"}"]`).click({ timeout: 2000 });
+          await dialog.waitFor({ state: "detached", timeout: 2000 }).catch(() => {});
+        }
+      } catch {
+        // the page navigated or closed while answering: look again
+      }
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  })();
+  return {
+    messages: state.messages,
+    set: (fn) => (state.decide = fn),
+    stop: () => (state.active = false),
+  };
+}

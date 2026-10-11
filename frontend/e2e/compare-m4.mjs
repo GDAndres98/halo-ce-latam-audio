@@ -11,7 +11,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { API_PORT, HERE, WEB_PORT, Services, runFixture, sha256File } from "./harness.mjs";
+import { API_PORT, HERE, WEB_PORT, Services, runFixture, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const LINE = "a10_010_cryotech";
@@ -85,6 +85,7 @@ async function runClassic(browser) {
 async function runStudio(browser) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   page.on("dialog", (d) => d.accept());
+  handleConfirms(page);
   await page.goto(`http://localhost:${WEB_PORT}/#/match?level=a10`);
   await page.getByPlaceholder(/Accents and case ignored/).waitFor({ timeout: 60000 });
   const t = tracker(page);

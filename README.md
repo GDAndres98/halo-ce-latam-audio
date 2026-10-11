@@ -172,10 +172,19 @@ Previews in the editor use the same steps, so what you hear is what the build wr
 
 ## Theme
 
-Colours, fonts and radii are defined once, in `frontend/src/theme/tokens.ts`. The palette is original and
-inspired by the interfaces of Halo: Combat Evolved (dark navy and charcoal, olive accents, a restrained cyan
-focus ring). No Halo artwork, fonts or logos are used. Unit tests check the contrast of every text colour
-against its surface (WCAG AA), and the browser checks run the same test on the live pages.
+The Studio reinterprets the menus of the original Xbox *Halo: Combat Evolved* (2001). It has a space
+backdrop, translucent navy panels in a bright blue rounded frame, wide uppercase blue titles over a lit rule,
+and framed selections that turn near-white. The dashboard works like the campaign menu. Confirmations use
+the Studio's own dialog, not the browser's.
+
+- **Design notes:** the references, decisions and the rules for extending the theme are in
+  [docs/ui-design-system.md](docs/ui-design-system.md).
+- **Tokens:** colours, fonts and shapes are defined once, in `frontend/src/theme/tokens.ts`. Styles are in
+  `frontend/src/styles/`, one file per area. Reusable pieces are in `frontend/src/components/ui/`.
+- **Fonts and art:** Michroma and Saira, both SIL OFL, are bundled. The emblem and backdrop are original
+  SVG. No Halo artwork, fonts, logos or sounds are used.
+- **Checks:** unit tests check the contrast of every text colour against its surface (WCAG AA).
+  `npm run test:theme` checks the live pages in a browser.
 
 ## Building and restoring the game files
 
@@ -223,6 +232,7 @@ npm run test:editor                           # browser test of the waveform edi
 npm run test:data                             # browser test of the Data page: CRLF, outside edits, import, export
 npm run test:navigation                       # browser test of the matching loop: in-place updates, save & next, caching
 npm run test:deploy                           # Build & Test: build, install, restore into a throw-away game folder (~2 min)
+npm run test:theme                            # browser checks of the theme: every screen, dialog, fonts, contrast, motion, widths
 npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```

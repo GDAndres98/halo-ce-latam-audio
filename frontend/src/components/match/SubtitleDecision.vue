@@ -5,6 +5,7 @@
 // "Missing" (MCC has no text for this line) and "omitted" (the user chose no subtitle) are shown
 // differently on purpose: a missing text is a problem to look at, an omitted one is a decision.
 
+import { Captions } from "lucide-vue-next";
 import { computed } from "vue";
 import type { CeLine, SlotDetail, SubtitleSource } from "../../api/types";
 import type { Draft } from "../../matching/draft";
@@ -40,7 +41,7 @@ const noSubtitleAtAll = (line: CeLine) => !Object.values(line.subtitles).some((s
 
 <template>
   <section class="block">
-    <h3>Subtitle</h3>
+    <h3><Captions :size="15" aria-hidden="true" /> Subtitle</h3>
     <p v-if="locked" class="note">Approved. Mark it Needs rework to change the subtitle.</p>
 
     <dl class="texts">

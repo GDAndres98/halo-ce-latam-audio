@@ -10,7 +10,7 @@
 // WaveSurfer.js draws the waveform and owns the audio element; regions, the time ruler and the hover time
 // come from its plugins.
 
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WaveSurfer from "wavesurfer.js";
 import HoverPlugin from "wavesurfer.js/dist/plugins/hover.esm.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.esm.js";
@@ -30,6 +30,8 @@ const props = withDefaults(
   defineProps<{
     url: string | null;
     label: string;
+    /** "A" or "B" in the comparison: shown as a tag before the label. */
+    channel?: string;
     editable?: boolean;
     keep?: Span | null;
     cuts?: Span[];
@@ -51,12 +53,19 @@ const emit = defineEmits<{
 // how a new drag selection is told apart from the regions drawn here.
 const KEEP = "studio-keep";
 const SELECTION = "studio-selection";
-const DIM = "rgba(8, 11, 15, 0.82)";
-const CUT = "rgba(241, 154, 140, 0.38)";
-const FADE = "rgba(111, 214, 232, 0.2)";
-const SELECTED = "rgba(154, 172, 106, 0.34)";
+// Region colours: trimmed-away parts dimmed to the well, cuts in the rework red, fades in the focus cyan, and
+// the selection in the menu blue (see theme/tokens.ts).
+const DIM = "rgba(1, 4, 12, 0.8)";
+const CUT = "rgba(255, 143, 128, 0.36)";
+const FADE = "rgba(127, 227, 255, 0.18)";
+const SELECTED = "rgba(77, 163, 255, 0.32)";
+const WAVE = "#3f6fae"; // unplayed part: a dim menu blue
+const PLAYED = "#9fd0ff"; // played part: the lit menu blue
 const ZOOM_LEVELS = [1, 2, 4, 8, 16, 32]; // multiples of the width that fits the whole recording
 const MIN_SELECTION_S = 0.01;
+
+/** The label with its A / B tag, for screen readers and toolbars. */
+const fullLabel = computed(() => (props.channel ? `${props.channel} · ${props.label}` : props.label));
 
 const host = ref<HTMLElement | null>(null);
 const duration = ref(0);
@@ -79,8 +88,8 @@ onMounted(() => {
   wave = WaveSurfer.create({
     container: host.value as HTMLElement,
     height: props.height,
-    waveColor: COLOURS.textMuted,
-    progressColor: COLOURS.olive,
+    waveColor: WAVE,
+    progressColor: PLAYED,
     cursorColor: COLOURS.cyan,
     cursorWidth: 2,
     barWidth: 2,
@@ -94,7 +103,7 @@ onMounted(() => {
       HoverPlugin.create({
         lineColor: COLOURS.cyan,
         lineWidth: 1,
-        labelColor: COLOURS.background,
+        labelColor: COLOURS.space,
         labelBackground: COLOURS.cyan,
         labelSize: "10px",
         formatTimeCallback: formatPosition,
@@ -219,7 +228,7 @@ function styleHandles(region: Region) {
   region.element?.querySelectorAll<HTMLElement>('[part*="region-handle"]').forEach((handle) => {
     handle.style.pointerEvents = "all";
     handle.style.width = "8px";
-    handle.style.background = "rgba(111, 214, 232, 0.25)";
+    handle.style.background = "rgba(127, 227, 255, 0.25)";
     handle.style.borderColor = COLOURS.cyan;
   });
 }
@@ -353,7 +362,12 @@ defineExpose({
 <template>
   <figure class="wave-view" :class="{ editable }" :data-playing="playing ? 'true' : 'false'">
     <figcaption class="wave-head">
-      <span class="wave-label"><AudioWaveform :size="15" aria-hidden="true" /> {{ label }}</span>
+      <span class="wave-label">
+        <span v-if="channel" class="channel" aria-hidden="true">{{ channel }}</span>
+        <AudioWaveform v-else :size="15" aria-hidden="true" />
+        <span v-if="channel" class="sr-only">{{ channel }} ·</span>
+        {{ label }}
+      </span>
       <span class="wave-times mono" data-testid="wave-time">{{ formatPosition(position) }} / {{ formatPosition(duration) }}</span>
     </figcaption>
 
@@ -361,7 +375,7 @@ defineExpose({
       ref="host"
       class="wave-host"
       role="img"
-      :aria-label="`${label} waveform`"
+      :aria-label="`${fullLabel} waveform`"
       :data-duration="duration"
       :data-zoom="ZOOM_LEVELS[zoomIndex]"
       data-testid="wave-host"
@@ -370,7 +384,7 @@ defineExpose({
     <p v-else-if="!url" class="small muted wave-status">No recording.</p>
     <p v-if="error" class="error small" role="alert">{{ error }}</p>
 
-    <div class="wave-transport" role="toolbar" :aria-label="`${label}: playback`">
+    <div class="wave-transport" role="toolbar" :aria-label="`${fullLabel}: playback`">
       <button type="button" class="icon-label" :disabled="!duration" :aria-pressed="playing" @click="togglePlay">
         <Pause v-if="playing" :size="16" aria-hidden="true" />
         <Play v-else :size="16" aria-hidden="true" />

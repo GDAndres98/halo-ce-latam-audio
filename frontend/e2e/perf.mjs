@@ -13,7 +13,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { API_PORT, HERE, WEB_PORT, Services, runFixture, sha256File } from "./harness.mjs";
+import { API_PORT, HERE, WEB_PORT, Services, runFixture, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const ITERATIONS = Number(process.env.PERF_ITERATIONS ?? 8);
@@ -55,6 +55,7 @@ async function studio(browser, lines) {
 let stage = "";
 async function studioSteps(page, lines) {
   page.on("dialog", (d) => d.accept());
+  handleConfirms(page);
   const steps = { select: [], search: [], use: [], save: [], total: [] };
   const extra = {};
   extra.open_workspace_ms = Math.round(await timed(async () => {

@@ -13,7 +13,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { HERE, REPO, WEB_PORT, Services, runFixture, sha256File } from "./harness.mjs";
+import { HERE, REPO, WEB_PORT, Services, handleConfirms, runFixture, sha256File } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const BANK_REL = "halo1/sound/pc/sounds_dialogs_spanish.fsb";
@@ -87,7 +87,6 @@ async function main() {
   const services = new Services(fixture.root, ["--mcc-root", game, "--deploy-state", state]);
   let browser;
   let candidate = null;
-  const dialogs = [];
 
   try {
     await step("start the Studio with a throw-away game folder", async () => {
@@ -96,10 +95,7 @@ async function main() {
     });
     browser = await chromium.launch({ channel: "msedge", headless: true });
     page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
-    page.on("dialog", (d) => {
-      dialogs.push(d.message());
-      d.accept();
-    });
+    const confirms = handleConfirms(page);
     await page.goto(`http://localhost:${WEB_PORT}/#/builds`);
 
     await step("the page shows the folder (fixed in test mode) and the original files", async () => {
@@ -134,7 +130,7 @@ async function main() {
       await page.locator(`tr[data-build="${BUILD}"]`).getByRole("button", { name: /Install to MCC/ }).click();
       const { state: s, log } = await waitJob("install", 5 * 60 * 1000);
       check(s === "done", `install ${s}: ${log.slice(-400)}`);
-      const confirmText = dialogs.at(-1) ?? "";
+      const confirmText = confirms.messages.at(-1) ?? "";
       check(confirmText.includes(BANK_REL) && confirmText.includes(game), `confirmation did not list the file and folder: ${confirmText.slice(0, 200)}`);
       check((await hash(join(game, BANK_REL))) === candidate, "the game bank is not the build's candidate");
       check(existsSync(join(state, "backup", "19905945", BANK_REL)), "no backup of the original");

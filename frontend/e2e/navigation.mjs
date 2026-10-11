@@ -11,7 +11,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { HERE, WEB_PORT, Services, runFixture, sha256File } from "./harness.mjs";
+import { HERE, WEB_PORT, Services, runFixture, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const LEVEL = "a30";
@@ -55,6 +55,7 @@ async function main() {
     browser = await chromium.launch({ channel: "msedge", headless: true });
     page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     page.on("dialog", (d) => d.accept());
+    const confirms = handleConfirms(page);
     page.on("request", (r) => requests.push(r.url()));
     page.on("requestfinished", async (r) => {
       if (!r.url().includes("/audio/")) return;
@@ -95,6 +96,9 @@ async function main() {
     });
 
     await step("Ctrl+Enter from the Notes field saves and moves on", async () => {
+      // Type once the new line is shown, as a person does (typing during its load is replaced by the load).
+      const tag = await selectedRow().locator(".tag").innerText();
+      await page.waitForFunction((t) => document.querySelector(".line-title h2")?.textContent.trim() === t, tag, { timeout: 15000 });
       await page.getByLabel("Notes").fill("nota rápida");
       await page.getByLabel("Notes").press("Control+Enter");
       await page.waitForFunction((id) => document.querySelector("li.row-item.selected")?.id !== id, second, { timeout: 15000 });
@@ -107,18 +111,16 @@ async function main() {
     await step("U moves to the next unmatched line; unsaved changes ask first", async () => {
       const here = await selectedRow().getAttribute("id");
       let asked = 0;
-      page.removeAllListeners("dialog");
-      page.on("dialog", (d) => {
+      confirms.set(() => {
         asked += 1;
-        d.dismiss();
+        return false; // "Stay on this line"
       });
       await page.getByLabel("Notes").fill("sin guardar");
       await page.locator(".line-title h2").click();
       await page.keyboard.press("u");
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(800);
       check(asked === 1 && (await selectedRow().getAttribute("id")) === here, "left a line with unsaved changes without asking");
-      page.removeAllListeners("dialog");
-      page.on("dialog", (d) => d.accept());
+      confirms.set(() => true);
       await page.keyboard.press("u");
       await page.waitForFunction((id) => document.querySelector("li.row-item.selected")?.id !== id, here, { timeout: 15000 });
       return "dismissed: stayed; accepted: moved";

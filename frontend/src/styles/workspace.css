@@ -1,0 +1,455 @@
+/* Matching workspace: three panels separated by dividers (SplitHandle). The widths of the side panels are
+   CSS variables set by useWorkspaceLayout; the centre panel takes the rest and never drops below 420 px.
+   Below 1000 px the panels stack, and the dividers are hidden. */
+
+.layout-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--frame-dim);
+  border-radius: var(--radius-control);
+  background: rgba(2, 8, 24, 0.8);
+}
+
+/* Keyboard legend: the original's controller prompts ("PRESS (A) TO CONTINUE"). */
+.keys {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.95rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: var(--left-w, 300px) 8px minmax(420px, 1fr) 8px var(--right-w, 360px);
+  gap: 0;
+  align-items: start;
+}
+
+.workspace.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* Divider: a slim rail with a lit grip, brightening when it is dragged or focused. */
+.split-handle {
+  align-self: stretch;
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 3px;
+  background: linear-gradient(180deg, transparent, rgba(47, 140, 255, 0.12) 20%, rgba(47, 140, 255, 0.12) 80%, transparent);
+}
+
+.split-handle .grip {
+  width: 2px;
+  height: 3rem;
+  border-radius: 2px;
+  background: var(--frame-dim);
+  box-shadow: 0 0 0 1px rgba(1, 4, 12, 0.6);
+}
+
+.split-handle:hover .grip,
+.split-handle:focus-visible .grip,
+.split-handle.dragging .grip {
+  background: var(--focus);
+  box-shadow: 0 0 10px var(--focus);
+}
+
+.split-handle:hover,
+.split-handle.dragging {
+  background: rgba(127, 227, 255, 0.12);
+}
+
+/* The three panels scroll on their own, so the titles stay in view (sticky title band). */
+.column {
+  min-width: 0;
+  max-height: calc(100vh - 8.6rem);
+  overflow: auto;
+  padding: 0.85rem 0.85rem;
+  scrollbar-gutter: stable;
+}
+
+.column > h2 {
+  position: sticky;
+  top: -0.85rem;
+  z-index: 3;
+  margin: -0.85rem -0.85rem 0.75rem;
+  padding: 0.65rem 0.85rem 0.55rem;
+  background: linear-gradient(180deg, #0a2150, #061535);
+}
+
+.column > h2 svg {
+  flex: none;
+  filter: drop-shadow(0 0 4px rgba(47, 140, 255, 0.6));
+}
+
+.column > h2 .count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-transform: none;
+}
+
+.controls {
+  display: grid;
+  gap: 0.5rem 0.6rem;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 0.55rem;
+}
+
+.controls .wide {
+  grid-column: 1 / -1;
+}
+
+.controls label,
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--menu);
+}
+
+.controls label.check {
+  flex-direction: row;
+  align-items: center;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.controls input:not([type="checkbox"]),
+.controls select {
+  width: 100%;
+}
+
+.progress {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--muted);
+}
+
+.list-meta {
+  margin: 0.3rem 0 0.45rem;
+}
+
+/* ---- Lists of lines: menu items. Unselected entries read in menu blue; the selected one is framed, its words
+   turn near-white, and a short lit connector runs to the panel edge, towards the decision panel. */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row-item {
+  position: relative;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.35rem;
+  border: var(--frame-width) solid var(--line);
+  border-radius: var(--radius-control);
+  background: rgba(2, 8, 24, 0.45);
+  cursor: pointer;
+}
+
+.row-item:hover {
+  transition: border-color var(--fast) ease, background-color var(--fast) ease;
+  border-color: var(--frame-dim);
+  background: rgba(47, 140, 255, 0.07);
+}
+
+.row-item .tag {
+  color: var(--menu);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.row-item.selected {
+  border-color: var(--frame);
+  background: linear-gradient(90deg, rgba(47, 140, 255, 0.24), rgba(47, 140, 255, 0.06));
+  box-shadow: 0 0 10px var(--frame-glow);
+}
+
+.row-item.selected .tag {
+  color: #ffffff;
+}
+
+.column.mcc .row-item.selected::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: calc(-0.85rem - var(--frame-width));
+  width: 0.85rem;
+  height: 2px;
+  background: var(--frame);
+  box-shadow: 0 0 6px var(--frame);
+}
+
+/* The candidate cursor (arrow keys) and a recording chosen for this line. */
+.row-item.focused {
+  border-color: var(--focus);
+  box-shadow: 0 0 10px rgba(127, 227, 255, 0.35);
+}
+
+.row-item.focused::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--focus);
+}
+
+.row-item.chosen {
+  border-left: 4px solid var(--green);
+  background: linear-gradient(90deg, rgba(142, 203, 91, 0.16), rgba(2, 8, 24, 0.45) 60%);
+}
+
+.line-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview {
+  margin: 0.25rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.badges,
+.status-row,
+.play-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.status-row {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.subtitles p {
+  margin: 0.2rem 0;
+}
+
+.culture {
+  display: inline-block;
+  min-width: 3.4rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--menu);
+}
+
+.more {
+  margin-top: 0.4rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.use {
+  margin-left: auto;
+}
+
+.empty-list {
+  list-style: none;
+}
+
+/* ---- Centre panel: the line title, the numbered sections and the action band. */
+.line-title {
+  margin-bottom: 0.25rem;
+}
+
+.line-title h2 {
+  margin: 0 0 0.15rem;
+  font-family: var(--font-ui);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  text-shadow: 0 0 12px rgba(47, 140, 255, 0.5);
+}
+
+.line-title .ident {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: center;
+  margin: 0;
+}
+
+.center .block {
+  border-top: 1px solid var(--line);
+}
+
+.center .line-title + .status-row + .block,
+.center .status-row + .block {
+  border-top: none;
+}
+
+.choice {
+  border: none;
+  padding: 0;
+  margin: 0.3rem 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.matched ul,
+.ce-subtitle ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.matched li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(2, 8, 24, 0.5);
+}
+
+.block-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--menu);
+}
+
+.block-label textarea {
+  width: 100%;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.flag-list {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.flag-list .opt svg {
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+/* Save and approve stay in view while the controls scroll: the bottom action band. */
+.approvals {
+  position: sticky;
+  bottom: -0.85rem;
+  z-index: 4;
+  margin: 0.6rem -0.85rem -0.85rem;
+  padding: 0.65rem 0.85rem 0.8rem;
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+}
+
+.center .approvals {
+  border-top: 2px solid var(--frame);
+}
+
+.approvals .approval-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0.55rem 0 0.2rem;
+}
+
+.approvals .approval-grid p {
+  margin: 0.25rem 0;
+}
+
+.approvals .approval-grid > div {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}
+
+.approvals .feedback {
+  margin: 0.35rem 0 0;
+}
+
+/* The empty centre panel: a prompt, like the original's "PRESS (A) TO SELECT". */
+.center-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  min-height: 18rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.center-empty svg {
+  color: var(--frame-dim);
+}
+
+@media (max-width: 1000px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .split-handle {
+    display: none;
+  }
+
+  .column {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .column > h2 {
+    position: static;
+  }
+
+  .column.mcc .row-item.selected::after {
+    display: none;
+  }
+
+  .approvals {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .approvals .approval-grid,
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .keys {
+    display: none;
+  }
+}

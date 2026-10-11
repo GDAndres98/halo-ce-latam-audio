@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File } from "./harness.mjs";
+import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const LINE = "a10_010_cryotech";
@@ -37,6 +37,7 @@ const matchingUrl = (query = "") => `http://localhost:${WEB_PORT}/#/match?level=
 async function openPage(browser, url, viewport = { width: 1440, height: 960 }) {
   const page = await browser.newPage({ viewport });
   page.on("dialog", (d) => d.accept());
+  handleConfirms(page);
   await page.goto(url);
   return page;
 }

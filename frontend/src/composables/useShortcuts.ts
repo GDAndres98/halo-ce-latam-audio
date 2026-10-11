@@ -18,6 +18,8 @@ export function useShortcuts(shortcuts: ShortcutMap) {
     const name = shortcutName(event);
     const action = actions[name];
     if (!action) return;
+    // A confirmation dialog owns the keyboard while it is open (Space and Enter press its buttons).
+    if (document.querySelector("dialog[open]")) return;
     if (isTyping(event.target) && !WHILE_TYPING.has(name)) return;
     event.preventDefault();
     action();

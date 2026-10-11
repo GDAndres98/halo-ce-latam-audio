@@ -11,10 +11,14 @@
 // Nothing here happens on its own, and nothing is imported at start-up.
 
 import { computed, onMounted, ref } from "vue";
-import { Database, Download, FileInput, RefreshCw, ScanSearch } from "lucide-vue-next";
+import { Database, Download, FileInput, FileJson, RefreshCw, ScanSearch, X } from "lucide-vue-next";
 import { api, ApiError } from "../api/client";
 import type { DataStatus, ImportPreview, SlotSummary } from "../api/types";
 import StatusBadge from "../components/StatusBadge.vue";
+import PageHeader from "../components/ui/PageHeader.vue";
+import PanelHeader from "../components/ui/PanelHeader.vue";
+import StateMessage from "../components/ui/StateMessage.vue";
+import { confirmAction } from "../composables/useConfirm";
 
 const status = ref<DataStatus | null>(null);
 const preview = ref<ImportPreview | null>(null);
@@ -74,10 +78,14 @@ async function runImport() {
   const approvals =
     (p.approvals_added.length ? `\nApprovals added: ${p.approvals_added.join(", ")}` : "") +
     (p.approvals_removed.length ? `\nApprovals REMOVED: ${p.approvals_removed.join(", ")}` : "");
-  const ok = window.confirm(
-    `Import manual_mappings.json into the database?\n\n${p.changes.length} slot(s) change.${approvals}\n\n` +
+  const ok = await confirmAction({
+    title: "Import from JSON",
+    message:
+      `Import manual_mappings.json into the database?\n\n${p.changes.length} slot(s) change.${approvals}\n\n` +
       "The database's current decisions for those slots are replaced (a backup is kept in mappings/.history/).",
-  );
+    confirmLabel: "Import now",
+    tone: "warning",
+  });
   if (!ok) return;
   busy.value = true;
   error.value = "";
@@ -95,10 +103,14 @@ async function runImport() {
 
 async function runExport() {
   if (!status.value) return;
-  const ok = window.confirm(
-    "Write the database's decisions over manual_mappings.json?\n\n" +
+  const ok = await confirmAction({
+    title: "Export database to JSON",
+    message:
+      "Write the database's decisions over manual_mappings.json?\n\n" +
       "Changes made to the file outside the Studio are discarded from the file (it is kept in mappings/.history/).",
-  );
+    confirmLabel: "Export now",
+    tone: "warning",
+  });
   if (!ok) return;
   busy.value = true;
   error.value = "";
@@ -124,22 +136,21 @@ onMounted(refresh);
 
 <template>
   <section class="data-view">
-    <h1><Database :size="22" aria-hidden="true" /> Data</h1>
+    <PageHeader title="Data" :icon="Database">
+      <button type="button" class="icon-label" :disabled="busy" @click="refresh">
+        <RefreshCw :size="15" aria-hidden="true" /> Check again
+      </button>
+    </PageHeader>
     <p class="note">
       Decisions live in <code>mappings/manual_mappings.db</code>. Every save also writes
       <code>mappings/manual_mappings.json</code>, the export the build tools and git see. If that file is changed
       outside the Studio, nothing is read from it until you choose what to keep.
     </p>
 
-    <div class="row">
-      <button type="button" class="icon-label" :disabled="busy" @click="refresh">
-        <RefreshCw :size="15" aria-hidden="true" /> Check again
-      </button>
-    </div>
-
-    <div v-if="status && stateText" class="sync-card" data-testid="sync-status">
+    <section v-if="status && stateText" class="panel" data-testid="sync-status">
+      <PanelHeader title="Export file" :icon="FileJson" />
       <p>
-        <strong>manual_mappings.json:</strong>
+        <strong>manual_mappings.json:</strong>&nbsp;
         <StatusBadge :label="stateText.label" :tone="stateText.tone" />
       </p>
       <p class="small">{{ stateText.help }}</p>
@@ -159,13 +170,15 @@ onMounted(refresh);
           <Download :size="16" aria-hidden="true" /> Export database to JSON
         </button>
       </div>
-    </div>
+    </section>
 
-    <p v-if="message" class="ok small" role="status">{{ message }}</p>
-    <p v-if="error" class="error small" role="alert">{{ error }}</p>
+    <StateMessage v-else-if="!error" kind="loading">Checking the files…</StateMessage>
 
-    <section v-if="preview" class="block" aria-label="Import preview" data-testid="import-preview">
-      <h2>Import preview</h2>
+    <StateMessage v-if="message" kind="success" class="small">{{ message }}</StateMessage>
+    <StateMessage v-if="error" kind="error" class="small">{{ error }}</StateMessage>
+
+    <section v-if="preview" class="panel" aria-label="Import preview" data-testid="import-preview">
+      <PanelHeader title="Import preview" :icon="ScanSearch" />
       <p class="small">
         {{ preview.changes.length }} slot(s) would change · file {{ preview.slots_in_file }} slots, database
         {{ preview.slots_in_database }} · line endings {{ preview.line_endings }}
@@ -173,7 +186,7 @@ onMounted(refresh);
       </p>
       <p v-if="preview.approvals_added.length" class="small warn">Approvals added: {{ preview.approvals_added.join(", ") }}</p>
       <p v-if="preview.approvals_removed.length" class="small bad">Approvals removed: {{ preview.approvals_removed.join(", ") }}</p>
-      <table v-if="preview.changes.length">
+      <div v-if="preview.changes.length" class="table-frame"><table>
         <thead><tr><th>Slot</th><th>Change</th><th>Database now</th><th>File (would become)</th></tr></thead>
         <tbody>
           <tr v-for="c in preview.changes" :key="c.mapping_id">
@@ -183,13 +196,13 @@ onMounted(refresh);
             <td class="small">{{ summary(c.file) }}</td>
           </tr>
         </tbody>
-      </table>
-      <p v-else class="small muted">No decision changes: only the file's bytes differ.</p>
+      </table></div>
+      <StateMessage v-else kind="empty">No decision changes: only the file's bytes differ.</StateMessage>
       <div class="row">
         <button type="button" class="primary icon-label" :disabled="busy" @click="runImport">
           <FileInput :size="16" aria-hidden="true" /> Import these changes
         </button>
-        <button type="button" :disabled="busy" @click="preview = null">Cancel</button>
+        <button type="button" class="icon-label" :disabled="busy" @click="preview = null"><X :size="15" aria-hidden="true" /> Cancel</button>
       </div>
     </section>
   </section>

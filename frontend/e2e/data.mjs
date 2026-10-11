@@ -11,7 +11,7 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File } from "./harness.mjs";
+import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const SLOT = "es:A10_020_cryotech#0";
@@ -63,6 +63,7 @@ async function main() {
     browser = await chromium.launch({ channel: "msedge", headless: true });
     page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
     page.on("dialog", (d) => d.accept());
+    handleConfirms(page);
 
     await step("the Data page reports the file in sync", async () => {
       await page.goto(`http://localhost:${WEB_PORT}/#/data`);

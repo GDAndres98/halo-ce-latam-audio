@@ -11,7 +11,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File } from "./harness.mjs";
+import { HERE, WEB_PORT, Services, runFixture, runPython, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const SLOT = "es:A10_010_cryotech#0";
@@ -121,6 +121,7 @@ async function main() {
     browser = await chromium.launch({ channel: "msedge", headless: true });
     page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     page.on("dialog", (d) => d.accept());
+    handleConfirms(page);
     page.on("pageerror", (err) => pageErrors.push(err.message));
     page.on("console", (msg) => msg.type() === "error" && pageErrors.push(msg.text()));
     await page.goto(`http://localhost:${WEB_PORT}/#/match?level=a10&slot=${encodeURIComponent(SLOT)}&cq=${encodeURIComponent("00460_cryotech")}`);

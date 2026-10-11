@@ -1,0 +1,16 @@
+/* The Studio's stylesheets, in cascade order. Tokens (colours, fonts, shapes) are in src/theme/tokens.ts;
+   the design system is described in docs/ui-design-system.md.
+     base       page, typography, focus, scrollbars, reduced motion
+     controls   buttons, fields, checkboxes and radios, key caps, badges, meters
+     panels     panel frames, title bands, numbered sections, tables, states, dialog
+     shell      backdrop, top band and navigation, main area
+     workspace  the matching screen (three panels, lists, centre panel, action band)
+     waveform   waveforms and the audio editor
+     pages      dashboard, Build & Test, Data */
+@import "./base.css";
+@import "./controls.css";
+@import "./panels.css";
+@import "./shell.css";
+@import "./workspace.css";
+@import "./waveform.css";
+@import "./pages.css";

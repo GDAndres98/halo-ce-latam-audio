@@ -6,7 +6,10 @@ import { BadgeCheck, Save, SkipForward, Wrench } from "lucide-vue-next";
 import { computed } from "vue";
 import type { ApprovalField } from "../../api/types";
 import { canApprove, canRework, draftProblems } from "../../matching/draft";
+import { confirmAction } from "../../composables/useConfirm";
 import type { MatchState } from "../../composables/useMatch";
+import StateMessage from "../ui/StateMessage.vue";
+import StatusBadge from "../StatusBadge.vue";
 
 const props = defineProps<{ match: MatchState }>();
 // "Save & next unmatched": saves the draft (never approves), then the parent opens the next unmatched line.
@@ -30,25 +33,32 @@ function saveDraft() {
 }
 
 async function approve(field: ApprovalField) {
-  const ok = window.confirm(
-    `Approve the ${FIELD_NAME[field]} decision for this line?\n\n` +
+  const ok = await confirmAction({
+    title: `Approve ${FIELD_NAME[field]}`,
+    message:
+      `Approve the ${FIELD_NAME[field]} decision for this line?\n\n` +
       "Approved decisions are read-only. To change one later, mark it Needs rework first.",
-  );
+    confirmLabel: "Yes, approve",
+  });
   if (ok) await props.match.save([{ action: "approve", field }]);
 }
 
 async function markRework(field: ApprovalField) {
-  const ok = window.confirm(
-    `Mark the ${FIELD_NAME[field]} decision as Needs rework?\n\n` +
+  const ok = await confirmAction({
+    title: `Needs rework: ${FIELD_NAME[field]}`,
+    message:
+      `Mark the ${FIELD_NAME[field]} decision as Needs rework?\n\n` +
       "It becomes editable again and must be approved again before it counts.",
-  );
+    confirmLabel: "Mark Needs rework",
+    tone: "warning",
+  });
   if (ok) await props.match.rework(field);
 }
 </script>
 
 <template>
-  <section class="block approvals">
-    <h3>Save and approve</h3>
+  <section class="block approvals action-band">
+    <h3><BadgeCheck :size="15" aria-hidden="true" /> Save and approve</h3>
 
     <ul v-if="problems.length" class="problems">
       <li v-for="p in problems" :key="p">{{ p }}</li>
@@ -67,13 +77,13 @@ async function markRework(field: ApprovalField) {
       >
         <SkipForward :size="16" aria-hidden="true" /> Save &amp; next unmatched
       </button>
-      <span v-if="!dirty" class="small muted">No unsaved changes.</span>
-      <span v-else class="small warn">Unsaved changes.</span>
+      <StatusBadge v-if="dirty" label="Unsaved changes." tone="warn" />
+      <span v-else class="small muted">No unsaved changes.</span>
     </div>
 
     <div class="approval-grid">
       <div>
-        <button type="button" :disabled="!approval.audio.allowed || match.saving.value" class="icon-label" :title="approval.audio.reason" @click="approve('audio')">
+        <button type="button" :disabled="!approval.audio.allowed || match.saving.value" class="approve icon-label" :title="approval.audio.reason" @click="approve('audio')">
           <BadgeCheck :size="16" aria-hidden="true" /> Approve audio
         </button>
         <p v-if="!approval.audio.allowed" class="small muted">{{ approval.audio.reason }}</p>
@@ -82,7 +92,7 @@ async function markRework(field: ApprovalField) {
         </button>
       </div>
       <div>
-        <button type="button" :disabled="!approval.subtitle.allowed || match.saving.value" class="icon-label" :title="approval.subtitle.reason" @click="approve('subtitle')">
+        <button type="button" :disabled="!approval.subtitle.allowed || match.saving.value" class="approve icon-label" :title="approval.subtitle.reason" @click="approve('subtitle')">
           <BadgeCheck :size="16" aria-hidden="true" /> Approve subtitle
         </button>
         <p v-if="!approval.subtitle.allowed" class="small muted">{{ approval.subtitle.reason }}</p>
@@ -92,10 +102,10 @@ async function markRework(field: ApprovalField) {
       </div>
     </div>
 
-    <p v-if="match.message.value" class="ok small">{{ match.message.value }}</p>
-    <p v-if="match.error.value" class="error small">
+    <StateMessage v-if="match.message.value" kind="success" class="feedback small">{{ match.message.value }}</StateMessage>
+    <StateMessage v-if="match.error.value" kind="error" class="feedback small">
       {{ match.error.value }}
       <button v-if="conflict" type="button" class="link" @click="match.reloadKeepingDraft()">Reload and keep my edits</button>
-    </p>
+    </StateMessage>
   </section>
 </template>

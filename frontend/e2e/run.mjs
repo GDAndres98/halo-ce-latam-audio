@@ -10,7 +10,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { API_PORT, HERE, WEB_PORT, Services, runFixture, runPython, sha256File } from "./harness.mjs";
+import { API_PORT, HERE, WEB_PORT, Services, runFixture, runPython, sha256File, handleConfirms } from "./harness.mjs";
 
 const OUT = join(HERE, "out");
 const SLOT = "es:A10_010_cryotech#0";
@@ -37,6 +37,7 @@ async function step(name, fn) {
 async function openMatching(browser, query = "", waitForLine = true) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   page.on("dialog", (dialog) => dialog.accept());
+  handleConfirms(page);
   page.on("pageerror", (err) => pageErrors.push(`${err.message}\n    ${(err.stack ?? "").split("\n").slice(1, 3).join("\n    ")}`));
   page.on("response", (res) => {
     // The browser asks for /favicon.ico on its own; that 404 is not a Studio error.

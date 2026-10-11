@@ -6,7 +6,7 @@
 // Only one recording ever plays (see audio/transport.ts).
 
 import { computed, ref, watch } from "vue";
-import { ArrowRightLeft, ListVideo, Square } from "lucide-vue-next";
+import { ArrowRightLeft, Headphones, ListVideo, Square } from "lucide-vue-next";
 import WaveformView from "./WaveformView.vue";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
@@ -34,7 +34,7 @@ const KIND_LABEL: Record<ReplacementKind, string> = {
 };
 
 const otherUrl = computed(() => props.replacement[kind.value]);
-const otherLabel = computed(() => `B · ${KIND_LABEL[kind.value]}${kind.value !== "unedited" && props.previewStale ? " — out of date" : ""}`);
+const otherLabel = computed(() => `${KIND_LABEL[kind.value]}${kind.value !== "unedited" && props.previewStale ? " — out of date" : ""}`);
 const difference = computed(() =>
   originalSeconds.value !== null && otherSeconds.value !== null ? otherSeconds.value - originalSeconds.value : null,
 );
@@ -91,7 +91,7 @@ useShortcuts({ a: switchAB, b: playSequence });
 <template>
   <section class="block compare" aria-label="Compare the original and the replacement">
     <header class="compare-head">
-      <h3>Listen and compare</h3>
+      <h3><Headphones :size="15" aria-hidden="true" /> Listen and compare</h3>
       <div class="toolbar" role="toolbar" aria-label="Comparison">
         <button
           type="button"
@@ -121,7 +121,8 @@ useShortcuts({ a: switchAB, b: playSequence });
       ref="original"
       :url="mccUrl"
       :height="64"
-      label="A · Original MCC (Spain, read-only)"
+      channel="A"
+      label="Original MCC (Spain, read-only)"
       @duration="(s) => (originalSeconds = s)"
       @finish="onOriginalFinished"
     />
@@ -143,6 +144,7 @@ useShortcuts({ a: switchAB, b: playSequence });
       ref="other"
       :url="otherUrl"
       :height="64"
+      channel="B"
       :label="otherLabel"
       @duration="(s) => (otherSeconds = s)"
     />

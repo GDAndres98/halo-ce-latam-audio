@@ -3,10 +3,12 @@
 // It is a global export setting, not a per-line control (per-line gain was removed on 2026-10-09).
 // Changing it does not rebuild anything: builds made with the old value are marked stale.
 
-import { RotateCcw, Save } from "lucide-vue-next";
+import { RotateCcw, Save, Volume2 } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { api, ApiError } from "../../api/client";
 import type { ExportSettings } from "../../api/types";
+import PanelHeader from "../ui/PanelHeader.vue";
+import StateMessage from "../ui/StateMessage.vue";
 
 const DEFAULT_GAIN_DB = 4;
 const RANGE_DB = { min: -12, max: 12 };
@@ -59,8 +61,8 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="card gain" aria-labelledby="gain-title">
-    <h2 id="gain-title">Global audio gain</h2>
+  <section class="panel gain" aria-labelledby="gain-title">
+    <PanelHeader title="Global audio gain" title-id="gain-title" :icon="Volume2" code="EXPORT" />
     <p class="muted small">
       Applied once to every Campaign Evolved replacement when a build is exported. Lines are never limited:
       a line that would peak above −1 dBFS gets less gain, and the build reports it.
@@ -89,13 +91,13 @@ onMounted(load);
     </div>
 
     <p id="gain-help" class="small">
-      Current: <strong>{{ settings ? signed(settings.global_gain_db) : "…" }}</strong>
+      Current: <strong class="gain-value">{{ settings ? signed(settings.global_gain_db) : "…" }}</strong>
       <span class="muted">({{ settings?.source === "default" ? "default, no saved setting" : "saved on this computer" }})</span>
       · allowed {{ RANGE_DB.min }} to +{{ RANGE_DB.max }} dB
     </p>
     <p v-if="!valid" class="error small">Enter a value between {{ RANGE_DB.min }} and +{{ RANGE_DB.max }} dB.</p>
-    <p v-if="message" class="ok small" role="status">{{ message }}</p>
-    <p v-if="error" class="error small" role="alert">{{ error }}</p>
+    <StateMessage v-if="message" kind="success" class="small">{{ message }}</StateMessage>
+    <StateMessage v-if="error" kind="error" class="small">{{ error }}</StateMessage>
 
     <details class="order">
       <summary>How the audio is processed, in order</summary>

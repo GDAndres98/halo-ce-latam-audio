@@ -2,7 +2,7 @@
 // Audio choice for one MCC line: keep Spain's recording, or use one of the matched Campaign Evolved lines.
 // The draft is edited in place (it is the parent's reactive copy). Approved audio is shown read-only.
 
-import { X } from "lucide-vue-next";
+import { FileAudio, X } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { audioUrl } from "../../api/client";
 import { clipDuration } from "../../audio/clipInfo";
@@ -61,7 +61,7 @@ function removeMatch(line: string) {
 
 <template>
   <section class="block">
-    <h3>Replacement audio</h3>
+    <h3><FileAudio :size="15" aria-hidden="true" /> Replacement audio</h3>
     <p v-if="locked" class="note">Approved. Mark it Needs rework to change the audio.</p>
 
     <fieldset :disabled="locked" class="choice">
