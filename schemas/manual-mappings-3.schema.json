@@ -118,8 +118,7 @@
                   "type": "object", "required": ["mode", "offset_db"], "additionalProperties": false,
                   "properties": {"mode": {"enum": ["off", "match_mcc"]},
                                  "offset_db": {"type": "number", "minimum": -12, "maximum": 12}}
-                },
-                "limiter": {"type": "boolean"}
+                }
               }
             },
             "fingerprint": {"type": ["object", "null"]},

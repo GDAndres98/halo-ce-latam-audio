@@ -29,7 +29,6 @@ function edit(overrides: Partial<AudioEdit> = {}): AudioEdit {
     fade_in_ms: 0,
     fade_out_ms: 0,
     crossfade_ms: 20,
-    limiter: true,
     loudness: { mode: "off", offset_db: 0 },
     ...overrides,
   };

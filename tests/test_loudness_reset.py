@@ -22,6 +22,35 @@ def slot(mid, mode, status="approved"):
             "subtitle": {"status": status, "revision": 1}}
 
 
+class LimiterRemovalTests(unittest.TestCase):
+    """2026-10-11: the `limiter` setting is removed from every recipe; nothing else changes."""
+
+    def setUp(self):
+        self.doc = {"schema": "manual-mappings/3", "pins": {}, "slots": [slot("m-1", "off"), slot("m-2", "off", "draft")]}
+        del self.doc["slots"][1]["audio"]["edit"]["limiter"]  # already without it
+
+    def test_only_the_field_goes_and_approvals_stay(self):
+        new, changes = mapping_store.strip_limiter(self.doc)
+        self.assertEqual([(c["mapping_id"], c["previous"]) for c in changes], [("m-1", True)])
+        self.assertNotIn("limiter", new["slots"][0]["audio"]["edit"])
+        self.assertEqual((new["slots"][0]["audio"]["status"], new["slots"][0]["audio"]["revision"]), ("approved", 2))
+        self.assertEqual(mapping_store.proof_only_limiter_removed(self.doc, new), [])
+        self.assertEqual(mapping_store.strip_limiter(new)[1], [])  # idempotent
+
+    def test_the_proof_catches_any_other_change(self):
+        new, _ = mapping_store.strip_limiter(self.doc)
+        new["slots"][0]["audio"]["edit"]["fade_out_ms"] = 10
+        self.assertTrue(mapping_store.proof_only_limiter_removed(self.doc, new))
+
+    def test_validator_accepts_the_removal_one_way_only(self):
+        removed, _ = mapping_store.strip_limiter(self.doc)
+        self.assertEqual(check_approved_protected(self.doc, removed), [])
+        self.assertTrue(check_approved_protected(removed, self.doc))  # adding it back to an approved recipe
+        changed = copy.deepcopy(self.doc)
+        changed["slots"][0]["audio"]["edit"]["limiter"] = False
+        self.assertTrue(check_approved_protected(self.doc, changed))  # changing it is not allowed either
+
+
 class LoudnessResetTests(unittest.TestCase):
     def setUp(self):
         self.doc = {"schema": "manual-mappings/3", "pins": {}, "slots": [slot("m-1", "match_mcc"), slot("m-2", "off")]}

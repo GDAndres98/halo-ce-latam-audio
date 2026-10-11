@@ -80,7 +80,7 @@ class GlobalGainTests(unittest.TestCase):
         self.assertTrue(any("global gain" in w for w in loud["warnings"]))
         self.assertEqual((hot["global_gain_applied_db"], hot["global_gain_shortfall_db"]), (0.0, 3.0))  # never attenuated
         for st in (quiet, normal, loud, hot):
-            self.assertEqual(st["limiter_max_reduction_db"], 0.0)   # no limiting or compression, ever
+            self.assertNotIn("limiter_max_reduction_db", st)   # no limiting or compression, ever
         neg = ae.render(tone(0.95), dict(ae.EDIT_ZERO), global_gain_db=-2.0)["stats"]
         self.assertEqual((neg["global_gain_applied_db"], neg["global_gain_shortfall_db"]), (-2.0, 0.0))
 
@@ -94,7 +94,7 @@ class GlobalGainTests(unittest.TestCase):
 
     def test_with_loudness_matching_the_gain_is_added_once_after_the_match(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))
-        e = ae.normalize({"loudness": {"mode": "match_mcc", "offset_db": -6}, "limiter": False}, SRC)
+        e = ae.normalize({"loudness": {"mode": "match_mcc", "offset_db": -6}}, SRC)
         r0 = ae.render(pcm, e, ref_lufs=-20.0, global_gain_db=0.0)["stats"]
         r3 = ae.render(pcm, e, ref_lufs=-20.0, global_gain_db=3.0)["stats"]
         self.assertAlmostEqual(r0["output_lufs"], -26.0, delta=0.1)          # matched to -20 - 6
@@ -113,7 +113,7 @@ class MigrationTests(AppTestBase):
         base = {"trim_start_s": 0.1, "trim_end_s": 0, "gap_s": 0, "engine": "audio-edit/1",
                 "for_source": SRC, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
                 "silences": [{"at_s": 0.3, "dur_s": 0.2}], "fade_in_ms": 10, "fade_out_ms": 0,
-                "crossfade_ms": 20, "loudness": {"mode": "match_mcc", "offset_db": -1}, "limiter": True}
+                "crossfade_ms": 20, "loudness": {"mode": "match_mcc", "offset_db": -1}}
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
                   audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}]},
                   radio_effect={"needed": True}, subtitle={"source": "custom", "custom_text": "Hola"},

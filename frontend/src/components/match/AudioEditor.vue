@@ -154,10 +154,6 @@ function setLoudnessOffset(offset: number) {
   return { ...props.draft.edit, loudness: { ...props.draft.edit.loudness, offset_db: Math.round(offset * 10) / 10 } };
 }
 
-function setLimiter(on: boolean) {
-  attempt(() => ({ ...props.draft.edit, limiter: on }));
-}
-
 // ---- Inserted silences. The length is typed in milliseconds; the recipe stores seconds (audio_edit.py).
 const silenceMs = ref(300);
 const silenceMarkers = computed(() => props.draft.edit.silences.map((s) => ({ at: s.at_s, dur: s.dur_s })));
@@ -313,10 +309,7 @@ useShortcuts({
               @change="onNumber($event, setLoudnessOffset, () => draft.edit.loudness.offset_db)"
             />
           </label>
-          <label class="opt">
-            <input :checked="draft.edit.limiter" type="checkbox" @change="setLimiter(($event.target as HTMLInputElement).checked)" />
-            Limit peaks (look-ahead limiter at −1 dBFS)
-          </label>
+          <span class="small muted">Never limited: the match gain is lowered if the peak would pass −1 dBFS.</span>
         </template>
       </fieldset>
 

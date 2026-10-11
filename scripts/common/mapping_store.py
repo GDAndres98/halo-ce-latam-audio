@@ -706,3 +706,59 @@ def reset_loudness_match(path, loaded_sha256, *, history_dir=None, now=None):
         raise StoreError("schema: " + "; ".join(errs[:5]))
     return _write(path, current, new, loaded_sha256, history_dir, now,
                   changed_ids=changed_mapping_ids(old, new)), changes
+
+
+def strip_limiter(doc):
+    """Pure. -> (new_doc, changes). Removes the `limiter` setting from every recipe (loudness matching never
+    limits since 2026-10-11, owner). It changes no audio: no recipe uses loudness matching, and the setting
+    only applied there. Nothing else changes. changes: [{mapping_id, slot_id, audio_status, audio_revision,
+    previous}]."""
+    new = json.loads(json.dumps(doc))
+    changes = []
+    for s in new.get("slots", []):
+        edit = s["audio"].get("edit") or {}
+        if "limiter" in edit:
+            changes.append({"mapping_id": s["mapping_id"], "slot_id": s["slot_id"],
+                            "audio_status": s["audio"]["status"], "audio_revision": s["audio"]["revision"],
+                            "previous": edit["limiter"]})
+            del edit["limiter"]
+    return new, changes
+
+
+def proof_only_limiter_removed(old_doc, new_doc):
+    """Problems if new_doc differs from old_doc in anything but the removal of audio.edit.limiter."""
+    problems = []
+    if {k: v for k, v in old_doc.items() if k != "slots"} != {k: v for k, v in new_doc.items() if k != "slots"}:
+        problems.append("top-level fields changed")
+    if [s["mapping_id"] for s in old_doc["slots"]] != [s["mapping_id"] for s in new_doc["slots"]]:
+        return problems + ["mapping ids or order changed"]
+    for o, n in zip(old_doc["slots"], new_doc["slots"]):
+        strip = lambda s: {**s, "audio": {**s["audio"], "edit": {k: v for k, v in s["audio"]["edit"].items() if k != "limiter"}}}
+        if strip(o) != strip(n):
+            problems.append(f"{o['mapping_id']}: something besides audio.edit.limiter changed")
+        if "limiter" in n["audio"]["edit"]:
+            problems.append(f"{o['mapping_id']}: limiter is still there")
+    return problems
+
+
+def remove_limiter(path, loaded_sha256, *, history_dir=None, now=None):
+    """One-time, owner-authorized (2026-10-11) removal of the `limiter` setting from every recipe, approved
+    ones included, WITHOUT touching approvals (status, revision, approved_at, fingerprint stay; nothing becomes
+    needs_rework). Same stale check, .history/ backup and database-first write as every save. Refuses unless
+    the result provably differs only by the removed field. -> (new sha256 or None, changes)."""
+    path = Path(path)
+    current = _current(path)
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changes = strip_limiter(old)
+    if not changes:
+        return None, []
+    bad = proof_only_limiter_removed(old, new)
+    if bad:
+        raise ProtectedError("; ".join(bad))
+    errs = schema_errors(new, load_schema(SCHEMA_NAME), changed_mapping_ids(old, new))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now,
+                  changed_ids=changed_mapping_ids(old, new)), changes

@@ -55,7 +55,6 @@ export function defaultEdit(gapS = 0): AudioEdit {
     fade_in_ms: 0,
     fade_out_ms: 0,
     crossfade_ms: 20,
-    limiter: true,
     loudness: { mode: "off", offset_db: 0 },
   };
 }
@@ -69,10 +68,12 @@ function completeEdit(stored: AudioEdit): AudioEdit {
 }
 
 /** The recipe as the editor works on it. `for_source` records which recording the recipe was made for; the
- * server recomputes it from the audio choice, so it is never sent back. */
+ * server recomputes it from the audio choice, so it is never sent back. A stored `limiter` (removed
+ * 2026-10-11) is dropped. */
 function editWithoutBinding(edit: AudioEdit): AudioEdit {
-  const copy = JSON.parse(JSON.stringify(edit)) as AudioEdit & { for_source?: unknown };
+  const copy = JSON.parse(JSON.stringify(edit)) as AudioEdit & { for_source?: unknown; limiter?: unknown };
   delete copy.for_source;
+  delete copy.limiter;
   return copy;
 }
 

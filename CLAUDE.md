@@ -165,7 +165,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
       inserted silences, fades, and an optional BS.1770 loudness match to the slot's Spain
-      recording (its limiter only applies there).
+      recording (never limited: the `limiter` setting was removed on 2026-10-11, see
+      `docs/migrations/2026-10-11-remove-limiter.md`).
       - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
         migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
         recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.

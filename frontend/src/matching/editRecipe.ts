@@ -138,8 +138,8 @@ export function setFade(edit: AudioEdit, which: "in" | "out", ms: number): Audio
   return which === "in" ? { ...edit, fade_in_ms: value } : { ...edit, fade_out_ms: value };
 }
 
-/** Back to an unedited recording. The gap, loudness and limiter settings are kept: they are not edits to
- * the audio itself. */
+/** Back to an unedited recording. The gap and loudness settings are kept: they are not edits to the audio
+ * itself. */
 export function resetEdits(edit: AudioEdit): AudioEdit {
   return {
     ...edit,

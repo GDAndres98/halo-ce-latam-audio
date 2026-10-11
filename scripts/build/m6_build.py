@@ -216,7 +216,7 @@ def test_report(name, manifest, report, app):
                            ("Edited s", lambda e: e["audio_stats"]["output_s"]),
                            ("LUFS out / Spain", lambda e: f"{e['audio_stats']['output_lufs']} / "
                                                           f"{e['audio_stats']['mcc_reference_lufs']}"),
-                           ("Match limiter dB", lambda e: e["audio_stats"]["limiter_max_reduction_db"])]) if edited \
+                           ("Match lowered dB", lambda e: e["audio_stats"]["match_gain_lowered_for_peak_db"])]) if edited \
         else ["- none"]
     g = manifest["global_gain"]
     short = [e for e in rep if (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]

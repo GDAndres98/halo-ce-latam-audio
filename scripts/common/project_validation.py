@@ -316,17 +316,21 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
     return out, drift
 
 
-def _only_loudness_turned_off(head_audio, audio):
-    """True when the only difference is audio.edit.loudness switched off (matching Spain's recording gave a
-    line its own gain; the owner made the global export gain the only level setting on 2026-10-11).
-    Switching matching on, or any other change, is still a change to an approved decision."""
+def _only_level_settings_reset(head_audio, audio):
+    """True when the only differences are the owner-authorized level resets of 2026-10-11, one way only:
+    audio.edit.loudness switched off (migrate_reset_loudness_match.py) and/or the audio.edit.limiter setting
+    removed (migrate_remove_limiter.py). The global export gain is the only level setting. Switching matching
+    on, adding a limiter back, or any other change is still a change to an approved decision."""
     from .mapping_store import LOUDNESS_OFF
     edit = audio.get("edit") or {}
-    if edit.get("loudness") != LOUDNESS_OFF:
+    head_edit = head_audio.get("edit") or {}
+    if "limiter" in edit and edit.get("limiter") != head_edit.get("limiter"):
+        return False  # a limiter added back or changed
+    if edit.get("loudness") != head_edit.get("loudness") and edit.get("loudness") != LOUDNESS_OFF:
         return False
     def without(a):
         a = comparable(a, "audio")
-        return {**a, "edit": {k: v for k, v in (a.get("edit") or {}).items() if k != "loudness"}}
+        return {**a, "edit": {k: v for k, v in (a.get("edit") or {}).items() if k not in ("loudness", "limiter")}}
     return without(head_audio) == without(audio)
 
 
@@ -351,8 +355,8 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
         for f in approved:
             if comparable(s[f], f) == comparable(hs[f], f):  # across v2 -> v3 (fx_request moved out)
                 continue
-            if f == "audio" and _only_loudness_turned_off(hs[f], s[f]):
-                continue  # owner-authorized reset (2026-10-11, migrate_reset_loudness_match.py); one-way only
+            if f == "audio" and _only_level_settings_reset(hs[f], s[f]):
+                continue  # owner-authorized resets (2026-10-11: loudness off, limiter removed); one-way only
             # Since HEAD the owner may have reworked it (revision + 1 per rework, enforced at save time by
             # mapping_store) and possibly approved it again: a higher revision is that trace. A change
             # without a higher revision is a silent edit.

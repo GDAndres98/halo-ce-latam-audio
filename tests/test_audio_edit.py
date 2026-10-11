@@ -63,7 +63,8 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual((r["loudness"]["offset_db"], r["engine"], r["for_source"]), (-1.3, ae.ENGINE, SRC))
         self.assertNotIn("speed", r)
         self.assertNotIn("gain_db", r)
-        self.assertTrue(r["limiter"])
+        self.assertNotIn("limiter", r)  # removed 2026-10-11
+        self.assertEqual(ae.normalize(dict(r, limiter=True)), r)  # a stored limiter is ignored and dropped
         self.assertEqual(ae.normalize(r), r)  # idempotent
         self.assertIn("match MCC", ae.summary(r))
         self.assertNotIn("speed", ae.summary(r))
@@ -71,7 +72,7 @@ class RecipeTests(unittest.TestCase):
     def test_rules(self):
         for bad in ({"speed": 1.1}, {"speed": 1}, {"gain_db": 0}, {"gain_db": 3}, {"bogus": 1}, {"cuts": [{"start_s": 1}]},
                     {"cuts": [{"start_s": 1, "end_s": 0.5}]}, {"loudness": {"mode": "loud"}}, {"trim_start_s": "x"},
-                    {"cuts": [{"start_s": 0.1, "end_s": 0.5}, {"start_s": 0.4, "end_s": 0.6}]}, {"limiter": 1}):
+                    {"cuts": [{"start_s": 0.1, "end_s": 0.5}, {"start_s": 0.4, "end_s": 0.6}]}):
             with self.assertRaises(ae.EditError, msg=bad):
                 ae.normalize(dict(bad, trim_end_s=0.1), SRC)
         with self.assertRaises(ae.EditError):
@@ -158,18 +159,12 @@ class DspTests(unittest.TestCase):
         self.assertLess(abs(z[4409]), 0.01)
         self.assertLess(abs(z[4410 + 2205]), 0.01)
 
-    def test_fades_and_limiter(self):
+    def test_fades(self):
         y = ae.fade([1.0] * 1000, 100, 50)
         self.assertLess(y[0], 0.01)
         self.assertLess(y[-1], 0.01)
         self.assertEqual(y[500], 1.0)
-        x = [1.8 * math.sin(2 * math.pi * 300 * i / FS) * (1 if i % 9000 < 4000 else 0.1) for i in range(FS)]
-        c = 10 ** (-1 / 20)
-        out, red = ae.limit(x, c)
-        self.assertLessEqual(max(map(abs, out)), c + 1e-12)
-        self.assertGreater(red, 5)
-        quiet = [0.1 * v for v in x]
-        self.assertEqual(ae.limit(quiet, c), (quiet, 0.0))  # untouched below the ceiling
+        self.assertFalse(hasattr(ae, "limit"))  # no limiter exists any more (2026-10-11)
 
     def test_render_is_deterministic_and_matches_loudness(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))
@@ -185,12 +180,15 @@ class DspTests(unittest.TestCase):
             ae.render(pcm, e)                     # match needs the MCC reference
         self.assertEqual(ae.render(pcm, dict(ae.EDIT_ZERO))["pcm"], pcm)  # identity, no global gain: unchanged
         loud = ae.float_to_pcm16(speech(1.5, amp=0.9))
-        nolim = ae.render(loud, dict(e, limiter=False, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
-        self.assertGreater(nolim["stats"]["match_gain_lowered_for_peak_db"], 0)
-        self.assertEqual(nolim["stats"]["limiter_max_reduction_db"], 0.0)
-        self.assertTrue(any("lowered" in w for w in nolim["stats"]["warnings"]))
-        off = ae.render(loud, dict(e, loudness={"mode": "off", "offset_db": 0}))  # no matching: never limited
-        self.assertEqual((off["stats"]["limiter_max_reduction_db"], off["stats"]["limiter"]), (0.0, False))
+        # Matching never limits: when the peak would pass -1 dBFS, the match gain is lowered instead.
+        lowered = ae.render(loud, dict(e, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
+        self.assertGreater(lowered["stats"]["match_gain_lowered_for_peak_db"], 0)
+        self.assertLessEqual(lowered["stats"]["output_peak_dbfs"], -1.0 + 0.01)
+        self.assertTrue(any("lowered" in w for w in lowered["stats"]["warnings"]))
+        self.assertNotIn("limiter", lowered["stats"])
+        # A legacy limiter=true in a recipe changes nothing.
+        legacy = ae.render(loud, dict(e, limiter=True, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
+        self.assertEqual(legacy["pcm"], lowered["pcm"])
 
 
 @unittest.skipUnless(FFMPEG and HAVE_CELT, "ffmpeg and libcelt needed")

@@ -575,15 +575,15 @@ async function save(actions, reworkOnly) {
 // The recipe is part of the audio decision (audio.edit): Save / Approve audio store it, approval locks it,
 // "needs rework" unlocks it. Previews come from the server, rendered by the same code M6 builds with.
 const editDefault = () => ({ trim_start_s: 0, trim_end_s: 0, gap_s: 0, cuts: [], silences: [], fade_in_ms: 0, fade_out_ms: 0,
-  crossfade_ms: 20, loudness: { mode: "off", offset_db: 0 }, limiter: true });
-const REMOVED_EDIT_FIELDS = ["speed", "gain_db"];   // removed 2026-10-09: volume = global export gain
+  crossfade_ms: 20, loudness: { mode: "off", offset_db: 0 } });
+// removed 2026-10-09 (speed, gain_db: volume = global export gain) and 2026-10-11 (limiter: matching never limits)
+const REMOVED_EDIT_FIELDS = ["speed", "gain_db", "limiter"];
 function editFrom(stored) {
   const d = editDefault(); if (!stored) return d;
   const e = Object.assign(d, JSON.parse(JSON.stringify(stored)));
   e.loudness = Object.assign({ mode: "off", offset_db: 0 }, stored.loudness || {});
   e.cuts = (stored.cuts || []).map(c => ({ start_s: c.start_s, end_s: c.end_s }));
   e.silences = (stored.silences || []).map(c => ({ at_s: c.at_s, dur_s: c.dur_s }));
-  if (e.limiter === undefined) e.limiter = true;
   for (const k of REMOVED_EDIT_FIELDS) delete e[k];
   return e;
 }
@@ -599,7 +599,6 @@ function editSummary(e) {   // mirrors audio_edit.summary()
   if (e.silences.length) b.push(`+${e.silences.length} silence${e.silences.length > 1 ? "s" : ""} (${e.silences.reduce((a, c) => a + c.dur_s, 0).toFixed(2)} s)`);
   if (e.loudness.mode === "match_mcc") b.push("match MCC loudness" + (e.loudness.offset_db ? ` ${e.loudness.offset_db > 0 ? "+" : ""}${e.loudness.offset_db} dB` : ""));
   if (e.fade_in_ms || e.fade_out_ms) b.push(`fades ${e.fade_in_ms}/${e.fade_out_ms} ms`);
-  if (e.loudness.mode === "match_mcc" && e.limiter === false) b.push("no limiter");
   return b.join(" · ");
 }
 function editConfirmText() {
@@ -780,7 +779,6 @@ function renderEditor() {
     </div>
     <div class="row ctl">
       <span class="grp" title="automatic gain to the loudness (BS.1770) of the original MCC Spain recording"><label class="opt" style="margin:0"><input type="checkbox" id="edMatch" ${dis}> Match Spain loudness</label> offset <input type="number" id="edOff" step="0.5" min="-12" max="12" ${dis}> dB</span>
-      <label class="opt" title="only for loudness matching: look-ahead peak limiter at -1 dBFS so the match can reach Spain's level; off = the match gain is lowered instead"><input type="checkbox" id="edLim" ${dis}> Limiter (for matching)</label>
     </div>
     <div class="small muted" id="edGlobal">Volume: the global export gain (config/audio_export.json) is applied to every line, after these edits.</div>
     <div class="lbl"><span>Spain (original MCC)</span><span id="wvScale"></span></div>
@@ -800,9 +798,8 @@ function fillEditorInputs() {
   v("edTs", (+e.trim_start_s).toFixed(3)); v("edTe", (+e.trim_end_s).toFixed(3));
   v("edFi", e.fade_in_ms); v("edFo", e.fade_out_ms); v("edXf", e.crossfade_ms);
   v("edOff", e.loudness.offset_db);
-  $("edMatch").checked = e.loudness.mode === "match_mcc"; $("edLim").checked = e.limiter !== false;
+  $("edMatch").checked = e.loudness.mode === "match_mcc";
   $("edOff").disabled = edLocked() || e.loudness.mode !== "match_mcc";
-  $("edLim").disabled = edLocked() || e.loudness.mode !== "match_mcc";
 }
 function renderCuts() {
   const e = S.edit.audio.edit, locked = edLocked();
@@ -828,10 +825,9 @@ function renderEdStats() {
   const lines = [
     `Duration: source ${f(st.source_s, " s")} → edited <b>${f(st.output_s, " s")}</b> · Spain ${f(sp, " s")} · Δ ${sgn(dl)} s`,
     `Loudness: CE ${f(st.loudness_before_gain_lufs, " LUFS")} → out <b>${f(st.output_lufs, " LUFS")}</b> · Spain ${f(st.mcc_reference_lufs, " LUFS")} · peak ${f(st.output_peak_dbfs, " dBFS")}`,
-    `Gain: ${st.loudness_match ? `loudness match ${sgn(st.match_applied_gain_db)} dB${st.limiter ? ` (limiter ${f(st.limiter_max_reduction_db, " dB")})` : ""} + ` : ""}global ${sgn(st.global_gain_applied_db)} of ${sgn(st.global_gain_requested_db)} dB <span class="muted">(${esc(p.export_config ? p.export_config.source : "?")})</span>`];
+    `Gain: ${st.loudness_match ? `loudness match ${sgn(st.match_applied_gain_db)} dB + ` : ""}global ${sgn(st.global_gain_applied_db)} of ${sgn(st.global_gain_requested_db)} dB <span class="muted">(${esc(p.export_config ? p.export_config.source : "?")})</span>`];
   const warn = [];
-  if (st.limiter_max_reduction_db > 6) warn.push(`Heavy limiting (${st.limiter_max_reduction_db.toFixed(1)} dB) in the loudness match: listen for squashed peaks; a negative offset is gentler.`);
-  for (const w of st.warnings || []) if (!w.startsWith("loudness match: limiter")) warn.push(w);
+  for (const w of st.warnings || []) warn.push(w);
   if (st.identity) lines.push(`<span class="muted">No edits: M6 encodes the original recording with only the global gain.${st.mcc_reference_lufs != null && st.output_lufs != null ? ` It is ${(st.mcc_reference_lufs - st.output_lufs).toFixed(1)} dB quieter than Spain.` : ""}</span>`);
   el.innerHTML = lines.join("<br>") + warn.map(w => `<div class="warnline">⚠ ${esc(w)}</div>`).join("");
 }
@@ -892,7 +888,6 @@ function wireEditor() {
   num("edXf", v => e.crossfade_ms = Math.round(Math.max(0, Math.min(200, v))));
   num("edOff", v => e.loudness.offset_db = Math.round(Math.max(-12, Math.min(12, v)) * 10) / 10);
   $("edMatch").onchange = (ev) => { e.loudness.mode = ev.target.checked ? "match_mcc" : "off"; edChanged(); };
-  $("edLim").onchange = (ev) => { e.limiter = ev.target.checked; edChanged(); };
   $("edReset").onclick = () => {
     if (editIsIdentity(e) || confirm("Reset all audio edits for this slot? (Takes effect when you save.)")) {
       S.edit.audio.edit = Object.assign(editDefault(), { gap_s: e.gap_s || 0, for_source: S.ed.src }); S.ed.sel = null; renderEditor(); setDirty();

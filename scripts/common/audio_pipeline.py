@@ -171,7 +171,7 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
     if st["loudness_match"]:
         steps.append({"op": "loudness_match", "reference_lufs": st["mcc_reference_lufs"],
                       "target_lufs": st["loudness_target_lufs"], "applied_gain_db": st["match_applied_gain_db"],
-                      "limiter": st["limiter"], "limiter_max_reduction_db": st["limiter_max_reduction_db"]})
+                      "lowered_for_peak_db": st["match_gain_lowered_for_peak_db"]})
     steps += [
         {"op": "global_gain", "requested_db": global_gain_db, "applied_db": st["global_gain_applied_db"],
          "shortfall_db": st["global_gain_shortfall_db"], "source": gain_source,
