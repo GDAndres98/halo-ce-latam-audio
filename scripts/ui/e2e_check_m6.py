@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "ui"))
 
-from common import mapping_store  # noqa: E402
+from common import audio_edit, mapping_store  # noqa: E402
 from common.m6_build import plan_audio  # noqa: E402
 from m4_app import M4App  # noqa: E402
 
@@ -38,6 +38,8 @@ def main():
         "planned_as_replacement": entry["action"] == "replace",
         "uses_the_chosen_recording": entry["edit"] is not None or entry.get("ce_line_ref") is not None,
         "no_conflicts": not [c for c in plan["conflicts"] if c.get("slot_id") == args.slot],
+        # The recipe the Studio saved follows the same rules M6 renders with (trims, cuts, fades).
+        "recipe_follows_the_rules": not audio_edit.problems(entry["edit"]),
     }
     print(json.dumps({"action": entry["action"], "reason": entry["reason"], "edit": entry["edit"],
                       "checks": checks, "ok": all(checks.values())}, ensure_ascii=False))

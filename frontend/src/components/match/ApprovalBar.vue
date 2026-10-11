@@ -2,6 +2,7 @@
 // Save and approval controls for the line. Approval and rework are deliberate: each is a button press
 // with a confirmation, and each explains why it is unavailable. Nothing is approved by a shortcut.
 
+import { BadgeCheck, Save, Wrench } from "lucide-vue-next";
 import { computed } from "vue";
 import type { ApprovalField } from "../../api/types";
 import { canApprove, canRework, draftProblems } from "../../matching/draft";
@@ -52,8 +53,8 @@ async function markRework(field: ApprovalField) {
     </ul>
 
     <div class="row">
-      <button type="button" class="primary" :disabled="!dirty || match.saving.value || problems.length > 0" @click="saveDraft">
-        Save draft (Ctrl+S)
+      <button type="button" class="primary icon-label" :disabled="!dirty || match.saving.value || problems.length > 0" @click="saveDraft">
+        <Save :size="16" aria-hidden="true" /> Save draft (Ctrl+S)
       </button>
       <span v-if="!dirty" class="small muted">No unsaved changes.</span>
       <span v-else class="small warn">Unsaved changes.</span>
@@ -61,21 +62,21 @@ async function markRework(field: ApprovalField) {
 
     <div class="approval-grid">
       <div>
-        <button type="button" :disabled="!approval.audio.allowed || match.saving.value" :title="approval.audio.reason" @click="approve('audio')">
-          Approve audio
+        <button type="button" :disabled="!approval.audio.allowed || match.saving.value" class="icon-label" :title="approval.audio.reason" @click="approve('audio')">
+          <BadgeCheck :size="16" aria-hidden="true" /> Approve audio
         </button>
         <p v-if="!approval.audio.allowed" class="small muted">{{ approval.audio.reason }}</p>
-        <button v-if="rework.audio.allowed" type="button" class="link" :disabled="match.saving.value" @click="markRework('audio')">
-          Needs rework (audio)
+        <button v-if="rework.audio.allowed" type="button" class="link icon-label" :disabled="match.saving.value" @click="markRework('audio')">
+          <Wrench :size="14" aria-hidden="true" /> Needs rework (audio)
         </button>
       </div>
       <div>
-        <button type="button" :disabled="!approval.subtitle.allowed || match.saving.value" :title="approval.subtitle.reason" @click="approve('subtitle')">
-          Approve subtitle
+        <button type="button" :disabled="!approval.subtitle.allowed || match.saving.value" class="icon-label" :title="approval.subtitle.reason" @click="approve('subtitle')">
+          <BadgeCheck :size="16" aria-hidden="true" /> Approve subtitle
         </button>
         <p v-if="!approval.subtitle.allowed" class="small muted">{{ approval.subtitle.reason }}</p>
-        <button v-if="rework.subtitle.allowed" type="button" class="link" :disabled="match.saving.value" @click="markRework('subtitle')">
-          Needs rework (subtitle)
+        <button v-if="rework.subtitle.allowed" type="button" class="link icon-label" :disabled="match.saving.value" @click="markRework('subtitle')">
+          <Wrench :size="14" aria-hidden="true" /> Needs rework (subtitle)
         </button>
       </div>
     </div>

@@ -572,12 +572,198 @@ button.link {
   font-style: italic;
 }
 
-.wave {
-  width: 100%;
-  height: 80px;
+/* ---- Icons and toolbars. Important actions carry an icon and a word; icon-only buttons have a tooltip
+   and an accessible name. */
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.icon-label svg,
+.icon-only svg,
+.top svg,
+.wave-label svg,
+.cut-list svg,
+.edit-grid svg {
+  flex: none;
+  vertical-align: -0.15em;
+}
+
+.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.4rem;
+}
+
+.small-button {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.85rem;
+}
+
+button.primary-soft:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.4rem 0;
+}
+
+.toolbar .sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 0.15rem;
+}
+
+.block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.hint {
+  margin: 0.3rem 0;
+}
+
+/* ---- Waveforms (components/waveform). */
+.wave-view {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.6rem 0.4rem;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+}
+
+.wave-view.editable {
+  border-color: var(--line-strong);
+}
+
+.wave-view[data-playing="true"] {
+  border-color: var(--focus);
+}
+
+.wave-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+.wave-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.wave-times {
+  color: var(--muted);
+}
+
+.wave-host {
+  min-height: 2rem;
+}
+
+.wave-host ::part(region-handle) {
+  border-color: var(--focus);
+}
+
+.wave-status {
+  margin: 0.2rem 0;
+}
+
+.wave-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.4rem;
+}
+
+.wave-transport button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.wave-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--accent);
+}
+
+.wave-transport .zoom {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
+.compare-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.compare-head h3 {
+  margin: 0;
+}
+
+.compare-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  align-items: center;
+}
+
+.durations.compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.4rem;
+  font-size: 0.85rem;
+}
+
+.durations.compact dd {
+  margin-right: 0.9rem;
+}
+
+.cut-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.2rem 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cut-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cut-list p {
+  margin: 0.4rem 0 0.1rem;
+}
+
+.top .title,
+.top nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .edit-grid {
@@ -852,3 +1038,13 @@ kbd {
 .pill.warn { color: var(--warn); }
 .pill.bad { color: var(--bad); }
 .pill.muted { color: var(--muted); }
+
+.loudness {
+  border: none;
+  padding: 0;
+  margin: 0.4rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  align-items: center;
+}

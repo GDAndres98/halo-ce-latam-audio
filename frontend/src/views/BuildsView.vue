@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FlaskConical, Lock } from "lucide-vue-next";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { api } from "../api/client";
 import GainSetting from "../components/build/GainSetting.vue";
@@ -91,8 +92,8 @@ function poll() {
     </div>
     <div class="row">
       <input v-model="name" placeholder="Name (optional)" />
-      <button type="button" :disabled="!chosen.length || job?.state === 'running'" @click="dryRun">
-        Dry run build
+      <button type="button" class="icon-label" :disabled="!chosen.length || job?.state === 'running'" @click="dryRun">
+        <FlaskConical :size="16" aria-hidden="true" /> Dry run build
       </button>
     </div>
     <p v-if="job" class="muted small">
@@ -133,7 +134,7 @@ function poll() {
     </p>
     <div class="deploy">
       <div v-for="action in DEPLOY_ACTIONS" :key="action.label" class="deploy-item">
-        <button type="button" disabled>{{ action.label }}</button>
+        <button type="button" class="icon-label" disabled><Lock :size="14" aria-hidden="true" /> {{ action.label }}</button>
         <span class="muted small">{{ action.reason }}</span>
       </div>
     </div>

@@ -71,12 +71,20 @@ Open **Matching**. The screen has three columns.
 
 - **Left: MCC lines.** Pick a level, filter (unmatched, draft, approved, needs rework, keep Spain audio,
   radio, different-but-fits), and search by ID, speaker or subtitle text. Accents and case are ignored;
-  partial words work. Play a line with the ▶ button.
-- **Centre: the decision for the selected line.** Both recordings and their durations side by side.
-  Then:
+  partial words work. Play a line with its play button.
+- **Centre: the decision for the selected line.** First **Listen and compare**: two waveform players,
+  **A** (the original MCC Spain recording, read-only) and **B** (the Campaign Evolved replacement: unedited,
+  the edited preview, or the preview as encoded for the game). Each can be played, stopped, replayed and
+  seeked by clicking. **A / B** switches between them at the same position; **A then B** plays the original
+  and then the replacement; the durations and their difference are shown. Then:
   1. **Replacement audio:** keep Spain's audio, or use one of the matched Campaign Evolved recordings.
-  2. **Audio editing:** trims and cuts on the replacement, with a waveform and a preview as the build
-     would render it. Reset returns to the original. The original WAV is never changed.
+  2. **Audio editing**, on the replacement's waveform: click to move the playhead, drag across it to
+     select (drag the selection's edges to adjust it), **Trim to selection**, **Cut selection** (as many
+     cuts as needed, each crossfaded), drag the cyan handles at the ends to trim, set fades (up to 500 ms),
+     optionally match Spain's loudness, zoom in to place edits precisely, **Undo** and **Reset edits**.
+     **Preview edited recording** renders the recipe with the same code as the build and plays it as B; a
+     preview made before a later change is marked out of date. Edits are a recipe saved with the draft; the
+     original WAV is never changed, and approved audio is read-only until marked *Needs rework*.
   3. **Subtitle:** Spain's, Campaign Evolved's (es-MX or EN where it exists), your own LATAM Spanish text,
      or none (a decision to show no subtitle, shown differently from a missing text).
   4. **Flags and notes:** radio effect (a flag only; no processing) and "different but fits".
@@ -102,6 +110,12 @@ first.
 | `s` | use the highlighted recording as the replacement |
 | `e` / `n` | play the highlighted (or chosen) recording in es-MX / English |
 | `/` / `\` | focus the MCC search / the candidate search |
+| `a` | A / B: switch between the original and the replacement at the same position |
+| `b` | play the original, then the replacement |
+| `w` | play or pause the replacement on the editing waveform (the selection, if there is one) |
+| `t` / `x` | trim to the selection / cut the selection |
+| `p` | preview the edited recording |
+| `Ctrl+Z` | undo the last edit (in a text field it stays the field's own undo) |
 | `Ctrl+S` | save the draft |
 | `Esc` | stop playback |
 
@@ -169,6 +183,7 @@ npm test                                      # unit tests of the matching rules
 npm run build                                 # type check and production build
 npm run test:e2e                              # browser test of the workflow (needs Microsoft Edge)
 npm run test:ux                               # browser checks: panels, gain, theme, responsive, keyboard
+npm run test:editor                           # browser test of the waveform editor and the A/B players
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```
 
@@ -179,12 +194,21 @@ decision persisted, check that approved decisions are protected, check the M6 pl
 (`scripts/ui/e2e_check_m6.py`), and check that the real mapping files did not change. Its screenshots and
 report go to `frontend/e2e/out/`, which is git-ignored because the screenshots show game text.
 
+`npm run test:editor` works the same way and drives the editor with the mouse and keyboard: seek by
+clicking, drag a selection and one of its edges, two cuts, a trim by dragging the handle, undo and reset,
+trim to selection, fades (and the 500 ms limit), zoom, preview (edited and encoded), A/B and A-then-B,
+the out-of-date preview, shortcuts not firing while typing, persistence after a reload, the M6 planner
+reading the approved recipe, and the approved recipe being read-only in the page and refused by the API.
+
 Debugging: the API returns `{"error": ..., "details": ...}`. A 409 means a stale page or a protected
 decision; a file that "differs from the database" was edited outside the Studio.
 
 ## Known limitations
 
-- Audio editing covers trims and cuts. Silences and fades remain in the classic page.
+- Audio editing covers trims, cuts, fades and loudness matching. Inserted silences are made on the classic
+  page; the Studio shows them and can remove them.
+- A/B keeps the same position in seconds; after trims and cuts the two recordings are not aligned word for
+  word.
 - The candidate list shows the mission and folder, not a speaker: the Campaign Evolved catalogue does not
   record speakers.
 - Silences, the validation footer, level status and several recordings for one subtitle are on the classic

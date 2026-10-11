@@ -3,10 +3,12 @@
 // Evolved candidates (right). The selected line and every filter are kept in the URL, so reloading or
 // going back returns to the same place.
 
+import { LayoutTemplate } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
 import { stop, togglePlay } from "../audio/player";
+import { stopCurrent } from "../audio/transport";
 import CeColumn from "../components/match/CeColumn.vue";
 import MccColumn from "../components/match/MccColumn.vue";
 import MatchPanel from "../components/match/MatchPanel.vue";
@@ -122,7 +124,10 @@ useShortcuts({
   "/": () => mccColumn.value?.focusSearch(),
   "\\": () => ceColumn.value?.focusSearch(),
   "ctrl+s": () => void match.save(),
-  escape: () => stop(),
+  escape: () => {
+    stop();
+    stopCurrent();
+  },
 });
 
 onMounted(async () => {
@@ -146,9 +151,15 @@ onMounted(async () => {
       <li><kbd>↑</kbd>/<kbd>↓</kbd> highlight</li>
       <li><kbd>S</kbd> use</li>
       <li><kbd>E</kbd> es-MX · <kbd>N</kbd> EN</li>
+      <li><kbd>A</kbd> A/B · <kbd>B</kbd> A then B</li>
+      <li><kbd>W</kbd> play edit · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>P</kbd> preview</li>
+      <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo edit</li>
+      <li><kbd>Esc</kbd> stop</li>
       <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save</li>
     </ul>
-    <button type="button" :disabled="layout.isDefault.value" @click="layout.reset()">Reset layout</button>
+    <button type="button" class="icon-label" :disabled="layout.isDefault.value" @click="layout.reset()">
+      <LayoutTemplate :size="15" aria-hidden="true" /> Reset layout
+    </button>
   </div>
   <div ref="workspaceEl" class="workspace" :class="{ resizing: layout.dragging.value !== null }">
     <MccColumn

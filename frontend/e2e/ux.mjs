@@ -164,8 +164,8 @@ async function main() {
 
     // ---- 8: playback and subtitle editing still work after resizing.
     await step("audio plays and subtitle text can be typed after resizing", async () => {
-      await page.getByRole("button", { name: "Play (m)" }).click();
-      await page.getByRole("button", { name: "■ Play (m)" }).waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play").click();
+      await page.locator("li.row-item.selected button.play.active").waitFor({ timeout: 10000 });
       await page.keyboard.press("Escape");
       await page.getByRole("checkbox", { name: /Needs radio effect/ }).check();
       await page.getByLabel("Notes").fill("nota de prueba de diseño");

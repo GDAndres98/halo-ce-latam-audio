@@ -3,6 +3,7 @@
 // Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
+import { ChevronsDown } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { useDebounced } from "../../composables/useDebounced";
@@ -139,7 +140,7 @@ function mccAudio(row: SlotRow) {
         <div class="line-head">
           <strong class="tag">{{ row.tag_name }}</strong>
           <span class="muted small">{{ row.speaker_from_name || "—" }} · {{ row.duration_s.toFixed(2) }} s</span>
-          <AudioButton :url="mccAudio(row)" label="" @click.stop />
+          <AudioButton :url="mccAudio(row)" label="" title="Spain's recording" @click.stop />
         </div>
         <div class="preview small" :title="row.preview">{{ row.preview || "(no subtitle text)" }}</div>
         <div class="badges">
@@ -155,6 +156,6 @@ function mccAudio(row: SlotRow) {
       <li v-if="!data.slots.length" class="muted">No lines match these filters.</li>
     </ul>
 
-    <button v-if="data?.truncated" type="button" class="more" @click="showMore">Show more lines</button>
+    <button v-if="data?.truncated" type="button" class="more icon-label" @click="showMore"><ChevronsDown :size="15" aria-hidden="true" /> Show more lines</button>
   </section>
 </template>

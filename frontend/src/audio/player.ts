@@ -2,11 +2,15 @@
 // so starting a clip anywhere stops the previous one, and every button shows the same state.
 
 import { reactive, readonly } from "vue";
+import { endPlayback, startPlayback, type Playback } from "./transport";
 
 const state = reactive({ url: null as string | null, playing: false, error: "" });
 let audio: HTMLAudioElement | null = null;
 
 export const playerState = readonly(state);
+
+// The one-click clips are one player among the others (see transport.ts).
+const clipPlayer: Playback = { pause: () => pause() };
 
 /** Starts the clip at `url`, or pauses it if it is the one playing. */
 export function togglePlay(url: string): void {
@@ -19,6 +23,7 @@ export function togglePlay(url: string): void {
   audio = new Audio(url);
   audio.onended = () => {
     state.playing = false;
+    endPlayback(clipPlayer);
   };
   state.url = url;
   state.error = "";
@@ -27,6 +32,7 @@ export function togglePlay(url: string): void {
 
 async function play(clip: HTMLAudioElement): Promise<void> {
   try {
+    startPlayback(clipPlayer);
     await clip.play();
     state.playing = true;
   } catch {
@@ -39,6 +45,7 @@ async function play(clip: HTMLAudioElement): Promise<void> {
 export function pause(): void {
   audio?.pause();
   state.playing = false;
+  endPlayback(clipPlayer);
 }
 
 export function stop(): void {
@@ -49,6 +56,7 @@ export function stop(): void {
   audio = null;
   state.url = null;
   state.playing = false;
+  endPlayback(clipPlayer);
 }
 
 /** Whether the clip at `url` is the one currently playing. */

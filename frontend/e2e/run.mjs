@@ -84,15 +84,17 @@ async function main() {
 
     // Step 6-7: both recordings play (the play buttons toggle to the stop symbol while playing).
     await step("play the MCC recording", async () => {
-      await page.getByRole("button", { name: "Play (m)" }).click();
-      await page.getByRole("button", { name: "■ Play (m)" }).waitFor({ timeout: 10000 });
-      await page.getByRole("button", { name: "■ Play (m)" }).click();
+      // The selected row's play button plays Spain's recording (the same clip the m key plays).
+      const spainButton = page.locator("li.row-item.selected button.play");
+      await spainButton.click();
+      await page.locator("li.row-item.selected button.play.active").waitFor({ timeout: 10000 });
+      await spainButton.click();
     });
     await step("play the Campaign Evolved recording", async () => {
       const row = page.locator("li.row-item", { hasText: CE_REF });
       await row.getByRole("button", { name: "es-MX" }).click();
-      await row.getByRole("button", { name: "■ es-MX" }).waitFor({ timeout: 10000 });
-      await row.getByRole("button", { name: "■ es-MX" }).click();
+      await row.locator("button.play.active", { hasText: "es-MX" }).waitFor({ timeout: 10000 });
+      await row.locator("button.play.active", { hasText: "es-MX" }).click();
     });
 
     // Step 8-9: explicitly choose the recording, then save the draft.
@@ -158,6 +160,7 @@ async function main() {
     });
     await step("apply a trim and preview the edited recording", async () => {
       await page.getByLabel("Trim start (s)").fill("0.2");
+      await page.getByLabel("Trim start (s)").press("Tab"); // number fields apply on change
       const previewed = page.waitForResponse((r) => r.url().includes("/api/edit/preview") && r.status() === 200, { timeout: 60000 });
       await page.getByRole("button", { name: "Preview edited recording" }).click();
       await previewed;
@@ -200,14 +203,14 @@ async function main() {
     await step("keyboard: m plays, Escape stops, typing in a field does not trigger shortcuts, Ctrl+S saves", async () => {
       await page.locator("h2").first().click();
       await page.keyboard.press("m");
-      await page.getByRole("button", { name: "■ Play (m)" }).waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play.active").waitFor({ timeout: 10000 });
       await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "▶ Play (m)" }).waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play:not(.active)").waitFor({ timeout: 10000 });
 
       await page.getByLabel("Notes").click();
       await page.keyboard.type("mj");
       if (!(await page.getByLabel("Notes").inputValue()).endsWith("mj")) throw new Error("typing was not kept");
-      if (await page.getByRole("button", { name: "■ Play (m)" }).count()) throw new Error("typing started playback");
+      if (await page.locator("li.row-item.selected button.play.active").count()) throw new Error("typing started playback");
       await page.keyboard.press("Control+s");
       await page.getByText("Draft saved.").waitFor({ timeout: 15000 });
       return "m plays, Escape stops, typed letters stay in the field, Ctrl+S saved the note";

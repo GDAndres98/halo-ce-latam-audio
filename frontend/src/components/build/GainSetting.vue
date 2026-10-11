@@ -3,6 +3,7 @@
 // It is a global export setting, not a per-line control (per-line gain was removed on 2026-10-09).
 // Changing it does not rebuild anything: builds made with the old value are marked stale.
 
+import { RotateCcw, Save } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { api, ApiError } from "../../api/client";
 import type { ExportSettings } from "../../api/types";
@@ -79,11 +80,11 @@ onMounted(load);
           aria-describedby="gain-help"
         />
       </label>
-      <button type="button" class="primary" :disabled="busy || !settings || unchanged || !valid" @click="apply">
-        Save gain
+      <button type="button" class="primary icon-label" :disabled="busy || !settings || unchanged || !valid" @click="apply">
+        <Save :size="16" aria-hidden="true" /> Save gain
       </button>
-      <button type="button" :disabled="busy || !settings || current === DEFAULT_GAIN_DB" @click="resetToDefault">
-        Reset to default (+4 dB)
+      <button type="button" class="icon-label" :disabled="busy || !settings || current === DEFAULT_GAIN_DB" @click="resetToDefault">
+        <RotateCcw :size="15" aria-hidden="true" /> Reset to default (+4 dB)
       </button>
     </div>
 

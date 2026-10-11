@@ -1,104 +1,170 @@
 <script setup lang="ts">
-// Non-destructive audio editing for the replacement recording: trims and cuts, previewed as M6 would
-// render them. The original WAV is never changed; the recipe is stored with the audio decision.
+// Non-destructive editing of the replacement recording, on its waveform.
 //
-// Speed and per-line gain are not offered: they were removed on 2026-10-09 (see CLAUDE.md).
+// What the user can do: drag across the waveform to select, drag the two handles of the kept part (trims),
+// keep or cut the selection (several cuts are allowed), remove cuts, set fades, match the loudness of Spain's
+// recording, and preview the result as the build renders it. Every change goes through editRecipe.ts and can
+// be undone. The original WAV is never changed; the recipe is saved with the audio decision (Save draft), and
+// approved audio must be marked Needs rework first (the server refuses the change otherwise).
+//
+// Speed and per-line gain do not exist here (removed 2026-10-09); volume is the global export gain.
 
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { Crop, Headphones, RotateCcw, Scissors, Trash2, TrendingDown, TrendingUp, Undo2 } from "lucide-vue-next";
 import { api, ApiError, audioUrl } from "../../api/client";
-import { togglePlay } from "../../audio/player";
-import { defaultEdit, type Draft } from "../../matching/draft";
+import type { AudioEdit } from "../../api/types";
+import { formatSeconds } from "../../audio/format";
+import { useShortcuts } from "../../composables/useShortcuts";
+import {
+  EditHistory,
+  MAX_FADE_MS,
+  addCut,
+  editedSeconds,
+  fadeSpans,
+  keepSpan,
+  removeCut,
+  resetEdits,
+  setFade,
+  setKeep,
+  type Span,
+} from "../../matching/editRecipe";
+import type { Draft } from "../../matching/draft";
+import WaveformView from "../waveform/WaveformView.vue";
+
+export interface EditPreview {
+  edited: string;
+  encoded: string;
+  /** The recipe the preview was rendered from (JSON), to tell when it is out of date. */
+  recipe: string;
+}
 
 const props = defineProps<{ draft: Draft; locked: boolean; slotId: string }>();
+const emit = defineEmits<{ preview: [preview: EditPreview | null] }>();
 
-const canvas = ref<HTMLCanvasElement | null>(null);
-const duration = ref<number | null>(null);
-const peaks = ref<number[]>([]);
-const waveError = ref("");
+const replacement = ref<InstanceType<typeof WaveformView> | null>(null);
+const duration = ref(0);
+const selection = ref<Span | null>(null);
+const history = new EditHistory();
+const undoDepth = ref(0); // EditHistory is not reactive; this mirrors its depth for the Undo button
+const editError = ref("");
 const previewError = ref<string[]>([]);
 const previewing = ref(false);
+const stats = ref<Record<string, number> | null>(null);
+const previewRecipe = ref<string | null>(null);
 
-const waveUrl = computed(() =>
-  props.draft.audioSource === "ce" && props.draft.audioRef
-    ? audioUrl.ce(props.draft.audioRef, props.draft.audioLanguage)
-    : null,
+const usesCe = computed(() => props.draft.audioSource === "ce" && Boolean(props.draft.audioRef));
+const replacementUrl = computed(() =>
+  usesCe.value ? audioUrl.ce(props.draft.audioRef as string, props.draft.audioLanguage) : null,
 );
+const editable = computed(() => usesCe.value && !props.locked);
+const canEdit = computed(() => editable.value && duration.value > 0);
+const keep = computed<Span | null>(() => (duration.value ? keepSpan(props.draft.edit, duration.value) : null));
+const cuts = computed<Span[]>(() => props.draft.edit.cuts.map((c) => ({ start: c.start_s, end: c.end_s })));
+const fades = computed(() => fadeSpans(props.draft.edit, duration.value));
+const afterEdits = computed(() => (duration.value ? editedSeconds(props.draft.edit, duration.value) : null));
+const recipeKey = computed(() => JSON.stringify(props.draft.edit));
+const previewStale = computed(() => previewRecipe.value !== null && previewRecipe.value !== recipeKey.value);
 
-/** Downloads the original WAV and decodes it once, to draw the waveform and know the exact length. */
-async function loadWaveform(url: string | null) {
-  duration.value = null;
-  peaks.value = [];
-  waveError.value = "";
-  if (!url) return;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`the recording is not available (${response.status})`);
-    const context = new AudioContext();
-    try {
-      const decoded = await context.decodeAudioData(await response.arrayBuffer());
-      duration.value = decoded.duration;
-      peaks.value = bucketPeaks(decoded.getChannelData(0), 600);
-    } finally {
-      await context.close();
-    }
-  } catch (e) {
-    waveError.value = e instanceof Error ? e.message : String(e);
-  }
-}
-
-watch(waveUrl, loadWaveform, { immediate: true });
-
-/** Maximum absolute sample per bucket: one bar per pixel column. */
-function bucketPeaks(samples: Float32Array, buckets: number): number[] {
-  const size = Math.max(1, Math.floor(samples.length / buckets));
-  const out: number[] = [];
-  for (let b = 0; b < buckets; b++) {
-    let max = 0;
-    const end = Math.min(samples.length, (b + 1) * size);
-    for (let i = b * size; i < end; i++) max = Math.max(max, Math.abs(samples[i]));
-    out.push(max);
-  }
-  return out;
-}
-
-const cutSeconds = computed(() => props.draft.edit.cuts.reduce((sum, c) => sum + Math.max(0, c.end_s - c.start_s), 0));
-const editedDuration = computed(() =>
-  duration.value === null
-    ? null
-    : Math.max(0, duration.value - props.draft.edit.trim_start_s - props.draft.edit.trim_end_s - cutSeconds.value),
-);
-
-/** The problems the user can see at once. The server checks the same rules again when previewing or saving. */
-const localProblems = computed(() => {
-  const e = props.draft.edit;
-  const problems: string[] = [];
-  if (e.trim_start_s < 0 || e.trim_end_s < 0) problems.push("Trims cannot be negative.");
-  if (duration.value !== null && editedDuration.value !== null && editedDuration.value <= 0.05) {
-    problems.push("The trims and cuts leave nothing to play.");
-  }
-  e.cuts.forEach((c, i) => {
-    if (c.end_s <= c.start_s) problems.push(`Cut ${i + 1} ends before it starts.`);
-  });
-  return problems;
+// A new recording starts with an empty history and no preview.
+watch(replacementUrl, () => {
+  history.clear();
+  undoDepth.value = 0;
+  duration.value = 0;
+  selection.value = null;
+  stats.value = null;
+  previewRecipe.value = null;
+  editError.value = "";
+  previewError.value = [];
+  emit("preview", null);
 });
 
-function addCut() {
-  props.draft.edit.cuts.push({ start_s: 0, end_s: 0 });
+/** Applies a recipe change: the current recipe is saved first, so Undo can return to it. */
+function applyEdit(next: AudioEdit) {
+  if (JSON.stringify(next) === recipeKey.value) return;
+  history.push(props.draft.edit);
+  undoDepth.value += 1;
+  props.draft.edit = next;
+  editError.value = "";
 }
 
-function removeCut(index: number) {
-  props.draft.edit.cuts.splice(index, 1);
+/** Runs a change; a refused change is explained and leaves the recipe as it was. */
+function attempt(change: () => AudioEdit): boolean {
+  if (!editable.value) return false;
+  try {
+    applyEdit(change());
+    return true;
+  } catch (e) {
+    editError.value = e instanceof Error ? e.message : String(e);
+    return false;
+  }
 }
 
-function resetEdits() {
-  props.draft.edit = defaultEdit(props.draft.edit.gap_s);
-  previewError.value = [];
+function onKeepChange(span: Span) {
+  // A refused drag (it would keep almost nothing) snaps the handles back to the recipe.
+  if (!attempt(() => setKeep(props.draft.edit, span, duration.value))) props.draft.edit = { ...props.draft.edit };
 }
 
-async function preview() {
-  if (!props.draft.audioRef) return;
+function keepSelection() {
+  const s = selection.value;
+  if (!s || !canEdit.value) return;
+  if (attempt(() => setKeep(props.draft.edit, s, duration.value))) replacement.value?.clearSelection();
+}
+
+function cutSelection() {
+  const s = selection.value;
+  if (!s || !canEdit.value) return;
+  if (attempt(() => addCut(props.draft.edit, s, duration.value))) replacement.value?.clearSelection();
+}
+
+function undo() {
+  if (!editable.value) return;
+  const previous = history.undo();
+  if (!previous) return;
+  undoDepth.value -= 1;
+  props.draft.edit = previous;
+  editError.value = "";
+}
+
+function reset() {
+  attempt(() => resetEdits(props.draft.edit));
+}
+
+/** A number field: applies the change, or puts the field back to the recipe's value if it is refused. */
+function onNumber(event: Event, change: (value: number) => AudioEdit, current: () => number) {
+  const field = event.target as HTMLInputElement;
+  const value = Number(field.value);
+  if (field.value.trim() === "" || !Number.isFinite(value) || !attempt(() => change(value))) {
+    if (field.value.trim() === "" || !Number.isFinite(value)) editError.value = "Enter a number.";
+    field.value = String(current());
+  }
+}
+
+const trimStart = (seconds: number) => setKeep(props.draft.edit, { start: seconds, end: (keep.value as Span).end }, duration.value);
+const trimEnd = (seconds: number) =>
+  setKeep(props.draft.edit, { start: (keep.value as Span).start, end: duration.value - seconds }, duration.value);
+
+function setLoudnessMode(mode: string) {
+  attempt(() => ({ ...props.draft.edit, loudness: { ...props.draft.edit.loudness, mode } }));
+}
+
+function setLoudnessOffset(offset: number) {
+  if (offset < -12 || offset > 12) throw new Error("the offset must be between −12 and +12 dB");
+  return { ...props.draft.edit, loudness: { ...props.draft.edit.loudness, offset_db: Math.round(offset * 10) / 10 } };
+}
+
+function setLimiter(on: boolean) {
+  attempt(() => ({ ...props.draft.edit, limiter: on }));
+}
+
+function removeSilence(index: number) {
+  attempt(() => ({ ...props.draft.edit, silences: props.draft.edit.silences.filter((_, i) => i !== index) }));
+}
+
+async function renderPreview() {
+  if (!props.draft.audioRef || previewing.value) return;
   previewing.value = true;
   previewError.value = [];
+  const recipe = recipeKey.value;
   try {
     const result = await api.editPreview({
       slot_id: props.slotId,
@@ -106,7 +172,9 @@ async function preview() {
       language: props.draft.audioLanguage,
       edit: props.draft.edit,
     });
-    togglePlay(result.urls.edited);
+    stats.value = result.stats as Record<string, number>;
+    previewRecipe.value = recipe;
+    emit("preview", { edited: result.urls.edited, encoded: result.urls.encoded, recipe });
   } catch (e) {
     previewError.value = e instanceof ApiError && e.details.length ? e.details : [e instanceof Error ? e.message : String(e)];
   } finally {
@@ -114,116 +182,176 @@ async function preview() {
   }
 }
 
-// Drawing: the bars, the trimmed ends and the cuts shaded over them.
-function draw() {
-  const el = canvas.value;
-  if (!el) return;
-  const ctx = el.getContext("2d");
-  if (!ctx) return;
-  const { width, height } = el;
-  ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "#8a94a6";
-  const bars = peaks.value;
-  bars.forEach((p, i) => {
-    const h = Math.max(1, p * height);
-    ctx.fillRect((i / bars.length) * width, (height - h) / 2, Math.max(1, width / bars.length), h);
-  });
-  if (duration.value === null) return;
-  const x = (s: number) => (s / (duration.value as number)) * width;
-  ctx.fillStyle = "rgba(180, 35, 24, 0.25)";
-  ctx.fillRect(0, 0, x(props.draft.edit.trim_start_s), height);
-  ctx.fillRect(width - x(props.draft.edit.trim_end_s), 0, x(props.draft.edit.trim_end_s), height);
-  ctx.fillStyle = "rgba(36, 86, 199, 0.25)";
-  for (const c of props.draft.edit.cuts) ctx.fillRect(x(c.start_s), 0, Math.max(1, x(c.end_s) - x(c.start_s)), height);
-}
-
-watch([peaks, duration, () => JSON.stringify(props.draft.edit)], () => draw(), { deep: false });
-onBeforeUnmount(() => {
-  // Nothing to release: the waveform context is closed after decoding.
+/** The gain report: the global gain is applied in full unless the peak would pass −1 dBFS (then it is
+ * reduced and the shortfall reported). */
+const gainReport = computed(() => {
+  const s = stats.value;
+  if (!s) return null;
+  const shortfall = Number(s.global_gain_shortfall_db ?? 0);
+  return {
+    applied: Number(s.global_gain_applied_db ?? 0),
+    shortfall,
+    peak: Number(s.output_peak_dbfs ?? 0),
+    reduced: shortfall > 0.05,
+  };
 });
 
-const seconds = (s: number | null) => (s === null ? "—" : `${s.toFixed(2)} s`);
+// Editing keys; they only act on an editable recording and never fire while typing in a field.
+useShortcuts({
+  w: () => replacement.value?.togglePlay(),
+  x: cutSelection,
+  t: keepSelection,
+  "ctrl+z": undo,
+  p: () => usesCe.value && void renderPreview(),
+});
 </script>
 
 <template>
-  <section class="block">
-    <h3>Audio editing</h3>
-    <p v-if="draft.audioSource !== 'ce' || !draft.audioRef" class="note">
-      Editing applies to a Campaign Evolved recording. Choose one to edit it.
-    </p>
+  <section class="block editor" aria-label="Audio editing">
+    <header class="block-head">
+      <h3>Audio editing</h3>
+      <span v-if="usesCe" class="small muted">Edits are a recipe; the original recording is never changed.</span>
+    </header>
+    <p v-if="!usesCe" class="note">Editing applies to a Campaign Evolved recording. Choose one to edit it.</p>
 
     <template v-else>
-      <p v-if="waveError" class="error small">{{ waveError }}</p>
-      <canvas ref="canvas" class="wave" width="600" height="80" aria-label="Waveform of the replacement recording"></canvas>
+      <p v-if="locked" class="note">Approved: read-only. Mark the audio Needs rework to change its editing.</p>
 
-      <dl class="durations">
-        <dt>Original</dt><dd>{{ seconds(duration) }}</dd>
-        <dt>After edits</dt><dd>{{ seconds(editedDuration) }}</dd>
+      <div class="toolbar" role="toolbar" aria-label="Editing tools">
+        <button type="button" class="icon-label" :disabled="!canEdit || !selection" title="Keep only the selection; trim the rest (T)" @click="keepSelection">
+          <Crop :size="16" aria-hidden="true" /> Trim to selection
+        </button>
+        <button type="button" class="icon-label" :disabled="!canEdit || !selection" title="Remove the selection, crossfaded (X)" @click="cutSelection">
+          <Scissors :size="16" aria-hidden="true" /> Cut selection
+        </button>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="icon-label" :disabled="!editable || undoDepth === 0" title="Undo the last change (Ctrl+Z)" @click="undo">
+          <Undo2 :size="16" aria-hidden="true" /> Undo
+        </button>
+        <button type="button" class="icon-label" :disabled="!editable" title="Remove all trims, cuts, silences and fades" @click="reset">
+          <RotateCcw :size="16" aria-hidden="true" /> Reset edits
+        </button>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" class="icon-label primary-soft" :disabled="previewing" title="Render the recipe as the build would (P)" @click="renderPreview">
+          <Headphones :size="16" aria-hidden="true" />
+          {{ previewing ? "Rendering…" : "Preview edited recording" }}
+        </button>
+      </div>
+
+      <p v-if="editError" class="error small" role="alert">{{ editError }}</p>
+
+      <WaveformView
+        ref="replacement"
+        :url="replacementUrl"
+        label="Replacement — Campaign Evolved LATAM (original timeline)"
+        :editable="editable"
+        :keep="keep"
+        :cuts="cuts"
+        :fades="fades"
+        @duration="(s) => (duration = s)"
+        @keep-change="onKeepChange"
+        @selection-change="(s) => (selection = s)"
+      />
+      <p v-if="editable" class="small muted hint">
+        Click to move the playhead. Drag across the waveform to select, then trim to it or cut it. Drag the cyan
+        handles at the ends to trim. <kbd>W</kbd> play · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo ·
+        <kbd>P</kbd> preview
+      </p>
+
+      <dl class="durations compact">
+        <dt>Original</dt><dd class="mono">{{ formatSeconds(duration || null) }}</dd>
+        <dt>After edits</dt><dd class="mono" data-testid="after-edits">{{ formatSeconds(afterEdits) }}</dd>
       </dl>
 
       <fieldset :disabled="locked" class="edit-grid">
         <label>Trim start (s)
-          <input v-model.number="draft.edit.trim_start_s" type="number" min="0" step="0.01" />
+          <input
+            :value="draft.edit.trim_start_s"
+            type="number" min="0" step="0.01" :disabled="!canEdit"
+            @change="onNumber($event, trimStart, () => draft.edit.trim_start_s)"
+          />
         </label>
         <label>Trim end (s)
-          <input v-model.number="draft.edit.trim_end_s" type="number" min="0" step="0.01" />
+          <input
+            :value="draft.edit.trim_end_s"
+            type="number" min="0" step="0.01" :disabled="!canEdit"
+            @change="onNumber($event, trimEnd, () => draft.edit.trim_end_s)"
+          />
         </label>
-      </fieldset>
-
-      <fieldset :disabled="locked" class="edit-grid">
-        <label>Fade in (ms)
-          <input v-model.number="draft.edit.fade_in_ms" type="number" min="0" max="5000" step="10" />
+        <label>
+          <span><TrendingUp :size="14" aria-hidden="true" /> Fade in (ms)</span>
+          <input
+            :value="draft.edit.fade_in_ms"
+            type="number" min="0" :max="MAX_FADE_MS" step="10" aria-label="Fade in (ms)"
+            @change="onNumber($event, (v) => setFade(draft.edit, 'in', v), () => draft.edit.fade_in_ms)"
+          />
         </label>
-        <label>Fade out (ms)
-          <input v-model.number="draft.edit.fade_out_ms" type="number" min="0" max="5000" step="10" />
+        <label>
+          <span><TrendingDown :size="14" aria-hidden="true" /> Fade out (ms)</span>
+          <input
+            :value="draft.edit.fade_out_ms"
+            type="number" min="0" :max="MAX_FADE_MS" step="10" aria-label="Fade out (ms)"
+            @change="onNumber($event, (v) => setFade(draft.edit, 'out', v), () => draft.edit.fade_out_ms)"
+          />
         </label>
       </fieldset>
 
       <fieldset :disabled="locked" class="loudness">
         <label class="inline">Loudness
-          <select v-model="draft.edit.loudness.mode">
+          <select :value="draft.edit.loudness.mode" @change="setLoudnessMode(($event.target as HTMLSelectElement).value)">
             <option value="off">Keep the source level</option>
             <option value="match_mcc">Match Spain's recording</option>
           </select>
         </label>
         <template v-if="draft.edit.loudness.mode === 'match_mcc'">
           <label class="inline">Offset (dB)
-            <input v-model.number="draft.edit.loudness.offset_db" type="number" min="-12" max="12" step="0.5" />
+            <input
+              :value="draft.edit.loudness.offset_db"
+              type="number" min="-12" max="12" step="0.5"
+              @change="onNumber($event, setLoudnessOffset, () => draft.edit.loudness.offset_db)"
+            />
           </label>
           <label class="opt">
-            <input v-model="draft.edit.limiter" type="checkbox" />
-            Limit peaks (look-ahead limiter at -1 dBFS)
+            <input :checked="draft.edit.limiter" type="checkbox" @change="setLimiter(($event.target as HTMLInputElement).checked)" />
+            Limit peaks (look-ahead limiter at −1 dBFS)
           </label>
         </template>
       </fieldset>
-      <p v-if="draft.edit.loudness.mode === 'match_mcc'" class="small muted">
-        The gain to Spain's loudness is applied before the global gain (see Build &amp; Test). Previews show the result.
-      </p>
 
-      <div class="cuts">
-        <p class="small muted">Cuts remove a part of the recording (times are from the original start):</p>
-        <div v-for="(cut, i) in draft.edit.cuts" :key="i" class="row">
-          <label>From (s) <input v-model.number="cut.start_s" type="number" min="0" step="0.01" :disabled="locked" /></label>
-          <label>To (s) <input v-model.number="cut.end_s" type="number" min="0" step="0.01" :disabled="locked" /></label>
-          <button type="button" class="link" :disabled="locked" @click="removeCut(i)">remove</button>
-        </div>
-        <button type="button" :disabled="locked" @click="addCut">Add cut</button>
+      <div v-if="draft.edit.cuts.length" class="cut-list">
+        <p class="small muted">Cuts (times on the original recording)</p>
+        <ul>
+          <li v-for="(cut, i) in draft.edit.cuts" :key="`${cut.start_s}-${cut.end_s}`" data-testid="cut">
+            <Scissors :size="14" aria-hidden="true" />
+            <span class="mono small">{{ cut.start_s.toFixed(3) }} – {{ cut.end_s.toFixed(3) }} s</span>
+            <span class="small muted">({{ (cut.end_s - cut.start_s).toFixed(3) }} s)</span>
+            <button type="button" class="icon-label small-button" :disabled="!editable" :aria-label="`Remove cut ${i + 1}`" @click="attempt(() => removeCut(draft.edit, i))">
+              <Trash2 :size="14" aria-hidden="true" /> Remove
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div v-if="draft.edit.silences.length" class="cut-list">
+        <p class="small muted">Inserted silences (made on the classic page)</p>
+        <ul>
+          <li v-for="(s, i) in draft.edit.silences" :key="`${s.at_s}`">
+            <span class="mono small">at {{ s.at_s.toFixed(3) }} s, {{ s.dur_s.toFixed(3) }} s long</span>
+            <button type="button" class="icon-label small-button" :disabled="!editable" :aria-label="`Remove silence ${i + 1}`" @click="removeSilence(i)">
+              <Trash2 :size="14" aria-hidden="true" /> Remove
+            </button>
+          </li>
+        </ul>
       </div>
 
-      <ul v-if="localProblems.length" class="problems">
-        <li v-for="p in localProblems" :key="p">{{ p }}</li>
-      </ul>
       <ul v-if="previewError.length" class="problems">
         <li v-for="p in previewError" :key="p">{{ p }}</li>
       </ul>
-
-      <div class="row">
-        <button type="button" :disabled="previewing || localProblems.length > 0" @click="preview">
-          {{ previewing ? "Rendering…" : "Preview edited recording" }}
-        </button>
-        <button type="button" :disabled="locked" @click="resetEdits">Reset edits to the original</button>
-      </div>
-      <p class="small muted">The preview is rendered as the build would render it. Nothing is saved until you save the draft.</p>
+      <p v-if="gainReport" class="small" :class="gainReport.reduced ? 'warn' : 'muted'" role="status" data-testid="gain-report">
+        <span v-if="previewStale" class="warn">Out of date: the recipe changed since this preview. </span>
+        Global gain {{ gainReport.applied >= 0 ? "+" : "" }}{{ gainReport.applied.toFixed(1) }} dB applied once
+        <span v-if="gainReport.reduced">· reduced by {{ gainReport.shortfall.toFixed(1) }} dB so the peak stays at or below −1 dBFS</span>
+        · output peak {{ gainReport.peak.toFixed(1) }} dBFS. Hear it as B under “Listen and compare”.
+      </p>
     </template>
   </section>
 </template>
