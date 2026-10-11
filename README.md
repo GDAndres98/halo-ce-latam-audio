@@ -168,18 +168,35 @@ against its surface (WCAG AA), and the browser checks run the same test on the l
 
 ## Building and restoring the game files
 
-The Studio does not install anything. The steps are:
+Everything is on **Build & Test**; no command line is needed.
 
-1. **Dry run:** Build & Test → choose levels → Dry run build, or
-   `python scripts/build/m6_build.py --level a10 --name a10_test`. This writes only under `work/m6/`.
-   A build marked **stale** was made from older decisions; rebuild it before any install.
-2. **Install** (needs your approval for that build, MCC closed):
-   `python scripts/build/m6_install.py --build <name> preflight`, then `install`. `status` shows the
-   installed state. Read the build's `install_rollback.md` first.
-3. **Restore originals:** `python scripts/build/m6_install.py --build <name> rollback`.
+1. **Build:** choose a scope, then **Build audio**:
+   - a *mission* (its folder plus the cinematics only it uses);
+   - *chosen folders*;
+   - *every folder with a mapping*.
 
-Subtitle deployment is **disabled**: the variable-length subtitle writer has not been validated in the
-game (see [docs/m6-build.md](docs/m6-build.md) §4).
+   The bank is built from your approved audio decisions, their edit recipes and the global gain into
+   `work/m6/<name>/`, with progress, the log and the validation result on the page. Existing builds are
+   never rebuilt for you; a **stale** build (older decisions or another gain) says so.
+2. **Install to MCC** (on a build's row): the page lists the exact files, the game folder and the backup
+   location, and installs only after you confirm.
+   - The installer (`scripts/build/m6_install.py`) refuses while MCC or its anti-cheat runs, checks the
+     Steam build and every original's hash, backs up the originals outside the game and verifies them,
+     copies and verifies the build, and checks that nothing else changed.
+   - Any failure restores the originals.
+   - A build whose replaced lines are no longer approved is refused.
+3. Launch MCC yourself (anti-cheat off) and test. The Studio never starts it.
+4. **Restore originals:** close MCC, then click it. Every replaced file is copied back from its verified
+   backup and checked; backups are kept.
+
+The page always shows which build, if any, is installed.
+
+The game folder comes from `.env` `HALO_MCC_FOLDER`, or the Steam library, or a folder you set on the page
+(`config/mcc_install.json`, git-ignored). **Build subtitles / Build both are disabled**: the
+variable-length SU/SP writer has not been validated in the game (see [docs/m6-build.md](docs/m6-build.md) §4).
+
+The same steps still work from the command line: `python scripts/build/m6_build.py --mission a10`, then
+`python scripts/build/m6_install.py --build <name> preflight|install|rollback|status`.
 
 ## Testing
 
@@ -194,6 +211,7 @@ npm run test:ux                               # browser checks: panels, gain, th
 npm run test:editor                           # browser test of the waveform editor and the A/B players
 npm run test:data                             # browser test of the Data page: CRLF, outside edits, import, export
 npm run test:navigation                       # browser test of the matching loop: in-place updates, save & next, caching
+npm run test:deploy                           # Build & Test: build, install, restore into a throw-away game folder (~2 min)
 npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```

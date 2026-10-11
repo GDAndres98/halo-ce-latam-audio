@@ -160,6 +160,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       Install/rollback is `scripts/build/m6_install.py --build a10
       check|preflight|install|rollback|status`. **Never run
       preflight/install without the owner's explicit approval for that build.**
+      The Studio's Build & Test page (2026-10-11) runs build/install/rollback through the same scripts only
+      when the owner clicks and confirms; never drive it, or the install API, yourself against the real game.
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
       inserted silences, fades, and an optional BS.1770 loudness match to the slot's Spain

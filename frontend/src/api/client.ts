@@ -1,6 +1,9 @@
 import type {
   AudioEdit,
   BuildJob,
+  BuildScope,
+  DeployStatus,
+  InstallPlan,
   ExportSettings,
   BuildsResponse,
   CeResponse,
@@ -46,11 +49,38 @@ export const api = {
 
   builds: () => request<BuildsResponse>("/api/builds"),
 
-  startDryRun: (levels: string[], name?: string) =>
-    request<BuildJob>("/api/builds/dry-run", {
+  /** Starts an audio build (m6_build.py) in the background; poll job(). */
+  startBuild: (body: { scope: BuildScope; mission?: string; levels?: string[]; name?: string }) =>
+    request<BuildJob>("/api/builds/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ levels, name }),
+      body: JSON.stringify({ kind: "audio", ...body }),
+    }),
+
+  deployStatus: () => request<DeployStatus>("/api/deploy/status"),
+  installPlan: (build: string) => request<InstallPlan>(`/api/deploy/plan${query({ build })}`),
+
+  /** Installs a build into MCC (preflight, then install). Only after the owner confirmed the plan. */
+  install: (build: string) =>
+    request<BuildJob>("/api/deploy/install", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ build, confirm: true }),
+    }),
+
+  /** Restores the original game files from the verified backups. */
+  restore: (build?: string) =>
+    request<BuildJob>("/api/deploy/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ build, confirm: true }),
+    }),
+
+  setMccFolder: (mccFolder: string) =>
+    request<DeployStatus>("/api/settings/mcc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mcc_folder: mccFolder }),
     }),
 
   job: (id: string) => request<BuildJob>(`/api/job${query({ id })}`),

@@ -17,6 +17,7 @@
     "test:editor": "node e2e/editor.mjs",
     "test:data": "node e2e/data.mjs",
     "test:navigation": "node e2e/navigation.mjs",
+    "test:deploy": "node e2e/deploy.mjs",
     "perf": "node e2e/perf.mjs"
   },
   "dependencies": {

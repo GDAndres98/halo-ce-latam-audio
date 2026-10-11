@@ -30,6 +30,12 @@ API (all JSON unless noted):
     POST /api/data/import/preview                 what importing the file would change (read-only)
     POST /api/data/import                         {file_sha256, db_export_sha256, confirm: true}
     POST /api/data/export                         {file_sha256, confirm: true}: database over the file
+    POST /api/builds/start                        {kind: audio, scope: mission|levels|all_mapped, mission, levels}
+    GET  /api/deploy/status                       the MCC folder and what it holds (original / build / unknown)
+    GET  /api/deploy/plan?build=                  what installing a build would change (for the confirmation)
+    POST /api/deploy/install                      {build, confirm: true}: m6_install preflight + install
+    POST /api/deploy/restore                      {build?, confirm: true}: m6_install rollback
+    POST /api/settings/mcc                        {mcc_folder}: saved to config/mcc_install.json
 """
 import argparse
 import json
@@ -143,6 +149,10 @@ def make_handler(app, quiet=False, builds=None):
                     return self._json(200, builds.list_builds())
                 if u.path == "/api/job":
                     return self._json(200, builds.job(q.get("id", "")))
+                if u.path == "/api/deploy/status":
+                    return self._json(200, builds.deploy_status())
+                if u.path == "/api/deploy/plan":
+                    return self._json(200, builds.install_plan(q.get("build", "")))
                 if u.path == "/audio/preview":
                     return self._wav(app.preview_wav(q.get("key", ""), q.get("kind", "")))
                 raise ApiError(404, "not found")
@@ -162,6 +172,14 @@ def make_handler(app, quiet=False, builds=None):
                     except (ConfigError, TypeError, ValueError) as e:
                         raise ApiError(409 if "changed since" in str(e) else 400, str(e))
                     return self._json(200, saved)
+                if u.path == "/api/builds/start":
+                    return self._json(202, builds.start_build(body))
+                if u.path == "/api/deploy/install":
+                    return self._json(202, builds.start_install(body))
+                if u.path == "/api/deploy/restore":
+                    return self._json(202, builds.start_restore(body))
+                if u.path == "/api/settings/mcc":
+                    return self._json(200, builds.set_mcc_folder(body.get("mcc_folder")))
                 if u.path == "/api/builds/dry-run":
                     return self._json(202, builds.start_dry_run(body.get("levels") or [], body.get("name")))
                 if u.path == "/api/data/import/preview":
@@ -222,12 +240,15 @@ def main():
     ap.add_argument("--ffmpeg", default=shutil.which("ffmpeg"), help="for the audio editor (owner-approved)")
     ap.add_argument("--celt-dll", type=Path, default=DEFAULT_DLL, help="libcelt-0110.dll (from vgmstream)")
     ap.add_argument("--no-open", action="store_true", help="don't open a browser tab")
+    ap.add_argument("--mcc-root", type=Path, help="TESTS ONLY: a throw-away copy of the game folder to install into")
+    ap.add_argument("--deploy-state", type=Path, help="TESTS ONLY: backups and install state for --mcc-root")
     args = ap.parse_args()
     app = make_app(args.root, args.vgmstream_cli, args.oodle_dll, args.ffmpeg, args.celt_dll)
     if not app.levels or not app.missions:
         raise SystemExit("no catalogs under work/; build them first (docs/m4-user-guide.md §1)")
     threading.Thread(target=app.validate, daemon=True).start()
-    httpd = ThreadingHTTPServer((HOST, args.port), make_handler(app))
+    builds = BuildBoard(app.root, lambda: set(app.levels), mcc_root=args.mcc_root, deploy_state=args.deploy_state)
+    httpd = ThreadingHTTPServer((HOST, args.port), make_handler(app, builds=builds))
     url = f"http://{HOST}:{args.port}/"
     print(f"M4 matching UI on {url}  ({len(app.levels)} MCC levels, {len(app.missions)} CE missions; Ctrl+C stops)")
     if not args.no_open:

@@ -246,17 +246,57 @@ export interface BuildSummary {
   built_gain_db: number | null;
   built_from_sha256: string | null;
   candidate_sha256: string | null;
+  install_files: { install_rel: string; candidate_sha256: string }[];
 }
 
 export interface BuildsResponse {
   builds: BuildSummary[];
   decisions_sha256: string | null;
+  /** Why subtitle builds are not offered yet. */
+  subtitles_disabled: string;
+  /** Playable maps a mission build can target (its folder plus its cinematics). */
+  missions: string[];
+}
+
+export type BuildScope = "mission" | "levels" | "all_mapped";
+
+/** The MCC folder and what it holds now (GET /api/deploy/status). */
+export interface DeployStatus {
+  mcc_folder: string | null;
+  source: string;
+  valid: boolean;
+  /** The folder is fixed by the server (test mode) and cannot be changed from the page. */
+  fixed: boolean;
+  game_running: string[];
+  files: { install_rel: string; sha256: string | null; state: "original" | "build" | "unknown"; builds: string[] }[];
+  active_builds: string[];
+  mod_installed: boolean;
+}
+
+/** What installing a build would change (GET /api/deploy/plan). */
+export interface InstallPlan {
+  build: string;
+  mcc_folder: string | null;
+  validation_ok: boolean | null;
+  stale: boolean;
+  stale_reasons: string[];
+  counts: Record<string, number>;
+  levels: string[];
+  files: {
+    install_rel: string;
+    installed_path: string;
+    candidate_bytes: number | null;
+    original_sha256: string;
+    candidate_sha256: string;
+    backup_folder: string;
+  }[];
+  subtitles: string;
 }
 
 export interface BuildJob {
   id: string;
+  kind: "build" | "install" | "restore";
   name: string;
-  levels: string[];
   state: "running" | "done" | "failed";
   started: string;
   returncode: number | null;

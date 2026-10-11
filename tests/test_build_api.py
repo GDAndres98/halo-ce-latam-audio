@@ -72,7 +72,7 @@ class BuildBoardTests(unittest.TestCase):
         board = self.board()
         started = board.start_dry_run(["a10"], "a10_test")
         job = self.wait_for(board, started["id"])
-        self.assertEqual(self.calls, [(["a10"], "a10_test")])
+        self.assertEqual(self.calls, [(["--level", "a10"], "a10_test")])  # m6_build.py arguments
         self.assertEqual((job["state"], job["returncode"]), ("done", 0))
 
     def test_refuses_unknown_levels_bad_names_and_existing_builds(self):
@@ -113,6 +113,29 @@ class BuildBoardTests(unittest.TestCase):
         with self.assertRaises(ApiError) as cm:
             self.board().job("nope")
         self.assertEqual(cm.exception.status, 404)
+
+    def test_build_scopes_pass_the_matching_builder_arguments(self):
+        (self.root / "work/mcc").mkdir(parents=True, exist_ok=True)
+        (self.root / "work/mcc/level_folders.json").write_text(json.dumps({"levels": {"a10": {}}}))
+        board = self.board()
+        self.wait_for(board, board.start_build({"scope": "mission", "mission": "a10", "name": "m1"})["id"])
+        self.wait_for(board, board.start_build({"scope": "all_mapped", "name": "m2"})["id"])
+        self.assertEqual(self.calls, [(["--mission", "a10"], "m1"), (["--all-mapped"], "m2")])
+        with self.assertRaises(ApiError):
+            board.start_build({"scope": "mission", "mission": "zz9"})
+
+    def test_subtitle_builds_are_refused_with_the_reason(self):
+        with self.assertRaises(ApiError) as cm:
+            self.board().start_build({"kind": "subtitles", "scope": "levels", "levels": ["a10"]})
+        self.assertIn("variable-length", cm.exception.message)
+        self.assertEqual(self.calls, [])
+
+    def test_install_and_restore_need_an_explicit_confirmation(self):
+        board = self.board()
+        for call in (lambda: board.start_install({"build": "a10"}), lambda: board.start_restore({})):
+            with self.assertRaises(ApiError) as cm:
+                call()
+            self.assertEqual(cm.exception.status, 400)
 
 
 if __name__ == "__main__":

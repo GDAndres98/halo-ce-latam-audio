@@ -40,4 +40,5 @@ frontend/e2e/out/
 
 # Local settings written by the Studio (global audio gain) and their history
 /config/audio_export.json
+/config/mcc_install.json
 /config/.history/

@@ -20,6 +20,11 @@ Subcommands (each refuses to run while MCC / EAC processes exist and stops on an
 
 Never launches MCC. State: work/m6/<build>/game/*.json (git-ignored).
 
+The Studio's Build & Test page runs this script (preflight + install, rollback, status) after the owner
+confirms; the safeguards are the same either way. --mcc-root / --backup-root / --state-dir point it at
+another folder (the browser test's throw-away copy of the game); by default it uses HALO_MCC_FOLDER from
+.env, the backups in work/mcc/backup/ and the state in work/m6/<build>/game/.
+
 Example:
     python scripts/build/m6_install.py --build a10 check
 """
@@ -44,18 +49,24 @@ def stop(msg):
 
 
 class Build:
-    def __init__(self, name):
+    def __init__(self, name, mcc_root=None, backup_root=None, state_dir=None):
         self.dir = REPO_ROOT / "work" / "m6" / name
         self.manifest = json.loads((self.dir / "build_manifest.json").read_text(encoding="utf-8"))
         self.report = json.loads((self.dir / "validation_report.json").read_text(encoding="utf-8"))
-        self.state = self.dir / "game"
-        env, _ = load_env()
-        self.root = require_path(env, "HALO_MCC_FOLDER", kind="dir")
+        self.state = Path(state_dir) if state_dir else self.dir / "game"
+        if mcc_root:
+            self.root = Path(mcc_root)
+            if not self.root.is_dir():
+                stop(f"MCC folder {self.root} does not exist")
+        else:
+            env, _ = load_env()
+            self.root = require_path(env, "HALO_MCC_FOLDER", kind="dir")
+        backups = Path(backup_root) if backup_root else REPO_ROOT / "work" / "mcc" / "backup"
         self.files = []
         for f in self.manifest["install_files"]:
             self.files.append({**f, "installed": self.root / f["install_rel"],
                                "candidate_path": REPO_ROOT / f["candidate"],
-                               "backup": REPO_ROOT / "work" / "mcc" / "backup" / STEAM_BUILD / f["install_rel"]})
+                               "backup": backups / STEAM_BUILD / f["install_rel"]})
 
     def write_state(self, name, data):
         self.state.mkdir(parents=True, exist_ok=True)
@@ -143,7 +154,7 @@ def preflight(b):
     snap = b.snapshot()
     b.write_state("preflight", {"steam_build": build, "files": [
         {"install_rel": f["install_rel"], "original_sha256": f["original_sha256"],
-         "candidate_sha256": f["candidate_sha256"], "backup": f["backup"].relative_to(REPO_ROOT).as_posix()}
+         "candidate_sha256": f["candidate_sha256"], "backup": f["backup"].as_posix()}
         for f in b.files], "notes": notes, "snapshot": snap})
     print("PREFLIGHT OK:", "; ".join(notes), f"; {len(snap['sha256'])} files hashed, {len(snap['stat'])} stat'ed")
 
@@ -232,8 +243,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--build", required=True, help="build folder under work/m6/ (e.g. a10)")
     ap.add_argument("action", choices=["check", "preflight", "install", "rollback", "status"])
+    ap.add_argument("--mcc-root", type=Path, help="MCC install folder (default: HALO_MCC_FOLDER in .env)")
+    ap.add_argument("--backup-root", type=Path, help="where originals are backed up (default work/mcc/backup)")
+    ap.add_argument("--state-dir", type=Path, help="preflight/install state (default work/m6/<build>/game)")
     a = ap.parse_args()
-    b = Build(a.build)
+    b = Build(a.build, a.mcc_root, a.backup_root, a.state_dir)
     {"check": check, "preflight": preflight, "install": install, "rollback": rollback, "status": status}[a.action](b)
 
 

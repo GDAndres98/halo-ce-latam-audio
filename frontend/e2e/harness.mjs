@@ -79,12 +79,14 @@ export function runFixture(dest) {
 
 /** The API server (on a disposable root) and the Vite dev server for the Studio. */
 export class Services {
-  constructor(root) {
+  /** extraArgs: more m4_server.py flags (the deploy test passes --mcc-root and --deploy-state). */
+  constructor(root, extraArgs = []) {
     this.root = root;
+    this.extraArgs = extraArgs;
   }
 
   async up() {
-    this.api = start("api", "python", ["scripts/ui/m4_server.py", "--root", this.root, "--port", String(API_PORT), "--no-open"], { cwd: REPO });
+    this.api = start("api", "python", ["scripts/ui/m4_server.py", "--root", this.root, "--port", String(API_PORT), "--no-open", ...this.extraArgs], { cwd: REPO });
     await waitForHttp(`http://127.0.0.1:${API_PORT}/api/state`);
     this.web = start("web", process.execPath, [join(FRONTEND, "node_modules", "vite", "bin", "vite.js"), "--port", String(WEB_PORT), "--strictPort"],
       { env: { STUDIO_API: `http://127.0.0.1:${API_PORT}` } });

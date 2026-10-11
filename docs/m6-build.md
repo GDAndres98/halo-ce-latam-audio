@@ -5,6 +5,10 @@
   `053c9741…`).
 - `a10` builds **audio-only**: 90 approved CE lines, 24/24 checks.
 - Subtitle generation is disabled (§4).
+- **From the Studio (2026-10-11):** Build & Test runs these builds, then install and rollback through
+  `m6_install.py`, after the owner confirms the listed files (README, "Building and restoring the game
+  files"). The safeguards are the script's own. `--mcc-root/--backup-root/--state-dir` exist for the
+  browser test's throw-away game folder (`npm run test:deploy`).
 - **Audio edit recipes (2026-10-09):** approved lines with an M4 edit (trims, cuts, silences,
   loudness) are built from their recipe (§2.1).
 - **Global export gain (2026-10-09):** +4 dB by default on every CE replacement (+3 dB until 2026-10-10) (§2.2). Speed and
