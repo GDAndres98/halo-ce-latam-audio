@@ -152,6 +152,10 @@ gain in a given build. Each build records the gain it used: the configured value
 recordings that a build does not replace are copied byte for byte and never get gain. Previews in the editor
 use the current setting.
 
+Loudness matching was switched off in every recipe on 2026-10-11 (owner decision; 5 approved lines,
+approvals unchanged), so no line gets its own level any more: see
+[docs/migrations/2026-10-11-reset-loudness-match.md](docs/migrations/2026-10-11-reset-loudness-match.md).
+
 Changing the gain does not rebuild anything. Every build made with another gain is marked **stale**, with the
 reason, and stays as it is until you rebuild it.
 

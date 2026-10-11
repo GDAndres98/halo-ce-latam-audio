@@ -645,3 +645,64 @@ def export_json(path, file_sha256, *, history_dir=None, now=None):
     finally:
         conn.close()
     return mapping_db.sha256(data)
+
+
+# --------------------------------------------------------------------------- loudness-match reset (2026-10-11)
+LOUDNESS_OFF = {"mode": "off", "offset_db": 0}
+
+
+def strip_loudness_match(doc):
+    """Pure. -> (new_doc, changes). Every recipe whose loudness is not off (matching Spain's recording gave
+    those lines their own gain on top of, and often instead of, the global export gain) gets loudness off.
+    Nothing else changes. changes: [{mapping_id, slot_id, audio_status, audio_revision, previous}]."""
+    new = json.loads(json.dumps(doc))
+    changes = []
+    for s in new.get("slots", []):
+        edit = s["audio"].get("edit") or {}
+        lo = edit.get("loudness")
+        if lo and (lo.get("mode", "off") != "off" or lo.get("offset_db", 0)):
+            changes.append({"mapping_id": s["mapping_id"], "slot_id": s["slot_id"],
+                            "audio_status": s["audio"]["status"], "audio_revision": s["audio"]["revision"],
+                            "previous": dict(lo)})
+            edit["loudness"] = dict(LOUDNESS_OFF)
+    return new, changes
+
+
+def proof_only_loudness_changed(old_doc, new_doc):
+    """Problems if new_doc differs from old_doc in anything but audio.edit.loudness (empty = proven)."""
+    problems = []
+    if {k: v for k, v in old_doc.items() if k != "slots"} != {k: v for k, v in new_doc.items() if k != "slots"}:
+        problems.append("top-level fields changed")
+    if [s["mapping_id"] for s in old_doc["slots"]] != [s["mapping_id"] for s in new_doc["slots"]]:
+        return problems + ["mapping ids or order changed"]
+    for o, n in zip(old_doc["slots"], new_doc["slots"]):
+        strip = lambda s: {**s, "audio": {**s["audio"], "edit": {k: v for k, v in s["audio"]["edit"].items() if k != "loudness"}}}
+        if strip(o) != strip(n):
+            problems.append(f"{o['mapping_id']}: something besides audio.edit.loudness changed")
+        if n["audio"]["edit"].get("loudness") not in (None, LOUDNESS_OFF):
+            problems.append(f"{o['mapping_id']}: loudness is not off")
+    return problems
+
+
+def reset_loudness_match(path, loaded_sha256, *, history_dir=None, now=None):
+    """One-time, owner-authorized (2026-10-11) reset: loudness matching off in every recipe, approved ones
+    included, WITHOUT touching approvals (status, revision, approved_at, fingerprint stay; nothing becomes
+    needs_rework), so every replacement follows the one global export gain. Same stale check, .history/
+    backup and database-first write as every save, so the database and the JSON stay in sync. Refuses
+    unless the result provably differs only in audio.edit.loudness. -> (new sha256 or None, changes)."""
+    path = Path(path)
+    current = _current(path)
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changes = strip_loudness_match(old)
+    if not changes:
+        return None, []
+    bad = proof_only_loudness_changed(old, new)
+    if bad:
+        raise ProtectedError("; ".join(bad))
+    errs = schema_errors(new, load_schema(SCHEMA_NAME), changed_mapping_ids(old, new))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now,
+                  changed_ids=changed_mapping_ids(old, new)), changes
