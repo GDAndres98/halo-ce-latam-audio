@@ -71,14 +71,24 @@ def _sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+_FOLDED_CHAR = {}  # char -> its folded form, or "" for a separator. Startup folds ~3M characters.
+
+
+def _fold_char(ch):
+    base = "".join(c for c in unicodedata.normalize("NFKD", ch) if not unicodedata.combining(c)).casefold()
+    return base if base and all(c.isalnum() for c in base) else ""
+
+
 def fold(text):
     """Search form: case-, accent- and punctuation-insensitive. Letters and digits are kept (accents
     removed, lower-cased); every other run of characters becomes one space. m4.html's highlighter
     mirrors this exactly."""
     out, space = [], True
     for ch in text or "":
-        base = "".join(c for c in unicodedata.normalize("NFKD", ch) if not unicodedata.combining(c)).casefold()
-        if base and all(c.isalnum() for c in base):
+        base = _FOLDED_CHAR.get(ch)
+        if base is None:
+            base = _FOLDED_CHAR[ch] = _fold_char(ch)
+        if base:
             out.append(base)
             space = False
         elif not space:
