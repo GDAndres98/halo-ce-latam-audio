@@ -178,9 +178,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         don't claim it works in game until the owner reports it.
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
-      inserted silences and fades. **No per-line level control:** loudness matching to Spain's
-      recording and its `limiter` were removed on 2026-10-11 (owner); the global export gain is
-      the only level setting (`docs/migrations/2026-10-11-remove-limiter.md`).
+      inserted silences and fades. **No per-line level control** in recipes (per-recipe matching and its
+      limiter were removed on 2026-10-11, `docs/migrations/2026-10-11-remove-limiter.md`).
+      - **Level modes (owner, 2026-10-11, after measuring the installed bank):** `level_mode` in
+        `config/audio_export.json` is a build setting.
+        - `global_gain` (default, +4 dB): linear, never limited.
+        - `match_spain`: each line matched to its Spain recording's loudness, with a look-ahead limiter
+          capped at 6 dB (`audio-render/5`).
+        - Cause of "too quiet": CE lines are more dynamic, about 16 dB peak-to-loudness against MCC's 11, so
+          the peak rule cut the gain. Replacements played a median 5.1 dB below Spain; match Spain gives
+          −1.7 dB (`docs/m6-build.md` §2.3, `scripts/discovery/level_survey.py`).
+        - Don't raise the global gain as a fix; it can't get past the peak rule.
       - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
         migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
         recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.

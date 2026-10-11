@@ -408,6 +408,18 @@ table.compact td {
   margin: 0.6rem 0;
 }
 
+.installed-level p {
+  margin: 0.2rem 0;
+}
+
+.builds-view .level-cell {
+  white-space: nowrap;
+}
+
+.builds-view .level-mode {
+  margin-top: 0;
+}
+
 .deploy-history summary svg {
   vertical-align: -0.15em;
 }

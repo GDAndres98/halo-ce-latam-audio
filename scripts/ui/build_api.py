@@ -57,6 +57,23 @@ RUNTIME_NOTE = ("Subtitle tables are rewritten with longer or shorter text (vari
                 "still to be confirmed in the game (only same-length edits were tested in game, B1).")
 
 
+def level_report(manifest):
+    """The level settings a build used and what they did (manifest `level`, or the older `global_gain` block)."""
+    lv = manifest.get("level")
+    g = manifest.get("global_gain") or {}
+    if lv:
+        return {"mode": lv["mode"], "global_gain_db": lv["global_gain_db"], "lines": lv["lines"],
+                "effective_gain_db": lv["effective_gain_db"], "constrained": len(lv["constrained"]),
+                "fallback": len(lv["fallback_to_global_gain"]), "limiter_max_reduction_db": lv["limiter_max_reduction_db"],
+                "loudness_vs_spain_db": lv["loudness_vs_spain_db"], "source": lv["source"]}
+    slots = [e for e in manifest.get("slots", []) if e.get("action") == "replace"]
+    gains = sorted(e.get("global_gain_applied_db", 0.0) for e in slots)
+    return {"mode": "global_gain", "global_gain_db": g.get("configured_db"), "lines": len(slots),
+            "effective_gain_db": {"min": gains[0], "median": gains[len(gains) // 2], "max": gains[-1]} if gains else None,
+            "constrained": len(g.get("short", [])), "fallback": 0, "limiter_max_reduction_db": None,
+            "loudness_vs_spain_db": None, "source": g.get("source")}
+
+
 def _sha_file(path):
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
@@ -90,7 +107,8 @@ class BuildBoard:
     def list_builds(self):
         current = hashlib.sha256(self.decisions.read_bytes()).hexdigest() if self.decisions.is_file() else None
         local_now = _sha_file(self.root / LOCAL)
-        gain_now = load_export_config(self.root)["global_gain_db"]
+        cfg_now = load_export_config(self.root)
+        gain_now, mode_now = cfg_now["global_gain_db"], cfg_now["level_mode"]
         builds = []
         for folder in sorted(p for p in self.build_root.glob("*") if p.is_dir()):
             manifest = _read_json(folder / "build_manifest.json")
@@ -107,7 +125,10 @@ class BuildBoard:
                 reasons.append("decisions changed since the build")
             if subs and inputs.get("local_sha256") != local_now:
                 reasons.append("custom subtitle text changed since the build")
-            if audio and (built_gain is None or built_gain != gain_now):
+            built_mode = (manifest.get("global_gain") or {}).get("level_mode", "global_gain")
+            if audio and built_mode != mode_now:
+                reasons.append(f"level mode changed since the build ({built_mode} → {mode_now})")
+            elif audio and built_mode == "global_gain" and (built_gain is None or built_gain != gain_now):
                 reasons.append("export gain changed since the build" if built_gain is not None
                                else "build does not record the export gain")
             sub = manifest.get("subtitles") or {}
@@ -125,6 +146,7 @@ class BuildBoard:
                 "stale": bool(reasons),
                 "stale_reasons": reasons,
                 "built_gain_db": built_gain,
+                "level": level_report(manifest) if audio else None,
                 "built_from_sha256": built_from,
                 "candidate_sha256": report.get("candidate_sha256"),
                 "install_files": [{"install_rel": f["install_rel"], "candidate": f.get("candidate"),
@@ -333,6 +355,18 @@ class BuildBoard:
             out["files"].append({"install_rel": rel, "sha256": sha, "state": state, "builds": matches})
         out["active_builds"] = sorted(active)
         out["mod_installed"] = any(f["state"] != "original" for f in out["files"])
+        # The level settings inside the installed audio, against what the Studio is set to now.
+        cfg = load_export_config(self.root)
+        out["current_level"] = {"mode": cfg["level_mode"], "global_gain_db": cfg["global_gain_db"]}
+        out["installed_level"] = []
+        for name in out["active_builds"]:
+            m = manifests[name]
+            if m.get("kind", "audio") in ("audio", "both"):
+                lv = level_report(m)
+                lv.update(build=name, built_at=m.get("built_at"),
+                          matches_current=lv["mode"] == cfg["level_mode"] and (
+                              lv["mode"] != "global_gain" or lv["global_gain_db"] == cfg["global_gain_db"]))
+                out["installed_level"].append(lv)
         return out
 
     def install_plan(self, name):

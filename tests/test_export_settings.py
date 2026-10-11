@@ -47,7 +47,7 @@ class GlobalGainTests(unittest.TestCase):
         saved = save_global_gain(self.root, 2.5, None, now=NOW)
         self.assertEqual(saved["global_gain_db"], 2.5)
         self.assertEqual(json.loads((self.root / CONFIG).read_text(encoding="utf-8")),
-                         {"schema": "audio-export-config/1", "global_gain_db": 2.5})
+                         {"schema": "audio-export-config/1", "global_gain_db": 2.5, "level_mode": "global_gain"})
         self.assertEqual(load_export_config(self.root)["global_gain_db"], 2.5)
 
     def test_values_outside_the_range_are_refused_and_nothing_is_written(self):

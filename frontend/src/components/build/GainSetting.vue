@@ -1,12 +1,14 @@
 <script setup lang="ts">
-// The global audio gain: one number for every Campaign Evolved replacement, applied once at export.
-// It is a global export setting, not a per-line control (per-line gain was removed on 2026-10-09).
-// Changing it does not rebuild anything: builds made with the old value are marked stale.
+// How every Campaign Evolved replacement's level is set at export. Two build-level modes, never per line:
+//   global gain  one number for every replacement, applied once, linear, never limited (default, +4 dB);
+//   match Spain  each line brought to the loudness of the Spain recording it replaces, with a look-ahead
+//                limiter capped at 6 dB (owner, 2026-10-11, after measuring the installed bank).
+// Changing either does not rebuild anything: builds made with other settings are marked stale.
 
 import { RotateCcw, Save, Volume2 } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { api, ApiError } from "../../api/client";
-import type { ExportSettings } from "../../api/types";
+import type { ExportSettings, LevelMode } from "../../api/types";
 import PanelHeader from "../ui/PanelHeader.vue";
 import StateMessage from "../ui/StateMessage.vue";
 
@@ -35,14 +37,18 @@ async function load() {
   }
 }
 
-async function save(value: number) {
+const MODE_TEXT: Record<LevelMode, string> = { global_gain: "global gain", match_spain: "match Spain's loudness" };
+
+async function save(value: number | null, mode?: LevelMode) {
   busy.value = true;
   error.value = "";
   message.value = "";
   try {
-    settings.value = await api.saveExportSettings(value, settings.value?.sha256 ?? null);
+    settings.value = await api.saveExportSettings(value, settings.value?.sha256 ?? null, mode);
     input.value = settings.value.global_gain_db;
-    message.value = `Global gain set to ${signed(settings.value.global_gain_db)}. Builds made with another gain are now marked stale.`;
+    message.value = mode
+      ? `Level set to ${MODE_TEXT[settings.value.level_mode]}. Audio builds made in the other mode are now marked stale.`
+      : `Global gain set to ${signed(settings.value.global_gain_db)}. Builds made with another gain are now marked stale.`;
     emit("saved");
   } catch (e) {
     error.value = e instanceof ApiError && e.status === 409
@@ -56,6 +62,8 @@ async function save(value: number) {
 
 const apply = () => valid.value && save(Number(input.value));
 const resetToDefault = () => save(DEFAULT_GAIN_DB);
+const mode = computed(() => settings.value?.level_mode ?? "global_gain");
+const setMode = (m: LevelMode) => m !== mode.value && save(null, m);
 
 onMounted(load);
 </script>
@@ -63,9 +71,25 @@ onMounted(load);
 <template>
   <section class="panel gain" aria-labelledby="gain-title">
     <PanelHeader title="Global audio gain" title-id="gain-title" :icon="Volume2" code="EXPORT" />
-    <p class="muted small">
-      Applied once to every Campaign Evolved replacement when a build is exported. Lines are never limited:
-      a line that would peak above −1 dBFS gets less gain, and the build reports it.
+    <fieldset class="scope level-mode" :disabled="busy || !settings" data-testid="level-mode">
+      <legend>Level</legend>
+      <label class="check">
+        <input type="radio" name="level-mode" :checked="mode === 'global_gain'" @change="setMode('global_gain')" />
+        Global gain: the same gain for every line, never limited
+      </label>
+      <label class="check">
+        <input type="radio" name="level-mode" :checked="mode === 'match_spain'" @change="setMode('match_spain')" />
+        Match Spain's loudness: each line as loud as the Spain recording it replaces
+      </label>
+    </fieldset>
+    <p v-if="mode === 'global_gain'" class="muted small">
+      The gain below is applied once to every Campaign Evolved replacement when a build is exported. Lines are never
+      limited: a line that would peak above −1 dBFS gets less gain, and the build reports it.
+    </p>
+    <p v-else class="muted small">
+      Each replacement gets the gain that brings it to the loudness of the Spain recording it replaces, so quiet lines
+      stay quiet and shouts stay loud. A look-ahead limiter keeps peaks at −1 dBFS and takes at most 6 dB off any peak;
+      a line that would need more gets less gain, and the build reports it. The global gain below is kept but not used.
     </p>
 
     <div class="gain-row">
@@ -104,7 +128,10 @@ onMounted(load);
       <ol class="small">
         <li>Sources are converted to 44.1 kHz mono.</li>
         <li>The edit recipe: trims, cuts, fades and inserted silences.</li>
-        <li><strong>Global gain</strong>: applied exactly once, linearly, never limited (see above).</li>
+        <li>
+          <strong>Level</strong>, by the mode above: the global gain (once, linear, never limited), or matching each
+          Spain recording (limiting capped at 6 dB).
+        </li>
         <li>Rounding to 16-bit, then encoding for the game (CELT).</li>
       </ol>
       <p class="small muted">

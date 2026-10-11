@@ -9,6 +9,7 @@ import type {
   DeployStatus,
   InstallPlan,
   ExportSettings,
+  LevelMode,
   BuildsResponse,
   CeLine,
   CeResponse,
@@ -119,12 +120,13 @@ export const api = {
 
   exportSettings: () => request<ExportSettings>("/api/settings/export"),
 
-  /** Saves the global gain. `loadedSha256` must be the hash the settings were read with (optimistic lock). */
-  saveExportSettings: (globalGainDb: number, loadedSha256: string | null) =>
+  /** Saves the global gain and/or the level mode (null keeps the saved value). `loadedSha256` must be the hash
+   * the settings were read with (optimistic lock). */
+  saveExportSettings: (globalGainDb: number | null, loadedSha256: string | null, levelMode?: LevelMode) =>
     request<ExportSettings>("/api/settings/export", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ global_gain_db: globalGainDb, loaded_sha256: loadedSha256 }),
+      body: JSON.stringify({ global_gain_db: globalGainDb, loaded_sha256: loadedSha256, level_mode: levelMode }),
     }),
 
   /** How manual_mappings.json relates to the database (the source of truth). Read-only. */

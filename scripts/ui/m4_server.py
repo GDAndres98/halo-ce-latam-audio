@@ -180,7 +180,8 @@ def make_handler(app, quiet=False, builds=None):
                     raise ApiError(400, "invalid JSON")
                 if u.path == "/api/settings/export":
                     try:
-                        saved = save_global_gain(app.root, body.get("global_gain_db"), body.get("loaded_sha256"))
+                        saved = save_global_gain(app.root, body.get("global_gain_db"), body.get("loaded_sha256"),
+                                                 level_mode=body.get("level_mode"))
                     except (ConfigError, TypeError, ValueError) as e:
                         raise ApiError(409 if "changed since" in str(e) else 400, str(e))
                     return self._json(200, saved)

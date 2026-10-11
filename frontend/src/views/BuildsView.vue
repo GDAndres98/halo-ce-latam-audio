@@ -20,7 +20,7 @@ import PageHeader from "../components/ui/PageHeader.vue";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
 import { confirmAction } from "../composables/useConfirm";
-import type { BuildJob, BuildKind, BuildPreview, BuildScope, BuildsResponse, DeployEvent, DeployStatus } from "../api/types";
+import type { BuildJob, BuildKind, BuildLevel, BuildPreview, BuildScope, BuildsResponse, DeployEvent, DeployStatus } from "../api/types";
 
 const builds = ref<BuildsResponse | null>(null);
 const deploy = ref<DeployStatus | null>(null);
@@ -204,6 +204,9 @@ const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subti
 const jobKind = computed(() => (job.value?.detail as { kind?: BuildKind } | undefined)?.kind);
 const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.includes(build));
 const fileName = (rel: string) => rel.split("/").pop();
+const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
+const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null }) =>
+  l.mode === "match_spain" ? "match Spain" : `global gain ${db(l.global_gain_db)}`;
 </script>
 
 <template>
@@ -297,6 +300,18 @@ const fileName = (rel: string) => rel.split("/").pop();
             <code>{{ f.install_rel }}</code>: {{ f.state === "original" ? "original" : f.state === "build" ? `build ${f.builds.join(", ")}` : "unknown content" }}
           </li>
         </ul>
+        <div v-for="l in deploy.installed_level ?? []" :key="l.build" class="installed-level small" data-testid="installed-level">
+          <p>
+            Installed audio level (<strong>{{ l.build }}</strong>, built {{ l.built_at ?? "?" }}): {{ levelName(l) }} ·
+            gain applied median {{ db(l.effective_gain_db?.median) }}
+            <template v-if="l.loudness_vs_spain_db"> · vs Spain median {{ db(l.loudness_vs_spain_db.median) }}</template>
+            · {{ l.constrained }} of {{ l.lines }} line(s) constrained
+          </p>
+          <StateMessage v-if="!l.matches_current && deploy.current_level" kind="warning">
+            The installed build was made with {{ levelName(l) }}, but the Studio is now set to
+            {{ levelName(deploy.current_level) }}. Restore, rebuild and install to hear the current setting.
+          </StateMessage>
+        </div>
         <StateMessage v-if="gameRunning" kind="warning">MCC appears to be running ({{ deploy.game_running.join(", ") }}). Close it to install or restore.</StateMessage>
         <div class="row">
           <button type="button" class="caution icon-label" :disabled="!canDeploy || !deploy.mod_installed" @click="restore">
@@ -314,7 +329,7 @@ const fileName = (rel: string) => rel.split("/").pop();
       <div v-if="builds" class="table-frame">
         <table>
           <thead>
-            <tr><th>Build</th><th>Contents</th><th>Folders</th><th>Built</th><th>Counts</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
+            <tr><th>Build</th><th>Contents</th><th>Folders</th><th>Built</th><th>Counts</th><th>Level</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
           </thead>
           <tbody>
             <template v-for="b in builds.builds" :key="b.name">
@@ -350,6 +365,15 @@ const fileName = (rel: string) => rel.split("/").pop();
                     <span :class="{ error: b.subtitles.conflicts }">· conflicts {{ b.subtitles.conflicts }}</span>
                   </template>
                 </td>
+                <td class="small level-cell" data-testid="build-level">
+                  <template v-if="b.level">
+                    <strong>{{ levelName(b.level) }}</strong>
+                    <div>applied {{ db(b.level.effective_gain_db?.median) }} <span class="muted">median</span></div>
+                    <div :class="{ warn: b.level.constrained }">{{ b.level.constrained }}/{{ b.level.lines }} constrained</div>
+                    <div v-if="b.level.loudness_vs_spain_db">vs Spain {{ db(b.level.loudness_vs_spain_db.median) }}</div>
+                  </template>
+                  <span v-else class="muted">—</span>
+                </td>
                 <td>
                   <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
                   <StatusBadge v-else-if="b.validation_ok === false" :label="`failed (${b.failed_checks.length})`" tone="bad" />
@@ -374,10 +398,10 @@ const fileName = (rel: string) => rel.split("/").pop();
                 </td>
               </tr>
               <tr v-if="open === b.name" class="detail-row">
-                <td colspan="8"><BuildDetails :name="b.name" :has-log="b.has_log" /></td>
+                <td colspan="9"><BuildDetails :name="b.name" :has-log="b.has_log" /></td>
               </tr>
             </template>
-            <tr v-if="!builds.builds.length"><td colspan="8"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
+            <tr v-if="!builds.builds.length"><td colspan="9"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
           </tbody>
         </table>
       </div>

@@ -2,14 +2,32 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "audio-export-config/1",
   "title": "Central audio export settings (config/audio_export.json, optional)",
-  "description": "Read by the M6 build and the M4 preview (scripts/common/export_config.py). Without the file, global_gain_db defaults to +4 dB.",
+  "description": "Read by the M6 build and the M4 preview (scripts/common/export_config.py). Without the file, global_gain_db defaults to +4 dB and level_mode to global_gain.",
   "type": "object",
-  "required": ["schema"],
+  "required": [
+    "schema"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema": {"const": "audio-export-config/1"},
-    "global_gain_db": {"type": "number", "minimum": -12, "maximum": 12,
-                       "description": "Linear gain applied once to every Campaign Evolved replacement before CELT encoding. Never limited: a recording whose peak would pass -1 dBFS gets less (reported)."},
-    "note": {"type": "string", "maxLength": 500}
+    "schema": {
+      "const": "audio-export-config/1"
+    },
+    "global_gain_db": {
+      "type": "number",
+      "minimum": -12,
+      "maximum": 12,
+      "description": "Linear gain applied once to every Campaign Evolved replacement before CELT encoding. Never limited: a recording whose peak would pass -1 dBFS gets less (reported)."
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "level_mode": {
+      "enum": [
+        "global_gain",
+        "match_spain"
+      ],
+      "description": "How every replacement's level is set. global_gain (default): global_gain_db, linear, never limited. match_spain: each line matched to the loudness of the Spain recording it replaces, look-ahead limiter at -1 dBFS taking at most 6 dB off any peak; the global gain is not used."
+    }
   }
 }

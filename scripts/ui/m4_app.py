@@ -560,13 +560,13 @@ class M4App:
             try:
                 mcc_ref = self.editor.reference_lufs(self.mcc_audio.wav(level, "spanish", s))
             except AudioUnavailable:
-                pass  # Spain's loudness is only reported; the preview does not need it
+                pass  # without it, match_spain falls back to the global gain (reported in the stats)
         try:
             cfg = load_export_config(self.root)  # read on every preview: a config change applies at once
         except ConfigError as e:
             raise ApiError(500, str(e))
         try:
-            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"])
+            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"])
         except audio_edit.EditError as e:
             raise ApiError(422, f"edit: {e}")
         return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_edit.summary(edit),

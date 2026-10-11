@@ -171,7 +171,8 @@ class DspTests(unittest.TestCase):
         self.assertLess(y[0], 0.01)
         self.assertLess(y[-1], 0.01)
         self.assertEqual(y[500], 1.0)
-        self.assertFalse(hasattr(ae, "limit"))  # no limiter exists any more (2026-10-11)
+        # The limiter exists only for the build-level match_spain mode; global_gain mode never limits
+        # (test_level_modes.py).
 
     def test_render_is_deterministic_and_has_no_per_line_level(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))

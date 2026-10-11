@@ -161,39 +161,55 @@ database to JSON* (the replaced file is kept). Line-ending-only changes from git
 line, the save is refused with nothing written, and your edits stay on screen: use *Reload and keep my
 edits*, check them, and save again.
 
-## Global audio gain
+## Audio level (global gain or match Spain)
 
-Build & Test has a *Global audio gain* card. It is one number for every Campaign Evolved replacement,
-applied once when a build is exported. The default is **+4 dB**, the range is −12 to +12 dB, and *Reset to
-default* returns to +4 dB. The value is saved in `config/audio_export.json` (git-ignored; the previous file is
-kept in `config/.history/`).
+Build & Test has a *Global audio gain* card with a **Level** choice. It is a build setting, never part of a
+mapping, saved in `config/audio_export.json` (git-ignored; the previous file is kept in `config/.history/`).
 
-The gain is a **build setting, never part of a mapping**. Edit recipes hold no gain (per-line gain was
-removed on 2026-10-09, approved mappings included), so every approved replacement, old or new, gets the same
-gain in a given build. Each build records the gain it used: the configured value in `build_manifest.json`
-(`global_gain`), and per line the dB actually applied and any shortfall from the peak protection. Original MCC
-recordings that a build does not replace are copied byte for byte and never get gain. Previews in the editor
-use the current setting.
+- **Global gain** (the default): one number for every Campaign Evolved replacement, applied once, linearly,
+  never limited. The default is **+4 dB**, the range is −12 to +12 dB, and *Reset to default* returns to +4 dB.
+  A line that would peak above −1 dBFS gets less, and the build reports it.
+- **Match Spain's loudness:** each replacement gets the gain that brings it to the loudness of the Spain
+  recording it replaces, so quiet lines stay quiet and shouts stay loud, as in the original game.
+  - A look-ahead limiter keeps peaks at −1 dBFS.
+  - The limiter never takes more than 6 dB off a peak. A line that would need more gets less gain, and the
+    build reports it.
+  - The global gain is not used in this mode.
 
-Loudness matching to Spain's recording was switched off in every recipe on 2026-10-11 (owner decision; 5
-approved lines, approvals unchanged:
-[docs/migrations/2026-10-11-reset-loudness-match.md](docs/migrations/2026-10-11-reset-loudness-match.md)), and
-then removed from the editors, the renderer and the schema, together with its limiter
-([docs/migrations/2026-10-11-remove-limiter.md](docs/migrations/2026-10-11-remove-limiter.md)). No line gets
-its own level: the global gain is the only level setting.
+**Why match Spain exists (measured 2026-10-11).** The Campaign Evolved recordings are much more dynamic than
+MCC's. Their peaks sit about 16 dB above their loudness; the Spain recordings sit about 11 dB, peaking at
+0 dBFS. With a linear gain, the peak rule stops most lines long before they are as loud as the line they
+replace. The installed build (+5 dB requested, +2.85 dB applied on the median line) played a median 5.1 dB
+quieter than the original Spanish dialogue. Raising the gain barely helps. Matching Spain with capped
+limiting brings the median to −1.7 dB in the decoded game bank. The numbers are in
+[docs/m6-build.md](docs/m6-build.md) §2.3; `python scripts/discovery/level_survey.py --build <name>` measures
+any build.
 
-Changing the gain does not rebuild anything. Every build made with another gain is marked **stale**, with the
-reason, and stays as it is until you rebuild it.
+Recipes still hold no level of their own. Per-line gain was removed on 2026-10-09, and per-recipe matching
+and its limiter on 2026-10-11
+([docs/migrations/2026-10-11-reset-loudness-match.md](docs/migrations/2026-10-11-reset-loudness-match.md),
+[docs/migrations/2026-10-11-remove-limiter.md](docs/migrations/2026-10-11-remove-limiter.md)). Every line of a
+build follows the same mode.
 
-Processing order for each replacement, as the build applies it:
+Each build records its settings and what they did, in `build_manifest.json` `level` and per line:
+- the effective gain;
+- the lines held back by the peak rule or the 6 dB cap;
+- the limiter reduction;
+- the loudness against the Spain recording.
+
+Build & Test shows them in the **Level** column. The installed build's level is shown next to the current
+setting, with a warning when they differ. Changing the mode or the gain rebuilds nothing: builds made with
+other settings are marked **stale**, with the reason. Original MCC recordings that a build does not replace
+are copied byte for byte.
+
+Processing order for each replacement, as the build applies it (previews in the editor use the same steps, so
+what you hear is what the build writes):
 
 1. Sources are converted to 44.1 kHz mono.
 2. The edit recipe: trims, cuts, fades and inserted silences.
-3. The global gain, applied once, linearly and never limited. A line that would peak above −1 dBFS gets less,
-   and the build reports it.
+3. The level: the global gain (once, linear, never limited), or matching the Spain recording (limiting capped at
+   6 dB).
 4. Rounding to 16-bit, then encoding for the game (CELT).
-
-Previews in the editor use the same steps, so what you hear is what the build writes.
 
 ## Theme
 
@@ -285,6 +301,7 @@ npm run test:navigation                       # browser test of the matching loo
 npm run test:deploy                           # Build & Test: build, install, restore into a throw-away game folder (~2 min)
 npm run test:subtitles                        # subtitle and combined builds: preview, build, details, install, restore,
                                               # automatic restore after a simulated failure (throw-away folder, ~4 min)
+npm run test:level -- --build <name>          # Level choice, Level column, installed-level warning (any global-gain audio build)
 npm run test:theme                            # browser checks of the theme: every screen, dialog, fonts, contrast, motion, widths
 npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed

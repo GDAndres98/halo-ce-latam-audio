@@ -20,6 +20,7 @@
     "test:navigation": "node e2e/navigation.mjs",
     "test:deploy": "node e2e/deploy.mjs",
     "test:subtitles": "node e2e/subtitles.mjs",
+    "test:level": "node e2e/level.mjs",
     "test:theme": "node e2e/theme.mjs",
     "perf": "node e2e/perf.mjs"
   },

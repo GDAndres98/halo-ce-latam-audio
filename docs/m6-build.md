@@ -151,8 +151,8 @@ Rules:
   `common/export_config.py`).
   - **Default +4 dB** when the file doesn't exist.
   - Range −12 to +12. Copy `config/audio_export.example.json` to start.
-- **Applied once per line:** to every CE replacement, after the recipe and the optional loudness
-  match (whose target ignores it), before CELT.
+- **Applied once per line** in `global_gain` mode (the default; §2.3): to every CE replacement, after
+  the recipe, before CELT.
 - **Linear only:** no limiting, compression or clipping.
   - If the peak would pass −1 dBFS, the line gets only as much as fits, never below 0 dB.
   - The shortfall is reported in the build output, in `test_report.md` ("Global gain") and in the
@@ -160,6 +160,85 @@ Rules:
 - **Determinism:** the setting is part of the build inputs and the M4 preview cache key.
 - **Changing it:** edit the file and rebuild. Installed builds keep the value they were built with,
   as recorded in their manifest.
+
+### 2.3 Level modes: global gain or match Spain (2026-10-11)
+
+**Why (measured).** The owner reported that replacements were noticeably quieter in game. The Studio's
+gain was set to +5 dB. A survey of the last installed build (`all_mapped_4`, 618 lines; 62 sampled
+across 18 folders with `scripts/discovery/level_survey.py`, decoding the bank the game reads) found:
+
+| | Spain (MCC original) | CE es-MX source | Decoded replacement |
+|---|---|---|---|
+| Loudness, median (LUFS, BS.1770) | −11.5 | −20.3 | −17.3 |
+| Sample peak, median | −0.2 dBFS | −3.9 dBFS | −1.0 dBFS |
+| Peak-to-loudness, median | 11.0 dB | 16.3 dB | 16.3 dB |
+
+- **The gain worked.** Rendered minus source equals the applied gain (median difference 0.00 dB). CELT
+  keeps the level (decoded minus rendered: −0.24 to +0.45 dB). The installed bank matched its manifest.
+- **But the peak rule cut it.** 494 of 618 lines got less than the requested +5 dB (median +2.85 dB).
+  Each line sat right at the −1 dBFS ceiling.
+- **The cause is the material, not the setting.** The Spain recordings are mastered with heavy
+  limiting: 11 dB peak-to-loudness, peaking at 0 dBFS. The CE recordings are natural: 16 dB. A linear
+  gain can never bring a line above −1 dBFS minus its own peak-to-loudness ratio, which is −17.3 LUFS on
+  the median line, exactly what was measured. Replacements were therefore a median **5.1 dB quieter**
+  than the line they replace (p10 −8.4, p90 −1.6), and Cortana lines up to 10.8 dB quieter. Raising the
+  global gain to +6 or +8 dB changes almost nothing; only lines with headroom get louder.
+- **Strategies tried on the same 62 lines:**
+
+  | Strategy | Result vs Spain, median (p10 / p90) | Limiting on the peaks |
+  |---|---|---|
+  | +4 dB, linear (before this change) | −5.3 (−8.3 / −2.2) | none |
+  | +4 dB with a peak limiter | −4.8 (−7.9 / −1.7) | median 1.1, max 3.7 dB |
+  | Match Spain, limiter uncapped | −1.6 (−3.1 / −0.1) | median 4.8, max 10.7 dB |
+  | **Match Spain, limiting ≤ 6 dB** (chosen) | −1.7 (−4.4 / −0.1) | median 4.8, max 6.0 dB |
+
+**The mode** (owner decision after these numbers): `level_mode` in `config/audio_export.json`, a build
+setting chosen on Build & Test.
+- **`global_gain` (default):** §2.2, unchanged. The default gain stays +4 dB.
+- **`match_spain`:**
+  - Each line gets the gain that brings its loudness to that of the Spain recording it replaces. The
+    reference is measured from the same pinned decode the M4 preview uses, and cached by sample hash in
+    `work/m6/_cache/spain_lufs.json`.
+  - A look-ahead peak limiter keeps every sample at −1 dBFS or below: 5 ms look-ahead, 80 ms release.
+    It is the audio-render/2 limiter, restored.
+  - The gain is lowered so the limiter never takes more than **6 dB** off a peak
+    (`audio_edit.MATCH_MAX_LIMITING_DB`). The lines that got less are reported.
+  - Lines louder than their Spain recording are lowered, with no limiting.
+  - The global gain is kept but not used. Without a measurable Spain reference, a line falls back to
+    the global gain (reported).
+  - Recipes hold no level setting. Per-line gain and the per-recipe "match" stay removed, so every line
+    of a build follows the same rule.
+- **Engine:** `audio-render/5`. Previews are cached by mode, and what the editor plays is what the build
+  writes.
+
+**Verified on the decoded FSB5 output** (disposable builds, 2026-10-11):
+- **Match Spain, every mapped folder (618 lines):**
+  - replacements at −14.3 LUFS median against Spain's −11.5, so −1.7 dB (p10 −4.1, p90 −0.1), down from
+    −5.1;
+  - effective gain from −5.0 to +13.8 dB (median +7.7); 204 lines limited by the 6 dB cap;
+  - per-line loudness follows the original game: correlation with Spain's per-line loudness 0.33 → 0.76.
+    The quietest lines stay quiet (−18.8 → −18.9 LUFS);
+  - peak-to-loudness 13.3 dB, still more dynamic than MCC's 11 dB;
+  - codec: ±0.3 dB.
+- **Global gain, `a10` at +4 vs 0 dB (101 lines):** the decoded difference per line equals the gain the
+  build recorded, within 0.006 dB. Only 5 of 26 sampled lines had room for the full +4 dB.
+- **All three builds:** unreplaced samples byte-identical, every subsong decodes, deterministic.
+- **Tail check:** `silence_after_source_end` now allows the codec's ring-out of a recording that ends
+  abruptly while still audible: below 64 LSB, or below half the peak of the source's last 512 samples. One
+  match-mode line (`A10_200_cryoassist`, room tone cut without a fade, +9.4 dB) rang out at 65 LSB.
+
+**Reporting.**
+- The manifest's `level` block holds:
+  - the mode, gain and source;
+  - the effective gain (distribution);
+  - the constrained lines and the fallbacks;
+  - the limiter reduction;
+  - loudness vs Spain (distribution), measured in both modes.
+- Build & Test shows each build's level (Level column), and for the installed build its settings next to
+  the Studio's current ones, with a warning when they differ.
+- A build made in another mode is stale. The global gain only makes `global_gain` builds stale.
+- `m6_build.py --level-mode … --global-gain …` overrides the saved setting for one build (recorded as the
+  source). It is meant for disposable comparisons.
 
 ## 3. Validation (`validation_report.json`; every check must pass)
 
@@ -175,7 +254,8 @@ Rules:
   - content SNR vs the 44.1 kHz source ≥ 30 dB (the `a10` run: 41–48 dB);
   - sample count; Custom CELT;
   - duration covers source + codec delay;
-  - no new clipping; silence after the end.
+  - no new clipping; silence after the end (the codec's ring-out of an abrupt, still-audible ending is
+    allowed, §2.3).
 - **Determinism:** the whole build runs twice in one go and gives identical bytes (also identical
   across separate runs).
 - **Stability:** `.lst` not written. Edits made in M4 during the build are reported; the install

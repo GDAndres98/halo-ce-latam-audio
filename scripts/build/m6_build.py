@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
 from common import audio_edit  # noqa: E402
 from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
-from common.export_config import ConfigError, load_export_config  # noqa: E402
+from common.export_config import LEVEL_MODES, ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
@@ -61,7 +61,7 @@ from common.m6_build import (  # noqa: E402
     plan_audio, subtitle_plan)
 from common.mcc_loc import parse_mcc_loc  # noqa: E402
 from common.mcc_loc_writer import WRITER, TableError, charset  # noqa: E402
-from common.ondemand_audio import CeAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
+from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from common.vgm import DEFAULT_VGMSTREAM, decode_all, decode_pcm, meta, meta_value  # noqa: E402
 from m4_app import M4App  # noqa: E402
 
@@ -120,28 +120,82 @@ def content_checks(exe, cand_path, idx, res):
               "vgm_encoding_custom_celt": meta_value(m, "encoding") == "Custom CELT",
               "duration_covers_source_plus_delay": n_src + 128 <= res["sample_count"] < n_src + 128 + 512,
               "no_new_clipping": full <= full_src,
-              "silence_after_source_end": max(map(abs, after), default=0) < 64}
+              # after the end only the codec's ring-out of the line's own last frame may remain: below 64 LSB
+              # (-54 dBFS), or below half the peak of the source's last 512 samples when the recording itself
+              # ends abruptly at a higher level (room tone cut off without a fade)
+              "silence_after_source_end": max(map(abs, after), default=0)
+              < max(64, max(map(abs, src_a[-512:]), default=0) / 2)}
     return checks, {"content_snr_db": round(snr, 1) if math.isfinite(snr) else str(snr)}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, cfg):
+SPAIN_LUFS_CACHE = REPO_ROOT / "work" / "m6" / "_cache" / "spain_lufs.json"
+
+
+def spain_references(targets, app, decoder):
+    """{slot_id: LUFS of the Spain recording the line replaces} (BS.1770, audio_edit.loudness), from the same
+    on-demand decode the M4 preview measures. Cached by the sample's data hash (work/m6/_cache/)."""
+    cache = {}
+    if SPAIN_LUFS_CACHE.is_file():
+        c = json.loads(SPAIN_LUFS_CACHE.read_text(encoding="utf-8"))
+        if c.get("method") == audio_edit.RENDER_ENGINE:
+            cache = c["values"]
+    mcc = MccAudio(REPO_ROOT, decoder)
+    out = {}
+    for e in targets:
+        level, _rec, sample = app.slot_index[e["slot_id"]]
+        k = sample["data_sha256"]
+        if k not in cache:
+            cache[k] = audio_edit.wav_loudness(mcc.wav(level, "spanish", sample))
+        out[e["slot_id"]] = cache[k]
+    SPAIN_LUFS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    SPAIN_LUFS_CACHE.write_text(json.dumps({"method": audio_edit.RENDER_ENGINE, "values": cache}), encoding="utf-8")
+    return out
+
+
+def level_summary(cfg, slots):
+    """The manifest's `level` block: the settings the build used and what they did, line by line."""
+    rep = [e for e in slots if e["action"] == "replace"]
+    st_ = [(e, e.get("audio_stats") or {}) for e in rep]
+    gains = sorted(s.get("total_gain_db", 0.0) or 0.0 for _, s in st_)
+    vs = sorted(s["output_lufs"] - s["mcc_reference_lufs"] for _, s in st_
+                if s.get("output_lufs") is not None and s.get("mcc_reference_lufs") is not None)
+    lim = sorted(((s.get("match") or {}).get("limiter_max_reduction_db") or 0.0) for _, s in st_ if s.get("match"))
+
+    def dist(v):
+        return {"min": v[0], "median": v[len(v) // 2], "max": v[-1], "p10": v[len(v) // 10],
+                "p90": v[9 * len(v) // 10]} if v else None
+    return {"mode": cfg["level_mode"], "global_gain_db": cfg["global_gain_db"], "source": cfg["source"],
+            "config_sha256": cfg["sha256"], "peak_ceiling_dbfs": audio_edit.PEAK_CEILING_DB,
+            "match_max_limiting_db": audio_edit.MATCH_MAX_LIMITING_DB, "lines": len(rep),
+            "effective_gain_db": dist([round(g, 2) for g in gains]),
+            "constrained": [e["slot_id"] for e, s in st_ if (s.get("global_gain_shortfall_db") or 0) > 0
+                            or ((s.get("match") or {}).get("shortfall_db") or 0) > 0],
+            "fallback_to_global_gain": [e["slot_id"] for e, s in st_ if s.get("level_mode_used") not in
+                                        (None, cfg["level_mode"])],
+            "limiter_max_reduction_db": dist(lim),
+            "loudness_vs_spain_db": dist([round(v, 2) for v in vs])}
+
+
+def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
-    cfg: the export config (global gain, applied once to every replacement)."""
+    cfg: the export config (level mode and global gain, the same for every replacement); refs: Spain
+    loudness per slot (the match target, or reported only)."""
     results = {}
-    gain = cfg["global_gain_db"]
+    gain, mode = cfg["global_gain_db"], cfg["level_mode"]
+    refs = refs or {}
     for e in targets:
         wav = ce_audio.wav(e["ce_mission"], e["language"], e["media"])
         meta = {"ce_line_ref": e["ce_line_ref"], "language": e["language"],
                 "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
         edit = e.get("edit") or audio_edit.EDIT_ZERO
-        if needs_processing(edit, gain):
+        if needs_processing(edit, gain, mode):
             try:
                 res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED,
-                                       global_gain_db=gain, profile="fmod", gain_source=cfg["source"],
-                                       source_meta=meta)
+                                       ref_lufs=refs.get(e["slot_id"]), global_gain_db=gain, level_mode=mode,
+                                       profile="fmod", gain_source=cfg["source"], source_meta=meta)
             except audio_edit.EditError as ex:
                 raise SystemExit(f"{e['slot_id']}: audio cannot be processed: {ex}")
-        else:  # unedited and no global gain: the original path, byte for byte
+        else:  # unedited, global_gain mode with no gain: the original path, byte for byte
             res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
                          source_meta=meta)
         res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
@@ -275,10 +329,32 @@ def test_report(name, manifest, report, app):
                                ("LUFS out", lambda e: e["audio_stats"]["output_lufs"])]) if edited \
             else ["- none"]
         g = manifest["global_gain"]
+        lv = manifest.get("level") or {}
         shortfall = [e for e in rep if (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]
-        L += ["", f"### Global gain: {g['configured_db']:+g} dB ({g['source']}), applied once to every replacement", "",
-              f"Applied in full to {g['full']} line(s); **{len(shortfall)} line(s) got less** because their peak would "
-              f"pass {audio_edit.PEAK_CEILING_DB:g} dBFS (no limiting or compression is used for the global gain).", ""]
+        if lv.get("mode") == "match_spain":
+            vs, lim, eg = lv["loudness_vs_spain_db"], lv["limiter_max_reduction_db"], lv["effective_gain_db"]
+            L += ["", "### Level: matched to the Spain recordings (build-level mode)", "",
+                  f"Each line gets the gain that brings it to the loudness of the Spain recording it replaces "
+                  f"(median {eg['median']:+.1f} dB, from {eg['min']:+.1f} to {eg['max']:+.1f}). A look-ahead limiter "
+                  f"keeps peaks at {audio_edit.PEAK_CEILING_DB:g} dBFS and takes at most "
+                  f"{lv['match_max_limiting_db']:g} dB off any peak (median {lim['median']:.1f}, max {lim['max']:.1f} dB). "
+                  f"**{len(lv['constrained'])} line(s)** got less than their match because of that cap; "
+                  f"{len(lv['fallback_to_global_gain'])} fell back to the global gain. Result vs Spain: median "
+                  f"{vs['median']:+.1f} dB (p10 {vs['p10']:+.1f}, p90 {vs['p90']:+.1f}). The global gain "
+                  f"({g['configured_db']:+g} dB) is not used in this mode.", ""]
+            short_m = [e for e in rep if ((e.get("audio_stats") or {}).get("match") or {}).get("shortfall_db")]
+            if short_m:
+                L += md_table(short_m, [("Slot", lambda e: f"`{e['slot_id']}`"),
+                                        ("Wanted dB", lambda e: e["audio_stats"]["match"]["requested_db"]),
+                                        ("Applied dB", lambda e: e["audio_stats"]["match"]["applied_db"]),
+                                        ("Limiter dB", lambda e: e["audio_stats"]["match"]["limiter_max_reduction_db"])])
+        else:
+            vs = lv.get("loudness_vs_spain_db")
+            L += ["", f"### Global gain: {g['configured_db']:+g} dB ({g['source']}), applied once to every replacement", "",
+                  f"Applied in full to {g['full']} line(s); **{len(shortfall)} line(s) got less** because their peak would "
+                  f"pass {audio_edit.PEAK_CEILING_DB:g} dBFS (no limiting or compression is used for the global gain)."
+                  + (f" Result vs the Spain recordings: median {vs['median']:+.1f} dB (p10 {vs['p10']:+.1f}, p90 "
+                     f"{vs['p90']:+.1f})." if vs else ""), ""]
         if shortfall:
             L += md_table(shortfall, [("Slot", lambda e: f"`{e['slot_id']}`"),
                                       ("Applied dB", lambda e: e["audio_stats"]["global_gain_applied_db"]),
@@ -296,8 +372,11 @@ def test_report(name, manifest, report, app):
         L += ["- Radio effects not applied (v1.1); flagged lines play the clean CE recording.",
               "- Not built: stereo slots, concatenations (`ce_concat`), user recordings. Edited lines (flag E) are "
               "built from their recipes.",
-              f"- Global export gain {manifest['global_gain']['configured_db']:+g} dB on every replacement "
-              "(lines listed under “Global gain” got less, to avoid clipping).",
+              (f"- Level matched to each Spain recording, limiting capped at "
+               f"{audio_edit.MATCH_MAX_LIMITING_DB:g} dB (lines listed under “Level” got less)."
+               if (manifest.get("level") or {}).get("mode") == "match_spain" else
+               f"- Global export gain {manifest['global_gain']['configured_db']:+g} dB on every replacement "
+               "(lines listed under “Global gain” got less, to avoid clipping)."),
               "- Durations differ from the Spain recordings; MCC proved it plays longer/shorter samples (E1b, E3), "
               "but timing against cutscenes/scripts is part of this test."]
     if manifest["subtitles"].get("enabled"):
@@ -358,7 +437,7 @@ def read_local(path):
     return json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
 
 
-def build_audio(out, targets, original, args, cfg, pins):
+def build_audio(out, targets, original, args, cfg, pins, app):
     """The audio stage: encode, assemble, validate the bank. -> (checks, results, per_target, report extras)."""
     checks = {"bank_copy_matches_pin": hashlib.sha256(original).hexdigest() == pins["spanish.fsb"]["sha256"],
               "lst_copy_matches_pin": sha256_file(LST) == pins["spanish.lst"]["sha256"]}
@@ -366,12 +445,16 @@ def build_audio(out, targets, original, args, cfg, pins):
         raise SystemExit("Spanish bank copy does not match its pin")
     exe = args.vgmstream_cli
     ce_audio = CeAudio(REPO_ROOT, vgmstream_decoder(exe), ce_source_reader(args.oodle_dll))
+    print(f"measuring the loudness of the {len(targets)} Spain recording(s) being replaced...")
+    refs = spain_references(targets, app, vgmstream_decoder(exe))
+    checks["spain_references_measured"] = sum(v is not None for v in refs.values()) == len(targets) \
+        or cfg["level_mode"] != "match_spain"
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
     print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg)
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs)
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
@@ -455,6 +538,10 @@ def main():
     ap.add_argument("--vgmstream-cli", type=Path, default=DEFAULT_VGMSTREAM)
     ap.add_argument("--ffmpeg", default=shutil.which("ffmpeg"))
     ap.add_argument("--oodle-dll", type=Path)
+    ap.add_argument("--level-mode", choices=LEVEL_MODES,
+                    help="override config/audio_export.json level_mode for this build (recorded in the manifest)")
+    ap.add_argument("--global-gain", type=float, metavar="DB",
+                    help="override config/audio_export.json global_gain_db for this build (recorded in the manifest)")
     args = ap.parse_args()
     want_audio, want_subs = args.kind in ("audio", "both"), args.kind in ("subtitles", "both")
     association = None
@@ -529,8 +616,17 @@ def main():
         cfg = load_export_config(REPO_ROOT)
     except ConfigError as e:
         raise SystemExit(str(e))
+    if args.level_mode or args.global_gain is not None:  # a one-off build setting, not saved
+        cfg = dict(cfg, source="command line (" + ", ".join(
+            x for x in (args.level_mode and f"--level-mode {args.level_mode}",
+                        args.global_gain is not None and f"--global-gain {args.global_gain:g}") if x) + ")",
+                   level_mode=args.level_mode or cfg["level_mode"],
+                   global_gain_db=cfg["global_gain_db"] if args.global_gain is None else args.global_gain)
     if want_audio:
-        print(f"global gain {cfg['global_gain_db']:+g} dB ({cfg['source']})")
+        print(f"level: {cfg['level_mode']}" + (f", global gain {cfg['global_gain_db']:+g} dB"
+                                               if cfg["level_mode"] == "global_gain" else
+                                               f" (limiting capped at {audio_edit.MATCH_MAX_LIMITING_DB:g} dB; "
+                                               "global gain not used)") + f" ({cfg['source']})")
 
     pins = json.loads((REPO_ROOT / "work/mcc/build.json").read_text(encoding="utf-8"))["files"]
     checks = {"validator_clean": True}
@@ -538,7 +634,8 @@ def main():
     original = None
     if want_audio:
         original = BANK.read_bytes()
-        a_checks, results, per_target, audio_extra, bank_file = build_audio(out, targets, original, args, cfg, pins)
+        a_checks, results, per_target, audio_extra, bank_file = build_audio(out, targets, original, args, cfg, pins,
+                                                                            app)
         checks.update(a_checks)
         install_files.append(bank_file)
     sub_tables, sub_warnings = {}, []
@@ -573,6 +670,7 @@ def main():
             st = r.get("edit_stats")
             e["audio_stats"] = st  # None: original path (no recipe, no global gain)
             e["global_gain_applied_db"] = st["global_gain_applied_db"] if st else 0.0
+            e["total_gain_db"] = st["total_gain_db"] if st else 0.0
             e["warnings"] = st["warnings"] if st else []
     slots = plan["entries"] if want_audio else []
     counts = dict(acts) if want_audio else {}
@@ -603,9 +701,11 @@ def main():
         "radio_effect_slots": [e["slot_id"] for e in slots if e["radio_effect"]],
         "edited_slots": [e["slot_id"] for e in slots if e["action"] == "replace" and e.get("edit")],
         "audio_edit_engine": audio_edit.ENGINE, "render_engine": audio_edit.RENDER_ENGINE,
+        "level": level_summary(cfg, slots) if want_audio else None,
         "global_gain": {"configured_db": cfg["global_gain_db"], "source": cfg["source"],
+                        "level_mode": cfg["level_mode"],
                         "config_sha256": cfg["sha256"], "peak_ceiling_dbfs": audio_edit.PEAK_CEILING_DB,
-                        "applies": want_audio,
+                        "applies": want_audio and cfg["level_mode"] == "global_gain",
                         "rule": "linear, applied once after the recipe, "
                                 "before CELT; reduced (never limited) when the peak would pass the ceiling",
                         "full": sum(1 for r in results.values() if not (r.get("edit_stats") or {}).get(
@@ -635,9 +735,11 @@ def main():
     for f in install_files:
         print(f"  {f['install_rel']}: candidate {f['candidate_sha256'][:16]}… ({f['growth_bytes']:+,} B)")
     if want_audio:
-        g = manifest["global_gain"]
-        print(f"  global gain {g['configured_db']:+g} dB ({g['source']}): full on {g['full']} line(s), reduced on "
-              f"{len(g['short'])} to avoid clipping (test_report.md lists them)")
+        lv = manifest["level"]
+        eg, vs = lv["effective_gain_db"], lv["loudness_vs_spain_db"]
+        print(f"  level {lv['mode']}: effective gain median {eg['median']:+.1f} dB (min {eg['min']:+.1f}, max "
+              f"{eg['max']:+.1f}); {len(lv['constrained'])} line(s) held back (" + ("6 dB limiting cap" if lv["mode"] == "match_spain" else "peak rule") + "); loudness vs Spain "
+              + (f"median {vs['median']:+.1f} dB (p10 {vs['p10']:+.1f}, p90 {vs['p90']:+.1f})" if vs else "n/a"))
     for w in sub_warnings:
         print("  warning:", w)
     for k in failed:

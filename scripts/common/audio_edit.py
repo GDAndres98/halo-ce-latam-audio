@@ -16,9 +16,10 @@ Removed 2026-10-09 (owner feedback): `speed` (pitch-preserving tempo sounded unn
 field is reported by `problems` / `removed_fields` until the one-time migration
 (scripts/validate/migrate_reset_speed_gain.py) removes them.
 
-Removed 2026-10-11 (owner): loudness matching to Spain's recording (`loudness`, it gave a line its own
-gain) and its `limiter`. The global export gain is the only level setting. A stored `limiter`, or a stored
-`loudness` that is off, is ignored and dropped on save; a recipe that asks for matching is refused.
+Removed 2026-10-11 (owner): loudness matching to Spain's recording as a per-recipe setting (`loudness`)
+and its `limiter`. Recipes hold no level setting: a stored `limiter`, or a stored `loudness` that is off, is
+ignored and dropped on save; a recipe that asks for matching is refused. Matching came back the same day
+as a BUILD-LEVEL mode (owner decision after measurements, docs/m6-build.md §2.3), the same for every line.
 
 Times are seconds on the SOURCE recording's timeline (the editor's waveform). Processing order
 (`render`, RENDER_ENGINE), on the 44.1 kHz mono PCM the pipeline already produces:
@@ -26,13 +27,21 @@ Times are seconds on the SOURCE recording's timeline (the editor's waveform). Pr
     1. edit: keep [trim_start, end - trim_end] minus the cuts (equal-power crossfade at each junction),
        fade in / out, then inserted silences (half-cosine fades of crossfade_ms / 2 on both sides;
        digital silence, ignored by BS.1770 gating)
-    2. global export gain (config/audio_export.json, default +4 dB; common/export_config.py), applied
-       exactly once, linearly, to every CE replacement. Never limited or compressed: if the peak
-       would pass -1 dBFS the gain is reduced to fit (never below 0 dB for a positive setting) and
-       the shortfall is reported.
+    2. the level, by the build-level mode in config/audio_export.json (common/export_config.py):
+       global_gain (default)  the global export gain (default +4 dB), applied exactly once, linearly, to
+                              every CE replacement. Never limited: if the peak would pass -1 dBFS the gain
+                              is reduced to fit (never below 0 dB for a positive setting); the shortfall
+                              is reported.
+       match_spain            each line gets the gain that brings its loudness (BS.1770) to the loudness
+                              of the Spain recording it replaces, so quiet lines stay quiet and shouts stay
+                              loud as in the original game. A look-ahead peak limiter keeps the peak at
+                              -1 dBFS; the gain is lowered so the limiter never takes more than
+                              MATCH_MAX_LIMITING_DB off any peak (the shortfall is reported). The global
+                              gain is not used. Without a measurable Spain reference the line falls back
+                              to the global gain (reported).
     3. round to 16-bit
 
-The loudness of the line (and, when given, of the original MCC recording) is measured for the stats only.
+The loudness of the line and of the original MCC recording are measured and reported.
 
 Nothing here reads mappings, approves anything or writes files. The radio flag is separate
 (`radio_effect`) and no effect is ever applied here.
@@ -41,9 +50,10 @@ import math
 import sys
 import wave
 from array import array
+from collections import deque
 
 ENGINE = "audio-edit/1"            # recipe format
-RENDER_ENGINE = "audio-render/4"   # processing (2: no speed/manual gain; 3: no limiter; 4: no matching)
+RENDER_ENGINE = "audio-render/5"   # 2: no speed/manual gain; 3: no limiter; 4: no matching; 5: level modes
 REMOVED_FIELDS = ("speed", "gain_db")
 # Removed 2026-10-11 (owner): the limiter and loudness matching. A stored `limiter` (migrate_remove_limiter.py
 # removed them from the mappings) or a `loudness` that is off is ignored and dropped on save.
@@ -56,6 +66,9 @@ LIMITS = {"fade_in_ms": (0, 500), "fade_out_ms": (0, 500), "crossfade_ms": (0, 2
 DEFAULTS = {"cuts": [], "silences": [], "fade_in_ms": 0, "fade_out_ms": 0, "crossfade_ms": 20}
 MIN_KEEP_S = 0.05          # the edited line must keep at least this much source audio
 PEAK_CEILING_DB = -1.0     # headroom for the codec; also keeps M6's "no new clipping" check meaningful
+LEVEL_MODES = ("global_gain", "match_spain")
+MATCH_MAX_LIMITING_DB = 6.0  # match_spain: the most the limiter may take off a peak (owner, 2026-10-11)
+LIMITER = {"lookahead_ms": 5.0, "release_ms": 80.0}
 
 
 class EditError(ValueError):
@@ -387,10 +400,61 @@ def global_gain(y, gain_db, ceiling_db=PEAK_CEILING_DB):
     return [v * g for v in y], round(applied, 2), round(gain_db - applied, 2)
 
 
-def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, fs=SAMPLE_RATE):
-    """44.1 kHz mono 16-bit PCM + recipe + global export gain -> {"pcm": bytes, "stats": {...}}.
-    Deterministic. ref_lufs: loudness of the original MCC recording, reported in the stats only.
-    An identity recipe with no global gain returns the input unchanged."""
+def limit(x, ceiling, fs=SAMPLE_RATE, lookahead_ms=LIMITER["lookahead_ms"], release_ms=LIMITER["release_ms"]):
+    """Look-ahead peak limiter -> (samples, max gain reduction dB, fraction of samples reduced by > 0.1 dB).
+    |output| <= ceiling for every sample: the gain at i is a mean of held minima that each cover sample i
+    (sliding minimum over the next `lookahead` samples, exponential release, then a box filter over the
+    previous `lookahead` samples). Restored from audio-render/2 (removed 2026-10-11, back for match_spain)."""
+    n, L = len(x), max(1, int(round(lookahead_ms * fs / 1000)))
+    req = [ceiling / abs(v) if abs(v) > ceiling else 1.0 for v in x]
+    if n == 0 or min(req) >= 1.0:
+        return list(x), 0.0, 0.0
+    hold, dq = [1.0] * n, deque()
+    for i in range(n - 1, -1, -1):  # hold[i] = min(req[i .. i+L])
+        while dq and req[dq[-1]] >= req[i]:
+            dq.pop()
+        dq.append(i)
+        while dq[0] > i + L:
+            dq.popleft()
+        hold[i] = req[dq[0]]
+    a, g = math.exp(-1000.0 / (release_ms * fs)), 1.0
+    for i in range(n):
+        g = min(hold[i], 1.0 - (1.0 - g) * a)
+        hold[i] = g
+    out, acc, gmin, reduced = [0.0] * n, 0.0, 1.0, 0
+    for i in range(n):  # mean of hold[i-L .. i]; every term <= req[i]
+        acc += hold[i]
+        if i > L:
+            acc -= hold[i - L - 1]
+        gi = min(acc / min(i + 1, L + 1), req[i])  # min() only guards float rounding
+        gmin = min(gmin, gi)
+        reduced += gi < 0.98855  # more than 0.1 dB
+        out[i] = x[i] * gi
+    return out, round(-20 * math.log10(gmin), 2), round(reduced / n, 4)
+
+
+def match_spain(y, measured_lufs, ref_lufs, ceiling_db=PEAK_CEILING_DB, max_limiting_db=MATCH_MAX_LIMITING_DB):
+    """Gain to the Spain recording's loudness, peaks held at ceiling_db by the look-ahead limiter, the gain
+    lowered so no peak loses more than max_limiting_db. -> (samples, {requested, applied, shortfall, limiter})."""
+    requested = ref_lufs - measured_lufs
+    applied = requested
+    pk = peak_db(y)
+    if pk is not None and pk + applied - ceiling_db > max_limiting_db:
+        applied = ceiling_db + max_limiting_db - pk
+    g = 10 ** (applied / 20)
+    z, reduction, frac = limit([v * g for v in y], 10 ** (ceiling_db / 20))
+    return z, {"requested_db": round(requested, 2), "applied_db": round(applied, 2),
+               "shortfall_db": round(requested - applied, 2), "limiter_max_reduction_db": reduction,
+               "limiter_fraction": frac}
+
+
+def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE):
+    """44.1 kHz mono 16-bit PCM + recipe + level (build-level mode) -> {"pcm": bytes, "stats": {...}}.
+    Deterministic. ref_lufs: loudness of the original MCC recording (the target in match_spain mode,
+    reported only in global_gain mode). In global_gain mode an identity recipe with no global gain returns
+    the input unchanged."""
+    if level_mode not in LEVEL_MODES:
+        raise EditError(f"unknown level mode {level_mode!r}")
     x = pcm16_to_float(pcm)
     n = len(x)
     bad = problems(edit, n / fs)
@@ -410,11 +474,23 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, fs=SAMPLE_RATE):
     edited = len(y)
     measured, method = loudness(y, fs)
     z = y
-    # 2. global export gain, once, never limited
-    z, g_applied, g_short = global_gain(z, global_gain_db)
-    if g_short > 0:
-        warnings.append(f"global gain: only {g_applied:+.1f} of {global_gain_db:+.1f} dB applied "
-                        f"({g_short:.1f} dB short: the peak would pass {PEAK_CEILING_DB:g} dBFS)")
+    match, used_mode = None, level_mode
+    g_applied = g_short = 0.0
+    if level_mode == "match_spain" and (ref_lufs is None or measured is None):
+        used_mode = "global_gain"  # nothing to match to (or a silent line): the global gain applies
+        warnings.append("match Spain: no measurable loudness for " + ("Spain's recording" if ref_lufs is None
+                                                                       else "this line") + "; global gain used")
+    if used_mode == "match_spain":  # 2. match the Spain recording, peaks held by the limiter (capped)
+        z, match = match_spain(z, measured, ref_lufs)
+        if match["shortfall_db"] > 0:
+            warnings.append(f"match Spain: {match['applied_db']:+.1f} of {match['requested_db']:+.1f} dB applied "
+                            f"({match['shortfall_db']:.1f} dB short: limiting is capped at "
+                            f"{MATCH_MAX_LIMITING_DB:g} dB)")
+    else:  # 2. global export gain, once, never limited
+        z, g_applied, g_short = global_gain(z, global_gain_db)
+        if g_short > 0:
+            warnings.append(f"global gain: only {g_applied:+.1f} of {global_gain_db:+.1f} dB applied "
+                            f"({g_short:.1f} dB short: the peak would pass {PEAK_CEILING_DB:g} dBFS)")
     out = float_to_pcm16(z)  # 3. 16-bit
     final = pcm16_to_float(out)
     stats = {"engine": RENDER_ENGINE, "recipe_format": ENGINE, "identity": identity,
@@ -424,8 +500,11 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, fs=SAMPLE_RATE):
              "output_samples": len(final), "output_s": round(len(final) / fs, 3),
              "loudness_method": method, "loudness_before_gain_lufs": _rnd(measured),
              "mcc_reference_lufs": _rnd(ref_lufs),
-             "global_gain_requested_db": global_gain_db, "global_gain_applied_db": g_applied,
-             "global_gain_shortfall_db": g_short, "total_gain_db": g_applied,
+             "level_mode": level_mode, "level_mode_used": used_mode,
+             "global_gain_requested_db": global_gain_db if used_mode == "global_gain" else 0.0,
+             "global_gain_applied_db": g_applied, "global_gain_shortfall_db": g_short,
+             "match": match,
+             "total_gain_db": match["applied_db"] if match else g_applied,
              "output_lufs": _rnd(loudness(final, fs)[0]), "output_peak_dbfs": _rnd(peak_db(final)),
              "warnings": warnings}
     return {"pcm": out, "stats": stats}

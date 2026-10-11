@@ -241,8 +241,12 @@ export interface EditPreviewResponse {
 }
 
 /** The global export gain (config/audio_export.json). `source` is "default" when no file has been saved. */
+/** How every replacement's level is set at export (a build setting, never part of a mapping). */
+export type LevelMode = "global_gain" | "match_spain";
+
 export interface ExportSettings {
   global_gain_db: number;
+  level_mode: LevelMode;
   source: string;
   sha256: string | null;
 }
@@ -292,6 +296,24 @@ export interface ExcludedSubtitle {
   source?: string;
 }
 
+type Dist = { min: number; median: number; max: number; p10?: number; p90?: number } | null;
+
+/** The level settings a build used and what they did (build_manifest.json `level`). */
+export interface BuildLevel {
+  mode: LevelMode;
+  global_gain_db: number | null;
+  lines: number;
+  /** The gain each replacement actually got (dB). */
+  effective_gain_db: Dist;
+  /** Lines that got less than asked: the peak rule (global gain) or the 6 dB limiting cap (match Spain). */
+  constrained: number;
+  fallback: number;
+  limiter_max_reduction_db: Dist;
+  /** Replacement loudness minus the Spain recording's (dB); negative = quieter than the original game. */
+  loudness_vs_spain_db: Dist;
+  source: string | null;
+}
+
 export interface BuildSummary {
   name: string;
   kind: BuildKind;
@@ -311,6 +333,7 @@ export interface BuildSummary {
   stale: boolean;
   stale_reasons: string[];
   built_gain_db: number | null;
+  level: BuildLevel | null;
   built_from_sha256: string | null;
   candidate_sha256: string | null;
   install_files: { install_rel: string; candidate: string | null; candidate_sha256: string; size: number | null }[];
@@ -376,6 +399,9 @@ export interface DeployStatus {
   files: { install_rel: string; sha256: string | null; state: "original" | "build" | "unknown"; builds: string[] }[];
   active_builds: string[];
   mod_installed: boolean;
+  /** What the Studio is set to now, and the level settings inside the installed audio build(s). */
+  current_level?: { mode: LevelMode; global_gain_db: number };
+  installed_level?: (BuildLevel & { build: string; built_at: string | null; matches_current: boolean })[];
 }
 
 /** What installing a build would change (GET /api/deploy/plan). */

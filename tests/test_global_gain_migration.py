@@ -39,7 +39,7 @@ def tone(amp, seconds=1.0):
 class ConfigTests(unittest.TestCase):
     def test_default_and_configured(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(load_export_config(tmp), {"global_gain_db": DEFAULT_GLOBAL_GAIN_DB, "source": "default",
+            self.assertEqual(load_export_config(tmp), {"global_gain_db": DEFAULT_GLOBAL_GAIN_DB, "level_mode": "global_gain", "source": "default",
                                                        "sha256": None})
             self.assertEqual(DEFAULT_GLOBAL_GAIN_DB, 4.0)
             (Path(tmp) / "config").mkdir()

@@ -131,17 +131,19 @@ def _write_derived(out_root, stream_sha, pcm, channels, recipe):
     return out
 
 
-def needs_processing(edit, global_gain_db):
-    """False only for an unedited line with no global gain: then `derive` (the original path) is used."""
-    return not audio_edit.is_identity(edit) or bool(global_gain_db)
+def needs_processing(edit, global_gain_db, level_mode="global_gain"):
+    """False only for an unedited line with no global gain in global_gain mode: then `derive` (the original
+    path) is used. match_spain always processes."""
+    return not audio_edit.is_identity(edit) or bool(global_gain_db) or level_mode != "global_gain"
 
 
-def render_edited(src, edit, *, ffmpeg, ref_lufs=None, global_gain_db=0.0):
-    """Source WAV -> 44.1 kHz PCM -> recipe -> global gain.
+def render_edited(src, edit, *, ffmpeg, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain"):
+    """Source WAV -> 44.1 kHz PCM -> recipe -> level (global gain or match Spain).
     -> (source_pcm, audio_edit.render result). The single function both the M4 preview and the M6
     build call (mono only)."""
     source_pcm = to_mcc_pcm(ffmpeg, src, 1)
-    return source_pcm, audio_edit.render(source_pcm, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
+    return source_pcm, audio_edit.render(source_pcm, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                                         level_mode=level_mode)
 
 
 def codec_roundtrip(celt, pcm, profile="fmod"):
@@ -153,11 +155,12 @@ def codec_roundtrip(celt, pcm, profile="fmod"):
 
 
 def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global_gain_db=0.0, profile="fmod",
-                     source_meta=None, gain_source=None):
-    """`derive` with the processing stages (recipe, global export gain)
+                     source_meta=None, gain_source=None, level_mode="global_gain"):
+    """`derive` with the processing stages (recipe, level: global export gain or match Spain)
     applied after the 44.1 kHz conversion and before CELT (mono)."""
     src = Path(src)
-    source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
+    source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                                  level_mode=level_mode)
     pcm, st = r["pcm"], r["stats"]
     enc = encode_for_mcc(celt, pcm, 1, profile)
     decoded = celt.decode(enc["packets"], channels=1)
@@ -168,10 +171,18 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
     if not identity:
         steps.append({"op": "audio_edit", "engine": audio_edit.ENGINE, "recipe": edit,
                       "summary": audio_edit.summary(edit), "source_pcm_sha256": sha256_bytes(source_pcm)})
+    if st["level_mode_used"] == "match_spain":
+        steps.append({"op": "match_spain", "spain_lufs": st["mcc_reference_lufs"],
+                      "line_lufs_before": st["loudness_before_gain_lufs"], **st["match"], "source": gain_source,
+                      "rule": f"gain to the Spain recording's loudness (BS.1770); look-ahead limiter at "
+                              f"{audio_edit.PEAK_CEILING_DB:g} dBFS taking at most {audio_edit.MATCH_MAX_LIMITING_DB:g} "
+                              "dB off any peak (gain lowered otherwise)"})
+    else:
+        steps.append({"op": "global_gain", "requested_db": st["global_gain_requested_db"],
+                      "applied_db": st["global_gain_applied_db"], "shortfall_db": st["global_gain_shortfall_db"],
+                      "source": gain_source,
+                      "rule": f"linear; reduced to keep the peak <= {audio_edit.PEAK_CEILING_DB:g} dBFS; never limited"})
     steps += [
-        {"op": "global_gain", "requested_db": global_gain_db, "applied_db": st["global_gain_applied_db"],
-         "shortfall_db": st["global_gain_shortfall_db"], "source": gain_source,
-         "rule": f"linear; reduced to keep the peak <= {audio_edit.PEAK_CEILING_DB:g} dBFS; never limited"},
         {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
         {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
          "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
@@ -181,7 +192,9 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
         "source": {"file": src.name, "sha256": sha256_file(src), **wav_info(src), **(source_meta or {})},
         "steps": steps,
         "content_changes": ("owner edit recipe: " + audio_edit.summary(edit) + "; " if not identity else "")
-        + f"global gain {st['global_gain_applied_db']:+g} dB (no effects; radio flag not applied)",
+        + (f"matched to Spain {st['total_gain_db']:+g} dB, limiter {st['match']['limiter_max_reduction_db']:g} dB"
+           if st["level_mode_used"] == "match_spain" else f"global gain {st['global_gain_applied_db']:+g} dB")
+        + " (no effects; radio flag not applied)",
         "stats": st,
         "pcm_44100": {"sha256": sha256_bytes(pcm), "samples": n, "seconds": round(n / SAMPLE_RATE, 3)},
         "output": {"stream_sha256": stream_sha, "stream_bytes": len(enc["stream"]), "frames": enc["frames"],
