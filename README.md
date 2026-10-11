@@ -145,6 +145,13 @@ applied once when a build is exported. The default is **+4 dB**, the range is âˆ
 default* returns to +4 dB. The value is saved in `config/audio_export.json` (git-ignored; the previous file is
 kept in `config/.history/`).
 
+The gain is a **build setting, never part of a mapping**. Edit recipes hold no gain (per-line gain was
+removed on 2026-10-09, approved mappings included), so every approved replacement, old or new, gets the same
+gain in a given build. Each build records the gain it used: the configured value in `build_manifest.json`
+(`global_gain`), and per line the dB actually applied and any shortfall from the peak protection. Original MCC
+recordings that a build does not replace are copied byte for byte and never get gain. Previews in the editor
+use the current setting.
+
 Changing the gain does not rebuild anything. Every build made with another gain is marked **stale**, with the
 reason, and stays as it is until you rebuild it.
 
