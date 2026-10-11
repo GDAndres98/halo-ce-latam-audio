@@ -4,7 +4,7 @@
     {"schema": "audio-export-config/1", "global_gain_db": 4.0}
 
 `global_gain_db` is applied once to every Campaign Evolved replacement, after the edit recipe and
-the optional loudness match, before CELT encoding (common/audio_edit.render). Without the file the
+before CELT encoding (common/audio_edit.render). Without the file the
 default (+4 dB; owner decisions: +3 dB on 2026-10-09, raised to +4 dB on 2026-10-10) is used. Mappings are never touched by this setting.
 """
 import hashlib

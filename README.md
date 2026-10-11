@@ -89,8 +89,8 @@ Open **Matching**. The screen has three columns.
      cuts as needed, each crossfaded), drag the cyan handles at the ends to trim, **Insert silence** (a length
      in milliseconds, 10–5000, at the playhead or the start of the selection; again at the same spot
      lengthens it), **Replace selection with silence** (sets a pause to an exact length), set fades (up to
-     500 ms), optionally match Spain's loudness, zoom in to place edits precisely, **Undo** and **Reset
-     edits**. Inserted silences show as green markers with their length and are listed below the waveform,
+     500 ms), zoom in to place edits precisely, **Undo** and **Reset edits**. There is no per-line level
+     control: the global gain (below) is the only one. Inserted silences show as green markers with their length and are listed below the waveform,
      where their position and length can be changed; silences made on the classic page appear there too.
      Edits are a recipe saved with the draft; the original WAV is never changed, and approved audio is
      read-only until marked *Needs rework*.
@@ -175,9 +175,12 @@ gain in a given build. Each build records the gain it used: the configured value
 recordings that a build does not replace are copied byte for byte and never get gain. Previews in the editor
 use the current setting.
 
-Loudness matching was switched off in every recipe on 2026-10-11 (owner decision; 5 approved lines,
-approvals unchanged), so no line gets its own level any more: see
-[docs/migrations/2026-10-11-reset-loudness-match.md](docs/migrations/2026-10-11-reset-loudness-match.md).
+Loudness matching to Spain's recording was switched off in every recipe on 2026-10-11 (owner decision; 5
+approved lines, approvals unchanged:
+[docs/migrations/2026-10-11-reset-loudness-match.md](docs/migrations/2026-10-11-reset-loudness-match.md)), and
+then removed from the editors, the renderer and the schema, together with its limiter
+([docs/migrations/2026-10-11-remove-limiter.md](docs/migrations/2026-10-11-remove-limiter.md)). No line gets
+its own level: the global gain is the only level setting.
 
 Changing the gain does not rebuild anything. Every build made with another gain is marked **stale**, with the
 reason, and stays as it is until you rebuild it.
@@ -186,10 +189,9 @@ Processing order for each replacement, as the build applies it:
 
 1. Sources are converted to 44.1 kHz mono.
 2. The edit recipe: trims, cuts, fades and inserted silences.
-3. Optional loudness match to Spain's recording (only where chosen on the line).
-4. The global gain, applied once, linearly and never limited. A line that would peak above −1 dBFS gets less,
+3. The global gain, applied once, linearly and never limited. A line that would peak above −1 dBFS gets less,
    and the build reports it.
-5. Rounding to 16-bit, then encoding for the game (CELT).
+4. Rounding to 16-bit, then encoding for the game (CELT).
 
 Previews in the editor use the same steps, so what you hear is what the build writes.
 
@@ -278,8 +280,7 @@ decision; a file that "differs from the database" was edited outside the Studio.
 
 ## Known limitations
 
-- Audio editing covers trims, cuts, fades and loudness matching. Inserted silences are made on the classic
-  page; the Studio shows them and can remove them.
+- Audio editing covers trims, cuts, fades and inserted silences; there is no per-line level control.
 - A/B keeps the same position in seconds; after trims and cuts the two recordings are not aligned word for
   word.
 - The candidate list shows the mission and folder, not a speaker: the Campaign Evolved catalogue does not

@@ -37,5 +37,8 @@ found nothing. The Studio was stopped during the run.
 old engine are not reused); a stored `limiter` is ignored and dropped on save. The schema no longer allows
 the field. Both editors (the Studio and the classic page) lost the checkbox.
 
-**Not changed.** The editors still offer "Match Spain's recording" (with its offset): it gives a line its
-own gain, now never limited.
+**Follow-up the same day (owner): loudness matching removed.** "Match Spain's recording" (with its offset)
+is gone from both editors, the renderer (`audio-render/4`), the M6 build and the server: the global export
+gain is the only level setting. A recipe that asks for matching is refused. Older recipes still store
+`loudness: {"mode": "off", "offset_db": 0}`; the schema accepts only that value, and the renderer and the
+Studio ignore it (a save drops it). Spain's loudness is still measured, for information only.

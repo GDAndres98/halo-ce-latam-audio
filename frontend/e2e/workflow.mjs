@@ -476,12 +476,11 @@ async function main() {
 
     // ---- 6b. A subtitle-only decision.
     await step("6b. a subtitle-only decision saves without an audio replacement", async () => {
-      const list = await api("/api/slots?level=a10&status=undecided&limit=5");
+      // Any undecided line will do (the owner's a10 may be fully decided by now).
+      const list = await api("/api/slots?level=all&status=undecided&limit=5");
       const target = list.slots.find((s) => s.slot_id !== SLOT);
-      check(target, "no undecided a10 line in the fixture");
-      await page.locator(`li.row-item[id="mcc-${target.slot_id}"]`).click().catch(async () => {
-        await page.goto(`http://localhost:${WEB_PORT}/#/match?level=a10&slot=${encodeURIComponent(target.slot_id)}`);
-      });
+      check(target, "no undecided line in the fixture");
+      await page.goto(`http://localhost:${WEB_PORT}/#/match?level=${target.level}&slot=${encodeURIComponent(target.slot_id)}`);
       await waitLine(target.slot_id);
       await subtitles().getByLabel("Write my own LATAM Spanish text").check();
       const su = (await api(`/api/slot?id=${encodeURIComponent(target.slot_id)}`)).mcc_subtitles.SU?.text ?? "";
@@ -505,8 +504,8 @@ async function main() {
     });
 
     await page.setViewportSize({ width: 1600, height: 2600 });
-    await page.locator(`li.row-item[id="mcc-${SLOT}"]`).click();
-    await page.waitForFunction((id) => document.querySelector('[data-testid="mcc-key"]')?.textContent === id, SLOT, { timeout: 10000 });
+    await page.goto(`http://localhost:${WEB_PORT}/#/match?level=a10&slot=${encodeURIComponent(SLOT)}`);
+    await waitLine(SLOT);
     await page.waitForTimeout(1500);
     await center().screenshot({ path: join(OUT, "workflow-panel.png") });
   } catch (e) {

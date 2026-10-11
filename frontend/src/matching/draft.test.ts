@@ -119,9 +119,10 @@ describe("reading a stored recipe", () => {
     expect(draft.edit.trim_start_s).toBe(0.1);
   });
 
-  it("keeps a stored loudness mode and fills its offset", () => {
-    const partial = decision({ audio: { ...decision().audio, edit: { trim_start_s: 0, trim_end_s: 0, gap_s: 0, loudness: { mode: "match_mcc" } } as never } });
-    expect(draftFrom(slot(partial)).edit.loudness).toEqual({ mode: "match_mcc", offset_db: 0 });
+  it("drops the removed loudness and limiter settings of older recipes", () => {
+    const old = decision({ audio: { ...decision().audio, edit: { ...defaultEdit(0), loudness: { mode: "off", offset_db: 0 }, limiter: true } as never } });
+    const edit = draftFrom(slot(old)).edit as unknown as Record<string, unknown>;
+    expect("loudness" in edit || "limiter" in edit).toBe(false);
   });
 
   it("never keeps the server's recording binding", () => {

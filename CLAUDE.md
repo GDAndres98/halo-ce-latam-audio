@@ -164,15 +164,15 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       when the owner clicks and confirms; never drive it, or the install API, yourself against the real game.
     - **Audio editor (2026-10-09):** non-destructive per-mapping recipes in `audio.edit`
       (`audio-edit/1`, `scripts/common/audio_edit.py`). It covers trims, cuts with crossfades,
-      inserted silences, fades, and an optional BS.1770 loudness match to the slot's Spain
-      recording (never limited: the `limiter` setting was removed on 2026-10-11, see
-      `docs/migrations/2026-10-11-remove-limiter.md`).
+      inserted silences and fades. **No per-line level control:** loudness matching to Spain's
+      recording and its `limiter` were removed on 2026-10-11 (owner); the global export gain is
+      the only level setting (`docs/migrations/2026-10-11-remove-limiter.md`).
       - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
         migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
         recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.
       - **Global export gain:** `config/audio_export.json` `global_gain_db`, +4 dB (since 2026-10-10) when the file is
         absent (`common/export_config.py`). It is applied once to every CE replacement, after the
-        optional match, before CELT. It is linear, never limited, and lines that can't take it in
+        recipe, before CELT. It is linear, never limited, and lines that can't take it in
         full are reported.
       - M4 shows waveforms and previews (`common/edit_preview.py`, `work/m4/preview/`). The
         "as encoded" preview is byte-identical to the bank decode.

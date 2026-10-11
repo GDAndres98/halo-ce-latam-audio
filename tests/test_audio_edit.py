@@ -56,17 +56,21 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(ae.normalize({}), ae.EDIT_ZERO)
         self.assertEqual(ae.normalize({"limiter": False, "crossfade_ms": 40}), ae.EDIT_ZERO)
         self.assertTrue(ae.is_identity({"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0}))
-        r = ae.normalize({"trim_start_s": 0.12345, "cuts": [{"start_s": 1.2, "end_s": 1.4}, {"start_s": 0.5, "end_s": 0.6}],
-                          "loudness": {"mode": "match_mcc", "offset_db": -1.26}}, SRC)
+        r = ae.normalize({"trim_start_s": 0.12345, "cuts": [{"start_s": 1.2, "end_s": 1.4}, {"start_s": 0.5, "end_s": 0.6}]}, SRC)
         self.assertEqual(r["trim_start_s"], 0.123)
         self.assertEqual([c["start_s"] for c in r["cuts"]], [0.5, 1.2])  # sorted
-        self.assertEqual((r["loudness"]["offset_db"], r["engine"], r["for_source"]), (-1.3, ae.ENGINE, SRC))
+        self.assertEqual((r["engine"], r["for_source"]), (ae.ENGINE, SRC))
         self.assertNotIn("speed", r)
         self.assertNotIn("gain_db", r)
         self.assertNotIn("limiter", r)  # removed 2026-10-11
-        self.assertEqual(ae.normalize(dict(r, limiter=True)), r)  # a stored limiter is ignored and dropped
+        self.assertNotIn("loudness", r)  # removed 2026-10-11
+        # Stored by older recipes: a limiter, or loudness that is off, is ignored and dropped.
+        self.assertEqual(ae.normalize(dict(r, limiter=True, loudness={"mode": "off", "offset_db": 0})), r)
+        for matching in ({"mode": "match_mcc", "offset_db": 0}, {"mode": "off", "offset_db": 2}):
+            with self.assertRaises(ae.EditError):  # asking for matching is refused
+                ae.normalize(dict(r, loudness=matching))
         self.assertEqual(ae.normalize(r), r)  # idempotent
-        self.assertIn("match MCC", ae.summary(r))
+        self.assertIn("cut", ae.summary(r))
         self.assertNotIn("speed", ae.summary(r))
 
     def test_rules(self):
@@ -103,9 +107,12 @@ class RecipeTests(unittest.TestCase):
         schema = load_schema("manual-mappings-3")
         edit_schema = schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"]
         r = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
-                          "silences": [{"at_s": 0.8, "dur_s": 0.4}],
-                          "loudness": {"mode": "match_mcc", "offset_db": -2}}, SRC)
+                          "silences": [{"at_s": 0.8, "dur_s": 0.4}]}, SRC)
         self.assertEqual(validate(r, {**edit_schema, "$defs": schema["$defs"]}), [])
+        full = {**edit_schema, "$defs": schema["$defs"]}
+        self.assertEqual(validate(dict(r, loudness={"mode": "off", "offset_db": 0}), full), [])  # older recipes
+        self.assertTrue(validate(dict(r, loudness={"mode": "match_mcc", "offset_db": 0}), full))  # matching gone
+        self.assertTrue(validate(dict(r, limiter=True), full))
         self.assertEqual(validate(dict(ae.EDIT_ZERO), {**edit_schema, "$defs": schema["$defs"]}), [])
         for gone in ({"speed": 1.0}, {"gain_db": 0}):  # removed fields are no longer in the schema
             self.assertTrue(validate(dict(r, **gone), {**edit_schema, "$defs": schema["$defs"]}))
@@ -166,29 +173,21 @@ class DspTests(unittest.TestCase):
         self.assertEqual(y[500], 1.0)
         self.assertFalse(hasattr(ae, "limit"))  # no limiter exists any more (2026-10-11)
 
-    def test_render_is_deterministic_and_matches_loudness(self):
+    def test_render_is_deterministic_and_has_no_per_line_level(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))
         e = ae.normalize({"trim_start_s": 0.05, "trim_end_s": 0.05, "fade_in_ms": 10, "fade_out_ms": 10,
-                          "cuts": [{"start_s": 0.7, "end_s": 0.8}], "loudness": {"mode": "match_mcc", "offset_db": 0}}, SRC)
-        r1, r2 = ae.render(pcm, e, ref_lufs=-14.0), ae.render(pcm, e, ref_lufs=-14.0)
-        self.assertEqual(r1["pcm"], r2["pcm"])
+                          "cuts": [{"start_s": 0.7, "end_s": 0.8}]}, SRC)
+        r1, r2 = ae.render(pcm, e, ref_lufs=-14.0), ae.render(pcm, e)
+        self.assertEqual(r1["pcm"], r2["pcm"])  # Spain's loudness is only reported, never applied
         st = r1["stats"]
         self.assertEqual(st["output_samples"], len(pcm) // 2 - int(0.2 * FS))
-        self.assertAlmostEqual(st["output_lufs"], -14.0, delta=0.15)
-        self.assertLessEqual(st["output_peak_dbfs"], -1.0 + 0.01)
-        with self.assertRaises(ae.EditError):
-            ae.render(pcm, e)                     # match needs the MCC reference
+        self.assertEqual((st["mcc_reference_lufs"], st["total_gain_db"]), (-14.0, 0.0))
+        for gone in ("loudness_match", "match_applied_gain_db", "limiter"):
+            self.assertNotIn(gone, st)
         self.assertEqual(ae.render(pcm, dict(ae.EDIT_ZERO))["pcm"], pcm)  # identity, no global gain: unchanged
-        loud = ae.float_to_pcm16(speech(1.5, amp=0.9))
-        # Matching never limits: when the peak would pass -1 dBFS, the match gain is lowered instead.
-        lowered = ae.render(loud, dict(e, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
-        self.assertGreater(lowered["stats"]["match_gain_lowered_for_peak_db"], 0)
-        self.assertLessEqual(lowered["stats"]["output_peak_dbfs"], -1.0 + 0.01)
-        self.assertTrue(any("lowered" in w for w in lowered["stats"]["warnings"]))
-        self.assertNotIn("limiter", lowered["stats"])
-        # A legacy limiter=true in a recipe changes nothing.
-        legacy = ae.render(loud, dict(e, limiter=True, loudness={"mode": "match_mcc", "offset_db": 0}), ref_lufs=-3.0)
-        self.assertEqual(legacy["pcm"], lowered["pcm"])
+        # An older recipe with loudness off (and a limiter) renders exactly like one without them.
+        legacy = ae.render(pcm, dict(e, limiter=True, loudness={"mode": "off", "offset_db": 0}))
+        self.assertEqual(legacy["pcm"], r1["pcm"])
 
 
 @unittest.skipUnless(FFMPEG and HAVE_CELT, "ffmpeg and libcelt needed")
@@ -211,8 +210,7 @@ class ParityTests(unittest.TestCase):
 
     def test_edited_preview_equals_m6_build(self):
         e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.8, "end_s": 0.9}],
-                          "silences": [{"at_s": 0.5, "dur_s": 0.25}, {"at_s": 0.8, "dur_s": 0.1}], "fade_in_ms": 10,
-                          "loudness": {"mode": "match_mcc", "offset_db": -1}}, SRC)
+                          "silences": [{"at_s": 0.5, "dur_s": 0.25}, {"at_s": 0.8, "dur_s": 0.1}], "fade_in_ms": 10}, SRC)
         prev = EditPreview(self.root, FFMPEG, Celt011)
         p = prev.render(self.src, e, -15.0, 3.0)
         built = derive_processed(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived",
@@ -223,7 +221,7 @@ class ParityTests(unittest.TestCase):
         self.assertEqual(p["stats"]["encoded_sample_count"], built["sample_count"])
         recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
         self.assertEqual([s["op"] for s in recipe["steps"]],
-                         ["ffmpeg_convert", "audio_edit", "loudness_match", "global_gain", "pad_end", "celt_encode"])
+                         ["ffmpeg_convert", "audio_edit", "global_gain", "pad_end", "celt_encode"])
         self.assertEqual(recipe["steps"][1]["recipe"], e)
         self.assertEqual(prev.render(self.src, e, -15.0, 3.0)["key"], p["key"])  # cached
         self.assertNotEqual(prev.render(self.src, e, -15.0, 0.0)["key"], p["key"])  # gain is part of the preview
@@ -281,8 +279,7 @@ class M4EditTests(AppTestBase):
         self.assertEqual(self.app.slot(self.slot)["mapping"]["audio"]["edit"]["trim_start_s"], 0.05)
 
     def edit(self, **kw):
-        return dict({"trim_start_s": 0.1, "cuts": [{"start_s": 1.0, "end_s": 1.2}], "fade_in_ms": 10,
-                     "loudness": {"mode": "match_mcc", "offset_db": 0}}, **kw)
+        return dict({"trim_start_s": 0.1, "cuts": [{"start_s": 1.0, "end_s": 1.2}], "fade_in_ms": 10}, **kw)
 
     def audio(self, edit=None, lang="Spanish(Mexico)"):
         a = {"source": "ce", "sources": [{"ce_line_ref": "line_a#0", "language": lang}]}
@@ -363,7 +360,7 @@ class M4EditTests(AppTestBase):
         self.assertTrue(app.preview_wav(r["key"], "encoded").is_file())
         self.assertLess(r["stats"]["output_s"], 2.0)
         with self.assertRaises(ApiError):
-            app.edit_preview({"slot_id": self.slot, **SRC, "edit": self.edit()})  # match needs the Spain recording
+            app.edit_preview({"slot_id": self.slot, **SRC, "edit": self.edit(loudness={"mode": "match_mcc", "offset_db": 0})})  # matching was removed
         with self.assertRaises(ApiError):
             app.preview_wav("../../mappings", "encoded")
         self.assertEqual({p: p.read_bytes() for p in (self.root / "mappings").glob("*")}, before)

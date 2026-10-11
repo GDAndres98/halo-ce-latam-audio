@@ -52,7 +52,7 @@ class EditPreview:
 
     def render(self, src_wav, edit, ref_lufs, global_gain_db):
         """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError.
-        Same processing as M6 for every line: recipe, optional loudness match, global export gain."""
+        Same processing as M6 for every line: recipe, global export gain. ref_lufs is reported only."""
         with self._lock:
             pcm = self._source(src_wav)
             key = hashlib.sha256(json.dumps({"engine": audio_edit.RENDER_ENGINE, "pcm": hashlib.sha256(pcm).hexdigest(),

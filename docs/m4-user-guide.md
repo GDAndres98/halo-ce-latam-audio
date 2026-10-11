@@ -150,13 +150,9 @@ applies when it builds the bank.
   lengths.
 - **Stats:**
   - durations (source → edited, Spain, Δ);
-  - loudness (CE → output, Spain) and peak;
-  - the gain: the loudness match (if on), then the **global export gain** as applied / requested,
-    and where it comes from.
-- **Warnings appear for:**
-  - heavy limiting in the loudness match (more than 6 dB);
-  - a match gain lowered for the peak;
-  - a line that couldn't take the full global gain.
+  - loudness (CE → output, Spain) and peak, for information only;
+  - the **global export gain** as applied / requested, and where it comes from.
+- **Warnings appear for** a line that couldn't take the full global gain.
 
 | Control | What it does |
 |---|---|
@@ -170,8 +166,6 @@ applies when it builds the bank.
 | **Replace selection with silence** | sets a pause to an exact length: cuts the selection and puts exactly the given silence in its place. Select a pause and enter `0.10` to shorten it to 0.1 s, or a longer value to lengthen it. |
 | Silences list | `+0.25 s @ 0.90 s ×`: × removes one. Cuts and trims drop any silence that ends up inside them. |
 | Trim start / end, Fade in / out, Crossfade | exact values. Trimming an edge for the first time adds a 10 ms fade there; set it to 0 if you don't want one. |
-| **Match Spain loudness** + offset (optional) | automatic gain to the ITU-R BS.1770 loudness of **this slot's original Spain recording**. The offset moves the target (for example −2 dB). Off by default. |
-| **Limiter (for matching)** | only used by the loudness match. On (default): a look-ahead limiter keeps peaks at −1 dBFS, so the match can reach Spain's level. CE lines are about 7 dB quieter than the Spain recordings (`a10` survey: 58 of 60 can't reach it with gain alone). Off: the match gain is lowered until the peak fits instead. Nothing is limited when matching is off. |
 | **Reset edits** | back to the unedited recording |
 
 **Removed (owner, 2026-10-09):**
@@ -180,8 +174,12 @@ applies when it builds the bank.
 - Saved speed and gain values were cleared once by
   `scripts/validate/migrate_reset_speed_gain.py`. See `docs/migrations/2026-10-09-reset-speed-gain.md`.
 
+**Removed (owner, 2026-10-11):** loudness matching to Spain's recording (with its offset) and its
+limiter. They gave a line its own level; the global export gain is now the only level setting. See
+`docs/migrations/2026-10-11-reset-loudness-match.md` and `docs/migrations/2026-10-11-remove-limiter.md`.
+
 **Order of operations** (always the same, in M4 and M6): original es-MX WAV → trims, cuts, fades,
-inserted silences → optional loudness match → **global export gain** → 16-bit → CELT. Recipe
+inserted silences → **global export gain** → 16-bit → CELT. Recipe
 times are on the source's timeline (the top waveform).
 
 **About inserted silences:**
@@ -190,7 +188,6 @@ times are on the source's timeline (the top waveform).
   there is no click.
 - The silence is digital silence, not room tone. CE's studio dialogue is normally clean, but listen
   for an audible "drop" in noisy lines.
-- Loudness gating ignores silence, so adding pauses doesn't change the loudness match.
 
 **Rules:**
 - **Previews are rendered on the server** about 0.4 s after a change. The first render of a line
@@ -204,20 +201,15 @@ times are on the source's timeline (the top waveform).
 - **The radio flag** stays as it is. No radio processing is applied. Editing never changes it.
 - **Invalid recipes are refused:** for example a trim past the end, overlapping cuts, or keeping
   less than 0.05 s. Nothing is written.
-- **Heavy limiting:** above about 6 dB of reduction, peaks may sound squashed. A negative loudness
-  offset is gentler.
 
 ### 4.2 Global export gain (volume for every line)
 
 All Campaign Evolved replacements get one gain at export, **+4 dB by default** (raised from +3 dB on 2026-10-10). It is the same
 in the M4 preview and the M6 build.
-- **Applied once:** after the edits and the optional loudness match, and before CELT encoding.
-  With loudness matching on, the line is matched to Spain and then gets the global gain on top.
-  Nothing is counted twice.
+- **Applied once:** after the edits, and before CELT encoding. It is the only level change.
 - **No limiting or compression:** the gain is linear. If a line's peak would pass −1 dBFS, that line
   gets less gain (never less than 0 dB). The editor and the M6 test report list those lines under
-  "Global gain". Loudness-matched lines with the limiter on already sit at −1 dBFS, so they
-  usually show up there.
+  "Global gain".
 - **To change it:** create `config/audio_export.json` (copy `config/audio_export.example.json`):
 
   ```json

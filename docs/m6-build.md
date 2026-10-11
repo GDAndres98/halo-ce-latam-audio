@@ -10,7 +10,7 @@
   files"). The safeguards are the script's own. `--mcc-root/--backup-root/--state-dir` exist for the
   browser test's throw-away game folder (`npm run test:deploy`).
 - **Audio edit recipes (2026-10-09):** approved lines with an M4 edit (trims, cuts, silences,
-  loudness) are built from their recipe (§2.1).
+  fades) are built from their recipe (§2.1). Loudness matching and its limiter were removed on 2026-10-11.
 - **Global export gain (2026-10-09):** +4 dB by default on every CE replacement (+3 dB until 2026-10-10) (§2.2). Speed and
   per-line gain were removed. `--mission a10` with the new code: 182 lines, 23/23 checks;
   every unedited line's stream is byte-identical to the earlier build (166/166 compared).
@@ -114,18 +114,15 @@ Rules:
 
 - **The recipe** is the approved `audio.edit` (`audio-edit/1`, `common/audio_edit.py`). It is part of
   the approved audio object, so it can only change through *needs rework*.
-- **The render path** is `audio_pipeline.derive_processed`, with render engine `audio-render/2`:
+- **The render path** is `audio_pipeline.derive_processed`, with render engine `audio-render/4`:
   1. CE WAV → ffmpeg 44.1 kHz;
   2. the recipe: trims and cuts with crossfades → fades → inserted silences;
-  3. the optional loudness match (limiter only when the recipe enables it for matching);
-  4. the **global export gain** (§2.2);
-  5. 16-bit → codec padding → CELT `fmod` profile.
+  3. the **global export gain** (§2.2), the only level change;
+  4. 16-bit → codec padding → CELT `fmod` profile.
   - This is the same function the M4 preview calls. The preview's *as encoded* audio is the
     libcelt decode of this exact stream.
   - The simulation on `es:A10_010_cryotech#0`: the preview is byte-identical to vgmstream's decode
     of the candidate bank.
-- **The loudness reference** is the slot's original Spain sample, decoded from the pinned bank copy
-  (hash-checked) and measured with ITU-R BS.1770-4 gated loudness.
 - **Unedited lines** (`{trim_start_s: 0, trim_end_s: 0, gap_s: 0}`) get only the global gain. With
   the gain set to 0 they take the original `derive` path, byte for byte.
 - **Reports:**

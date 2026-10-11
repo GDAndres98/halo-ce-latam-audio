@@ -10,7 +10,7 @@ Pipeline (docs/b2-audio-research.md §5.10):
     -> FMOD framing; sample_count = frames * 512 (as in every original MCC sample)
 
 `derive` changes no content. `derive_processed` inserts the processing stages (common/audio_edit:
-the owner's edit recipe of trims, cuts, fades and silences; optional loudness match; the global
+the owner's edit recipe of trims, cuts, fades and silences; the global
 export gain, common/export_config) between the 44.1 kHz conversion and the padding, and records
 every step. `codec_roundtrip` is what the M4 editor plays: the same encode,
 decoded by the same libcelt, so the preview equals the bank content. Nothing here knows about
@@ -137,7 +137,7 @@ def needs_processing(edit, global_gain_db):
 
 
 def render_edited(src, edit, *, ffmpeg, ref_lufs=None, global_gain_db=0.0):
-    """Source WAV -> 44.1 kHz PCM -> recipe -> optional loudness match -> global gain.
+    """Source WAV -> 44.1 kHz PCM -> recipe -> global gain.
     -> (source_pcm, audio_edit.render result). The single function both the M4 preview and the M6
     build call (mono only)."""
     source_pcm = to_mcc_pcm(ffmpeg, src, 1)
@@ -154,7 +154,7 @@ def codec_roundtrip(celt, pcm, profile="fmod"):
 
 def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global_gain_db=0.0, profile="fmod",
                      source_meta=None, gain_source=None):
-    """`derive` with the processing stages (recipe, optional loudness match, global export gain)
+    """`derive` with the processing stages (recipe, global export gain)
     applied after the 44.1 kHz conversion and before CELT (mono)."""
     src = Path(src)
     source_pcm, r = render_edited(src, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs, global_gain_db=global_gain_db)
@@ -168,10 +168,6 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
     if not identity:
         steps.append({"op": "audio_edit", "engine": audio_edit.ENGINE, "recipe": edit,
                       "summary": audio_edit.summary(edit), "source_pcm_sha256": sha256_bytes(source_pcm)})
-    if st["loudness_match"]:
-        steps.append({"op": "loudness_match", "reference_lufs": st["mcc_reference_lufs"],
-                      "target_lufs": st["loudness_target_lufs"], "applied_gain_db": st["match_applied_gain_db"],
-                      "lowered_for_peak_db": st["match_gain_lowered_for_peak_db"]})
     steps += [
         {"op": "global_gain", "requested_db": global_gain_db, "applied_db": st["global_gain_applied_db"],
          "shortfall_db": st["global_gain_shortfall_db"], "source": gain_source,

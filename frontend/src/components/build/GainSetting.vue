@@ -104,7 +104,6 @@ onMounted(load);
       <ol class="small">
         <li>Sources are converted to 44.1 kHz mono.</li>
         <li>The edit recipe: trims, cuts, fades and inserted silences.</li>
-        <li>Optional loudness match to Spain's recording (only where chosen on the line).</li>
         <li><strong>Global gain</strong>: applied exactly once, linearly, never limited (see above).</li>
         <li>Rounding to 16-bit, then encoding for the game (CELT).</li>
       </ol>

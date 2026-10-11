@@ -3,8 +3,8 @@
 //
 // What the user can do: drag across the waveform to select, drag the two handles of the kept part (trims),
 // keep or cut the selection (several cuts are allowed), remove cuts, insert silences (at the playhead or the
-// start of the selection, or in place of the selection), set fades and match the loudness of Spain's
-// recording. Every change goes through editRecipe.ts and can be undone. The result is rendered automatically
+// start of the selection, or in place of the selection) and set fades. There is no level control here: the
+// global export gain (Build & Test) is the only level setting. Every change goes through editRecipe.ts and can be undone. The result is rendered automatically
 // as the build renders it and heard as B under "Listen and compare" (composables/useEditPreview.ts). The original WAV is never changed; the recipe is saved with the audio decision (Save draft), and
 // approved audio must be marked Needs rework first (the server refuses the change otherwise).
 //
@@ -145,15 +145,6 @@ const trimStart = (seconds: number) => setKeep(props.draft.edit, { start: second
 const trimEnd = (seconds: number) =>
   setKeep(props.draft.edit, { start: (keep.value as Span).start, end: duration.value - seconds }, duration.value);
 
-function setLoudnessMode(mode: string) {
-  attempt(() => ({ ...props.draft.edit, loudness: { ...props.draft.edit.loudness, mode } }));
-}
-
-function setLoudnessOffset(offset: number) {
-  if (offset < -12 || offset > 12) throw new Error("the offset must be between −12 and +12 dB");
-  return { ...props.draft.edit, loudness: { ...props.draft.edit.loudness, offset_db: Math.round(offset * 10) / 10 } };
-}
-
 // ---- Inserted silences. The length is typed in milliseconds; the recipe stores seconds (audio_edit.py).
 const silenceMs = ref(300);
 const silenceMarkers = computed(() => props.draft.edit.silences.map((s) => ({ at: s.at_s, dur: s.dur_s })));
@@ -292,25 +283,6 @@ useShortcuts({
             @change="onNumber($event, (v) => setFade(draft.edit, 'out', v), () => draft.edit.fade_out_ms)"
           />
         </label>
-      </fieldset>
-
-      <fieldset :disabled="locked" class="loudness">
-        <label class="inline">Loudness
-          <select :value="draft.edit.loudness.mode" @change="setLoudnessMode(($event.target as HTMLSelectElement).value)">
-            <option value="off">Keep the source level</option>
-            <option value="match_mcc">Match Spain's recording</option>
-          </select>
-        </label>
-        <template v-if="draft.edit.loudness.mode === 'match_mcc'">
-          <label class="inline">Offset (dB)
-            <input
-              :value="draft.edit.loudness.offset_db"
-              type="number" min="-12" max="12" step="0.5"
-              @change="onNumber($event, setLoudnessOffset, () => draft.edit.loudness.offset_db)"
-            />
-          </label>
-          <span class="small muted">Never limited: the match gain is lowered if the peak would pass −1 dBFS.</span>
-        </template>
       </fieldset>
 
       <div v-if="draft.edit.cuts.length" class="cut-list">

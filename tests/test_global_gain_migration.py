@@ -92,16 +92,13 @@ class GlobalGainTests(unittest.TestCase):
         self.assertTrue(all(abs(b - a * g) <= 1 / 32768 for a, b in zip(x, y)))
         self.assertEqual(out["stats"]["total_gain_db"], 6.0)
 
-    def test_with_loudness_matching_the_gain_is_added_once_after_the_match(self):
+    def test_the_global_gain_is_the_only_level_change(self):
         pcm = ae.float_to_pcm16(speech(1.5, amp=0.05))
-        e = ae.normalize({"loudness": {"mode": "match_mcc", "offset_db": -6}}, SRC)
+        e = ae.normalize({"trim_start_s": 0.1}, SRC)
         r0 = ae.render(pcm, e, ref_lufs=-20.0, global_gain_db=0.0)["stats"]
         r3 = ae.render(pcm, e, ref_lufs=-20.0, global_gain_db=3.0)["stats"]
-        self.assertAlmostEqual(r0["output_lufs"], -26.0, delta=0.1)          # matched to -20 - 6
-        self.assertAlmostEqual(r3["output_lufs"], -23.0, delta=0.1)          # +3 once, not +6
-        self.assertEqual(r3["loudness_target_lufs"], -26.0)                  # the match target ignores the gain
-        self.assertAlmostEqual(r3["match_applied_gain_db"], r0["match_applied_gain_db"], delta=0.01)
-        self.assertEqual(r3["global_gain_applied_db"], 3.0)
+        self.assertAlmostEqual(r3["output_lufs"] - r0["output_lufs"], 3.0, delta=0.05)  # +3 once
+        self.assertEqual((r0["total_gain_db"], r3["total_gain_db"]), (0.0, 3.0))       # nothing per line
 
 
 class MigrationTests(AppTestBase):
@@ -113,7 +110,7 @@ class MigrationTests(AppTestBase):
         base = {"trim_start_s": 0.1, "trim_end_s": 0, "gap_s": 0, "engine": "audio-edit/1",
                 "for_source": SRC, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
                 "silences": [{"at_s": 0.3, "dur_s": 0.2}], "fade_in_ms": 10, "fade_out_ms": 0,
-                "crossfade_ms": 20, "loudness": {"mode": "match_mcc", "offset_db": -1}}
+                "crossfade_ms": 20, "loudness": {"mode": "off", "offset_db": 0}}
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
                   audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}]},
                   radio_effect={"needed": True}, subtitle={"source": "custom", "custom_text": "Hola"},

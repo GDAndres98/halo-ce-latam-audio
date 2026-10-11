@@ -54,8 +54,8 @@ export type SubtitleSource = "keep_original" | "ce_locres" | "custom" | "none";
 export type ApprovalField = "audio" | "subtitle";
 export type ObjectStatus = "draft" | "approved" | "needs_rework";
 
-/** An audio recipe. Speed and per-line gain were removed on 2026-10-09, and the limiter setting on
- * 2026-10-11; none of them must come back. */
+/** An audio recipe. Speed and per-line gain were removed on 2026-10-09, loudness matching and its limiter
+ * on 2026-10-11: the global export gain is the only level setting. None of them must come back. */
 export interface AudioEdit {
   trim_start_s: number;
   trim_end_s: number;
@@ -65,7 +65,6 @@ export interface AudioEdit {
   fade_in_ms: number;
   fade_out_ms: number;
   crossfade_ms: number;
-  loudness: { mode: string; offset_db: number };
 }
 
 /** The decision as stored in mappings/manual_mappings.json (returned inside /api/slot). */

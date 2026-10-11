@@ -55,25 +55,22 @@ export function defaultEdit(gapS = 0): AudioEdit {
     fade_in_ms: 0,
     fade_out_ms: 0,
     crossfade_ms: 20,
-    loudness: { mode: "off", offset_db: 0 },
   };
 }
 
-/** A stored recipe with every field present: missing fields get the defaults, and a partial loudness
- * setting keeps its mode and gets the default offset. */
+/** A stored recipe with every field present: missing fields get the defaults. */
 function completeEdit(stored: AudioEdit): AudioEdit {
-  const edit = editWithoutBinding(stored);
-  const defaults = defaultEdit(stored.gap_s ?? 0);
-  return { ...defaults, ...edit, loudness: { ...defaults.loudness, ...(edit.loudness ?? {}) } };
+  return { ...defaultEdit(stored.gap_s ?? 0), ...editWithoutBinding(stored) };
 }
 
 /** The recipe as the editor works on it. `for_source` records which recording the recipe was made for; the
- * server recomputes it from the audio choice, so it is never sent back. A stored `limiter` (removed
- * 2026-10-11) is dropped. */
+ * server recomputes it from the audio choice, so it is never sent back. The `limiter` and `loudness` of older
+ * recipes (both removed 2026-10-11) are dropped. */
 function editWithoutBinding(edit: AudioEdit): AudioEdit {
-  const copy = JSON.parse(JSON.stringify(edit)) as AudioEdit & { for_source?: unknown; limiter?: unknown };
+  const copy = JSON.parse(JSON.stringify(edit)) as AudioEdit & { for_source?: unknown; limiter?: unknown; loudness?: unknown };
   delete copy.for_source;
   delete copy.limiter;
+  delete copy.loudness;
   return copy;
 }
 

@@ -145,7 +145,7 @@ async function main() {
           loaded_sha256: current.sha256.mappings,
           local_sha256: current.sha256.local,
           audio: { source: "ce", sources: [{ ce_line_ref: "vo_scr_m01_00460_cryotech#0", language: "Spanish(Mexico)" }],
-                   edit: { trim_start_s: 0.2, trim_end_s: 0, gap_s: 0, cuts: [], silences: [], fade_in_ms: 0, fade_out_ms: 0, crossfade_ms: 20, loudness: { mode: "off", offset_db: 0 } } },
+                   edit: { trim_start_s: 0.2, trim_end_s: 0, gap_s: 0, cuts: [], silences: [], fade_in_ms: 0, fade_out_ms: 0, crossfade_ms: 20 } },
         };
         const res = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         return res.status;

@@ -29,7 +29,6 @@ function edit(overrides: Partial<AudioEdit> = {}): AudioEdit {
     fade_in_ms: 0,
     fade_out_ms: 0,
     crossfade_ms: 20,
-    loudness: { mode: "off", offset_db: 0 },
     ...overrides,
   };
 }
@@ -104,11 +103,10 @@ describe("fades", () => {
 });
 
 describe("reset and undo", () => {
-  it("resets the audio edits and keeps the loudness and gap settings", () => {
-    const changed = setFade(addCut(setKeep(edit({ gap_s: 0.3, loudness: { mode: "match_mcc", offset_db: 1 } }), { start: 0.5, end: 3.5 }, DURATION), { start: 1, end: 1.5 }, DURATION), "in", 50);
+  it("resets the audio edits and keeps the gap", () => {
+    const changed = setFade(addCut(setKeep(edit({ gap_s: 0.3 }), { start: 0.5, end: 3.5 }, DURATION), { start: 1, end: 1.5 }, DURATION), "in", 50);
     const reset = resetEdits(changed);
     expect(reset).toMatchObject({ trim_start_s: 0, trim_end_s: 0, cuts: [], silences: [], fade_in_ms: 0, gap_s: 0.3 });
-    expect(reset.loudness).toEqual({ mode: "match_mcc", offset_db: 1 });
   });
 
   it("undoes changes one at a time, back to the start", () => {

@@ -51,7 +51,7 @@ from common.fsb5_lib import parse_header  # noqa: E402
 from common.m6_build import (  # noqa: E402
     FOLDER_GROUPS, assemble, compare_plans, entry_group, folder_summary, mission_folders, multi_structural_checks,
     plan_audio, subtitle_plan)
-from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
+from common.ondemand_audio import CeAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
 from common.vgm import DEFAULT_VGMSTREAM, decode_all, decode_pcm, meta, meta_value  # noqa: E402
 from m4_app import M4App  # noqa: E402
 
@@ -114,10 +114,9 @@ def content_checks(exe, cand_path, idx, res):
     return checks, {"content_snr_db": round(snr, 1) if math.isfinite(snr) else str(snr)}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, mcc_ref, cfg):
+def build_once(original, targets, ce_audio, ffmpeg, celt, cfg):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
-    mcc_ref(entry) -> loudness (LUFS) of the slot's original Spain recording, for edit recipes that
-    match it. cfg: the export config (global gain, applied once to every replacement)."""
+    cfg: the export config (global gain, applied once to every replacement)."""
     results = {}
     gain = cfg["global_gain_db"]
     for e in targets:
@@ -126,11 +125,10 @@ def build_once(original, targets, ce_audio, ffmpeg, celt, mcc_ref, cfg):
                 "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
         edit = e.get("edit") or audio_edit.EDIT_ZERO
         if needs_processing(edit, gain):
-            ref = mcc_ref(e) if not audio_edit.is_identity(edit) and edit["loudness"]["mode"] == "match_mcc" else None
             try:
-                res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, ref_lufs=ref,
+                res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED,
                                        global_gain_db=gain, profile="fmod", gain_source=cfg["source"],
-                                       source_meta=dict(meta, mcc_reference_lufs=ref))
+                                       source_meta=meta)
             except audio_edit.EditError as ex:
                 raise SystemExit(f"{e['slot_id']}: audio cannot be processed: {ex}")
         else:  # unedited and no global gain: the original path, byte for byte
@@ -214,9 +212,7 @@ def test_report(name, manifest, report, app):
     L += md_table(edited, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Recipe", lambda e: e["edit_summary"]),
                            ("Source s", lambda e: e["audio_stats"]["source_s"]),
                            ("Edited s", lambda e: e["audio_stats"]["output_s"]),
-                           ("LUFS out / Spain", lambda e: f"{e['audio_stats']['output_lufs']} / "
-                                                          f"{e['audio_stats']['mcc_reference_lufs']}"),
-                           ("Match lowered dB", lambda e: e["audio_stats"]["match_gain_lowered_for_peak_db"])]) if edited \
+                           ("LUFS out", lambda e: e["audio_stats"]["output_lufs"])]) if edited \
         else ["- none"]
     g = manifest["global_gain"]
     short = [e for e in rep if (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]
@@ -227,9 +223,7 @@ def test_report(name, manifest, report, app):
         L += md_table(short, [("Slot", lambda e: f"`{e['slot_id']}`"),
                               ("Applied dB", lambda e: e["audio_stats"]["global_gain_applied_db"]),
                               ("Short dB", lambda e: e["audio_stats"]["global_gain_shortfall_db"]),
-                              ("Peak before", lambda e: f"{round(e['audio_stats']['output_peak_dbfs'] - e['audio_stats']['global_gain_applied_db'], 2)} dBFS"),
-                              ("Note", lambda e: "loudness-matched (already at the peak ceiling)"
-                               if e["audio_stats"]["loudness_match"] else "")])
+                              ("Peak before", lambda e: f"{round(e['audio_stats']['output_peak_dbfs'] - e['audio_stats']['global_gain_applied_db'], 2)} dBFS")])
     radio = [e for e in rep if e["radio_effect"]]
     L += ["", f"## 3. Needs Radio Effect ({len(radio)}): recorded in the manifest, **no effect applied**", ""]
     L += [f"- `{e['slot_id']}` ← `{e['ce_line_ref']}`" for e in radio] or ["- none"]
@@ -373,20 +367,12 @@ def main():
         raise SystemExit("Spanish bank copy does not match its pin")
     exe = args.vgmstream_cli
     ce_audio = CeAudio(REPO_ROOT, vgmstream_decoder(exe), ce_source_reader(args.oodle_dll))
-    mcc_audio = MccAudio(REPO_ROOT, vgmstream_decoder(exe))
-    refs = {}
-
-    def mcc_ref(e):  # the original Spain recording, decoded from the pinned bank copy (verified)
-        if e["slot_id"] not in refs:
-            level, _rec, sample = app.slot_index[e["slot_id"]]
-            refs[e["slot_id"]] = audio_edit.wav_loudness(mcc_audio.wav(level, "spanish", sample))
-        return refs[e["slot_id"]]
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
     print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref, cfg)
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, mcc_ref, cfg)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg)
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
@@ -453,7 +439,7 @@ def main():
         "audio_edit_engine": audio_edit.ENGINE, "render_engine": audio_edit.RENDER_ENGINE,
         "global_gain": {"configured_db": cfg["global_gain_db"], "source": cfg["source"],
                         "config_sha256": cfg["sha256"], "peak_ceiling_dbfs": audio_edit.PEAK_CEILING_DB,
-                        "rule": "linear, applied once after the recipe and the optional loudness match, "
+                        "rule": "linear, applied once after the recipe, "
                                 "before CELT; reduced (never limited) when the peak would pass the ceiling",
                         "full": sum(1 for r in results.values() if not (r.get("edit_stats") or {}).get(
                             "global_gain_shortfall_db")),

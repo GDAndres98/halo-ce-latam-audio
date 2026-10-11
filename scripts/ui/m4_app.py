@@ -559,9 +559,8 @@ class M4App:
         if self.mcc_audio:
             try:
                 mcc_ref = self.editor.reference_lufs(self.mcc_audio.wav(level, "spanish", s))
-            except AudioUnavailable as e:
-                if edit.get("loudness", {}).get("mode") == "match_mcc":
-                    raise ApiError(503, f"Spain recording unavailable for loudness matching: {e}")
+            except AudioUnavailable:
+                pass  # Spain's loudness is only reported; the preview does not need it
         try:
             cfg = load_export_config(self.root)  # read on every preview: a config change applies at once
         except ConfigError as e:
