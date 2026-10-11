@@ -36,6 +36,8 @@ const props = withDefaults(
     keep?: Span | null;
     cuts?: Span[];
     fades?: Fades;
+    /** Inserted silences: a marker at each position (original timeline), labelled with its length. */
+    silences?: { at: number; dur: number }[];
     height?: number;
     /** Shown when there is no URL (for example while a preview renders). */
     emptyText?: string;
@@ -45,6 +47,7 @@ const props = withDefaults(
     keep: null,
     cuts: () => [],
     fades: () => ({ fadeIn: null, fadeOut: null }),
+    silences: () => [],
     height: 96,
     emptyText: "No recording.",
   },
@@ -68,6 +71,7 @@ const DIM = "rgba(1, 4, 12, 0.8)";
 const CUT = "rgba(255, 143, 128, 0.36)";
 const FADE = "rgba(127, 227, 255, 0.18)";
 const SELECTED = "rgba(77, 163, 255, 0.32)";
+const SILENCE = "rgba(126, 231, 135, 0.95)"; // inserted silence markers, in the approved green
 const WAVE = "#3f6fae"; // unplayed part: a dim menu blue
 const PLAYED = "#9fd0ff"; // played part: the lit menu blue
 const ZOOM_LEVELS = [1, 2, 4, 8, 16, 32]; // multiples of the width that fits the whole recording
@@ -185,7 +189,7 @@ watch(
   },
 );
 watch(
-  () => [props.keep, props.cuts, props.fades],
+  () => [props.keep, props.cuts, props.fades, props.silences],
   () => drawRegions(),
   { deep: true },
 );
@@ -259,6 +263,17 @@ function drawRegions() {
   props.cuts.forEach((cut, i) => shade(`studio-cut-${i}`, cut, CUT));
   if (props.fades.fadeIn) shade("studio-fade-in", props.fades.fadeIn, FADE);
   if (props.fades.fadeOut) shade("studio-fade-out", props.fades.fadeOut, FADE);
+  props.silences.forEach((s, i) => {
+    // A region without an end is a marker; its label says how much silence is inserted there.
+    const label = document.createElement("span");
+    label.className = "silence-marker";
+    // Regions live in WaveSurfer's shadow root, out of reach of the page's stylesheets: styled inline.
+    label.style.cssText =
+      "display:inline-block;margin:2px 0 0 3px;padding:0 3px;font:600 10px/1.4 monospace;" +
+      "color:#04120a;background:rgba(126,231,135,0.95);border-radius:2px;white-space:nowrap";
+    label.textContent = `+${(s.dur * 1000).toFixed(0)} ms`;
+    passive(regions!.addRegion({ id: `studio-silence-${i}`, start: s.at, color: SILENCE, content: label, drag: false, resize: false }));
+  });
   if (props.editable) {
     // Only the two handles of the kept part take the pointer; its body lets drags make selections.
     const kept = regions.addRegion({ id: KEEP, start: keep.start, end: keep.end, color: "rgba(0, 0, 0, 0)", drag: false, resize: true });
@@ -369,6 +384,7 @@ defineExpose({
   selection,
   duration,
   playing,
+  position,
 });
 </script>
 

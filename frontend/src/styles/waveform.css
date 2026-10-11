@@ -251,3 +251,25 @@
     animation: none;
   }
 }
+
+/* ---- Insert silence tools and the list of inserted silences (AudioEditor.vue). */
+.silence-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.silence-tools input {
+  width: 5.5rem;
+}
+
+.silence-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+}
+
+.silence-list input {
+  width: 6.5rem;
+}

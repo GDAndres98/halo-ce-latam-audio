@@ -10,7 +10,8 @@
 //  6. audio, subtitle, flags and notes are chosen and saved in one request, and a subtitle-only decision works;
 //  7. the chosen recording's LATAM subtitle is proposed, without overriding a decided subtitle;
 //  8. approved decisions stay protected;
-//  9. the flag icons are distinct and labelled.
+//  9. the flag icons are distinct and labelled;
+// 10. Insert silence (addendum): insert, mark, lengthen the result, preview, edit, undo, save, reload.
 //
 // Works on a disposable copy of the mapping data (scripts/ui/e2e_fixture.py); the real mappings are hashed
 // before and after.
@@ -241,6 +242,63 @@ async function main() {
       return "B switched to unedited and back";
     });
 
+    // ---- 10. Insert silence (addendum to prompt 40).
+    const editorRegion = () => page.getByRole("region", { name: "Audio editing" });
+    const editorWave = () => editorRegion().locator(".wave-view");
+    const afterEdits = async () => Number((await editorRegion().getByTestId("after-edits").innerText()).replace(" s", ""));
+    const bSeconds = async () => Number(await waveB().getByTestId("wave-host").getAttribute("data-duration"));
+    async function clickWaveAt(fraction) {
+      await editorWave().scrollIntoViewIfNeeded();
+      const box = await editorWave().getByTestId("wave-host").boundingBox();
+      await page.mouse.click(box.x + box.width * fraction, box.y + (box.height - 16) / 2);
+    }
+
+    await step("10. Insert silence at the playhead: listed, marked on the waveform, added to the duration", async () => {
+      const beforeEdits = await afterEdits();
+      await waitPreviewState("ready");
+      await waitBLoaded();
+      const beforeB = await bSeconds();
+      await clickWaveAt(0.5);
+      await editorRegion().getByLabel("Silence length (ms)").fill("400");
+      await editorRegion().getByTestId("insert-silence").click();
+      check((await editorRegion().getByTestId("silence").count()) === 1, "no silence listed");
+      const marker = editorWave().locator(".silence-marker");
+      await marker.first().waitFor({ timeout: 5000 });
+      check((await marker.first().textContent()) === "+400 ms", `marker says ${await marker.first().textContent()}`);
+      const grown = (await afterEdits()) - beforeEdits;
+      check(Math.abs(grown - 0.4) < 0.002, `after edits grew by ${grown}`);
+      // The preview renders by itself and B plays the recording with the silence.
+      check((await previewState()) === "rendering", "the preview did not start rendering");
+      await waitPreviewState("ready");
+      await waitBLoaded();
+      const body = previewBodies.at(-1).edit;
+      check(body.silences.length === 1 && body.silences[0].dur_s === 0.4, `rendered ${JSON.stringify(body.silences)}`);
+      const longer = (await bSeconds()) - beforeB;
+      check(Math.abs(longer - 0.4) < 0.03, `B is ${longer.toFixed(3)} s longer`);
+      return `at ${body.silences[0].at_s} s; B +${longer.toFixed(3)} s`;
+    });
+
+    await step("10b. an inserted silence can be edited, and a second one undone", async () => {
+      await waitBLoaded();
+      const beforeB = await bSeconds();
+      const length = editorRegion().getByLabel("Length of silence 1 (ms)");
+      await length.fill("600");
+      await length.press("Tab");
+      await waitPreviewState("ready");
+      await waitBLoaded();
+      check(previewBodies.at(-1).edit.silences[0].dur_s === 0.6, "the new length was not rendered");
+      const longer = (await bSeconds()) - beforeB;
+      check(Math.abs(longer - 0.2) < 0.03, `B grew by ${longer.toFixed(3)} s, not 0.2 s`);
+      await clickWaveAt(0.2);
+      await editorRegion().getByTestId("insert-silence").click();
+      check((await editorRegion().getByTestId("silence").count()) === 2, "second silence not listed");
+      check((await editorWave().locator(".silence-marker").count()) === 2, "second marker missing");
+      await editorRegion().getByRole("button", { name: "Undo" }).click();
+      check((await editorRegion().getByTestId("silence").count()) === 1, "undo did not remove the second silence");
+      await waitPreviewState("ready");
+      return "600 ms rendered; second silence undone";
+    });
+
     // ---- 6. Everything saved together.
     await step("6. audio, edits, subtitle, flags and notes are saved by one Save draft", async () => {
       await page.getByTestId("flag-recording").locator("input").check();
@@ -255,10 +313,22 @@ async function main() {
       const m = (await api(`/api/slot?id=${encodeURIComponent(SLOT)}`)).mapping;
       check(m.audio.source === "ce" && m.audio.sources[0].ce_line_ref === CE_REF, "audio not saved");
       check(m.audio.edit.fade_in_ms === 300, "recipe not saved");
+      check(m.audio.edit.silences.length === 1 && m.audio.edit.silences[0].dur_s === 0.6, `silences saved: ${JSON.stringify(m.audio.edit.silences)}`);
       check(m.subtitle.source === "ce_locres" && m.subtitle.ce_locres.ce_line_ref === CE_REF, "subtitle not saved");
       check(m.needs_recording?.marked === true && m.notes === "prompt 40 test", "flag or notes not saved");
       check(m.audio.status === "draft" && m.subtitle.status === "draft", "something was approved");
       return "one request; audio + recipe + subtitle + flag + notes; nothing approved";
+    });
+
+    await step("10c. after a reload the saved silence is listed and marked again", async () => {
+      await page.reload();
+      await waitLine(SLOT);
+      const row = editorRegion().getByTestId("silence");
+      await row.first().waitFor({ timeout: 15000 });
+      check((await row.count()) === 1, `${await row.count()} silences after reload`);
+      check((await editorRegion().getByLabel("Length of silence 1 (ms)").inputValue()) === "600", "length lost");
+      await editorWave().locator(".silence-marker").first().waitFor({ timeout: 15000 });
+      return "1 silence, 600 ms, marked";
     });
 
     await step("9b. the MCC list shows the saved flag with its icon and label", async () => {

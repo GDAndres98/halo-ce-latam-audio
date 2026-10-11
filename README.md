@@ -84,8 +84,12 @@ Open **Matching**. The screen has three columns.
      approvals.
   3. **Audio editing**, on the replacement's waveform: click to move the playhead, drag across it to
      select (drag the selection's edges to adjust it), **Trim to selection**, **Cut selection** (as many
-     cuts as needed, each crossfaded), drag the cyan handles at the ends to trim, set fades (up to 500 ms),
-     optionally match Spain's loudness, zoom in to place edits precisely, **Undo** and **Reset edits**.
+     cuts as needed, each crossfaded), drag the cyan handles at the ends to trim, **Insert silence** (a length
+     in milliseconds, 10–5000, at the playhead or the start of the selection; again at the same spot
+     lengthens it), **Replace selection with silence** (sets a pause to an exact length), set fades (up to
+     500 ms), optionally match Spain's loudness, zoom in to place edits precisely, **Undo** and **Reset
+     edits**. Inserted silences show as green markers with their length and are listed below the waveform,
+     where their position and length can be changed; silences made on the classic page appear there too.
      Edits are a recipe saved with the draft; the original WAV is never changed, and approved audio is
      read-only until marked *Needs rework*.
   4. **Listen and compare:** **A** (the original MCC Spain recording, read-only) and **B** (by default the

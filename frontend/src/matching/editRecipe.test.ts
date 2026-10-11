@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { AudioEdit } from "../api/types";
-import { EditHistory, addCut, editedSeconds, fadeSpans, keepSpan, removeCut, resetEdits, setFade, setKeep } from "./editRecipe";
+import {
+  EditHistory,
+  addCut,
+  addSilence,
+  editedSeconds,
+  fadeSpans,
+  keepSpan,
+  moveSilence,
+  removeCut,
+  removeSilence,
+  replaceWithSilence,
+  resetEdits,
+  setFade,
+  setKeep,
+  setSilenceLength,
+} from "./editRecipe";
 
 const DURATION = 4;
 
@@ -117,5 +132,49 @@ describe("reset and undo", () => {
     history.push(before);
     before.trim_start_s = 9;
     expect(history.undo()?.trim_start_s).toBe(0);
+  });
+});
+
+describe("inserting silence", () => {
+  it("inserts silences in milliseconds, kept in order, and adds them to the duration", () => {
+    let next = addSilence(edit(), 2, 300, DURATION);
+    next = addSilence(next, 1, 250, DURATION);
+    expect(next.silences).toEqual([{ at_s: 1, dur_s: 0.25 }, { at_s: 2, dur_s: 0.3 }]);
+    expect(editedSeconds(next, DURATION)).toBe(4.55);
+  });
+
+  it("lengthens a silence inserted again at the same position, up to 5 s", () => {
+    let next = addSilence(edit(), 1, 300, DURATION);
+    next = addSilence(next, 1, 200, DURATION);
+    expect(next.silences).toEqual([{ at_s: 1, dur_s: 0.5 }]);
+    next = addSilence(next, 1, 5000, DURATION);
+    expect(next.silences[0].dur_s).toBe(5);
+  });
+
+  it("refuses a bad length, a trimmed position and a position inside a cut", () => {
+    expect(() => addSilence(edit(), 1, 5, DURATION)).toThrow(/10–5000 ms/);
+    expect(() => addSilence(edit(), 1, 6000, DURATION)).toThrow(/10–5000 ms/);
+    expect(() => addSilence(edit({ trim_start_s: 1 }), 0.5, 300, DURATION)).toThrow(/trimmed/);
+    expect(() => addSilence(edit({ cuts: [{ start_s: 1, end_s: 2 }] }), 1.5, 300, DURATION)).toThrow(/inside a cut/);
+    // At a cut's edge is allowed (the renderer places it at the join).
+    expect(addSilence(edit({ cuts: [{ start_s: 1, end_s: 2 }] }), 1, 300, DURATION).silences).toHaveLength(1);
+  });
+
+  it("edits, moves and removes an existing silence", () => {
+    const base = addSilence(addSilence(edit(), 1, 300, DURATION), 2, 300, DURATION);
+    expect(setSilenceLength(base, 1, 800).silences[1]).toEqual({ at_s: 2, dur_s: 0.8 });
+    expect(moveSilence(base, 1, 0.5, DURATION).silences).toEqual([{ at_s: 0.5, dur_s: 0.3 }, { at_s: 1, dur_s: 0.3 }]);
+    expect(() => moveSilence(base, 1, 1, DURATION)).toThrow(/already/);
+    expect(removeSilence(base, 0).silences).toEqual([{ at_s: 2, dur_s: 0.3 }]);
+    expect(resetEdits(base).silences).toEqual([]);
+  });
+
+  it("drops a silence that a new cut swallows, and replaces a selection with an exact pause", () => {
+    const withSilence = addSilence(edit(), 1.5, 300, DURATION);
+    expect(addCut(withSilence, { start: 1, end: 2 }, DURATION).silences).toEqual([]);
+    const pause = replaceWithSilence(edit(), { start: 1, end: 2 }, 400, DURATION);
+    expect(pause.cuts).toEqual([{ start_s: 1, end_s: 2 }]);
+    expect(pause.silences).toEqual([{ at_s: 1, dur_s: 0.4 }]);
+    expect(editedSeconds(pause, DURATION)).toBe(3.4);
   });
 });

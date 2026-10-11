@@ -35,7 +35,11 @@ const emit = defineEmits<{ saveNext: [] }>();
 
 const detail = computed(() => props.match.detail.value);
 const shownKey = computed(() => props.slotId ?? detail.value?.slot_id ?? "");
-const switching = computed(() => Boolean(detail.value && props.slotId && props.slotId !== detail.value.slot_id));
+// Busy until the latest load has answered: an older answer may already show the same line, and the newer
+// one would replace anything changed meanwhile.
+const switching = computed(
+  () => Boolean(detail.value && ((props.slotId && props.slotId !== detail.value.slot_id) || props.match.loading.value)),
+);
 const draft = computed(() => props.match.draft);
 const stored = computed(() => detail.value?.mapping ?? null);
 const audioLocked = computed(() => stored.value?.audio.status === "approved");

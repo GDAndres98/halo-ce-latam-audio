@@ -160,6 +160,9 @@ useShortcuts({
 });
 
 onMounted(async () => {
+  // The line first: /api/state can be slow, and a line loaded after it would replace whatever the user
+  // already started on that line.
+  if (selectedSlot.value) void match.load(selectedSlot.value);
   try {
     const state = await api.state();
     levels.value = state.levels.map((l) => l.level);
@@ -167,7 +170,6 @@ onMounted(async () => {
   } catch (e) {
     match.error.value = e instanceof Error ? e.message : String(e);
   }
-  if (selectedSlot.value) void match.load(selectedSlot.value);
 });
 </script>
 

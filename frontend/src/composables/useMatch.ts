@@ -85,7 +85,7 @@ export function useMatch() {
    * the subtitle (see proposeSubtitle). Returns false when the audio is approved and cannot change.
    */
   async function chooseRecording(ref: string): Promise<boolean> {
-    if (!detail.value || !baseline.value) return false;
+    if (!detail.value || !baseline.value || loading.value) return false; // the line is still loading
     if (detail.value.mapping?.audio.status === "approved") {
       error.value = "The audio decision is approved. Mark it Needs rework before choosing another recording.";
       return false;
