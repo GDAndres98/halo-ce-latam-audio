@@ -2,14 +2,14 @@
 //
 // Shortcuts are single keys ("m", "j", "[") or a modifier plus key ("ctrl+s"). They never fire while
 // the user is typing in a field, so typing a subtitle cannot play audio or change the selection. The one
-// exception is Ctrl+S (save); Ctrl+Z in a field stays the field's own undo.
+// exceptions are Ctrl+S (save) and Ctrl+Enter (save and next); Ctrl+Z in a field stays the field's own undo.
 // Shortcuts never approve anything: approval is always a button press with a confirmation.
 
 import { onBeforeUnmount, onMounted } from "vue";
 
 export type ShortcutMap = Record<string, () => void>;
 
-const WHILE_TYPING = new Set(["ctrl+s"]);
+const WHILE_TYPING = new Set(["ctrl+s", "ctrl+enter"]);
 
 export function useShortcuts(shortcuts: ShortcutMap) {
   // Names are compared in lower case, so "ArrowDown" and "arrowdown" are the same binding.

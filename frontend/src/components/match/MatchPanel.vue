@@ -13,6 +13,7 @@ import SubtitleDecision from "./SubtitleDecision.vue";
 import type { MatchState } from "../../composables/useMatch";
 
 const props = defineProps<{ match: MatchState }>();
+const emit = defineEmits<{ saveNext: [] }>();
 
 const detail = computed(() => props.match.detail.value);
 const draft = computed(() => props.match.draft);
@@ -75,7 +76,7 @@ const previewStale = computed(() => preview.value !== null && preview.value.reci
         </label>
       </section>
 
-      <ApprovalBar :match="match" />
+      <ApprovalBar :match="match" @save-next="emit('saveNext')" />
     </template>
 
     <p v-else-if="match.loading.value" class="muted">Loading line…</p>

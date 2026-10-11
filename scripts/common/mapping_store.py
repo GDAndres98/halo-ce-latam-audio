@@ -190,13 +190,13 @@ def _atomic_write(path, data):
     os.replace(tmp, path)
 
 
-def _write_database_backed(path, data, now):
-    """Save the decisions: commit SQLite first (with slot history), then write the JSON export."""
-    doc = json.loads(data.decode("utf-8"))
+def _write_database_backed(path, doc, now, *, data=None, changed_ids=None):
+    """Save the decisions: commit SQLite first (with slot history), then write the JSON export.
+    data: exact bytes to write (a restore); otherwise the export is built from the stored slot bodies."""
     changed_at = (now or dt.datetime.now()).isoformat(timespec="microseconds")
     conn = mapping_db.open_existing(mapping_db.db_path_for(path))
     try:
-        mapping_db.replace_slots(conn, doc, changed_at)
+        _, data = mapping_db.store_document(conn, doc, changed_at, data=data, changed_ids=changed_ids)
         _atomic_write(path, data)
         mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
     finally:
@@ -214,6 +214,29 @@ def _write_document(path, data, now):
     finally:
         conn.close()
     return mapping_db.sha256(data)
+
+
+def changed_mapping_ids(old_doc, new_doc):
+    """mapping_ids whose slot is new or differs from old_doc (dict comparison, no serialisation)."""
+    old = {s["mapping_id"]: s for s in old_doc.get("slots", [])}
+    return {s["mapping_id"] for s in new_doc.get("slots", []) if old.get(s["mapping_id"]) != s}
+
+
+def schema_errors(doc, schema, only_mapping_ids=None):
+    """Schema errors of a manual-mappings document. With only_mapping_ids, the top-level fields and just those
+    slots are checked, at their real positions (error paths stay /slots/<index>/...).
+
+    That is equivalent to checking the whole document when every other slot is unchanged from a document
+    the store already validated: the schema puts no constraint on the slots array as a whole (no
+    uniqueItems, minItems or contains), only on each item. Saves check the 1 slot they change instead
+    of all 536 (~150 ms per save)."""
+    if only_mapping_ids is None:
+        return validate(doc, schema)
+    errs = validate({**doc, "slots": []}, schema)
+    for i, slot in enumerate(doc.get("slots", [])):
+        if slot.get("mapping_id") in only_mapping_ids:
+            errs += validate(slot, schema["properties"]["slots"]["items"], schema, ("slots", i))
+    return errs
 
 
 def check_transition(old_doc, new_doc, user_actions=()):
@@ -267,28 +290,32 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
         raise StoreError(f"schema version change {old_doc.get('schema')} -> {new_doc.get('schema')}: "
                          "use mapping_store.migrate()")
     check_transition(old_doc, new_doc, user_actions)
-    errs = validate(new_doc, schema or load_schema(SCHEMA_NAME))
+    # The stored document passed this schema when it was written, so only the slots this save changes
+    # need checking (schema_errors explains why that is the same result).
+    only = changed_mapping_ids(old_doc, new_doc) if current else None
+    errs = schema_errors(new_doc, schema or load_schema(SCHEMA_NAME), only)
     if errs:
         raise StoreError("schema: " + "; ".join(errs[:5]))
-    return _write(path, current, new_doc, loaded_sha256, history_dir, now)
+    return _write(path, current, new_doc, loaded_sha256, history_dir, now, changed_ids=only)
 
 
-def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None):
+def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None, changed_ids=None):
     """Back up the previous bytes to .history/, then write atomically. -> new sha256.
-    raw: exact bytes to write instead of serializing new_doc (restore)."""
-    data = raw if raw is not None else mapping_db.serialize(new_doc)
+    raw: exact bytes to write instead of serializing new_doc (restore). changed_ids: see store_document."""
     history = Path(history_dir) if history_dir else path.parent / ".history"
     if current:  # every save keeps the previous bytes (M3 rule 5), also for the decisions file
         history.mkdir(parents=True, exist_ok=True)
         stamp = (now or dt.datetime.now()).strftime("%Y%m%dT%H%M%S%f")
         (history / f"{path.stem}.{stamp}.{loaded_sha256[:12]}.json").write_bytes(current)
-    if path.name in DOCUMENT_FILES:
-        return _write_document(path, data, now)
     if path.name == DB_MANAGED and mapping_db.is_imported(mapping_db.db_path_for(path)):
         # Database first (with per-slot history), then the JSON export. Without an imported decisions
         # table (the schema migration, or a brand-new file) the JSON is written directly; the import
         # happens on the next read.
-        return _write_database_backed(path, data, now)
+        doc = new_doc if raw is None else json.loads(raw.decode("utf-8"))
+        return _write_database_backed(path, doc, now, data=raw, changed_ids=changed_ids if raw is None else None)
+    data = raw if raw is not None else mapping_db.serialize(new_doc)
+    if path.name in DOCUMENT_FILES:
+        return _write_document(path, data, now)
     _atomic_write(path, data)
     return hashlib.sha256(data).hexdigest()
 

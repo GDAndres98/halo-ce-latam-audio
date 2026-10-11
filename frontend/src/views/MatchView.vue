@@ -7,6 +7,7 @@ import { LayoutTemplate } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
+import type { LevelProgress, SlotRow } from "../api/types";
 import { stop, togglePlay } from "../audio/player";
 import { stopCurrent } from "../audio/transport";
 import CeColumn from "../components/match/CeColumn.vue";
@@ -22,6 +23,11 @@ interface ColumnHandle {
   focusSearch: () => void;
 }
 
+interface MccHandle extends ColumnHandle {
+  updateRow: (row: SlotRow, progress?: LevelProgress) => void;
+  nextUnmatched: () => string | null;
+}
+
 interface CandidateHandle extends ColumnHandle {
   playNth: (index: number) => void;
 }
@@ -33,7 +39,7 @@ const match = useMatch();
 const levels = ref<string[]>([]);
 const missions = ref<string[]>([]);
 const focusedRef = ref<string | null>(null);
-const mccColumn = ref<ColumnHandle | null>(null);
+const mccColumn = ref<MccHandle | null>(null);
 const workspaceEl = ref<HTMLElement | null>(null);
 const layout = useWorkspaceLayout(workspaceEl);
 const ceColumn = ref<CandidateHandle | null>(null);
@@ -74,6 +80,18 @@ watch(
   },
   { immediate: false },
 );
+
+// ---- After a save: only the saved row and the level's counters change in the list (server values).
+match.onSaved((response) => {
+  if (response.row) mccColumn.value?.updateRow(response.row, response.progress);
+});
+
+/** Save the draft (no approval), then open the next unmatched line of the list. */
+async function saveAndNext() {
+  if (match.saving.value) return;
+  if (match.dirty() && !(await match.save())) return; // a refused save keeps the draft and the line
+  if (!mccColumn.value?.nextUnmatched()) match.message.value = "Saved. No unmatched line left in this list.";
+}
 
 // ---- Candidates. Choosing one is always an explicit action (the "Use" button or the s key).
 function useCandidate(ref: string) {
@@ -124,6 +142,8 @@ useShortcuts({
   "/": () => mccColumn.value?.focusSearch(),
   "\\": () => ceColumn.value?.focusSearch(),
   "ctrl+s": () => void match.save(),
+  "ctrl+enter": () => void saveAndNext(),
+  u: () => mccColumn.value?.nextUnmatched(),
   escape: () => {
     stop();
     stopCurrent();
@@ -156,6 +176,7 @@ onMounted(async () => {
       <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo edit</li>
       <li><kbd>Esc</kbd> stop</li>
       <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save</li>
+      <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> save &amp; next · <kbd>U</kbd> next unmatched</li>
     </ul>
     <button type="button" class="icon-label" :disabled="layout.isDefault.value" @click="layout.reset()">
       <LayoutTemplate :size="15" aria-hidden="true" /> Reset layout
@@ -178,7 +199,7 @@ onMounted(async () => {
       @drag-start="layout.startDrag('left', $event)"
       @step="(direction, coarse) => layout.step('left', direction, coarse)"
     />
-    <MatchPanel :match="match" />
+    <MatchPanel :match="match" @save-next="saveAndNext" />
     <SplitHandle
       side="right"
       :width="layout.widths.value.right"

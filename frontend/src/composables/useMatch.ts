@@ -7,7 +7,7 @@
 
 import { reactive, ref, watch } from "vue";
 import { api, ApiError } from "../api/client";
-import type { ApprovalField, SaveAction, SlotDetail } from "../api/types";
+import type { ApprovalField, SaveAction, SaveResponse, SlotDetail } from "../api/types";
 import { buildReworkBody, buildSaveBody, draftFrom, draftKey, isDirty, type Draft } from "../matching/draft";
 
 const sessionKey = (slotId: string) => `studio.draft.${slotId}`;
@@ -20,6 +20,9 @@ export function useMatch() {
   const saving = ref(false);
   const message = ref("");
   const error = ref("");
+  // Called with the server's answer after every successful save or rework (the list updates that row).
+  const savedListeners: ((response: SaveResponse) => void)[] = [];
+  const onSaved = (listener: (response: SaveResponse) => void) => savedListeners.push(listener);
 
   /** Takes the server's copy. `keepTyping` leaves the user's draft as it is (after a rework, or when they
    * typed while a request was in flight); otherwise the draft becomes the stored decision. */
@@ -58,6 +61,7 @@ export function useMatch() {
       message.value = response.saved ? savedMessage(actions) : (response.message ?? "Nothing changed.");
       adopt(response.slot, draftKey(draft) !== sentKey);
       forgetSession(slotId);
+      savedListeners.forEach((listener) => listener(response));
       return true;
     } catch (e) {
       error.value = describe(e);
@@ -76,6 +80,7 @@ export function useMatch() {
       const response = await api.save(buildReworkBody(detail.value, field));
       message.value = `${field === "audio" ? "Audio" : "Subtitle"} marked Needs rework. Change it, then save and approve again.`;
       adopt(response.slot, true);
+      savedListeners.forEach((listener) => listener(response));
       return true;
     } catch (e) {
       error.value = describe(e);
@@ -103,7 +108,7 @@ export function useMatch() {
     },
   );
 
-  return { detail, baseline, draft, loading, saving, message, error, load, save, rework, reloadKeepingDraft, dirty };
+  return { detail, baseline, draft, loading, saving, message, error, load, save, rework, reloadKeepingDraft, dirty, onSaved };
 }
 
 /** The object returned by useMatch(), passed to the components of the matching workspace. */

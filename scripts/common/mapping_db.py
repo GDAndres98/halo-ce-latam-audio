@@ -111,6 +111,19 @@ def body_of(slot):
     return json.dumps(slot, ensure_ascii=False, indent=2)
 
 
+def serialize_from_bodies(schema, pins, bodies):
+    """serialize({"schema", "pins", "slots"}) built from the stored slot bodies instead of encoding every slot
+    again. Byte-identical: json.dumps(indent=2) writes a slot at depth 2 exactly as body_of() writes it at
+    depth 0, with every line indented four more spaces (tests/test_mapping_sync.py checks it on the live
+    file). Python's indenting encoder is pure Python; encoding 536 slots took ~70 ms per save."""
+    head = json.dumps({"schema": schema, "pins": pins, "slots": []}, indent=2, ensure_ascii=False)
+    if not bodies:
+        return (head + "\n").encode("utf-8")
+    assert head.endswith('"slots": []\n}')
+    slots = ",\n".join("    " + b.replace("\n", "\n    ") for b in bodies)
+    return (head[:-len("[]\n}")] + "[\n" + slots + "\n  ]\n}\n").encode("utf-8")
+
+
 def slot_columns(slot):
     """Indexed columns derived from one slot document. The only place they are computed."""
     return (
@@ -216,38 +229,69 @@ def import_document(conn, doc, json_sha256):
     conn.commit()
 
 
-def replace_slots(conn, doc, changed_at, reason=None):
-    """Replace the whole document in one transaction and record each changed slot in slot_history.
-    Sets pending_json_write=1: the caller must write the JSON file and then call mark_json_synced().
-    Unchanged slots keep their rows, so their history is untouched. reason: see slot_history.reason."""
-    old = {mid: body for mid, body in conn.execute("SELECT mapping_id, body FROM slots")}
-    new = {slot["mapping_id"]: body_of(slot) for slot in doc["slots"]}
-    history = []
-    for mid in old.keys() | new.keys():
-        before, after = old.get(mid), new.get(mid)
-        if before != after:
-            history.append((changed_at, mid, before, after, reason))
+def replace_slots(conn, doc, changed_at, reason=None, data=None):
+    """store_document() for callers that only need the number of history rows written."""
+    return store_document(conn, doc, changed_at, reason=reason, data=data)[0]
+
+
+def store_document(conn, doc, changed_at, *, reason=None, data=None, changed_ids=None):
+    """Store the whole document in one transaction and record each changed slot in slot_history.
+    Only rows that changed are written (a save usually changes one slot); unchanged rows and their
+    history are untouched. Sets pending_json_write=1: the caller must write the JSON file and then call
+    mark_json_synced(). reason: see slot_history.reason. data: serialize(doc) if the caller already has it.
+    changed_ids: the mapping_ids the caller knows changed (by comparing with the document it loaded from
+    this database); every other slot keeps its stored body without being encoded again.
+    -> (history rows written, the export bytes = serialize(doc))"""
+    old = {mid: (pos, body) for pos, mid, body in conn.execute("SELECT position, mapping_id, body FROM slots")}
+
+    def body(slot):
+        mid = slot["mapping_id"]
+        if changed_ids is not None and mid not in changed_ids and mid in old:
+            return old[mid][1]
+        return body_of(slot)
+
+    new = [(position, slot, body(slot)) for position, slot in enumerate(doc["slots"])]
+    new_ids = {slot["mapping_id"] for _, slot, _ in new}
+    history, upserts = [], []
+    for position, slot, body in new:
+        mid = slot["mapping_id"]
+        before = old.get(mid)
+        if before is None or before[1] != body:
+            history.append((changed_at, mid, None if before is None else before[1], body, reason))
+        if before is None or before != (position, body):
+            upserts.append((position, *slot_columns(slot), body))
+    removed = [mid for mid in old if mid not in new_ids]
+    history += [(changed_at, mid, old[mid][1], None, reason) for mid in removed]
+    if data is None:
+        data = serialize_from_bodies(doc["schema"], doc["pins"], [b for _, _, b in new])
+    export_sha = sha256(data)
     try:
         conn.execute("BEGIN")
-        conn.execute("DELETE FROM slots")
+        conn.executemany("DELETE FROM slots WHERE mapping_id = ?", [(mid,) for mid in removed])
+        if any(old.get(u[1], (None,))[0] != u[0] for u in upserts):
+            # Positions move (a slot added or removed in the middle): rewrite the rows that moved without
+            # colliding on the position key.
+            conn.executemany("DELETE FROM slots WHERE mapping_id = ?", [(u[1],) for u in upserts])
         conn.executemany(
             "INSERT INTO slots (position, mapping_id, slot_id, mcc_tag, match_status, audio_status, "
-            "subtitle_status, radio_needed, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [(position, *slot_columns(slot), body_of(slot)) for position, slot in enumerate(doc["slots"])],
-        )
+            "subtitle_status, radio_needed, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(mapping_id) DO UPDATE SET position = excluded.position, slot_id = excluded.slot_id, "
+            "mcc_tag = excluded.mcc_tag, match_status = excluded.match_status, audio_status = excluded.audio_status, "
+            "subtitle_status = excluded.subtitle_status, radio_needed = excluded.radio_needed, body = excluded.body",
+            upserts)
         conn.executemany("INSERT INTO slot_history (changed_at, mapping_id, before_body, after_body, reason) "
                          "VALUES (?, ?, ?, ?, ?)", history)
         _write_meta(conn, [
             ("source_schema", doc["schema"]),
             ("pins", json.dumps(doc["pins"], ensure_ascii=False)),
-            ("export_sha256", sha256(serialize(doc))),
+            ("export_sha256", export_sha),
             ("pending_json_write", "1"),
         ])
         conn.execute("COMMIT")
     except Exception:
         conn.execute("ROLLBACK")
         raise
-    return len(history)
+    return len(history), data
 
 
 def mark_json_synced(conn, json_sha256):

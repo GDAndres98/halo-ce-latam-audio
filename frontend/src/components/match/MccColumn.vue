@@ -7,7 +7,7 @@ import { ChevronsDown } from "lucide-vue-next";
 import { onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { useDebounced } from "../../composables/useDebounced";
-import type { SlotRow, SlotsResponse } from "../../api/types";
+import type { LevelProgress, SlotRow, SlotsResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
 import { markFor } from "../../matching/status";
 import StatusBadge from "../StatusBadge.vue";
@@ -75,7 +75,33 @@ function focusSearch() {
   searchBox.value?.focus();
 }
 
-defineExpose({ move, focusSearch });
+/** After a save: the server's version of that row and of the level's counters replace the old ones, so the
+ * list stays right without being reloaded (the selection, the scroll position and the filters stay). */
+function updateRow(row: SlotRow, progress?: LevelProgress) {
+  if (!data.value) return;
+  const i = data.value.slots.findIndex((r) => r.slot_id === row.slot_id);
+  if (i !== -1) data.value.slots[i] = row;
+  if (progress && row.level === data.value.level) data.value.progress = progress;
+}
+
+const unmatched = (r: SlotRow) => !r.decision || r.decision.match === "unreviewed";
+
+/** The next line after the selected one (wrapping) that has no match decision yet, among the listed lines. */
+function nextUnmatched(): string | null {
+  const rows = data.value?.slots ?? [];
+  const start = rows.findIndex((r) => r.slot_id === props.selectedId);
+  for (let step = 1; step <= rows.length; step++) {
+    const row = rows[(start + step + rows.length) % rows.length];
+    if (row && row.slot_id !== props.selectedId && unmatched(row)) {
+      emit("select", row.slot_id);
+      document.getElementById(`mcc-${row.slot_id}`)?.scrollIntoView({ block: "nearest" });
+      return row.slot_id;
+    }
+  }
+  return null;
+}
+
+defineExpose({ move, focusSearch, updateRow, nextUnmatched });
 
 const tone = (state: string) => (state === "approved" ? "ok" : state === "draft" ? "warn" : state === "needs_rework" ? "bad" : "muted");
 const matchTone = (state: string) => (state === "matched" ? "ok" : state === "no_equivalent" ? "bad" : "muted");

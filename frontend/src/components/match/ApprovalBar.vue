@@ -2,13 +2,15 @@
 // Save and approval controls for the line. Approval and rework are deliberate: each is a button press
 // with a confirmation, and each explains why it is unavailable. Nothing is approved by a shortcut.
 
-import { BadgeCheck, Save, Wrench } from "lucide-vue-next";
+import { BadgeCheck, Save, SkipForward, Wrench } from "lucide-vue-next";
 import { computed } from "vue";
 import type { ApprovalField } from "../../api/types";
 import { canApprove, canRework, draftProblems } from "../../matching/draft";
 import type { MatchState } from "../../composables/useMatch";
 
 const props = defineProps<{ match: MatchState }>();
+// "Save & next unmatched": saves the draft (never approves), then the parent opens the next unmatched line.
+const emit = defineEmits<{ saveNext: [] }>();
 
 const stored = computed(() => props.match.detail.value?.mapping ?? null);
 const baseline = computed(() => props.match.baseline.value);
@@ -55,6 +57,15 @@ async function markRework(field: ApprovalField) {
     <div class="row">
       <button type="button" class="primary icon-label" :disabled="!dirty || match.saving.value || problems.length > 0" @click="saveDraft">
         <Save :size="16" aria-hidden="true" /> Save draft (Ctrl+S)
+      </button>
+      <button
+        type="button"
+        class="icon-label"
+        :disabled="!dirty || match.saving.value || problems.length > 0"
+        title="Save the draft, then open the next unmatched line (Ctrl+Enter). Approves nothing."
+        @click="emit('saveNext')"
+      >
+        <SkipForward :size="16" aria-hidden="true" /> Save &amp; next unmatched
       </button>
       <span v-if="!dirty" class="small muted">No unsaved changes.</span>
       <span v-else class="small warn">Unsaved changes.</span>

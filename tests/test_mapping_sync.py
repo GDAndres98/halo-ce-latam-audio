@@ -165,5 +165,133 @@ class SyncTests(unittest.TestCase):
             conn.close()
 
 
+class IncrementalReplaceTests(unittest.TestCase):
+    """replace_slots writes only changed rows; the stored document must equal the input in every case."""
+
+    def setUp(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file as a valid v3 template")
+        self._tmp = tempfile.TemporaryDirectory()
+        doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+        doc["slots"] = doc["slots"][:5]
+        self.doc = doc
+        self.conn = mapping_db.create(Path(self._tmp.name) / "m.db")
+        mapping_db.import_document(self.conn, doc, mapping_db.sha256(mapping_db.serialize(doc)))
+
+    def tearDown(self):
+        self.conn.close()
+        self._tmp.cleanup()
+
+    def assertStored(self, doc):
+        self.assertEqual(mapping_db.export_document(self.conn), doc)
+        self.assertEqual(mapping_db.meta_get(self.conn, "export_sha256"), mapping_db.sha256(mapping_db.serialize(doc)))
+        self.assertEqual(mapping_db.check_derived_columns(self.conn), [])
+
+    def history(self):
+        return self.conn.execute("SELECT mapping_id, before_body IS NULL, after_body IS NULL FROM slot_history ORDER BY id").fetchall()
+
+    def test_one_changed_slot_writes_one_history_row(self):
+        doc = copy.deepcopy(self.doc)
+        doc["slots"][2]["notes"] = "solo esta"
+        self.assertEqual(mapping_db.replace_slots(self.conn, doc, "t1"), 1)
+        self.assertStored(doc)
+        self.assertEqual(self.history(), [(doc["slots"][2]["mapping_id"], 0, 0)])
+
+    def test_insert_in_the_middle_remove_and_reorder(self):
+        doc = copy.deepcopy(self.doc)
+        extra = copy.deepcopy(doc["slots"][0])
+        extra["mapping_id"], extra["slot_id"] = "m-999999", "es:TEST_999#0"
+        doc["slots"].insert(1, extra)              # every later slot moves
+        mapping_db.replace_slots(self.conn, doc, "t1")
+        self.assertStored(doc)
+        removed = doc["slots"].pop(3)              # removal in the middle
+        mapping_db.replace_slots(self.conn, doc, "t2")
+        self.assertStored(doc)
+        doc["slots"].reverse()                     # every position changes, no body changes
+        self.assertEqual(mapping_db.replace_slots(self.conn, doc, "t3"), 0)
+        self.assertStored(doc)
+        self.assertIn((removed["mapping_id"], 0, 1), self.history())
+        self.assertIn(("m-999999", 1, 0), self.history())
+
+    def test_a_failure_rolls_everything_back(self):
+        doc = copy.deepcopy(self.doc)
+        doc["slots"][0]["notes"] = "no debe quedar"
+        doc["slots"][1]["slot_id"] = doc["slots"][2]["slot_id"]  # violates slots.slot_id UNIQUE
+        with self.assertRaises(sqlite3.IntegrityError):
+            mapping_db.replace_slots(self.conn, doc, "t1")
+        self.assertStored(self.doc)
+        self.assertEqual(self.history(), [])
+
+
+class IncrementalSchemaTests(unittest.TestCase):
+    """Checking only the changed slots must find exactly what checking the whole document finds."""
+
+    def setUp(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file")
+        from common.jsonschema_lite import load_schema
+        self.schema = load_schema("manual-mappings-3")
+        self.doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+
+    def compare(self, mutate):
+        new = copy.deepcopy(self.doc)
+        mutate(new)
+        only = mapping_store.changed_mapping_ids(self.doc, new)
+        full = mapping_store.schema_errors(new, self.schema)
+        incremental = mapping_store.schema_errors(new, self.schema, only)
+        self.assertEqual(sorted(incremental), sorted(full))
+        return only, full
+
+    def test_valid_change(self):
+        only, errs = self.compare(lambda d: d["slots"][10].__setitem__("notes", "válido"))
+        self.assertEqual((len(only), errs), (1, []))
+
+    def test_invalid_changes_are_found_at_their_real_position(self):
+        _, errs = self.compare(lambda d: d["slots"][200]["audio"].__setitem__("status", "maybe"))
+        self.assertTrue(errs and errs[0].startswith("/slots/200/audio/status"))
+        self.compare(lambda d: d["slots"][5].pop("radio_effect"))
+        self.compare(lambda d: d["slots"][7].__setitem__("unexpected", 1))
+        self.compare(lambda d: d.__setitem__("schema", "manual-mappings/9"))
+        self.compare(lambda d: d["pins"].__setitem__("mcc_spanish_fsb_sha256", "nothex"))
+
+    def test_added_slot_is_checked(self):
+        def add(d):
+            extra = copy.deepcopy(d["slots"][0])
+            extra["mapping_id"], extra["match"]["status"] = "m-999999", "perhaps"
+            d["slots"].append(extra)
+        only, errs = self.compare(add)
+        self.assertEqual(only, {"m-999999"})
+        self.assertTrue(errs)
+
+
+class ExportFromBodiesTests(unittest.TestCase):
+    def test_byte_identical_to_a_full_serialization(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file")
+        doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+        bodies = [mapping_db.body_of(x) for x in doc["slots"]]
+        self.assertEqual(mapping_db.serialize_from_bodies(doc["schema"], doc["pins"], bodies), mapping_db.serialize(doc))
+        for n in (0, 1, 2):
+            part = {**doc, "slots": doc["slots"][:n]}
+            self.assertEqual(mapping_db.serialize_from_bodies(part["schema"], part["pins"], bodies[:n]),
+                             mapping_db.serialize(part))
+
+    def test_a_save_writes_what_a_full_serialization_would(self):
+        if not LIVE.exists():
+            self.skipTest("needs the live mappings file")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manual_mappings.json"
+            doc = json.loads(LIVE.read_bytes().decode("utf-8"))
+            doc["slots"] = doc["slots"][:20]
+            path.write_bytes(mapping_db.serialize(doc))
+            doc, sha = mapping_store.load(path)
+            new = copy.deepcopy(doc)
+            new["slots"][7]["notes"] = "ñandú «comillas» — y emoji 🎧"
+            new_sha = mapping_store.save(path, new, sha, history_dir=Path(tmp) / "h")
+            self.assertEqual(path.read_bytes(), mapping_db.serialize(new))
+            self.assertEqual(new_sha, mapping_db.sha256(mapping_db.serialize(new)))
+            self.assertEqual(mapping_store.sync_status(path)["state"], "in_sync")
+
+
 if __name__ == "__main__":
     unittest.main()

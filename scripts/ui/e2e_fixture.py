@@ -7,8 +7,8 @@ Two things differ, both only in the copy:
 - the line the acceptance test works on (es:A10_010_cryotech#0) is reset to undecided. The real decision
   is approved, and an approved decision can only be changed through a Needs-rework step, which is part of
   what the test checks; starting from undecided lets the test walk the whole workflow once.
-- work/ is linked, not copied (it holds gigabytes of audio). The copy only ever writes its own mappings
-  folder and the audio preview cache.
+- work/ and reference-audio/ are linked, not copied (gigabytes of audio). The copy only ever writes its
+  own mappings folder and the audio caches under work/; reference-audio/ (the pinned banks) is only read.
 
 The real mappings folder is never written by this script. It prints a JSON line with the paths the test
 needs, and a hash of the real decisions so the test can prove they did not change.
@@ -50,10 +50,9 @@ def reset_test_line(json_path):
         conn.close()
 
 
-def link_work(dest):
-    """A directory junction (no admin rights needed on Windows). Falls back to a copy of the small
-    catalogs only if the junction cannot be made."""
-    target, link = REPO_ROOT / "work", dest / "work"
+def link_work(dest, name="work"):
+    """A directory junction (no admin rights needed on Windows) to the repository's folder `name`."""
+    target, link = REPO_ROOT / name, dest / name
     if sys.platform == "win32":
         result = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)],
                                 capture_output=True, text=True)
@@ -80,6 +79,9 @@ def main():
         (dest / "config").mkdir(exist_ok=True)
         shutil.copy2(REPO_ROOT / "config" / "audio_export.json", dest / "config" / "audio_export.json")
     link = link_work(dest)
+    # The pinned bank copies the MCC audio is decoded from on demand (read only; nothing writes there).
+    if (REPO_ROOT / "reference-audio").is_dir():
+        link_work(dest, "reference-audio")
     reset_test_line(dest / "mappings" / "manual_mappings.json")
     print(json.dumps({
         "root": dest.as_posix(),

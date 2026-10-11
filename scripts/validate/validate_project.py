@@ -71,20 +71,42 @@ def read_json(path, out, rel):
         return None
 
 
-def load_catalogs(root, out):
+def load_catalogs(root, out, cache=None):
+    """Read and check every catalog. cache: an optional dict kept by a long-running caller (the Studio). A
+    catalog file whose size and modification time are unchanged since the last run, with an unchanged
+    build.json, reuses its records and findings: the catalogs are generated files that only the catalog
+    builders rewrite, and reading plus schema-checking all of them cost about 5 s per run."""
     ce_records, mcc_records = [], []
     for kind, sub, schema_name, schema_id, sink in (
             ("ce", "work/ce", "ce-voice-asset-3", "ce-voice-asset/3", ce_records),
             ("mcc", "work/mcc", "mcc-dialogue-tag-3", "mcc-dialogue-tag/3", mcc_records)):
-        build = read_json(root / sub / "build.json", out, f"{sub}/build.json")
+        build_path = root / sub / "build.json"
+        build = read_json(build_path, out, f"{sub}/build.json")
+        build_stamp = _stamp(build_path)
         schema = load_schema(schema_name)
         for p in sorted((root / sub / "catalog").glob("*.jsonl")):
-            data = p.read_bytes()
-            records = [json.loads(line) for line in data.decode("utf-8").splitlines() if line.strip()]
             rel = p.relative_to(root).as_posix()
-            out += validate_catalog(rel, records, schema, schema_id, build, hashlib.sha256(data).hexdigest())
+            key = (rel, _stamp(p), build_stamp)
+            hit = cache.get(rel) if cache is not None else None
+            if hit and hit[0] == key:
+                records, findings = hit[1], hit[2]
+            else:
+                data = p.read_bytes()
+                records = [json.loads(line) for line in data.decode("utf-8").splitlines() if line.strip()]
+                findings = validate_catalog(rel, records, schema, schema_id, build, hashlib.sha256(data).hexdigest())
+                if cache is not None:
+                    cache[rel] = (key, records, findings)
+            out += findings
             sink += records
     return ce_records, mcc_records
+
+
+def _stamp(path):
+    try:
+        st = path.stat()
+        return (st.st_size, st.st_mtime_ns)
+    except FileNotFoundError:
+        return None
 
 
 def current_pins(root):
@@ -95,10 +117,17 @@ def current_pins(root):
             "mcc_spanish_fsb_sha256": ((mcc.get("files") or {}).get("spanish.fsb") or {}).get("sha256")}
 
 
-def run(root, use_git=True):
+def run(root, use_git=True, catalog_cache=None):
     out, drift = [], []
-    ce_records, mcc_records = load_catalogs(root, out)
-    ce, mcc = build_ce_index(ce_records), build_mcc_index(mcc_records)
+    ce_records, mcc_records = load_catalogs(root, out, catalog_cache)
+    if catalog_cache is not None:  # the indexes depend only on the (unchanged) catalog files
+        keys = tuple(sorted(v[0] for k, v in catalog_cache.items() if k != "__indexes__"))
+        hit = catalog_cache.get("__indexes__")
+        if not hit or hit[0] != keys:
+            hit = catalog_cache["__indexes__"] = (keys, build_ce_index(ce_records), build_mcc_index(mcc_records))
+        ce, mcc = hit[1], hit[2]
+    else:
+        ce, mcc = build_ce_index(ce_records), build_mcc_index(mcc_records)
     # cross-catalog uniqueness (several missions / levels)
     for label, keys in (("ce_line_ref", [e["ce_line_ref"] for r in ce_records for e in r["entries"]]),
                         ("slot_id", [s for r in mcc_records for s in r["slot_ids"]])):

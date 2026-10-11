@@ -117,6 +117,8 @@ first.
 | `p` | preview the edited recording |
 | `Ctrl+Z` | undo the last edit (in a text field it stays the field's own undo) |
 | `Ctrl+S` | save the draft |
+| `Ctrl+Enter` | save the draft and open the next unmatched line (never approves; also works in a text field) |
+| `u` | next unmatched line (asks first if there are unsaved changes) |
 | `Esc` | stop playback |
 
 Approval has no shortcut.
@@ -191,6 +193,8 @@ npm run test:e2e                              # browser test of the workflow (ne
 npm run test:ux                               # browser checks: panels, gain, theme, responsive, keyboard
 npm run test:editor                           # browser test of the waveform editor and the A/B players
 npm run test:data                             # browser test of the Data page: CRLF, outside edits, import, export
+npm run test:navigation                       # browser test of the matching loop: in-place updates, save & next, caching
+npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 ```
 

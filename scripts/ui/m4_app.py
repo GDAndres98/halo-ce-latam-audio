@@ -172,6 +172,12 @@ class M4App:
         self.run_validator = run_validator
         self._save_lock = threading.Lock()
         self.last_validation = None
+        # The project validator after a save runs in the background (validate_soon): it re-checks every
+        # catalog and took ~5.4 s of each 5.7 s save. Catalog results are cached by file size and mtime.
+        self._catalog_cache = {}
+        self._validation_lock = threading.Lock()
+        self._validation_queued = False
+        self._queue_lock = threading.Lock()
         self.reload()
 
     # ------------------------------------------------------------------ loading
@@ -333,7 +339,6 @@ class M4App:
         out, total = [], 0
         for lv in (self.levels if level == "all" else [level]):
             for r in self.levels[lv]:
-                en = r["samples"]["english"]
                 for s in r["samples"]["spanish"]:
                     m = by_slot.get(s["slot_id"])
                     if not self._slot_filter(status, m, s):
@@ -343,18 +348,7 @@ class M4App:
                     total += 1
                     if len(out) >= limit:
                         continue
-                    k = s["ordinal_in_tag"]
-                    out.append({"slot_id": s["slot_id"], "level": lv, "mcc_tag": r["mcc_tag"],
-                                "tag_name": r["tag_name"], "kind": r["kind"],
-                                "speaker_from_name": r["speaker_from_name"], "ordinal": k,
-                                "permutations": len(r["samples"]["spanish"]), "duration_s": s["duration_s"],
-                                "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
-                                "channels": s["channels"], "flags": r["flags"],
-                                "decision": self._decision_summary(m),
-                                "radio_effect": bool(m and m["radio_effect"]["needed"]),
-                                "different_but_fits": _fits(m), "edited": _edited(m),
-                                "preview": self._subtitle_preview(r["mcc_tag"]),
-                                "spanish_index": s["index"]})
+                    out.append(self._slot_row(lv, r, s, m))
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
@@ -362,6 +356,22 @@ class M4App:
             prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings)
         return {"level": level, "slots": out, "total": total, "truncated": total > len(out),
                 "progress": prog, "sha256": msha, "terms": terms}
+
+    def _slot_row(self, lv, r, s, m):
+        """One line of the MCC list (also returned by a save, so the page updates that row in place)."""
+        en = r["samples"]["english"]
+        k = s["ordinal_in_tag"]
+        return {"slot_id": s["slot_id"], "level": lv, "mcc_tag": r["mcc_tag"],
+                "tag_name": r["tag_name"], "kind": r["kind"],
+                "speaker_from_name": r["speaker_from_name"], "ordinal": k,
+                "permutations": len(r["samples"]["spanish"]), "duration_s": s["duration_s"],
+                "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
+                "channels": s["channels"], "flags": r["flags"],
+                "decision": self._decision_summary(m),
+                "radio_effect": bool(m and m["radio_effect"]["needed"]),
+                "different_but_fits": _fits(m), "edited": _edited(m),
+                "preview": self._subtitle_preview(r["mcc_tag"]),
+                "spanish_index": s["index"]}
 
     def _verifs_for(self, subject):
         return [v for v in self._verifications().get("verifications", []) if v.get("subject") == subject]
@@ -760,7 +770,7 @@ class M4App:
         verifs = self._verifications()
         findings, _ = validate_mappings(new_doc, load_schema(SCHEMA_NAME), ce=self.ce_idx, mcc=self.mcc_idx,
                                         local=new_local, verifications=verifs, current_pins=self._current_pins(),
-                                        file=MAPPINGS)
+                                        file=MAPPINGS, only_mapping_ids={mid})
         errors = [f for f in findings if f["severity"] == "error" and (f"({mid})" in f["where"] or f["code"] == "schema")]
         if errors:
             raise ApiError(422, "the decision is not valid yet", [f"{f['code']}: {f['message']}" for f in errors])
@@ -774,7 +784,17 @@ class M4App:
             raise ApiError(409, str(e))
         except StoreError as e:
             raise ApiError(422, str(e))
-        return {"saved": True, "sha256": new_sha, "slot": self.slot(slot_id), "validation": self.validate()}
+        self.validate_soon()
+        detail = self.slot(slot_id)
+        level_slots = [sid for x in self.levels[level] for sid in x["slot_ids"]]
+        return {"saved": True, "sha256": new_sha, "slot": detail,
+                # The list row and the level's progress as the server now holds them: the page replaces that
+                # row and the counters instead of reloading the list.
+                "row": self._slot_row(level, rec, _s, detail["mapping"]),
+                "progress": level_progress(level_slots, {"slots": new_doc["slots"]}),
+                # The project-wide report is refreshed in the background (validate_soon); this is the last
+                # complete one. The decision itself was checked above, before anything was written.
+                "validation": self.last_validation, "validation_pending": self.run_validator}
 
     # ------------------------------------------------------------------ level status
     def set_progress(self, body):
@@ -809,7 +829,9 @@ class M4App:
                 raise ApiError(409, str(e))
             except StoreError as e:
                 raise ApiError(422, str(e))
-        return {"saved": True, "sha256": new_sha, "entry": entry, "validation": self.validate()}
+        self.validate_soon()
+        return {"saved": True, "sha256": new_sha, "entry": entry, "validation": self.last_validation,
+                "validation_pending": self.run_validator}
 
     # ------------------------------------------------------------------ data (JSON <-> SQLite)
     # The database is the source of truth; the JSON file is its export. These are the owner's explicit
@@ -852,14 +874,40 @@ class M4App:
 
     # ------------------------------------------------------------------ validator
     def validate(self):
+        """Run the project validator now (start-up, POST /api/validate). One run at a time."""
         if not self.run_validator:
             return None
-        spec = importlib.util.spec_from_file_location(
-            "validate_project", Path(__file__).resolve().parents[1] / "validate" / "validate_project.py")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        report, drift = mod.run(self.root, use_git=(self.root / ".git").exists())
-        self.last_validation = {"summary": report["summary"],
-                                "findings": [f for f in report["findings"] if f["severity"] != "info"][:50],
-                                "drift_entries": len(drift["drift"])}
-        return self.last_validation
+        with self._validation_lock:
+            if getattr(self, "_validator", None) is None:
+                spec = importlib.util.spec_from_file_location(
+                    "validate_project", Path(__file__).resolve().parents[1] / "validate" / "validate_project.py")
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                self._validator = mod
+            report, drift = self._validator.run(self.root, use_git=(self.root / ".git").exists(),
+                                                catalog_cache=self._catalog_cache)
+            self.last_validation = {"summary": report["summary"],
+                                    "findings": [f for f in report["findings"] if f["severity"] != "info"][:50],
+                                    "drift_entries": len(drift["drift"]),
+                                    "at": dt.datetime.now().isoformat(timespec="seconds")}
+            return self.last_validation
+
+    def validate_soon(self):
+        """Refresh the report in the background after a save. Saves in quick succession share one run: a run
+        that is queued but not started yet covers every save before it."""
+        if not self.run_validator:
+            return
+        with self._queue_lock:
+            if self._validation_queued:
+                return
+            self._validation_queued = True
+
+        def work():
+            with self._queue_lock:
+                self._validation_queued = False
+            try:
+                self.validate()
+            except Exception as e:  # noqa: BLE001 - a background report must never take the server down
+                self.last_validation = {"error": f"{type(e).__name__}: {e}"}
+
+        threading.Thread(target=work, daemon=True, name="validate-soon").start()

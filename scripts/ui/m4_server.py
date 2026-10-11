@@ -71,7 +71,7 @@ def make_handler(app, quiet=False, builds=None):
             self.send_response(status)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", (extra or {}).pop("Cache-Control", "no-store"))
             self.send_header("X-Content-Type-Options", "nosniff")
             for k, v in (extra or {}).items():
                 self.send_header(k, v)
@@ -83,6 +83,14 @@ def make_handler(app, quiet=False, builds=None):
             self._send(status, json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
         def _wav(self, path):
+            # Decoded clips are files written once, so the browser may keep them; it revalidates with the
+            # ETag (size + mtime) each time, and gets 304 without a body when nothing changed. The players
+            # load the same clip several times per line (A/B, the editor), which was a full download each.
+            st = Path(path).stat()
+            etag = f'"{st.st_size:x}-{st.st_mtime_ns:x}"'
+            cache = {"Cache-Control": "private, no-cache", "ETag": etag}
+            if self.headers.get("If-None-Match") == etag:
+                return self._send(304, b"", "audio/wav", cache)
             data = Path(path).read_bytes()
             rng = self.headers.get("Range")
             if rng and rng.startswith("bytes="):
@@ -92,8 +100,8 @@ def make_handler(app, quiet=False, builds=None):
                 if start > end:
                     return self._send(416, b"", "text/plain", {"Content-Range": f"bytes */{len(data)}"})
                 return self._send(206, data[start:end + 1], "audio/wav",
-                                  {"Content-Range": f"bytes {start}-{end}/{len(data)}", "Accept-Ranges": "bytes"})
-            self._send(200, data, "audio/wav", {"Accept-Ranges": "bytes"})
+                                  {"Content-Range": f"bytes {start}-{end}/{len(data)}", "Accept-Ranges": "bytes", **cache})
+            self._send(200, data, "audio/wav", {"Accept-Ranges": "bytes", **cache})
 
         def _guard_origin(self):
             """Reject cross-site requests: the page and the API share one local origin."""

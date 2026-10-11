@@ -55,7 +55,11 @@ watch([mission, debouncedQuery, hideUsed, subtitles], () => {
   load();
 });
 // The hidden set depends on the selected MCC line (its own matches are never hidden from it).
-watch(() => props.slotId, load);
+// The list depends on the selected line only through "hide recordings already used" (keep_slot); otherwise
+// switching lines keeps the same candidates and search, with no request.
+watch(() => props.slotId, () => {
+  if (hideUsed.value) load();
+});
 onMounted(load);
 
 function showMore() {

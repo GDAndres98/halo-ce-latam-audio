@@ -216,6 +216,9 @@ export interface SaveResponse {
   message?: string;
   sha256?: string;
   slot: SlotDetail;
+  /** The saved line as the MCC list shows it, and its level's progress (absent when nothing changed). */
+  row?: SlotRow;
+  progress?: LevelProgress;
 }
 
 export interface EditPreviewResponse {

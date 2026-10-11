@@ -171,10 +171,14 @@ def compare_slot_identity(old_records, new_records):
 
 
 # --------------------------------------------------------------------------- mappings
-def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pins, file="manual_mappings.json"):
-    """-> (findings, drift). ce/mcc are indexes; local may be None; current_pins may hold None values."""
+def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pins, file="manual_mappings.json",
+                      only_mapping_ids=None):
+    """-> (findings, drift). ce/mcc are indexes; local may be None; current_pins may hold None values.
+    only_mapping_ids: check just these slots in depth (a save checks the slot it changes; the others are
+    unchanged and were checked when they were saved). Duplicate ids are still looked for across all slots."""
+    from .mapping_store import schema_errors
     out, drift = [], []
-    errs = schema_validate(doc, schema)
+    errs = schema_errors(doc, schema, only_mapping_ids)
     out += [finding("error", "schema", file, e.split(":")[0], e) for e in errs]
     if errs:
         return out, drift
@@ -199,6 +203,8 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
             out.append(finding("error", "conflicting_slot_decisions", file, w,
                                f"{s['slot_id']} is also mapped by {slots_seen[s['slot_id']]}"))
         slots_seen.setdefault(s["slot_id"], s["mapping_id"])
+        if only_mapping_ids is not None and s["mapping_id"] not in only_mapping_ids:
+            continue
         radio = s.get("radio_effect") or {}
         if radio.get("needed") and s["audio"]["source"] == "keep_original":
             out.append(finding("error", "radio_effect_without_selected_audio", file, w + "/radio_effect",
