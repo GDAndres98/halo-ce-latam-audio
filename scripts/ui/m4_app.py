@@ -327,11 +327,12 @@ class M4App:
                 "recording": _needs_recording(m),
                 "stereo": s["channels"] > 1}.get(status, False)
 
-    def _subtitle_preview(self, mcc_tag):
-        """The first words of the LATAM Spanish subtitle (Spain's if there is none): enough to recognise a
-        line in the list without loading the full text."""
+    def _subtitle_preview(self, mcc_tag, table=None):
+        """The first words of the LATAM Spanish subtitle (Spain's if there is none), or of one table's text
+        (`table`, e.g. "EN"): enough to recognise a line in the list without loading the full text."""
         texts = self._mcc_text(mcc_tag)
-        text = (texts.get("SU") or texts.get("SP") or {}).get("text") or ""
+        entry = texts.get(table) if table else (texts.get("SU") or texts.get("SP"))
+        text = (entry or {}).get("text") or ""
         return text if len(text) <= 90 else text[:87].rstrip() + "…"
 
     def slots(self, level, status=None, q=None, limit=1500):
@@ -371,11 +372,13 @@ class M4App:
                 "speaker_from_name": r["speaker_from_name"], "ordinal": k,
                 "permutations": len(r["samples"]["spanish"]), "duration_s": s["duration_s"],
                 "en_duration_s": en[k]["duration_s"] if k < len(en) else None,
+                "english_index": en[k]["index"] if k < len(en) else None,
                 "channels": s["channels"], "flags": r["flags"],
                 "decision": self._decision_summary(m),
                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
                 "different_but_fits": _fits(m), "needs_recording": _needs_recording(m), "edited": _edited(m),
                 "preview": self._subtitle_preview(r["mcc_tag"]),
+                "english_preview": self._subtitle_preview(r["mcc_tag"], "EN"),
                 "spanish_index": s["index"]}
 
     def _verifs_for(self, subject):

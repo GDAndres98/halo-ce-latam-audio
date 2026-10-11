@@ -103,8 +103,12 @@ export interface SlotRow {
   kind: string;
   speaker_from_name: string;
   ordinal: number;
+  /** How many Spain samples the tag has (several = takes, shown as "#n"). */
+  permutations: number;
   duration_s: number;
   en_duration_s: number | null;
+  /** Bank index of the English sample of the same take (what /audio/mcc plays in English), if any. */
+  english_index: number | null;
   channels: number;
   flags: string[];
   /** Null for a line with no saved decision. */
@@ -114,6 +118,8 @@ export interface SlotRow {
   needs_recording: boolean;
   edited: boolean;
   preview: string;
+  /** The first words of MCC's English subtitle. */
+  english_preview: string;
   /** Bank index of the Spain sample: what /audio/mcc plays. */
   spanish_index: number;
 }
@@ -138,6 +144,7 @@ export interface SpanishSample {
 export interface EnglishSample {
   index: number;
   name_in_bank: string;
+  ordinal_in_tag: number;
   duration_s: number;
 }
 

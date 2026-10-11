@@ -71,13 +71,15 @@ Open **Matching**. The screen has three columns.
 
 - **Left: MCC lines.** Pick a level, filter (unmatched, draft, approved, needs rework, keep Spain audio,
   radio, needs recording, different-but-fits), and search by ID, speaker or subtitle text. Accents and case are ignored;
-  partial words work. Play a line with its play button.
+  partial words work. Each line shows its name as the classic page does (the tag, plus `#n` when the tag has
+  several takes), **ES** / **EN** buttons to play the Spain and English recordings, and the English subtitle.
 - **Centre: the decision for the selected line**, in working order. The save bar stays in view at the
   bottom.
   1. **Replacement audio.** At the top, the **MCC original** key of the selected line (for example
-     `es:A10_010_cryotech#0`, with a copy button), shown as soon as you select the line. Below it, the
-     chosen **Campaign Evolved replacement** and its key, the choice between keeping Spain's audio and a
-     matched recording, the replacement's language, and the audio approval.
+     `es:A10_010_cryotech#0`, with a copy button), shown as soon as you select the line. Then MCC's English
+     recordings of the line (play buttons and names with `#n`) and MCC's subtitles (SU, SP, EN). Below them,
+     the chosen **Campaign Evolved replacement** and its key, the choice between keeping Spain's audio and a
+     matched recording, the replacement's language, and the audio status.
   2. **Flags & notes:** *Needs radio effect* (radio tower; a flag only, no processing), *Needs recording*
      (microphone; no suitable recording exists yet), *Different but fits* (puzzle piece), and notes. The
      same icons are used in the MCC list, its flag filters and the Dashboard. Flags are independent of
@@ -101,17 +103,19 @@ Open **Matching**. The screen has three columns.
      and their difference are shown, with the global gain report (a build setting).
   5. **Subtitles:** MCC's LATAM text (SU), a Campaign Evolved subtitle (es-MX or EN where it exists), your
      own LATAM Spanish text, or none (a decision to show no subtitle, shown differently from a missing
-     text). A preview shows the text the game will display, and the subtitle approval sits here. When you
+     text). Choosing *Write my own* with an empty box starts it from the chosen recording's LATAM subtitle
+     (MCC's SU text when no recording is chosen). A preview shows the text the game will display. When you
      choose a recording, its LATAM subtitle is **proposed** (marked "proposed · unsaved") if the subtitle
      is still MCC's default text; a subtitle you already chose or saved, or an approved one, is never
      replaced. A recording with no LATAM subtitle says so, and you choose the subtitle yourself.
 
   **Save draft** writes everything for the line in one request: the audio choice and its editing, the
   subtitle, the flags and the notes. The subtitle can be chosen before anything is saved. Saving never
-  approves. Approve audio and subtitle separately (a button press with a confirmation); an approved
-  decision is read-only until you mark it *Needs rework*.
+  approves. The save bar also holds **Approve audio**, **Approve subtitle** and **Approve both** (each a
+  button press with a confirmation); an approved decision is read-only until you mark it *Needs rework*.
 - **Right: Campaign Evolved candidates.** Search by ID, English or LATAM text, pick a mission, hide
-  recordings already used elsewhere. Results stay in catalog order. Nothing is selected for you: use
+  recordings already used elsewhere. Each recording shows its name with `#n`, the length of its es-MX
+  recording (measured when the row comes into view), and es-MX / EN play buttons. Results stay in catalog order. Nothing is selected for you: use
   **Use this recording** to choose one. A recording with no subtitle says so.
 
 **Resuming.** Everything you save is in `mappings/manual_mappings.db`. The address keeps the selected

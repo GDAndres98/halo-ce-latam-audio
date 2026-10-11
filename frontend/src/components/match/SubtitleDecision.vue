@@ -7,7 +7,7 @@
 // differently on purpose: a missing text is a problem to look at, an omitted one is a decision.
 
 import { Captions, Sparkles } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import type { CeLine, SlotDetail, SubtitleSource } from "../../api/types";
 import { LATAM_CULTURE, subtitleDirty, type Draft } from "../../matching/draft";
 import StatusBadge from "../StatusBadge.vue";
@@ -58,6 +58,22 @@ const chosenWithoutLatam = computed(() => {
   const line = props.lines.find((l) => l.ce_line_ref === props.draft.audioRef);
   return Boolean(line) && !line?.subtitles[LATAM_CULTURE]?.text;
 });
+
+/**
+ * Choosing "Write my own" with an empty text box starts it from a text to adapt: the chosen Campaign
+ * Evolved recording's LATAM subtitle, or MCC's LATAM text (SU) when no recording is chosen. Text the user
+ * already wrote is never replaced.
+ */
+watch(
+  () => props.draft.subtitleSource,
+  (source) => {
+    if (source !== "custom" || props.locked || props.draft.customText.trim()) return;
+    const d = props.draft;
+    const chosen = d.audioSource === "ce" && d.audioRef ? props.lines.find((l) => l.ce_line_ref === d.audioRef) : undefined;
+    const start = chosen ? chosen.subtitles[LATAM_CULTURE]?.text : su.value.text;
+    if (start) d.customText = start;
+  },
+);
 
 /** The text the game will show, as chosen now (saved or not). */
 const preview = computed<{ text: string | null; note: string }>(() => {

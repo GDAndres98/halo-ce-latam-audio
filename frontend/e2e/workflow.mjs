@@ -11,7 +11,9 @@
 //  7. the chosen recording's LATAM subtitle is proposed, without overriding a decided subtitle;
 //  8. approved decisions stay protected;
 //  9. the flag icons are distinct and labelled;
-// 10. Insert silence (addendum): insert, mark, lengthen the result, preview, edit, undo, save, reload.
+// 10. Insert silence (addendum): insert, mark, lengthen the result, preview, edit, undo, save, reload;
+// 11. quick changes: list names and players, English takes and MCC subtitles on top, custom text start,
+//     approvals (including both) in the save bar, es-MX seconds in the candidates.
 //
 // Works on a disposable copy of the mapping data (scripts/ui/e2e_fixture.py); the real mappings are hashed
 // before and after.
@@ -161,6 +163,44 @@ async function main() {
     });
 
     // ---- 9. Flag icons.
+    await step("11a. MCC list rows: classic name, Spain and English players, English subtitle", async () => {
+      const slots = await api("/api/slots?level=a10&limit=400");
+      const multi = slots.slots.find((r) => r.permutations > 1);
+      const plain = slots.slots.find((r) => r.slot_id === SLOT);
+      const row = page.locator(`li.row-item[id="mcc-${SLOT}"]`);
+      check((await row.locator("strong.tag").innerText()) === (plain.permutations > 1 ? `${plain.tag_name} #${plain.ordinal}` : plain.tag_name), "row name");
+      check((await row.getByRole("button", { name: /ES/ }).count()) === 1 && (await row.getByRole("button", { name: /EN/ }).count()) === 1, "ES/EN players");
+      check((await row.locator(".preview").innerText()) === plain.english_preview, "preview is not the English subtitle");
+      let multiName = "none in a10";
+      if (multi) {
+        const other = page.locator(`li.row-item[id="mcc-${multi.slot_id}"] strong.tag`);
+        if (await other.count()) {
+          multiName = await other.innerText();
+          check(multiName === `${multi.tag_name} #${multi.ordinal}`, `takes name ${multiName}`);
+        }
+      }
+      const playing = page.waitForResponse((r) => r.url().includes("/audio/mcc") && r.url().includes("lang=english"), { timeout: 15000 });
+      await row.getByRole("button", { name: /EN/ }).click();
+      check((await playing).status() < 400, "English audio did not load");
+      await page.keyboard.press("Escape");
+      return `"${plain.english_preview.slice(0, 30)}…"; takes: ${multiName}`;
+    });
+
+    await step("11b. the centre panel starts with the English takes and MCC's subtitles", async () => {
+      const detail = await api(`/api/slot?id=${encodeURIComponent(SLOT)}`);
+      const takes = replacement().getByTestId("english-takes");
+      const names = await takes.locator("li .mono").allInnerTexts();
+      const expected = detail.english.map((e) => `${e.name_in_bank} #${e.ordinal_in_tag}`);
+      check(JSON.stringify(names) === JSON.stringify(expected), `takes ${names.join(", ")}`);
+      check((await takes.getByRole("button").count()) === expected.length, "a take has no play button");
+      const texts = await replacement().getByTestId("mcc-subtitles").innerText();
+      for (const key of ["SU", "SP", "EN"]) {
+        const text = detail.mcc_subtitles[key]?.text;
+        if (text) check(texts.includes(text), `${key} text missing at the top`);
+      }
+      return `${expected.join(", ")}; SU/SP/EN shown`;
+    });
+
     await step("9. the flag icons are distinct and labelled (flags, list filters)", async () => {
       const expected = { radio: ["lucide-radio-tower", "Needs radio effect"], recording: ["lucide-mic", "Needs recording"], fits: ["lucide-puzzle", "Different but fits"] };
       for (const [name, [icon, label]] of Object.entries(expected)) {
@@ -193,6 +233,19 @@ async function main() {
       const ceKey = await center().getByTestId("ce-replacement").textContent();
       check(ceKey.includes(CE_REF), `the CE key is not shown: ${ceKey}`);
       return `${previewBodies.length - before} render(s), no click on any preview button`;
+    });
+
+    await step("11c. candidates show the es-MX length and one header line", async () => {
+      const row = page.locator("section.column.ce li.row-item", { hasText: CE_REF });
+      await page.waitForFunction(
+        (ref) => /\d+\.\d\d s/.test([...document.querySelectorAll("section.column.ce li.row-item")].find((li) => li.textContent.includes(ref))?.querySelector('[data-testid="clip-seconds"]')?.textContent ?? ""),
+        CE_REF,
+        { timeout: 20000 },
+      );
+      const shown = Number((await row.getByTestId("clip-seconds").innerText()).replace(" s", ""));
+      check(Math.abs(shown - 3.63) < 0.05, `es-MX ${shown} s`);
+      check((await row.locator(".line-head").count()) === 1, "more than one header line");
+      return `${shown.toFixed(2)} s`;
     });
 
     await step("7. the chosen recording's LATAM subtitle is proposed, unsaved", async () => {
@@ -343,6 +396,8 @@ async function main() {
     let otherRef = "";
     await step("7b. choosing another recording keeps a subtitle the user decided", async () => {
       await subtitles().getByLabel("Write my own LATAM Spanish text").check();
+      const start = await subtitles().getByLabel("Subtitle text (LATAM Spanish)").inputValue();
+      check(start === latam, `custom text starts as ${JSON.stringify(start)}`);
       await subtitles().getByLabel("Subtitle text (LATAM Spanish)").fill("Texto propio de prueba");
       await page.getByTestId("save-draft").click();
       await page.getByText("Draft saved.").waitFor({ timeout: 15000 });
@@ -410,13 +465,24 @@ async function main() {
       });
       await waitLine(target.slot_id);
       await subtitles().getByLabel("Write my own LATAM Spanish text").check();
+      const su = (await api(`/api/slot?id=${encodeURIComponent(target.slot_id)}`)).mcc_subtitles.SU?.text ?? "";
+      const start = await subtitles().getByLabel("Subtitle text (LATAM Spanish)").inputValue();
+      check(start === su, `custom text starts as ${JSON.stringify(start)}, SU is ${JSON.stringify(su)}`);
       await subtitles().getByLabel("Subtitle text (LATAM Spanish)").fill("Solo subtítulo");
       await page.getByTestId("save-draft").click();
       await page.getByText("Draft saved.").waitFor({ timeout: 15000 });
       const m = (await api(`/api/slot?id=${encodeURIComponent(target.slot_id)}`)).mapping;
       check(m.audio.source === "keep_original" && m.subtitle.source === "custom", "not a subtitle-only decision");
       check(m.subtitle.status === "draft", "the subtitle was approved");
-      return target.slot_id;
+      // 11d. Approve both, from the save bar.
+      const bar = page.getByRole("region", { name: "Save the decision" });
+      check((await bar.getByRole("button", { name: "Approve audio" }).count()) === 1, "no Approve audio in the save bar");
+      check((await bar.getByRole("button", { name: "Approve subtitle" }).count()) === 1, "no Approve subtitle in the save bar");
+      await bar.getByTestId("approve-both").click();
+      await page.getByText("Saved; approved audio, approved subtitle.").waitFor({ timeout: 15000 });
+      const approved = (await api(`/api/slot?id=${encodeURIComponent(target.slot_id)}`)).mapping;
+      check(approved.audio.status === "approved" && approved.subtitle.status === "approved", "approve both did not approve both");
+      return `${target.slot_id}; custom text started from SU; approved both from the save bar`;
     });
 
     await page.setViewportSize({ width: 1600, height: 2600 });

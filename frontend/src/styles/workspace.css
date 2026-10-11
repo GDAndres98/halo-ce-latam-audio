@@ -368,15 +368,50 @@
   margin: 0.35rem 0 0;
 }
 
-/* ---- Approval of one decision, at the end of its section (ApprovalControls.vue). */
+/* ---- Approvals in the save bar: audio, subtitle, both (SaveBar.vue, ApprovalControls.vue). */
+.approval-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  margin: 0.5rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px dashed var(--line);
+}
+
 .approval-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.6rem;
-  margin: 0.6rem 0 0.2rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--line);
+  gap: 0.3rem 0.5rem;
+}
+
+.decision-status {
+  margin: 0.45rem 0 0.1rem;
+}
+
+/* ---- MCC reference at the top of the centre panel: the English takes and MCC's subtitles. */
+.english-takes {
+  margin: 0 0 0.45rem;
+}
+
+.english-takes ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.english-takes li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mcc-texts {
+  margin: 0 0 0.55rem;
 }
 
 /* ---- Replacement audio: the MCC original and the Campaign Evolved replacement, told apart by a tag, a

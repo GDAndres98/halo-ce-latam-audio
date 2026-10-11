@@ -63,6 +63,5 @@ async function markRework() {
     <button v-if="rework.allowed" type="button" class="link icon-label" :disabled="match.saving.value" @click="markRework">
       <Wrench :size="14" aria-hidden="true" /> Needs rework ({{ name }})
     </button>
-    <span v-else-if="!approval.allowed" class="small muted">{{ approval.reason }}</span>
   </div>
 </template>

@@ -11,6 +11,7 @@
 import { FileAudio, ListChecks } from "lucide-vue-next";
 import { computed } from "vue";
 import { audioUrl } from "../../api/client";
+import AudioButton from "../AudioButton.vue";
 import type { CeLine } from "../../api/types";
 import { useEditPreview } from "../../composables/useEditPreview";
 import type { MatchState } from "../../composables/useMatch";
@@ -18,7 +19,6 @@ import StatusBadge from "../StatusBadge.vue";
 import CopyButton from "../ui/CopyButton.vue";
 import StateMessage from "../ui/StateMessage.vue";
 import AudioCompare from "../waveform/AudioCompare.vue";
-import ApprovalControls from "./ApprovalControls.vue";
 import AudioDecision from "./AudioDecision.vue";
 import AudioEditor from "./AudioEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
@@ -64,6 +64,27 @@ const draftLines = computed<CeLine[]>(() =>
 const activeFlags = computed(() => FLAG_ORDER.filter((name) => draft.value[name]).map((name) => FLAGS[name]));
 const matchTone = computed(() => (draft.value.matchStatus === "matched" ? "ok" : "muted"));
 
+/** MCC's three subtitle tables for this line, in the order they matter for the LATAM build. */
+const MCC_TABLES: { key: string; label: string }[] = [
+  { key: "SU", label: "MCC LATAM (SU)" },
+  { key: "SP", label: "MCC Spain (SP)" },
+  { key: "EN", label: "MCC English (EN)" },
+];
+const englishName = (sample: { name_in_bank: string; ordinal_in_tag: number }) =>
+  `${sample.name_in_bank} #${sample.ordinal_in_tag}`;
+
+function statusOf(field: "audio" | "subtitle") {
+  const status = stored.value?.[field].status;
+  return {
+    label: `${field}: ${status ? status.replace("_", " ") : "not saved"}`,
+    tone: (status === "approved" ? "ok" : status === "needs_rework" ? "bad" : status ? "warn" : "muted") as
+      | "ok"
+      | "bad"
+      | "warn"
+      | "muted",
+  };
+}
+
 async function choose(ref: string) {
   await props.match.chooseRecording(ref);
 }
@@ -84,9 +105,33 @@ async function choose(ref: string) {
           <p v-if="switching" class="source-meta small muted">Loading this line…</p>
           <div v-else class="source-meta line-title">
             <h2>{{ detail.tag_name }}</h2>
-            <p class="small muted">{{ detail.slot_id }} · speaker {{ detail.speaker_from_name || "—" }} · {{ detail.spanish.duration_s.toFixed(2) }} s (Spain)</p>
+            <p class="small muted">speaker {{ detail.speaker_from_name || "—" }} · {{ detail.spanish.duration_s.toFixed(2) }} s (Spain)</p>
           </div>
         </div>
+
+        <div v-if="detail.english.length" class="english-takes" data-testid="english-takes">
+          <span class="source-tag">MCC English recordings</span>
+          <ul>
+            <li v-for="sample in detail.english" :key="sample.index">
+              <AudioButton
+                :url="audioUrl.mcc(detail.level, 'english', sample.index)"
+                label=""
+                :title="`English ${englishName(sample)}`"
+              />
+              <span class="mono small">{{ englishName(sample) }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <dl class="texts mcc-texts" data-testid="mcc-subtitles">
+          <template v-for="t in MCC_TABLES" :key="t.key">
+            <dt>{{ t.label }}</dt>
+            <dd>
+              <span v-if="detail.mcc_subtitles[t.key]?.text">{{ detail.mcc_subtitles[t.key]?.text }}</span>
+              <span v-else class="missing">No text.</span>
+            </dd>
+          </template>
+        </dl>
 
         <div class="source-card ce-source" :class="{ empty: draft.audioSource !== 'ce' }" data-testid="ce-replacement">
           <span class="source-tag">Campaign Evolved replacement</span>
@@ -106,7 +151,7 @@ async function choose(ref: string) {
         </div>
 
         <AudioDecision :draft="draft" :locked="audioLocked" @choose="choose" @remove="match.removeMatch" />
-        <ApprovalControls :match="match" field="audio" />
+        <p class="decision-status"><StatusBadge v-bind="statusOf('audio')" /></p>
       </section>
 
       <!-- 2. Flags & notes -->
@@ -135,7 +180,7 @@ async function choose(ref: string) {
         :lines="draftLines"
         :proposed-ref="match.proposedSubtitle.value"
       >
-        <ApprovalControls :match="match" field="subtitle" />
+        <p class="decision-status"><StatusBadge v-bind="statusOf('subtitle')" /></p>
       </SubtitleDecision>
 
       <SaveBar :match="match" @save-next="emit('saveNext')" />

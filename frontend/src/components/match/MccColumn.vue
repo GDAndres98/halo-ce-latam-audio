@@ -133,6 +133,11 @@ function toggleFlagFilter(name: FlagName) {
 function mccAudio(row: SlotRow) {
   return audioUrl.mcc(row.level, "spanish", row.spanish_index);
 }
+
+/** The line's name as the classic page shows it: the tag, and "#n" when the tag has several takes. */
+function rowLabel(row: SlotRow) {
+  return row.permutations > 1 ? `${row.tag_name} #${row.ordinal}` : row.tag_name;
+}
 </script>
 
 <template>
@@ -201,11 +206,20 @@ function mccAudio(row: SlotRow) {
         @click="emit('select', row.slot_id)"
       >
         <div class="line-head">
-          <strong class="tag">{{ row.tag_name }}</strong>
+          <strong class="tag">{{ rowLabel(row) }}</strong>
           <span class="muted small">{{ row.speaker_from_name || "—" }} · {{ row.duration_s.toFixed(2) }} s</span>
-          <AudioButton :url="mccAudio(row)" label="" title="Spain's recording" @click.stop />
+          <span class="play-group">
+            <AudioButton :url="mccAudio(row)" label="ES" title="Spain Spanish recording" @click.stop />
+            <AudioButton
+              v-if="row.english_index !== null"
+              :url="audioUrl.mcc(row.level, 'english', row.english_index)"
+              label="EN"
+              title="English recording"
+              @click.stop
+            />
+          </span>
         </div>
-        <div class="preview small" :title="row.preview">{{ row.preview || "(no subtitle text)" }}</div>
+        <div class="preview small" :title="row.english_preview">{{ row.english_preview || "(no English subtitle)" }}</div>
         <div class="badges">
           <span class="pill" :class="markFor(decisionOf(row).match).tone" :title="`match: ${markFor(decisionOf(row).match).word}`"
                 :aria-label="`match: ${markFor(decisionOf(row).match).word}`">M{{ markFor(decisionOf(row).match).glyph }}</span>

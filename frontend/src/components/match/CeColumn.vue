@@ -13,6 +13,7 @@ import { useDebounced } from "../../composables/useDebounced";
 import { highlightSegments } from "../../matching/text";
 import type { CeLine, CeResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
+import ClipSeconds from "../ClipSeconds.vue";
 import StatusBadge from "../StatusBadge.vue";
 import StateMessage from "../ui/StateMessage.vue";
 
@@ -142,14 +143,16 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
       >
         <div class="line-head">
           <strong class="tag mono small">{{ line.ce_line_ref }}</strong>
-          <span class="muted small">{{ line.mission }} · {{ line.folder }}</span>
-        </div>
-        <div class="line-head">
-          <span class="small">{{ line.display_key }}</span>
-          <div class="play-group">
+          <span class="play-group">
+            <ClipSeconds
+              :url="audioUrl.ce(line.ce_line_ref, 'Spanish(Mexico)')"
+              :known="line.media['Spanish(Mexico)']?.duration_s"
+              :disabled="!line.media['Spanish(Mexico)']?.count"
+              :title="'Length of the es-MX recording'"
+            />
             <AudioButton :url="audioUrl.ce(line.ce_line_ref, 'Spanish(Mexico)')" label="es-MX" :disabled="!line.media['Spanish(Mexico)']?.count" @click.stop />
             <AudioButton :url="audioUrl.ce(line.ce_line_ref, 'English(US)')" label="EN" :disabled="!line.media['English(US)']?.count" @click.stop />
-          </div>
+          </span>
         </div>
         <div class="subtitles small">
           <p v-if="spanish(line)" class="es">
