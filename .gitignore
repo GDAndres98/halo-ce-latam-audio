@@ -30,3 +30,7 @@ __pycache__/
 /mappings/*.db
 /mappings/*.db-journal
 /mappings/*.tmp
+
+# Studio frontend: dependencies and build output
+frontend/node_modules/
+frontend/dist/

@@ -42,6 +42,7 @@ from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.edit_preview import EditPreview  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
+from build_api import BuildBoard  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 
 HOST = "127.0.0.1"
@@ -50,7 +51,9 @@ DEFAULT_VGMSTREAM = Path("D:/Tools/vgmstream-r2117/vgmstream-cli.exe")
 MAX_BODY = 1 << 20
 
 
-def make_handler(app, quiet=False):
+def make_handler(app, quiet=False, builds=None):
+    builds = builds or BuildBoard(app.root, lambda: set(app.levels))
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "M4/1"
 
@@ -118,6 +121,10 @@ def make_handler(app, quiet=False):
                     return self._wav(app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)))
                 if u.path == "/audio/ce":
                     return self._wav(app.ce_wav(q.get("ref", ""), q.get("lang", ""), q.get("k", 0)))
+                if u.path == "/api/builds":
+                    return self._json(200, builds.list_builds())
+                if u.path == "/api/job":
+                    return self._json(200, builds.job(q.get("id", "")))
                 if u.path == "/audio/preview":
                     return self._wav(app.preview_wav(q.get("key", ""), q.get("kind", "")))
                 raise ApiError(404, "not found")
@@ -131,6 +138,8 @@ def make_handler(app, quiet=False):
                     body = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
                 except ValueError:
                     raise ApiError(400, "invalid JSON")
+                if u.path == "/api/builds/dry-run":
+                    return self._json(202, builds.start_dry_run(body.get("levels") or [], body.get("name")))
                 if u.path == "/api/save":
                     return self._json(200, app.save(body))
                 if u.path == "/api/edit/preview":

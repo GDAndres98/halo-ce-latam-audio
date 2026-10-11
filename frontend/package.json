@@ -1,0 +1,26 @@
+{
+  "name": "halo-mcc-localization-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local UI for the Halo MCC Latin American Spanish localization. Talks to scripts/ui/m4_server.py.",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "python ../scripts/ui/m4_server.py --no-open",
+    "dev:web": "vite",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "vue-tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "vue": "^3.5.43",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "concurrently": "^9.2.5",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.4",
+    "vue-tsc": "^2.2.12"
+  }
+}
