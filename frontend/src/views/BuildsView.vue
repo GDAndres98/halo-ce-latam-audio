@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { api } from "../api/client";
+import GainSetting from "../components/build/GainSetting.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import type { BuildJob, BuildsResponse } from "../api/types";
 
@@ -76,6 +77,8 @@ function poll() {
     <h1>Build &amp; Test</h1>
     <p v-if="error" class="error">{{ error }}</p>
 
+    <GainSetting @saved="refresh" />
+
     <h2>Dry run</h2>
     <p class="muted small">
       Builds the candidate audio into <code>work/m6/NAME</code>. Nothing is installed.
@@ -115,7 +118,7 @@ function poll() {
             <StatusBadge v-else label="not validated" tone="muted" />
           </td>
           <td>
-            <StatusBadge v-if="b.stale" label="stale: decisions changed since" tone="bad" />
+            <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
             <StatusBadge v-else label="current" tone="ok" />
           </td>
         </tr>

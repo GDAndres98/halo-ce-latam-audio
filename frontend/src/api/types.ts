@@ -224,6 +224,13 @@ export interface EditPreviewResponse {
   stats: Record<string, number>;
 }
 
+/** The global export gain (config/audio_export.json). `source` is "default" when no file has been saved. */
+export interface ExportSettings {
+  global_gain_db: number;
+  source: string;
+  sha256: string | null;
+}
+
 export interface BuildSummary {
   name: string;
   levels: string[];
@@ -232,6 +239,8 @@ export interface BuildSummary {
   subtitles: Record<string, unknown>;
   validation_ok: boolean | null;
   stale: boolean;
+  stale_reasons: string[];
+  built_gain_db: number | null;
   built_from_sha256: string | null;
   candidate_sha256: string | null;
 }

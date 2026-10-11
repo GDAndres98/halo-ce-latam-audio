@@ -12,6 +12,8 @@ import MccColumn from "../components/match/MccColumn.vue";
 import MatchPanel from "../components/match/MatchPanel.vue";
 import { useMatch } from "../composables/useMatch";
 import { useShortcuts } from "../composables/useShortcuts";
+import SplitHandle from "../layout/SplitHandle.vue";
+import { useWorkspaceLayout } from "../layout/useWorkspaceLayout";
 
 interface ColumnHandle {
   move: (delta: number) => void;
@@ -26,6 +28,8 @@ const levels = ref<string[]>([]);
 const missions = ref<string[]>([]);
 const focusedRef = ref<string | null>(null);
 const mccColumn = ref<ColumnHandle | null>(null);
+const workspaceEl = ref<HTMLElement | null>(null);
+const layout = useWorkspaceLayout(workspaceEl);
 const ceColumn = ref<ColumnHandle | null>(null);
 
 // ---- URL state: everything the user can change is reflected in the address.
@@ -116,7 +120,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="workspace">
+  <div class="layout-bar">
+    <span class="muted small">Drag the dividers to resize the panels. Widths are kept on this computer.</span>
+    <button type="button" :disabled="layout.isDefault.value" @click="layout.reset()">Reset layout</button>
+  </div>
+  <div ref="workspaceEl" class="workspace" :class="{ resizing: layout.dragging.value !== null }">
     <MccColumn
       ref="mccColumn"
       v-model:level="mccLevel"
@@ -126,7 +134,21 @@ onMounted(async () => {
       :selected-id="selectedSlot"
       @select="selectSlot"
     />
+    <SplitHandle
+      side="left"
+      :width="layout.widths.value.left"
+      :dragging="layout.dragging.value === 'left'"
+      @drag-start="layout.startDrag('left', $event)"
+      @step="(direction, coarse) => layout.step('left', direction, coarse)"
+    />
     <MatchPanel :match="match" />
+    <SplitHandle
+      side="right"
+      :width="layout.widths.value.right"
+      :dragging="layout.dragging.value === 'right'"
+      @drag-start="layout.startDrag('right', $event)"
+      @step="(direction, coarse) => layout.step('right', direction, coarse)"
+    />
     <CeColumn
       ref="ceColumn"
       v-model:mission="ceMission"

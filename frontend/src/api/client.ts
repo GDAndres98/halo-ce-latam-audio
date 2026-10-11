@@ -1,6 +1,7 @@
 import type {
   AudioEdit,
   BuildJob,
+  ExportSettings,
   BuildsResponse,
   CeResponse,
   EditPreviewResponse,
@@ -62,6 +63,16 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    }),
+
+  exportSettings: () => request<ExportSettings>("/api/settings/export"),
+
+  /** Saves the global gain. `loadedSha256` must be the hash the settings were read with (optimistic lock). */
+  saveExportSettings: (globalGainDb: number, loadedSha256: string | null) =>
+    request<ExportSettings>("/api/settings/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ global_gain_db: globalGainDb, loaded_sha256: loadedSha256 }),
     }),
 
   /** Renders an edit as M6 would, for listening only. Writes nothing to the mappings. */
