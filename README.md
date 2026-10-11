@@ -2,8 +2,8 @@
 
 A local tool for a Latin American Spanish localization of *Halo: Combat Evolved* inside
 *Halo: The Master Chief Collection* (MCC). You match MCC dialogue lines to *Halo: Campaign Evolved*
-(CE) recordings and subtitles by hand, approve them, build replacement audio and subtitle files for
-the game, and restore the originals.
+(CE) recordings and subtitles by hand, approve them, build replacement files for the game, and restore
+the originals.
 
 Nothing is automatic: tools never match, approve or rewrite decisions. Game files and recordings are
 never committed. Read [CLAUDE.md](CLAUDE.md) for the project rules and [docs/roadmap.md](docs/roadmap.md)
@@ -13,18 +13,18 @@ for the plan.
 
 | Part | Where | Role |
 |---|---|---|
-| API server | `scripts/ui/m4_server.py`, `m4_app.py`, `build_api.py` | Python standard library only. Serves the JSON API and audio. |
+| API server | `scripts/ui/m4_server.py`, `m4_app.py`, `build_api.py` | Python standard library only. JSON API and audio. |
 | Decisions store | `scripts/common/mapping_store.py`, `mapping_db.py` | The only writer of decisions. SQLite database, JSON export. |
 | Studio UI | `frontend/` | Vue 3 + TypeScript + Vite. Talks to the API. |
-| Classic page | `scripts/ui/m4.html` | The original matching page. Still needed for matching, approvals and edits. |
+| Classic page | `scripts/ui/m4.html` | The original M4 page. Kept as a reference until the Studio covers all of it. |
 | Build and install | `scripts/build/m6_build.py`, `m6_install.py` | Offline builds under `work/m6/`. Installing is separate and needs approval. |
 | Catalogs and extraction | `scripts/catalog/`, `scripts/extraction/` | Build the dialogue catalogs under `work/`. |
 | Validation | `scripts/validate/` | Read-only checks and one-time migrations. |
 
 **Source of truth.** `mappings/manual_mappings.db` (SQLite) holds the decisions, the custom subtitles,
 the mission progress and their change history. `mappings/manual_mappings.json` is an export of it,
-written only by the store and checked on every read. Editing that JSON by hand is refused.
-Deleting the database re-imports the JSON and loses the history, so do not delete it.
+written only by the store and checked on every read. A JSON file edited by hand is refused. Do not
+delete the database: removing it re-imports the JSON and loses the history.
 
 ## Repository layout
 
@@ -33,11 +33,10 @@ scripts/common/     parsers, the store, audio processing, CELT and FSB5 writers
 scripts/catalog/    catalog builders (CE and MCC)
 scripts/extraction/ FSB decoding and CE audio export
 scripts/build/      M6 build and install tools
-scripts/ui/         API server, application logic, classic page, build API
+scripts/ui/         API server, application logic, build API, end-to-end helpers
 scripts/validate/   validator and migrations
-scripts/discovery/  research and experiments (not used by the Studio)
-frontend/           Vue Studio (src/views, src/components, src/api)
-mappings/           decisions (database + export), local custom text, progress
+frontend/           Vue Studio (src/views, src/components/match, src/matching, e2e)
+mappings/           decisions (database + export), custom text, progress
 schemas/            JSON schemas for every user-owned file
 tests/              unittest suite (Python)
 docs/               design notes and reverse-engineering research
@@ -46,91 +45,115 @@ work/               generated, git-ignored: catalogs, audio, builds, backups
 
 ## Requirements
 
-- Python 3.12 (standard library only for the server; `ffmpeg` on the PATH for the audio editor).
-- Node.js 20 or newer, for the frontend.
-- Your own legally obtained game files. Set their locations in `.env` (see `.env` comments; the
-  folders are read-only to this project).
+- Python 3.12 (standard library for the server; `ffmpeg` on the PATH for audio previews).
+- Node.js 20 or newer, for the frontend. Microsoft Edge, for the browser test.
+- Your own legally obtained game files, with their locations set in `.env`. This project only reads them.
 - vgmstream-cli and `libcelt-0110.dll` (from vgmstream), for decoding and CELT encoding. Defaults are in
   `scripts/ui/m4_server.py`; override them with the command-line options.
-
-Build the catalogs once before the first run (see [docs/m4-user-guide.md](docs/m4-user-guide.md) §1).
+- The catalogs under `work/`, built once (see [docs/m4-user-guide.md](docs/m4-user-guide.md) §1).
 
 ## Install and run
 
 ```sh
-# Frontend dependencies, once
 cd frontend
 npm install
 
-# Run the Studio: the API server and the Vite dev server together
-npm run dev
+npm run dev          # starts the API and the Vite dev server together
 # then open http://localhost:5173
 ```
 
-`npm run dev` starts `scripts/ui/m4_server.py` on 127.0.0.1:8765 and the Vite dev server on port 5173,
-which forwards `/api` and `/audio` to the API. The classic page is at http://127.0.0.1:8765/.
+`npm run dev` starts `scripts/ui/m4_server.py` on 127.0.0.1:8765 and Vite on port 5173, which forwards
+`/api` and `/audio` to the API. The classic page is at http://127.0.0.1:8765/.
 
-To run only the API, from the repository root: `python scripts/ui/m4_server.py --no-open`.
+## Matching workflow
 
-## Screens
+Open **Matching**. The screen has three columns.
 
-- **Dashboard:** progress per MCC level, Campaign Evolved missions, and whether the build pins match the
-  installed game.
-- **Dialogues:** lines for one level, filtered by status and searched (case- and accent-insensitive,
-  Spanish and English text, identifiers, speakers). The filter and search are kept in the URL.
-- **Line:** both recordings and the CE candidates, side by side, with the decision status and the
-  subtitles in the game. Read-only for now.
-- **Build & Test:** existing builds with validation and stale-decision status; dry-run builds of
-  selected levels; the install actions, which are shown but disabled.
+- **Left: MCC lines.** Pick a level, filter (unmatched, draft, approved, needs rework, keep Spain audio,
+  radio, different-but-fits), and search by ID, speaker or subtitle text. Accents and case are ignored;
+  partial words work. Play a line with the ▶ button.
+- **Centre: the decision for the selected line.** Both recordings and their durations side by side.
+  Then:
+  1. **Replacement audio:** keep Spain's audio, or use one of the matched Campaign Evolved recordings.
+  2. **Audio editing:** trims and cuts on the replacement, with a waveform and a preview as the build
+     would render it. Reset returns to the original. The original WAV is never changed.
+  3. **Subtitle:** Spain's, Campaign Evolved's (es-MX or EN where it exists), your own LATAM Spanish text,
+     or none (a decision to show no subtitle, shown differently from a missing text).
+  4. **Flags and notes:** radio effect (a flag only; no processing) and "different but fits".
+  5. **Save and approve:** save the draft, then approve audio and subtitle separately. Approval is always
+     a button press with a confirmation. An approved decision is read-only until you mark it *Needs rework*.
+- **Right: Campaign Evolved candidates.** Search by ID, English or LATAM text, pick a mission, hide
+  recordings already used elsewhere. Results stay in catalog order. Nothing is selected for you: use
+  **Use this recording** to choose one. A recording with no subtitle says so.
 
-## Mapping and approval workflow
+**Resuming.** Everything you save is in `mappings/manual_mappings.db`. The address keeps the selected
+line and every filter, so reloading or using Back returns you to the same place. Unsaved typing is kept
+in the browser session for the same stored version of the line; leaving a line with unsaved changes asks
+first.
 
-1. Match a line to CE lines on the classic page, or record a draft.
-2. Choose the audio and the subtitle independently. An approval is always your own action.
-3. Approved objects are immutable. Changing one means "needs rework", which bumps its revision.
-4. Mission progress is set by you. A level is ready to build when every line is decided and has
-   approved audio.
+**Keyboard** (not while typing in a field):
 
-Every save keeps the previous file in `mappings/.history/` and the per-line history in the database.
+| Key | Action |
+|---|---|
+| `m` | play the MCC recording |
+| `e` / `n` | play the highlighted (or chosen) recording in es-MX / English |
+| `j` / `k` | move the highlight through the candidates (selects nothing) |
+| `s` | use the highlighted recording as the replacement |
+| `[` / `]` | previous / next MCC line |
+| `/` / `\` | focus the MCC search / the candidate search |
+| `Ctrl+S` | save the draft |
+| `Esc` | stop playback |
+
+Approval has no shortcut.
+
+**Concurrency.** Every save sends the hashes the page was loaded from. If another window changed the
+line, the save is refused with nothing written, and your edits stay on screen: use *Reload and keep my
+edits*, check them, and save again.
 
 ## Building and restoring the game files
 
-The Studio never installs anything. The steps are:
+The Studio does not install anything. The steps are:
 
-1. **Dry run:** `Build & Test` → choose levels → `Dry run build`, or
+1. **Dry run:** Build & Test → choose levels → Dry run build, or
    `python scripts/build/m6_build.py --level a10 --name a10_test`. This writes only under `work/m6/`.
-   Check that the build is not marked **stale**; rebuild it if the decisions changed.
-2. **Install (needs your approval for that build, MCC closed):**
+   A build marked **stale** was made from older decisions; rebuild it before any install.
+2. **Install** (needs your approval for that build, MCC closed):
    `python scripts/build/m6_install.py --build <name> preflight`, then `install`. `status` shows the
    installed state. Read the build's `install_rollback.md` first.
-3. **Restore originals:** `python scripts/build/m6_install.py --build <name> rollback`. It restores the
-   files from the verified backups and checks them against the pinned originals.
+3. **Restore originals:** `python scripts/build/m6_install.py --build <name> rollback`.
 
-Subtitle deployment is **disabled**. The variable-length subtitle writer has not been validated in the
+Subtitle deployment is **disabled**: the variable-length subtitle writer has not been validated in the
 game (see [docs/m6-build.md](docs/m6-build.md) §4).
 
-## Testing and debugging
+## Testing
 
 ```sh
-python -m unittest discover -s tests       # Python suite (about 25 s)
-cd frontend && npm run build               # type check and production build
+python -m unittest discover -s tests          # Python suite (about 25 s)
+cd frontend
+npm run typecheck                             # Vue and TypeScript
+npm test                                      # unit tests of the matching rules
+npm run build                                 # type check and production build
+npm run test:e2e                              # browser test (needs Microsoft Edge)
 ```
 
-Debugging tips:
-- The API returns `{"error": ..., "details": ...}` with a status code. 409 means a stale page or a
-  conflict, such as a file changed outside the Studio.
-- A file that "differs from the database" was edited outside the Studio. Restore it from git or from
-  `mappings/.history/`, then reload.
-- Startup takes about 1.5 s. Read timings: slot lists about 8 ms, CE search about 20 ms.
+The browser test starts its own API server and Vite server on a copy of your mapping data (made by
+`scripts/ui/e2e_fixture.py`). It drives Microsoft Edge through the workflow: choose a recording, save,
+write a subtitle, approve each part, flag radio, trim and preview, restart both servers, check that every
+decision persisted, check that approved decisions are protected, check the M6 planner
+(`scripts/ui/e2e_check_m6.py`), and check that the real mapping files did not change. Its screenshots and
+report go to `frontend/e2e/out/`, which is git-ignored because the screenshots show game text.
+
+Debugging: the API returns `{"error": ..., "details": ...}`. A 409 means a stale page or a protected
+decision; a file that "differs from the database" was edited outside the Studio.
 
 ## Known limitations
 
-- Matching, approvals and edits still happen on the classic page. The Studio currently browses and
-  plays.
-- The line list shows up to 500 rows per request, without virtualised scrolling.
-- Audio editing (trims, cuts, loudness) is available on the classic page only.
-- Subtitle deployment is disabled, and installs are not started from the UI.
-- Nothing has been checked in a browser yet; the UI is verified by type check, build and API tests.
+- Audio editing covers trims and cuts. Silences and fades remain in the classic page.
+- The candidate list shows the mission and folder, not a speaker: the Campaign Evolved catalogue does not
+  record speakers.
+- The line list shows up to 300 lines per page ("show more"), not virtual scrolling.
+- Radio effects are only flagged; no processing is applied yet.
+- Subtitle deployment is disabled, and installs are not started from the Studio.
 - The per-save file copies in `mappings/.history/` grow by about 1.3 MB per save. Pruning is a decision
   for the owner.
 - Publishing to Steam Workshop is out of scope and needs separate approval (see CLAUDE.md).

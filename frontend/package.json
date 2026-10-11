@@ -9,7 +9,9 @@
     "dev:api": "python ../scripts/ui/m4_server.py --no-open",
     "dev:web": "vite",
     "typecheck": "vue-tsc --noEmit",
-    "build": "vue-tsc --noEmit && vite build"
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:e2e": "node e2e/run.mjs"
   },
   "dependencies": {
     "vue": "^3.5.43",
@@ -19,8 +21,10 @@
     "@types/node": "^22.20.5",
     "@vitejs/plugin-vue": "^5.2.4",
     "concurrently": "^9.2.5",
+    "playwright-core": "^1.64.0",
     "typescript": "^5.9.3",
     "vite": "^6.4.4",
+    "vitest": "^3.2.7",
     "vue-tsc": "^2.2.12"
   }
 }

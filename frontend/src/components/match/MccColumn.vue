@@ -1,0 +1,151 @@
+<script setup lang="ts">
+// Left column: the MCC dialogue lines of one level, with filters and search.
+// Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
+// Changing a filter never changes the selected line: the line stays open even when it is filtered out.
+
+import { onMounted, ref, watch } from "vue";
+import { api, ApiError, audioUrl } from "../../api/client";
+import { useDebounced } from "../../composables/useDebounced";
+import type { SlotRow, SlotsResponse } from "../../api/types";
+import AudioButton from "../AudioButton.vue";
+import StatusBadge from "../StatusBadge.vue";
+
+const props = defineProps<{ levels: string[]; selectedId: string | null }>();
+const emit = defineEmits<{ select: [slotId: string] }>();
+
+const level = defineModel<string>("level", { required: true });
+const status = defineModel<string>("status", { default: "" });
+const query = defineModel<string>("query", { default: "" });
+const debouncedQuery = useDebounced(query, 250);
+
+const PAGE = 300;
+const limit = ref(PAGE);
+const data = ref<SlotsResponse | null>(null);
+const error = ref("");
+const searchBox = ref<HTMLInputElement | null>(null);
+let latest = 0; // ignore responses to older requests
+
+const STATUS_OPTIONS: [string, string][] = [
+  ["", "All lines"],
+  ["undecided", "Unmatched"],
+  ["draft", "Draft"],
+  ["approved", "Approved (both)"],
+  ["needs_rework", "Needs rework"],
+  ["keep_original", "Keep Spain audio"],
+  ["radio", "Needs radio effect"],
+  ["fits", "Different but fits"],
+  ["stereo", "Stereo"],
+];
+
+async function load() {
+  const request = ++latest;
+  error.value = "";
+  try {
+    const res = await api.slots({ level: level.value, status: status.value, q: debouncedQuery.value, limit: limit.value });
+    if (request === latest) data.value = res;
+  } catch (e) {
+    if (request === latest) error.value = e instanceof ApiError ? e.message : String(e);
+  }
+}
+
+watch([level, status, debouncedQuery], () => {
+  limit.value = PAGE;
+  load();
+});
+onMounted(load);
+
+function showMore() {
+  limit.value += PAGE;
+  load();
+}
+
+/** Moves the selection through the visible list (keyboard: [ and ]). */
+function move(delta: number) {
+  const rows = data.value?.slots ?? [];
+  if (!rows.length) return;
+  const index = rows.findIndex((r) => r.slot_id === props.selectedId);
+  const next = index === -1 ? rows[0] : rows[Math.min(Math.max(index + delta, 0), rows.length - 1)];
+  if (next.slot_id !== props.selectedId) emit("select", next.slot_id);
+  document.getElementById(`mcc-${next.slot_id}`)?.scrollIntoView({ block: "nearest" });
+}
+
+function focusSearch() {
+  searchBox.value?.focus();
+}
+
+defineExpose({ move, focusSearch });
+
+const tone = (state: string) => (state === "approved" ? "ok" : state === "draft" ? "warn" : state === "needs_rework" ? "bad" : "muted");
+const matchTone = (state: string) => (state === "matched" ? "ok" : state === "no_equivalent" ? "bad" : "muted");
+
+/** A line with no saved decision is listed as undecided (the server sends no summary for it). */
+const UNDECIDED = { match: "unreviewed", audio: "draft", subtitle: "draft" };
+function decisionOf(row: SlotRow) {
+  return row.decision ?? UNDECIDED;
+}
+
+function mccAudio(row: SlotRow) {
+  return audioUrl.mcc(row.level, "spanish", row.spanish_index);
+}
+</script>
+
+<template>
+  <section class="column mcc">
+    <h2>MCC dialogue</h2>
+    <div class="controls">
+      <label>Level
+        <select v-model="level">
+          <option v-for="l in levels" :key="l" :value="l">{{ l }}</option>
+        </select>
+      </label>
+      <label>Show
+        <select v-model="status">
+          <option v-for="[value, label] in STATUS_OPTIONS" :key="value" :value="value">{{ label }}</option>
+        </select>
+      </label>
+      <label class="wide">Search ID, speaker or subtitle
+        <input ref="searchBox" v-model="query" type="search" placeholder="Accents and case ignored (/)" />
+      </label>
+    </div>
+
+    <p v-if="data?.progress" class="progress small">
+      Decided {{ data.progress.decided }} / {{ data.progress.slots }} ·
+      audio approved {{ data.progress.audio_approved }} ·
+      subtitles approved {{ data.progress.subtitle_approved }}
+      <StatusBadge v-if="data.progress.ready_for_build" label="ready to build" tone="ok" />
+    </p>
+    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="data" class="muted small">
+      {{ data.slots.length }} of {{ data.total }} lines<span v-if="data.truncated"> · more below</span>
+    </p>
+
+    <ul v-if="data" class="rows" role="listbox" aria-label="MCC dialogue lines">
+      <li
+        v-for="row in data.slots"
+        :id="`mcc-${row.slot_id}`"
+        :key="row.slot_id"
+        class="row-item"
+        :class="{ selected: row.slot_id === selectedId }"
+        role="option"
+        :aria-selected="row.slot_id === selectedId"
+        @click="emit('select', row.slot_id)"
+      >
+        <div class="line-head">
+          <strong class="tag">{{ row.tag_name }}</strong>
+          <span class="muted small">{{ row.speaker_from_name || "—" }} · {{ row.duration_s.toFixed(2) }} s</span>
+          <AudioButton :url="mccAudio(row)" label="" @click.stop />
+        </div>
+        <div class="preview small" :title="row.preview">{{ row.preview || "(no subtitle text)" }}</div>
+        <div class="badges">
+          <StatusBadge :label="`match: ${decisionOf(row).match}`" :tone="matchTone(decisionOf(row).match)" />
+          <StatusBadge :label="`audio: ${decisionOf(row).audio}`" :tone="tone(decisionOf(row).audio)" />
+          <StatusBadge :label="`subtitle: ${decisionOf(row).subtitle}`" :tone="tone(decisionOf(row).subtitle)" />
+          <StatusBadge v-if="row.radio_effect" label="radio" tone="warn" />
+        </div>
+      </li>
+      <li v-if="!data.slots.length" class="muted">No lines match these filters.</li>
+    </ul>
+
+    <button v-if="data?.truncated" type="button" class="more" @click="showMore">Show more lines</button>
+  </section>
+</template>

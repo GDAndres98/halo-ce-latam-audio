@@ -34,3 +34,6 @@ __pycache__/
 # Studio frontend: dependencies and build output
 frontend/node_modules/
 frontend/dist/
+
+# End-to-end test output: screenshots show game text and the report holds local paths
+frontend/e2e/out/

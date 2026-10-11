@@ -53,7 +53,7 @@ const pct = (n: number, total: number) => (total ? Math.round((100 * n) / total)
         <tbody>
           <tr v-for="l in state.levels" :key="l.level">
             <td>
-              <RouterLink :to="{ name: 'dialogues', query: { level: l.level } }">{{ l.level }}</RouterLink>
+              <RouterLink :to="{ name: 'match', query: { level: l.level } }">{{ l.level }}</RouterLink>
               <span class="muted small"> {{ l.group }}</span>
             </td>
             <td>{{ l.progress.decided }} / {{ l.progress.slots }} ({{ pct(l.progress.decided, l.progress.slots) }}%)</td>
