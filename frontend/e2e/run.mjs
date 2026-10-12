@@ -86,9 +86,9 @@ async function main() {
     // Step 6-7: both recordings play (the play buttons toggle to the stop symbol while playing).
     await step("play the MCC recording", async () => {
       // The selected row's play button plays Spain's recording (the same clip the m key plays).
-      const spainButton = page.locator("li.row-item.selected button.play");
+      const spainButton = page.locator("li.row-item.selected button.play").first();
       await spainButton.click();
-      await page.locator("li.row-item.selected button.play.active").waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play.active").first().waitFor({ timeout: 10000 });
       await spainButton.click();
     });
     await step("play the Campaign Evolved recording", async () => {
@@ -196,20 +196,22 @@ async function main() {
       // The badges of the centre panel only (the list shows the same words for other lines).
       const centre = page.locator(".status-row");
       await centre.getByText("match: matched").waitFor({ timeout: 15000 });
-      await centre.getByText("audio: approved").waitFor({ timeout: 15000 });
-      await centre.getByText("subtitle: approved").waitFor({ timeout: 15000 });
+      // The approval badges are in the save bar (since the approvals moved there).
+      const saveBar = page.locator(".save-bar");
+      await saveBar.getByText("audio: approved").waitFor({ timeout: 15000 });
+      await saveBar.getByText("subtitle: approved").waitFor({ timeout: 15000 });
     });
 
     await step("keyboard: m plays, Escape stops, typing in a field does not trigger shortcuts, Ctrl+S saves", async () => {
-      await page.locator("h2").first().click();
+      await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).click();
       await page.keyboard.press("m");
-      await page.locator("li.row-item.selected button.play.active").waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play.active").first().waitFor({ timeout: 10000 });
       await page.keyboard.press("Escape");
-      await page.locator("li.row-item.selected button.play:not(.active)").waitFor({ timeout: 10000 });
+      await page.locator("li.row-item.selected button.play:not(.active)").first().waitFor({ timeout: 10000 });
 
-      await page.getByLabel("Notes").click();
+      await page.getByLabel("Notes", { exact: true }).click();
       await page.keyboard.type("mj");
-      if (!(await page.getByLabel("Notes").inputValue()).endsWith("mj")) throw new Error("typing was not kept");
+      if (!(await page.getByLabel("Notes", { exact: true }).inputValue()).endsWith("mj")) throw new Error("typing was not kept");
       if (await page.locator("li.row-item.selected button.play.active").count()) throw new Error("typing started playback");
       await page.keyboard.press("Control+s");
       await page.getByText("Draft saved.").waitFor({ timeout: 15000 });

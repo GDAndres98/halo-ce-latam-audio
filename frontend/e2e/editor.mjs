@@ -229,7 +229,7 @@ async function main() {
     });
 
     await step("Ctrl+Z undoes the trim; Reset clears everything and can be undone", async () => {
-      await page.locator("h2").first().click(); // keys go to the page, not a field
+      await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).click(); // keys go to the page, not a field
       await page.keyboard.press("Control+z");
       check((await fieldNumber("Trim start (s)")) === 0, "the trim was not undone");
       check((await cutCount()) === 2, "undo removed the cuts");
@@ -317,7 +317,7 @@ async function main() {
     });
 
     await step("A/B switches between the original and the edited replacement (A key)", async () => {
-      await page.locator("h2").first().click();
+      await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).click();
       await page.keyboard.press("a");
       await waitPlaying(waveA());
       await page.waitForTimeout(400);
@@ -354,7 +354,7 @@ async function main() {
     });
 
     await step("the W key plays the replacement on the editor waveform", async () => {
-      await page.locator("h2").first().click();
+      await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).click();
       await page.keyboard.press("w");
       await waitPlaying(editorWave());
       await page.keyboard.press("Escape");
@@ -412,7 +412,7 @@ async function main() {
       await dragBetween(xAt(box, 0.3), xAt(box, 0.5), box.y + box.height / 2);
       check((await selection(editorWave())) === null, "a drag made a selection on approved audio");
       const cuts = await cutCount();
-      await page.locator("h2").first().click();
+      await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).click();
       await page.keyboard.press("Control+z");
       check((await cutCount()) === cuts, "Ctrl+Z changed approved audio");
       check((await page.locator(".center .status-row").getByText("unsaved changes", { exact: true }).count()) === 0, "the approved line became dirty");
