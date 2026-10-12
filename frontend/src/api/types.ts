@@ -45,6 +45,50 @@ export interface Hashes {
   mappings: string;
   local: string;
   progress: string;
+  /** /api/slot only: the stored version of that one line (its decision and custom text). Saves send it back, so
+   * saves of other lines (another computer) never make this line stale. */
+  slot?: string;
+}
+
+/** GET /api/session: the address this page came from and who is signed in (docs/remote-access.md). */
+export interface SessionInfo {
+  listener: "local" | "remote";
+  auth_required: boolean;
+  authenticated: boolean;
+  user: string | null;
+  role: "editor" | "admin" | null;
+  csrf: string | null;
+  /** The host computer's own address (no sign-in; the only place game files can be installed or restored). */
+  local_admin: boolean;
+  https: boolean;
+  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean };
+}
+
+export interface NetworkInfo {
+  local_url: string;
+  remote: { enabled: boolean; running: boolean; host: string; port: number; tls: boolean };
+  urls: { url: string; kind: string; encrypted: boolean }[];
+  addresses: { address: string; kind: string }[];
+  hostname: string;
+  allowed_hosts: string[];
+  allowed_origins: string[];
+  public_url: string | null;
+  config_file: string | null;
+  session: { idle_hours: number; max_days: number };
+  this_listener: "local" | "remote";
+  https: boolean;
+  remote_users: string[] | null;
+  signed_in: { user: string; from: string | null; last_seen: number }[] | null;
+}
+
+/** One message of GET /api/events: lines and files that changed (any computer, any tool). */
+export interface ChangeEvent {
+  type: "change";
+  seq: number;
+  slots: string[];
+  documents: string[];
+  /** Who saved each line, when it was saved through the Studio. */
+  by: Record<string, string>;
 }
 
 export type MatchStatus = "unreviewed" | "matched" | "no_equivalent" | "deferred";
@@ -205,6 +249,8 @@ export interface SaveBody {
   slot_id: string;
   loaded_sha256: string;
   local_sha256: string;
+  /** The line's version as loaded (Hashes.slot). When sent, only this line must be unchanged. */
+  loaded_slot_sha256?: string;
   actions?: SaveAction[];
   match?: { status: MatchStatus; ce_line_refs: string[] };
   audio?: {

@@ -18,6 +18,7 @@ import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
 import { AudioWaveform, Crosshair, Maximize, Pause, Play, RotateCcw, Square, X, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { endPlayback, startPlayback, type Playback } from "../../audio/transport";
 import { formatPosition } from "../../audio/format";
+import { loadPeaks } from "../../audio/peaks";
 import type { Span } from "../../matching/editRecipe";
 import { COLOURS } from "../../theme/tokens";
 
@@ -212,7 +213,11 @@ function setSelection(span: Span | null) {
   emit("selectionChange", selection.value);
 }
 
+// Loads in quick succession (choosing recordings, a new preview): only the latest one is shown.
+let loadSequence = 0;
+
 async function load(url: string | null) {
+  const mine = ++loadSequence;
   wave?.pause();
   duration.value = 0;
   position.value = 0;
@@ -226,9 +231,15 @@ async function load(url: string | null) {
     return;
   }
   loading.value = true;
+  // Server peaks first: the waveform is drawn at once and the audio streams (and seeks) with range requests.
+  // Without peaks the player downloads and decodes the whole recording, as before.
+  const peaks = await loadPeaks(url);
+  if (mine !== loadSequence || !wave) return;
   try {
-    await wave.load(url);
+    if (peaks) await wave.load(url, [peaks.peaks], peaks.duration);
+    else await wave.load(url);
   } catch {
+    if (mine !== loadSequence) return;
     loading.value = false;
     error.value = "This recording could not be loaded.";
     emit("failed", error.value);

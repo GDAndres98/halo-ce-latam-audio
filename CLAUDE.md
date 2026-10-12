@@ -209,6 +209,14 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       It has 28 character folders, 2,279 records and 14,350 variations, 14,349 with es-MX audio,
       and no subtitles. M4 defaults generic MCC folders to the SYS scope. M6 builds generic folders
       only when named with `--level`.
+    - **Remote access (owner request, 2026-10-12):** `docs/remote-access.md`. One server, two listeners:
+      the local `127.0.0.1:8765` (no sign-in; the **only** place install/restore/MCC-folder changes work) and an
+      opt-in remote listener (`--lan` / `config/studio_server.json`, sign-in, CSRF, roles editor/admin).
+      Accounts: `scripts/ui/studio_users.py` (scrypt hashes in git-ignored `config/studio_users.json`). Saves
+      check the line's own version (`loaded_slot_sha256`); live updates via SSE `/api/events`. Internet access
+      is Tailscale Serve only. **Never** enable Tailscale Funnel, forward router ports, change firewall rules,
+      or create accounts/enable remote access on the owner's machine yourself; never let a remote listener
+      install into the game. Test: `npm run test:remote` (disposable data).
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

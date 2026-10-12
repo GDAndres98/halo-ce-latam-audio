@@ -1,0 +1,66 @@
+// Who is using this Studio page (docs/remote-access.md).
+//
+// The host computer's own address (127.0.0.1) needs no sign-in and is the only place game files can be
+// installed or restored. Other computers reach the Studio through the remote address, sign in, and get the
+// permissions of their account's role. The server decides every permission; this store only mirrors it
+// so the screens can hide what would be refused.
+
+import { computed, reactive, readonly } from "vue";
+import { api, ApiError, onUnauthorized, setCsrfToken } from "../api/client";
+import type { SessionInfo } from "../api/types";
+
+const state = reactive({
+  loaded: false,
+  info: null as SessionInfo | null,
+  /** Why the page is showing the sign-in form (expired session, signed out, unreachable server). */
+  reason: "",
+});
+
+export const session = readonly(state);
+
+export const signedIn = computed(() => !!state.info && (!state.info.auth_required || state.info.authenticated));
+export const permissions = computed(
+  () => state.info?.permissions ?? { edit: false, admin: false, install: false, settings_mcc: false },
+);
+
+function adopt(info: SessionInfo) {
+  state.info = info;
+  setCsrfToken(info.csrf);
+}
+
+export async function loadSession(): Promise<void> {
+  try {
+    adopt(await api.session());
+    state.reason = "";
+  } catch (e) {
+    state.reason = e instanceof Error ? e.message : String(e);
+  } finally {
+    state.loaded = true;
+  }
+}
+
+export async function signIn(username: string, password: string): Promise<void> {
+  const info = await api.login(username, password);
+  adopt(info);
+  state.reason = "";
+}
+
+export async function signOut(): Promise<void> {
+  try {
+    await api.logout();
+  } catch (e) {
+    if (!(e instanceof ApiError)) throw e;
+  }
+  await loadSession();
+  state.reason = "Signed out.";
+}
+
+// A 401 anywhere means the session ended: show the sign-in form. Unsaved typing stays in the browser session
+// (see useMatch), so signing in again returns to it.
+onUnauthorized(() => {
+  if (state.info?.auth_required && state.info.authenticated) {
+    state.info = { ...state.info, authenticated: false, user: null, role: null, csrf: null };
+    setCsrfToken(null);
+    state.reason = "Your session ended. Sign in again; unsaved edits on this computer are kept.";
+  }
+});

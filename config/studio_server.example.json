@@ -1,0 +1,14 @@
+{
+  "schema": "studio-server/1",
+  "local": { "host": "127.0.0.1", "port": 8765 },
+  "remote": { "enabled": true, "host": "0.0.0.0", "port": 8766, "tls_cert": null, "tls_key": null },
+  "allowed_hosts": [],
+  "allowed_origins": [],
+  "public_url": null,
+  "session": { "idle_hours": 72, "max_days": 14 },
+  "secure_cookies": "auto",
+  "users_file": "config/studio_users.json",
+  "sessions_file": "work/studio/sessions.sqlite",
+  "audit_file": "work/studio/audit.jsonl",
+  "static_dir": "frontend/dist"
+}

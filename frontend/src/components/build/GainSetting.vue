@@ -8,6 +8,7 @@
 import { RotateCcw, Save, Volume2 } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { api, ApiError } from "../../api/client";
+import { permissions } from "../../auth/session";
 import type { ExportSettings, LevelMode } from "../../api/types";
 import PanelHeader from "../ui/PanelHeader.vue";
 import StateMessage from "../ui/StateMessage.vue";
@@ -71,7 +72,7 @@ onMounted(load);
 <template>
   <section class="panel gain" aria-labelledby="gain-title">
     <PanelHeader title="Global audio gain" title-id="gain-title" :icon="Volume2" code="EXPORT" />
-    <fieldset class="scope level-mode" :disabled="busy || !settings" data-testid="level-mode">
+    <fieldset class="scope level-mode" :disabled="busy || !settings || !permissions.admin" data-testid="level-mode">
       <legend>Level</legend>
       <label class="check">
         <input type="radio" name="level-mode" :checked="mode === 'global_gain'" @change="setMode('global_gain')" />
@@ -101,15 +102,15 @@ onMounted(load);
           :min="RANGE_DB.min"
           :max="RANGE_DB.max"
           step="0.5"
-          :disabled="busy || !settings"
+          :disabled="busy || !settings || !permissions.admin"
           :aria-invalid="!valid"
           aria-describedby="gain-help"
         />
       </label>
-      <button type="button" class="primary icon-label" :disabled="busy || !settings || unchanged || !valid" @click="apply">
+      <button type="button" class="primary icon-label" :disabled="busy || !settings || !permissions.admin || unchanged || !valid" @click="apply">
         <Save :size="16" aria-hidden="true" /> Save gain
       </button>
-      <button type="button" class="icon-label" :disabled="busy || !settings || current === DEFAULT_GAIN_DB" @click="resetToDefault">
+      <button type="button" class="icon-label" :disabled="busy || !settings || !permissions.admin || current === DEFAULT_GAIN_DB" @click="resetToDefault">
         <RotateCcw :size="15" aria-hidden="true" /> Reset to default (+4 dB)
       </button>
     </div>

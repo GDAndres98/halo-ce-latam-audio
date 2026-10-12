@@ -42,3 +42,11 @@ frontend/e2e/out/
 /config/audio_export.json
 /config/mcc_install.json
 /config/.history/
+
+# Remote access (docs/remote-access.md): network settings, accounts (password hashes) and TLS keys
+/config/studio_server.json
+/config/studio_users.json
+/config/studio_users.json.tmp
+/config/*.key
+/config/*.crt
+/config/*.pem

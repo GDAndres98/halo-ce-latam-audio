@@ -8,6 +8,8 @@
     "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "python ../scripts/ui/m4_server.py --no-open",
     "dev:web": "vite",
+    "serve": "python ../scripts/ui/m4_server.py --no-open",
+    "host": "npm run build && python ../scripts/ui/m4_server.py --lan --no-open",
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build",
     "test": "vitest run",
@@ -22,6 +24,7 @@
     "test:subtitles": "node e2e/subtitles.mjs",
     "test:level": "node e2e/level.mjs",
     "test:theme": "node e2e/theme.mjs",
+    "test:remote": "node e2e/remote.mjs",
     "perf": "node e2e/perf.mjs"
   },
   "dependencies": {

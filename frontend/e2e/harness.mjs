@@ -86,7 +86,9 @@ export class Services {
   }
 
   async up() {
-    this.api = start("api", "python", ["scripts/ui/m4_server.py", "--root", this.root, "--port", String(API_PORT), "--no-open", ...this.extraArgs], { cwd: REPO });
+    // --state-dir: sessions and the audit log stay in the disposable folder (its work/ links to the real one).
+    this.api = start("api", "python", ["scripts/ui/m4_server.py", "--root", this.root, "--port", String(API_PORT), "--no-open",
+      "--state-dir", join(this.root, "studio-state"), ...this.extraArgs], { cwd: REPO });
     await waitForHttp(`http://127.0.0.1:${API_PORT}/api/state`);
     this.web = start("web", process.execPath, [join(FRONTEND, "node_modules", "vite", "bin", "vite.js"), "--port", String(WEB_PORT), "--strictPort"],
       { env: { STUDIO_API: `http://127.0.0.1:${API_PORT}` } });

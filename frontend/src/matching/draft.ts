@@ -229,6 +229,7 @@ export function buildReworkBody(detail: SlotDetail, field: ApprovalField): SaveB
     slot_id: detail.slot_id,
     loaded_sha256: detail.sha256.mappings,
     local_sha256: detail.sha256.local,
+    ...(detail.sha256.slot ? { loaded_slot_sha256: detail.sha256.slot } : {}),
     actions: [{ action: "needs_rework", field }],
   };
 }
@@ -248,6 +249,7 @@ export function buildSaveBody(detail: SlotDetail, draft: Draft, baseline: Draft,
     slot_id: detail.slot_id,
     loaded_sha256: detail.sha256.mappings,
     local_sha256: detail.sha256.local,
+    ...(detail.sha256.slot ? { loaded_slot_sha256: detail.sha256.slot } : {}),
     match: { status: draft.matchStatus, ce_line_refs: [...draft.ceRefs] },
     radio_effect: { needed: draft.radio },
     different_but_fits: { marked: draft.fits },

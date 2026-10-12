@@ -6,8 +6,9 @@
 // recording" (s).
 
 import { ChevronsDown, CircleCheck, Library } from "lucide-vue-next";
-import { onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
+import { onChange } from "../../live/changes";
 import { togglePlay } from "../../audio/player";
 import { useDebounced } from "../../composables/useDebounced";
 import { highlightSegments } from "../../matching/text";
@@ -63,6 +64,18 @@ watch(() => props.slotId, () => {
   if (hideUsed.value) load();
 });
 onMounted(load);
+
+// "Hide recordings already used" depends on every line's decision: reload it when another computer saves.
+let liveTimer: ReturnType<typeof setTimeout> | undefined;
+const stopChanges = onChange(() => {
+  if (!hideUsed.value) return;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(load, 400);
+});
+onBeforeUnmount(() => {
+  clearTimeout(liveTimer);
+  stopChanges();
+});
 
 function showMore() {
   limit.value += PAGE;

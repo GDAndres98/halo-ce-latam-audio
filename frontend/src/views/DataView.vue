@@ -13,6 +13,7 @@
 import { computed, onMounted, ref } from "vue";
 import { Database, Download, FileInput, FileJson, RefreshCw, ScanSearch, X } from "lucide-vue-next";
 import { api, ApiError } from "../api/client";
+import { permissions } from "../auth/session";
 import type { DataStatus, ImportPreview, SlotSummary } from "../api/types";
 import StatusBadge from "../components/StatusBadge.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
@@ -43,8 +44,13 @@ const STATE_TEXT: Record<DataStatus["state"], { label: string; tone: "ok" | "war
   not_imported: { label: "no database yet", tone: "muted", help: "The database is created from the file on first use." },
 };
 const stateText = computed(() => (status.value ? STATE_TEXT[status.value.state] : null));
-const canImport = computed(() => status.value?.state === "external_edit" || status.value?.state === "line_endings");
-const canExport = computed(() => status.value && ["external_edit", "missing", "line_endings"].includes(status.value.state));
+// Import and export replace decisions or the export file: admin accounts only (the server checks it too).
+const canImport = computed(
+  () => permissions.value.admin && (status.value?.state === "external_edit" || status.value?.state === "line_endings"),
+);
+const canExport = computed(
+  () => permissions.value.admin && status.value && ["external_edit", "missing", "line_endings"].includes(status.value.state),
+);
 
 const describe = (e: unknown) =>
   e instanceof ApiError ? `${e.message}${e.details.length ? ` (${e.details.join("; ")})` : ""}` : e instanceof Error ? e.message : String(e);

@@ -130,7 +130,10 @@ export function useMatch() {
     message.value = "";
     try {
       const next = await api.slot(slotId);
-      if (request === latestLoad) adopt(next, false);
+      if (request === latestLoad) {
+        adopt(next, false);
+        remoteChange.value = null;
+      }
     } catch (e) {
       if (request === latestLoad) error.value = describe(e);
     } finally {
@@ -152,6 +155,7 @@ export function useMatch() {
       const response = await api.save(buildSaveBody(detail.value, draft, baseline.value, actions));
       message.value = response.saved ? savedMessage(actions) : (response.message ?? "Nothing changed.");
       adopt(response.slot, draftKey(draft) !== sentKey);
+      remoteChange.value = null;
       forgetSession(slotId);
       savedListeners.forEach((listener) => listener(response));
       return true;
@@ -185,12 +189,45 @@ export function useMatch() {
   /** After a conflict (409): fetch the newer decision, keep the user's draft, and ask them to check it. */
   async function reloadKeepingDraft(): Promise<void> {
     if (!detail.value) return;
+    loading.value = true; // saving waits for the newer version (a save sent before it would be refused again)
     try {
       adopt(await api.slot(detail.value.slot_id), true);
+      remoteChange.value = null;
+      message.value = "";
       error.value = "The line changed elsewhere. Your edits are kept: check them, then save again.";
     } catch (e) {
       error.value = describe(e);
+    } finally {
+      loading.value = false;
     }
+  }
+
+  /** Set when another computer (or window) changed the open line while this one has unsaved edits: the edits
+   * stay on screen, and saving them would be refused until the newer version is loaded. */
+  const remoteChange = ref<{ by: string | null } | null>(null);
+
+  /**
+   * The server announced a change to the open line (live updates). With no unsaved edits the newer version is
+   * simply shown; with unsaved edits nothing on screen changes, and the user is told (remoteChange). A change
+   * that is this page's own save is recognised by its version and ignored.
+   */
+  async function lineChangedElsewhere(by: string | null): Promise<void> {
+    const current = detail.value;
+    if (!current || saving.value || loading.value) return;
+    let next: SlotDetail;
+    try {
+      next = await api.slot(current.slot_id);
+    } catch {
+      return; // the next save or reload reports the problem
+    }
+    if (detail.value?.slot_id !== current.slot_id || next.sha256.slot === detail.value.sha256.slot) return;
+    if (dirty()) {
+      remoteChange.value = { by };
+      return;
+    }
+    adopt(next, false);
+    remoteChange.value = null;
+    message.value = by ? `This line was just updated by ${by}.` : "This line was just updated elsewhere.";
   }
 
   // Recordings restored from a session draft also need their subtitles.
@@ -202,7 +239,7 @@ export function useMatch() {
   watch(
     () => draftKey(draft),
     () => {
-      if (detail.value && dirty()) writeSession(detail.value.slot_id, detail.value.sha256.mappings, draft);
+      if (detail.value && dirty()) writeSession(detail.value.slot_id, versionOf(detail.value), draft);
     },
   );
 
@@ -221,6 +258,8 @@ export function useMatch() {
     save,
     rework,
     reloadKeepingDraft,
+    remoteChange,
+    lineChangedElsewhere,
     dirty,
     onSaved,
     chooseRecording,
@@ -242,6 +281,9 @@ function describe(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/** The stored version of the line a draft belongs to (the line's own version when the server gives one). */
+const versionOf = (d: SlotDetail) => d.sha256.slot ?? d.sha256.mappings;
+
 function writeSession(slotId: string, sha: string, draft: Draft) {
   try {
     sessionStorage.setItem(sessionKey(slotId), JSON.stringify({ sha, draft }));
@@ -255,7 +297,7 @@ function restoreSession(next: SlotDetail): Partial<Draft> | null {
     const raw = sessionStorage.getItem(sessionKey(next.slot_id));
     if (!raw) return null;
     const stored = JSON.parse(raw) as { sha: string; draft: Partial<Draft> };
-    return stored.sha === next.sha256.mappings ? stored.draft : null;
+    return stored.sha === versionOf(next) ? stored.draft : null;
   } catch {
     return null;
   }

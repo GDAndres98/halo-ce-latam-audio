@@ -4,7 +4,7 @@
 // going back returns to the same place.
 
 import { LayoutTemplate } from "lucide-vue-next";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
 import type { LevelProgress, SlotRow } from "../api/types";
@@ -19,6 +19,7 @@ import { useMatch } from "../composables/useMatch";
 import { useShortcuts } from "../composables/useShortcuts";
 import SplitHandle from "../layout/SplitHandle.vue";
 import { useWorkspaceLayout } from "../layout/useWorkspaceLayout";
+import { onChange, onReconnect } from "../live/changes";
 
 interface ColumnHandle {
   move: (delta: number) => void;
@@ -97,6 +98,22 @@ watch(
 // ---- After a save: only the saved row and the level's counters change in the list (server values).
 match.onSaved((response) => {
   if (response.row) mccColumn.value?.updateRow(response.row, response.progress);
+});
+
+// ---- Live updates: another computer (or a tool on the host) changed decisions. The lists reload themselves
+// (MccColumn, CeColumn); the open line is refreshed here, never over unsaved edits.
+const stopChanges = onChange((event) => {
+  const open = match.detail.value?.slot_id;
+  if (open && (event.slots.includes(open) || event.documents.some((d) => d.endsWith(".local.json")))) {
+    void match.lineChangedElsewhere(event.by[open] ?? null);
+  }
+});
+const stopReconnect = onReconnect(() => {
+  if (match.detail.value) void match.lineChangedElsewhere(null);
+});
+onBeforeUnmount(() => {
+  stopChanges();
+  stopReconnect();
 });
 
 /** Save the draft (no approval), then open the next unmatched line of the list. */

@@ -13,7 +13,8 @@ for the plan.
 
 | Part | Where | Role |
 |---|---|---|
-| API server | `scripts/ui/m4_server.py`, `m4_app.py`, `build_api.py` | Python standard library only. JSON API and audio. |
+| API server | `scripts/ui/m4_server.py`, `m4_app.py`, `build_api.py` | Python standard library only. JSON API, audio, and the built Studio page. |
+| Remote access | `scripts/ui/studio_auth.py`, `studio_net.py`, `live_feed.py`, `studio_users.py` | Sign-in, sessions, network settings, live updates. See [docs/remote-access.md](docs/remote-access.md). |
 | Decisions store | `scripts/common/mapping_store.py`, `mapping_db.py` | The only writer of decisions. SQLite database, JSON export. |
 | Studio UI | `frontend/` | Vue 3 + TypeScript + Vite. Talks to the API. |
 | Classic page | `scripts/ui/m4.html` | The original M4 page. Kept as a reference until the Studio covers all of it. |
@@ -63,7 +64,22 @@ npm run dev          # starts the API and the Vite dev server together
 ```
 
 `npm run dev` starts `scripts/ui/m4_server.py` on 127.0.0.1:8765 and Vite on port 5173, which forwards
-`/api` and `/audio` to the API. The classic page is at http://127.0.0.1:8765/.
+`/api` and `/audio` to the API. It is for working on the Studio's code, on this computer only.
+
+To use the Studio, build it once and let the server serve it from one address:
+
+```sh
+npm run build        # frontend/dist
+npm run serve        # http://127.0.0.1:8765/ (this computer only; the classic page is at /classic)
+npm run host         # build, then also accept other computers (sign-in required, port 8766)
+```
+
+**Other computers.** Create an account on the host
+(`python scripts/ui/studio_users.py add <name> --role admin`) and run `npm run host`. Then open the address
+shown on the **Network** page from the other computer's browser. They need no game files, tools or audio:
+everything streams from the host. Use Tailscale for access over the internet. Installing into or restoring the
+game is only possible on the host's own address. Setup, firewall, Tailscale and troubleshooting:
+[docs/remote-access.md](docs/remote-access.md).
 
 ## Matching workflow
 
@@ -157,9 +173,11 @@ shows the differences, with *Import from JSON* (preview, confirm, database backe
 database to JSON* (the replaced file is kept). Line-ending-only changes from git are not treated as edits. See
 [docs/mapping-storage.md](docs/mapping-storage.md).
 
-**Concurrency.** Every save sends the hashes the page was loaded from. If another window changed the
-line, the save is refused with nothing written, and your edits stay on screen: use *Reload and keep my
-edits*, check them, and save again.
+**Concurrency.** Every save sends the version of the line the page was loaded from, so several windows or
+computers can work on different lines at once. If another window or computer changed the same line, the save
+is refused with nothing written, and your edits stay on screen: use *Reload and keep my edits*, check them,
+and save again. Changes from other computers appear live (the list, the counters, and the open line when it
+has no unsaved edits); a line changed elsewhere while you edit it shows a warning.
 
 ## Audio level (global gain or match Spain)
 

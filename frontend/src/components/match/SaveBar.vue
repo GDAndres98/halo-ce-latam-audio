@@ -20,7 +20,9 @@ const emit = defineEmits<{ saveNext: [] }>();
 const problems = computed(() => draftProblems(props.match.draft));
 const dirty = computed(() => props.match.dirty());
 const conflict = computed(() => /changed/.test(props.match.error.value));
-const blocked = computed(() => !dirty.value || props.match.saving.value || problems.value.length > 0);
+const blocked = computed(
+  () => !dirty.value || props.match.saving.value || props.match.loading.value || problems.value.length > 0,
+);
 
 const both = computed(() => {
   const stored = props.match.detail.value?.mapping ?? null;
@@ -93,6 +95,11 @@ async function approveBoth() {
       </button>
     </div>
 
+    <StateMessage v-if="match.remoteChange.value" kind="warning" class="feedback small" data-testid="remote-change">
+      {{ match.remoteChange.value.by ? `${match.remoteChange.value.by} changed` : "Someone changed" }} this line on another
+      computer while you were editing. Your edits are kept here; load the newer version before saving.
+      <button type="button" class="link" @click="match.reloadKeepingDraft()">Reload and keep my edits</button>
+    </StateMessage>
     <StateMessage v-if="match.message.value" kind="success" class="feedback small">{{ match.message.value }}</StateMessage>
     <StateMessage v-if="match.error.value" kind="error" class="feedback small">
       {{ match.error.value }}

@@ -11,6 +11,7 @@
 import { Captions, ChevronDown, ChevronRight, FileAudio, Folder, Hammer, HardDriveDownload, Layers, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
+import { permissions } from "../auth/session";
 import BuildDetails from "../components/build/BuildDetails.vue";
 import DeployHistory from "../components/build/DeployHistory.vue";
 import GainSetting from "../components/build/GainSetting.vue";
@@ -44,7 +45,11 @@ let previewSeq = 0;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const running = computed(() => job.value?.state === "running");
 const gameRunning = computed(() => Boolean(deploy.value?.game_running.length));
-const canDeploy = computed(() => Boolean(deploy.value?.valid) && !gameRunning.value && !running.value);
+// Installing and restoring touch the game folder: only the host computer's own Studio may do it (the server
+// refuses it elsewhere, whatever the account). Builds and the level setting need an admin account.
+const canDeploy = computed(
+  () => permissions.value.install && Boolean(deploy.value?.valid) && !gameRunning.value && !running.value,
+);
 const scopeReady = computed(() => (scope.value === "levels" ? chosen.value.length > 0 : scope.value === "mission" ? Boolean(mission.value) : true));
 const scopeBody = () => ({
   scope: scope.value,
@@ -57,9 +62,12 @@ const nothing = computed(() => ({
   subtitles: preview.value ? preview.value.subtitles.keys_to_write === 0 : false,
 }));
 const blocked = (kind: BuildKind) =>
+  !permissions.value.admin ||
   running.value || !scopeReady.value || (kind !== "subtitles" && nothing.value.audio) || (kind !== "audio" && nothing.value.subtitles);
 const blockedReason = (kind: BuildKind) =>
-  kind !== "subtitles" && nothing.value.audio
+  !permissions.value.admin
+    ? "Building needs an admin account"
+    : kind !== "subtitles" && nothing.value.audio
     ? "No approved Campaign Evolved audio in this scope"
     : kind !== "audio" && nothing.value.subtitles
       ? "No approved subtitle text in this scope"
@@ -284,7 +292,11 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
           <code>{{ deploy.mcc_folder ?? "not found" }}</code> <span class="muted">({{ deploy.source }})</span>
           <StatusBadge v-if="!deploy.valid" label="not an MCC install" tone="bad" />
         </p>
-        <div v-if="!deploy.fixed" class="row">
+        <StateMessage v-if="!permissions.install" kind="warning" data-testid="install-host-only">
+          Installing into and restoring the game are only possible on the host computer's own Studio address
+          (http://127.0.0.1:8765/), never from another computer.
+        </StateMessage>
+        <div v-if="!deploy.fixed && permissions.settings_mcc" class="row">
           <input v-model="folderInput" class="grow-input" aria-label="MCC folder" placeholder="…\steamapps\common\Halo The Master Chief Collection" />
           <button type="button" class="icon-label" @click="saveFolder"><Folder :size="15" aria-hidden="true" /> Use this folder</button>
         </div>

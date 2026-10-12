@@ -4,8 +4,9 @@
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
 import { ChevronsDown, ListMusic } from "lucide-vue-next";
-import { onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
+import { onChange, onReconnect } from "../../live/changes";
 import { useDebounced } from "../../composables/useDebounced";
 import type { LevelProgress, SlotRow, SlotsResponse } from "../../api/types";
 import AudioButton from "../AudioButton.vue";
@@ -58,6 +59,21 @@ watch([level, status, debouncedQuery], () => {
   load();
 });
 onMounted(load);
+
+// Decisions changed on another computer (or by a tool on the host): reload the list in place, at most once
+// per burst of changes. The selection, the filters and the scroll position stay.
+let liveTimer: ReturnType<typeof setTimeout> | undefined;
+const reloadSoon = () => {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(load, 400);
+};
+const stopChanges = onChange(reloadSoon);
+const stopReconnect = onReconnect(reloadSoon);
+onBeforeUnmount(() => {
+  clearTimeout(liveTimer);
+  stopChanges();
+  stopReconnect();
+});
 
 function showMore() {
   limit.value += PAGE;

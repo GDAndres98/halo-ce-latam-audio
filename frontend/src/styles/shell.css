@@ -146,3 +146,13 @@ main.wide {
     padding: 0.75rem 1rem 1.5rem;
   }
 }
+
+/* ---- The signed-in account (remote address only), at the right of the top band. */
+.top .who {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

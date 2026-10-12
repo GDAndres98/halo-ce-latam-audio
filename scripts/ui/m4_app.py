@@ -168,6 +168,16 @@ def _subtitle_sem(s):
     return (s["source"], s["ce_locres"], s["custom_ref"])
 
 
+def slot_version(m, local):
+    """The stored version of one line: its decision and its custom subtitle text. A save that names the
+    version it was loaded from (loaded_slot_sha256) is refused when this changed, and accepted when only
+    other lines changed (several computers matching different lines at once)."""
+    custom = None
+    if m and m["subtitle"]["custom_ref"]:
+        custom = (local["custom_subtitles"].get(m["subtitle"]["custom_ref"]) or {}).get("text")
+    return _sha(json.dumps({"slot": m, "custom_text": custom}, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+
 class M4App:
     def __init__(self, root, *, mcc_audio=None, ce_audio=None, editor=None, today=None, run_validator=True):
         self.root = Path(root)
@@ -494,7 +504,8 @@ class M4App:
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
                 "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
                          "available": self.editor is not None, "engine": audio_edit.ENGINE},
-                "ce_missions": self._mission_scope(level), "sha256": {"mappings": msha, "local": lsha}}
+                "ce_missions": self._mission_scope(level),
+                "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 
     # ------------------------------------------------------------------ audio
     def mcc_wav(self, level, lang, index):
@@ -639,13 +650,21 @@ class M4App:
             raise ApiError(404, f"unknown slot {slot_id}")
         level, rec, _s = self.slot_index[slot_id]
         doc, sha = self._mappings()
-        if body.get("loaded_sha256") != sha:
-            raise ApiError(409, "manual_mappings.json changed since this page loaded it; reload and re-apply")
         local, lsha = self._local()
-        if body.get("local_sha256", lsha) != lsha:
-            raise ApiError(409, "manual_mappings.local.json changed since this page loaded it; reload")
+        idx = next((i for i, x in enumerate(doc["slots"]) if x["slot_id"] == slot_id), None)
+        if "loaded_slot_sha256" in body:
+            # Per line: the save is checked against the version of this line the page loaded, so saves of
+            # other lines (another computer, another window) do not make it stale. The write itself is still
+            # checked against the whole file below (the store refuses if anything changed in between).
+            if body["loaded_slot_sha256"] != slot_version(None if idx is None else doc["slots"][idx], local):
+                raise ApiError(409, "This line was changed elsewhere (another computer or window) since this page "
+                                    "loaded it; reload it and re-apply your edits")
+        else:  # the whole-file check (classic page, older clients)
+            if body.get("loaded_sha256") != sha:
+                raise ApiError(409, "manual_mappings.json changed since this page loaded it; reload and re-apply")
+            if body.get("local_sha256", lsha) != lsha:
+                raise ApiError(409, "manual_mappings.local.json changed since this page loaded it; reload")
         new_doc = copy.deepcopy(doc)
-        idx = next((i for i, x in enumerate(new_doc["slots"]) if x["slot_id"] == slot_id), None)
         if idx is None:
             slot = default_slot(_next_id("m", [x["mapping_id"] for x in doc["slots"]]), slot_id, rec["mcc_tag"])
         else:

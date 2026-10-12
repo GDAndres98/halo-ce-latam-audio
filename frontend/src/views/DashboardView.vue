@@ -4,9 +4,10 @@
 // panel on the right; choosing it opens it in Matching.
 
 import { ArrowRight, Clapperboard, Gauge, ListFilter, Map as MapIcon, ShieldCheck, Users } from "lucide-vue-next";
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api, ApiError } from "../api/client";
+import { onChange } from "../live/changes";
 import type { LevelSummary, StateResponse } from "../api/types";
 import StatusBadge from "../components/StatusBadge.vue";
 import HudMeter from "../components/ui/HudMeter.vue";
@@ -21,13 +22,25 @@ const error = ref("");
 const highlighted = ref<string | null>(null);
 const list = ref<HTMLElement | null>(null);
 
-onMounted(async () => {
+async function load() {
   try {
     state.value = await api.state();
-    highlighted.value = state.value.levels[0]?.level ?? null;
+    highlighted.value ??= state.value.levels[0]?.level ?? null;
   } catch (e) {
     error.value = e instanceof ApiError || e instanceof Error ? e.message : String(e);
   }
+}
+onMounted(load);
+
+// Progress changes when any computer saves: reload the counters (at most once per burst of changes).
+let liveTimer: ReturnType<typeof setTimeout> | undefined;
+const stopChanges = onChange(() => {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(load, 600);
+});
+onBeforeUnmount(() => {
+  clearTimeout(liveTimer);
+  stopChanges();
 });
 
 // The build pins must match the installed game and the reference copies, or decisions were made

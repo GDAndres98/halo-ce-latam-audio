@@ -21,6 +21,8 @@ import type {
   SlotDetail,
   SlotsResponse,
   StateResponse,
+  SessionInfo,
+  NetworkInfo,
 } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
@@ -31,12 +33,40 @@ export class ApiError extends Error {
   }
 }
 
+// The CSRF token of the signed-in session (remote access, docs/remote-access.md). Every POST carries it;
+// the host's own address needs none and ignores it. Set by the session store (auth/session.ts).
+let csrfToken: string | null = null;
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+// Told when the server answers 401: the session ended (signed out, expired, password changed).
+const unauthorizedListeners: (() => void)[] = [];
+export function onUnauthorized(listener: () => void): void {
+  unauthorizedListeners.push(listener);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
+  const headers = new Headers(init?.headers);
+  if (init?.method === "POST" && csrfToken) headers.set("X-Studio-CSRF", csrfToken);
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, credentials: "same-origin" });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new ApiError(0, "The Studio server cannot be reached. Check the connection to the host computer.");
+  }
   const body = (await res.json().catch(() => ({}))) as { error?: string; details?: string[] };
+  if (res.status === 401 && path !== "/api/login") unauthorizedListeners.forEach((listener) => listener());
   if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText, body.details ?? []);
   return body as T;
 }
+
+const postJson = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
 
 const query = (params: Record<string, string | number | undefined | null>): string => {
   const parts = Object.entries(params)
@@ -46,6 +76,13 @@ const query = (params: Record<string, string | number | undefined | null>): stri
 };
 
 export const api = {
+  /** Who is signed in on this address, the role and what it may do. Never needs a session. */
+  session: () => request<SessionInfo>("/api/session"),
+  login: (username: string, password: string) => request<SessionInfo>("/api/login", postJson({ username, password })),
+  logout: () => request<{ signed_out: boolean }>("/api/logout", postJson({})),
+  /** Listeners and the addresses to open from another computer. */
+  network: () => request<NetworkInfo>("/api/network"),
+
   state: () => request<StateResponse>("/api/state"),
 
   slots: (params: { level: string; status?: string; q?: string; limit?: number }) =>
@@ -170,4 +207,6 @@ export const audioUrl = {
   mcc: (level: string, lang: "spanish" | "english", index: number) =>
     `/audio/mcc${query({ level, lang, index })}`,
   ce: (ref: string, lang: string) => `/audio/ce${query({ ref, lang })}`,
+  /** Waveform peaks of one of the URLs above (drawn before the audio itself is downloaded). */
+  peaks: (url: string) => `/audio/peaks${query({ src: url })}`,
 };
