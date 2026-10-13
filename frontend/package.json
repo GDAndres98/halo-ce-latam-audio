@@ -25,7 +25,8 @@
     "test:level": "node e2e/level.mjs",
     "test:theme": "node e2e/theme.mjs",
     "test:remote": "node e2e/remote.mjs",
-    "perf": "node e2e/perf.mjs"
+    "perf": "node e2e/perf.mjs",
+    "docs:screenshots": "node e2e/screenshots.mjs"
   },
   "dependencies": {
     "@fontsource-variable/saira": "^5.3.0",
