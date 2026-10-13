@@ -185,8 +185,8 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
                       "rule": f"linear; reduced to keep the peak <= {audio_edit.PEAK_CEILING_DB:g} dBFS; never limited"})
     if st.get("interference"):
         steps.append({"op": "interference", **st["interference"],
-                      "rule": "Victor 933 only: masked = speech muted under MCC static, partial = speech ducked under "
-                              "quieter static; regions on the source timeline (audio_edit.interference_effect)"})
+                      "rule": "Victor 933 only: an intensity curve on the source timeline drives speech ducking (removed "
+                              "at >= 0.95) and MCC's continuous static (common/interference.py)"})
     if st.get("echo"):
         steps.append({"op": "echo", **{k: v for k, v in st["echo"].items()},
                       "rule": "applied with the recipe (audio_edit.echo_effect); the line is extended by the ring-out"})

@@ -234,13 +234,18 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       - `scripts/validate/migrate_eco_effect.py` gave all 18 the Spain intercom + Spain echo and set them to
         needs rework, with matches kept (`docs/migrations/2026-10-13-eco-effect.md`). Not listened to yet.
     - **Victor 933's damaged transmission (owner prompt 44, 2026-10-13):** `docs/victor933-interference.md`.
-      - A ONE-OFF for `vo_scr_m06_00740_victor933` (`m-000482`) only: recipe field `audio.edit.interference`
-        (11 owner-chosen regions; masked = speech muted under MCC static, partial = ducked). It is refused for
-        any other line (`audio_edit.INTERFERENCE_LINES`).
-      - Applied on the source timeline before edits (`audio-render/9`). The static is MCC Spain's own burst
+      - A ONE-OFF for `vo_scr_m06_00740_victor933` (`m-000482`) only: recipe field `audio.edit.interference`,
+        engine `interference/2` since prompt 45, in `scripts/common/interference.py`. It is refused for any other
+        line.
+      - The field holds an intensity curve (points t/v) plus the 11 owner-chosen phrase guides. The curve drives
+        speech ducking (removed at >= 0.95) and continuous granular MCC static with flutter.
+      - Applied on the source timeline before edits (`audio-render/10`). The static is MCC Spain's own burst
         (`scripts/common/radio_static.py`, pinned, decoded on demand).
-      - Aligned defaults are in `config/interference/vo_scr_m06_00740_victor933.json`; the Studio shows a
-        "Transmission interference" section for that line only. Browser test: `npm run test:interference`.
+      - Guides are in `config/interference/vo_scr_m06_00740_victor933.json`; the default curve is generated
+        from them, and masked guides always stay fully hidden.
+      - The Studio shows an automation lane (`InterferenceLane.vue`) for that line only: points/draw, zoom,
+        an MCC reference overlay (`/api/interference/reference`), play from the cursor.
+        Browser test: `npm run test:interference`.
       - Never extend it to other lines without the owner; never change the owner's subtitle `c-000023`.
     - **M-SYS catalogued (owner request, 2026-10-10):** `python
       scripts/catalog/build_ce_catalog.py --systemic` (also in `--all`) writes

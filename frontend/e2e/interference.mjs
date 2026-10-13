@@ -1,10 +1,11 @@
-// Browser test of Victor 933's one-off "Transmission interference" section (2026-10-13).
+// Browser test of Victor 933's interference lane (owner prompt 45).
 //
 //   npm run test:interference      (from frontend/; needs Microsoft Edge)
 //
-// On a disposable copy of the mapping data: the section shows the 11 aligned regions for Victor 933's line only,
-// a region edit re-renders the automatic preview with the interference, an invalid edit is refused, Reset
-// restores the aligned timings, and another line has no such section. The real mappings are hashed before/after.
+// On a disposable copy of the mapping data: the lane shows the curve and the 11 phrase guides for Victor 933's
+// line only; points can be added, dragged, nudged and removed; a drawn stretch replaces the curve under it and
+// the guide list warns when a masked phrase becomes audible; Ctrl+Z undoes; Reset regenerates the curve; zoom
+// and the MCC reference overlay work; the curve is saved and survives a reload. The real mappings are hashed.
 
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,6 +15,9 @@ import { HERE, WEB_PORT, Services, runFixture, sha256File, handleConfirms } from
 
 const OUT = join(HERE, "out");
 const SLOT = "es:c10_010_captpilot#0";
+const HEIGHT = 220;
+const RULER = 18;
+const TOP = 16;
 const results = [];
 const pageErrors = [];
 let page = null;
@@ -33,6 +37,7 @@ async function step(name, fn) {
 const check = (ok, message) => {
   if (!ok) throw new Error(message);
 };
+const lane = () => page.getByTestId("interference-lane");
 const section = () => page.getByTestId("interference");
 
 async function nextPreview(change) {
@@ -43,6 +48,17 @@ async function nextPreview(change) {
   return (await r.json()).stats;
 }
 
+/** Page coordinates of (time, intensity) on the lane at the current zoom (scrolled to the start). */
+async function at(t, v, duration) {
+  await lane().scrollIntoViewIfNeeded();
+  const box = await lane().boundingBox();
+  return { x: box.x + (t / duration) * box.width, y: box.y + TOP + (1 - v) * (HEIGHT - RULER - TOP) };
+}
+
+async function guideTexts() {
+  return section().getByTestId("interference-guide").allInnerTexts();
+}
+
 async function main() {
   await mkdir(OUT, { recursive: true });
   const tmp = await mkdtemp(join(tmpdir(), "studio-interference-"));
@@ -50,55 +66,107 @@ async function main() {
   const realBefore = fixture.real_mappings_sha256;
   const services = new Services(fixture.root);
   let browser;
+  let duration = 0;
+  let pointsBefore = 0;
   try {
     await step("start the API and the Studio on disposable data", async () => {
       await services.up();
     });
     browser = await chromium.launch({ channel: "msedge", headless: true });
-    page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
     page.on("dialog", (d) => d.accept());
     handleConfirms(page);
     page.on("pageerror", (err) => pageErrors.push(err.message));
     page.on("console", (msg) => msg.type() === "error" && pageErrors.push(msg.text()));
 
-    await step("Victor 933's line shows the 11 aligned regions, with the preview rendering them", async () => {
+    await step("Victor 933's line shows the lane: curve, 11 guides, masked phrases hidden, continuous rendering", async () => {
       const first = page.waitForResponse((r) => r.url().includes("/api/edit/preview"), { timeout: 120000 });
       await page.goto(`http://localhost:${WEB_PORT}/#/match?level=c10&slot=${encodeURIComponent(SLOT)}`);
-      await section().waitFor({ timeout: 60000 });
-      const rows = section().getByTestId("interference-region");
-      check((await rows.count()) === 11, `${await rows.count()} regions`);
-      check((await rows.nth(1).getByLabel("Effect of region 2").inputValue()) === "masked", "region 2 is not masked");
-      check((await rows.nth(0).getByLabel("Effect of region 1").inputValue()) === "partial", "region 1 is not partial");
+      await lane().waitFor({ timeout: 60000 });
+      const guides = await guideTexts();
+      check(guides.length === 11, `${guides.length} guides`);
+      check(guides.filter((g) => /hidden/.test(g) && !/meant/.test(g)).length === 6, `masked status: ${guides.join(" | ")}`);
       const stats = (await (await first).json()).stats;
-      check(stats.interference && stats.interference.masked === 6 && stats.interference.partial === 5, JSON.stringify(stats.interference));
-      check(Math.abs(stats.output_s - stats.edited_s) < 0.01, "the interference changed the length");
+      check(stats.interference && stats.interference.masked_hidden === true, JSON.stringify(stats.interference));
+      check(Math.abs(stats.output_s - stats.edited_s) < 0.3, "the interference changed the length"); // clicks add 0.267 s
+      pointsBefore = stats.interference.points;
+      const detail = await page.evaluate(async (slot) => (await (await fetch(`/api/slot?id=${encodeURIComponent(slot)}`)).json()), SLOT);
+      duration = detail.interference["vo_scr_m06_00740_victor933#0"].duration_s;
       await section().scrollIntoViewIfNeeded();
-      await section().screenshot({ path: join(OUT, "interference.png") });
-      return `${stats.interference.masked} masked, ${stats.interference.partial} partial; peak ${stats.output_peak_dbfs} dBFS`;
+      await section().screenshot({ path: join(OUT, "interference-lane.png") });
+      return `${pointsBefore} points; peak ${stats.output_peak_dbfs} dBFS`;
     });
 
-    await step("a timing edit re-renders; an overlapping one is refused and snaps back", async () => {
-      const end = section().getByLabel("End of region 11 (s)");
-      const stats = await nextPreview(async () => {
-        await end.fill("26.0");
-        await end.press("Tab");
+    await step("click adds a point, dragging moves it, Delete removes it (each re-renders)", async () => {
+      const p = await at(12.75, 0.8, duration); // empty space (the bed points sit near 0.35)
+      let stats = await nextPreview(() => page.mouse.click(p.x, p.y));
+      check(stats.interference.points === pointsBefore + 1, `${stats.interference.points} points after adding`);
+      const time = section().getByLabel("Selected point time (s)");
+      check(Math.abs(Number(await time.inputValue()) - 12.75) < 0.05, `selected time ${await time.inputValue()}`);
+      const q = await at(12.75, 0.55, duration);
+      stats = await nextPreview(async () => {
+        await page.mouse.move(p.x, p.y);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(p.x, p.y + ((q.y - p.y) * i) / 8);
+        await page.mouse.up();
       });
-      check(stats.interference.regions === 11, "regions lost");
-      const start2 = section().getByLabel("Start of region 2 (s)");
-      await start2.fill("0.2");
-      await start2.press("Tab");
-      check(Number(await start2.inputValue()) === 1.93, `start of region 2 is ${await start2.inputValue()}`);
+      const v = Number(await section().getByLabel("Selected point intensity").inputValue());
+      check(Math.abs(v - 0.55) < 0.05, `dragged to ${v}`);
+      stats = await nextPreview(() => lane().press("Delete"));
+      check(stats.interference.points === pointsBefore, `${stats.interference.points} points after Delete`);
     });
 
-    await step("Reset restores the aligned timings", async () => {
-      await section().getByRole("button", { name: /Reset to the aligned timings/ }).click();
-      check(Number(await section().getByLabel("End of region 11 (s)").inputValue()) === 25.93, "not reset");
+    await step("drawing over a masked phrase replaces the curve and the guide warns; Ctrl+Z restores it", async () => {
+      await section().getByRole("button", { name: /Draw/ }).click();
+      const a = await at(1.7, 0.2, duration);
+      const b = await at(2.8, 0.2, duration);
+      await nextPreview(async () => {
+        await page.mouse.move(a.x, a.y);
+        await page.mouse.down();
+        for (let i = 1; i <= 20; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 20, a.y);
+        await page.mouse.up();
+      });
+      const warned = (await guideTexts())[1];
+      check(/audible!/.test(warned), `guide 2 after drawing: ${warned}`);
+      await section().getByRole("button", { name: /Points/ }).click();
+      await page.locator("body").click({ position: { x: 5, y: 5 } });
+      await nextPreview(() => page.keyboard.press("Control+z"));
+      const back = (await guideTexts())[1];
+      check(/hidden/.test(back), `guide 2 after undo: ${back}`);
     });
 
-    await step("another line has no interference section", async () => {
+    await step("zoom, MCC reference overlay and play from the cursor", async () => {
+      await section().getByRole("button", { name: "Zoom in" }).click();
+      check((await section().getByTestId("lane-zoom").innerText()) === "2×", "zoom");
+      const ref = page.waitForResponse((r) => r.url().includes("/api/interference/reference"), { timeout: 120000 });
+      await section().getByLabel("MCC reference overlay").selectOption("spanish");
+      const body = await (await ref).json();
+      check(body.values.length > 1000 && body.language === "spanish", "reference curve");
+      await section().getByRole("button", { name: "Zoom out" }).click();
+      await section().getByTestId("lane-play-spanish").click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="lane-play-spanish"]')?.getAttribute("aria-pressed") === "true");
+      await section().getByRole("button", { name: "Stop" }).click();
+      return `reference ${body.values.length} frames`;
+    });
+
+    await step("Reset regenerates the curve; the curve is saved and is there after a reload", async () => {
+      const p = await at(13.05, 0.85, duration);
+      await nextPreview(() => page.mouse.click(p.x, p.y));
+      await page.keyboard.press("Control+s");
+      await page.getByText("Draft saved.").waitFor({ timeout: 15000 });
+      await page.reload();
+      await lane().waitFor({ timeout: 60000 });
+      const detail = await page.evaluate(async (slot) => (await (await fetch(`/api/slot?id=${encodeURIComponent(slot)}`)).json()), SLOT);
+      const saved = detail.mapping.audio.edit.interference.points;
+      check(saved.length === pointsBefore + 1 && saved.some((q) => Math.abs(q.t - 13.05) < 0.05), `saved ${saved.length} points`);
+      const stats = await nextPreview(() => section().getByRole("button", { name: /Reset curve/ }).click());
+      check(stats.interference.points === pointsBefore, `${stats.interference.points} points after reset`);
+    });
+
+    await step("another line has no interference lane", async () => {
       await page.goto(`http://localhost:${WEB_PORT}/#/match?level=a10&slot=${encodeURIComponent("es:A10_010_cryotech#0")}`);
       await page.getByRole("heading", { level: 2, name: "a10_010_cryotech" }).waitFor({ timeout: 30000 });
-      check((await page.getByTestId("interference").count()) === 0, "the section appears on another line");
+      check((await page.getByTestId("interference").count()) === 0, "the lane appears on another line");
     });
   } finally {
     if (browser) await browser.close().catch(() => {});

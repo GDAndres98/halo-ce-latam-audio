@@ -1,9 +1,9 @@
 {
-  "schema": "interference-defaults/1",
+  "schema": "interference-defaults/2",
   "ce_line_ref": "vo_scr_m06_00740_victor933#0",
   "language": "Spanish(Mexico)",
   "slot_id": "es:c10_010_captpilot#0",
-  "description": "Victor 933's damaged transmission (owner request, 2026-10-13; docs/victor933-interference.md). The owner chose the 11 phrases and their kinds; the times were aligned on the CE es-MX recording (source timeline, seconds).",
+  "description": "Victor 933's damaged transmission (owner prompts 44-45, 2026-10-13; docs/victor933-interference.md). The owner chose the 11 phrases and their kinds; the times were aligned on the CE es-MX recording (source timeline, seconds). They are the guides of the interference curve; the default curve is generated from them (common/interference.default_points).",
   "alignment": {
     "method": "Windows es-ES speech recognizer (System.Speech dictation) word timings, utterance 2 anchored at +16.15 s on the recording's silences (20.25 s, 23.09 s); every edge snapped to the nearest energy valley (+-50 ms, 10 ms frames); fragment edges placed at syllable/closure valleys.",
     "uncertain": [
@@ -16,17 +16,72 @@
     "partial": "Low but understandable: speech ducked, static underneath.",
     "masked": "Not understandable: speech muted, replaced by MCC static."
   },
-  "regions": [
-    {"label": "Aquí", "kind": "partial", "start_s": 0.12, "end_s": 0.40},
-    {"label": "33 (Víctor 9-33)", "kind": "masked", "start_s": 1.93, "end_s": 2.51},
-    {"label": "necesito ayuda inmediata", "kind": "partial", "start_s": 5.23, "end_s": 6.64},
-    {"label": "bajo un fuerte", "kind": "partial", "start_s": 7.42, "end_s": 7.99},
-    {"label": "…til aliení…", "kind": "masked", "start_s": 9.51, "end_s": 10.08},
-    {"label": "no es del Covenant", "kind": "partial", "start_s": 10.37, "end_s": 11.28},
-    {"label": "hostiles. Estamos", "kind": "partial", "start_s": 13.91, "end_s": 14.96},
-    {"label": "…an estruc…", "kind": "masked", "start_s": 16.11, "end_s": 16.59},
-    {"label": "…empo podre…", "kind": "masked", "start_s": 18.99, "end_s": 19.57},
-    {"label": "…víen ayuda si reciben esta transmis…", "kind": "masked", "start_s": 21.06, "end_s": 22.92},
-    {"label": "intervalos", "kind": "masked", "start_s": 25.47, "end_s": 25.93}
+  "guides": [
+    {
+      "label": "Aquí",
+      "kind": "partial",
+      "start_s": 0.12,
+      "end_s": 0.4
+    },
+    {
+      "label": "33 (Víctor 9-33)",
+      "kind": "masked",
+      "start_s": 1.93,
+      "end_s": 2.51
+    },
+    {
+      "label": "necesito ayuda inmediata",
+      "kind": "partial",
+      "start_s": 5.23,
+      "end_s": 6.64
+    },
+    {
+      "label": "bajo un fuerte",
+      "kind": "partial",
+      "start_s": 7.42,
+      "end_s": 7.99
+    },
+    {
+      "label": "…til aliení…",
+      "kind": "masked",
+      "start_s": 9.51,
+      "end_s": 10.08
+    },
+    {
+      "label": "no es del Covenant",
+      "kind": "partial",
+      "start_s": 10.37,
+      "end_s": 11.28
+    },
+    {
+      "label": "hostiles. Estamos",
+      "kind": "partial",
+      "start_s": 13.91,
+      "end_s": 14.96
+    },
+    {
+      "label": "…an estruc…",
+      "kind": "masked",
+      "start_s": 16.11,
+      "end_s": 16.59
+    },
+    {
+      "label": "…empo podre…",
+      "kind": "masked",
+      "start_s": 18.99,
+      "end_s": 19.57
+    },
+    {
+      "label": "…víen ayuda si reciben esta transmis…",
+      "kind": "masked",
+      "start_s": 21.06,
+      "end_s": 22.92
+    },
+    {
+      "label": "intervalos",
+      "kind": "masked",
+      "start_s": 25.47,
+      "end_s": 25.93
+    }
   ]
 }

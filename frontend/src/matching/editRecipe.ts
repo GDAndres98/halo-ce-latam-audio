@@ -6,7 +6,7 @@
 // previews and for the build (scripts/common/audio_edit.py), so these rules only decide what the recipe
 // contains; the server decides what it sounds like.
 
-import type { AudioEdit, EchoEffect, EchoPreset, InterferenceRegion, RadioFilter, RadioPreset } from "../api/types";
+import type { AudioEdit, CurvePoint, EchoEffect, EchoPreset, InterferenceCurve, RadioFilter, RadioPreset } from "../api/types";
 
 /** A span of the original recording, in seconds. */
 export interface Span {
@@ -225,37 +225,100 @@ export function echoProblem(e: EchoEffect): string | null {
   return null;
 }
 
-// ---- Transmission interference (Victor 933 only). Same rules as audio_edit.interference_problems.
-export const INTERFERENCE_INTENSITY = [-12, 12] as const;
+// ---- Transmission interference (Victor 933 only): the intensity curve. Same rules and mapping as
+// scripts/common/interference.py; the server checks again and renders it.
+export const CURVE = { minSpacing: 0.002, maxPoints: 3000, speechFull: 0.35, partial: 0.6, mask: 0.95, bed: 0.35 } as const;
 
-/** Sets the regions (a copy), or removes the interference (null). */
-export function setInterference(edit: AudioEdit, regions: InterferenceRegion[] | null): AudioEdit {
-  if (regions === null) return { ...edit, interference: null };
-  return { ...edit, interference: { regions: regions.map((r) => ({ ...r, intensity_db: r.intensity_db ?? 0 })) } };
+/** Speech level (dB) under the interference at intensity i; null = removed. Mirrors interference.speech_gain. */
+export function speechDb(i: number): number | null {
+  if (i <= CURVE.speechFull) return 0;
+  if (i >= CURVE.mask) return null;
+  let g = Math.pow(10, -(5 * ((i - CURVE.speechFull) / (CURVE.partial - CURVE.speechFull)) ** 2) / 20);
+  if (i > 0.85) {
+    const u = (i - 0.85) / (CURVE.mask - 0.85);
+    g *= 1 - u * u * (3 - 2 * u);
+  }
+  return g > 0 ? 20 * Math.log10(g) : null;
 }
 
-/** Changes one value of one region; refuses an empty, reversed, overlapping or out-of-range region. */
-export function setRegionValue<K extends keyof InterferenceRegion>(
-  edit: AudioEdit,
-  index: number,
-  key: K,
-  value: InterferenceRegion[K],
-  duration: number,
-): AudioEdit {
-  const regions = edit.interference?.regions;
-  if (!regions || !regions[index]) throw new Error("no such interference region");
-  const next = regions.map((r, i) => (i === index ? { ...r, [key]: typeof value === "number" ? round3(value) : value } : r));
-  const r = next[index];
-  if (!Number.isFinite(r.start_s) || !Number.isFinite(r.end_s) || r.start_s < 0 || r.end_s <= r.start_s) {
-    throw new Error("a region must start before it ends");
+/** The curve's value at time t (linear between points; flat before the first and after the last). */
+export function curveAt(points: CurvePoint[], t: number): number {
+  if (!points.length) return 0;
+  if (t <= points[0].t) return points[0].v;
+  for (let k = 1; k < points.length; k++) {
+    const p = points[k - 1];
+    const q = points[k];
+    if (t <= q.t) return p.v + ((q.v - p.v) * (t - p.t)) / (q.t - p.t || 1);
   }
-  if (duration > 0 && r.end_s > duration) throw new Error("the region ends after the recording");
-  if ((index > 0 && r.start_s < next[index - 1].end_s) || (index < next.length - 1 && r.end_s > next[index + 1].start_s)) {
-    throw new Error("regions may not overlap");
+  return points[points.length - 1].v;
+}
+
+/** The lowest curve value over [a, b] (the points inside and both ends). */
+export function curveMin(points: CurvePoint[], a: number, b: number): number {
+  let m = Math.min(curveAt(points, a), curveAt(points, b));
+  for (const p of points) if (p.t > a && p.t < b) m = Math.min(m, p.v);
+  return m;
+}
+
+/** Why a curve would be refused, or null. */
+export function curveProblem(points: CurvePoint[], duration: number): string | null {
+  if (points.length < 2) return "the curve needs at least 2 points";
+  if (points.length > CURVE.maxPoints) return `at most ${CURVE.maxPoints} points`;
+  for (let k = 0; k < points.length; k++) {
+    const p = points[k];
+    if (!Number.isFinite(p.t) || !Number.isFinite(p.v)) return "enter numbers";
+    if (p.v < 0 || p.v > 1) return "intensity is 0–1";
+    if (p.t < 0 || (duration > 0 && p.t > duration + 0.001)) return "a point is outside the recording";
+    if (k && p.t - points[k - 1].t < CURVE.minSpacing - 1e-9) return "two points are too close together";
   }
-  const [lo, hi] = INTERFERENCE_INTENSITY;
-  if (!Number.isFinite(r.intensity_db) || r.intensity_db < lo || r.intensity_db > hi) throw new Error(`intensity must be ${lo}–${hi} dB`);
-  return { ...edit, interference: { ...edit.interference, regions: next } };
+  return null;
+}
+
+/** Sets the curve's points (sorted, rounded like the server), refusing an invalid curve. */
+export function setCurvePoints(edit: AudioEdit, points: CurvePoint[], duration: number): AudioEdit {
+  if (!edit.interference) throw new Error("no interference curve on this recording");
+  const next = [...points]
+    .map((p) => ({ t: round3(p.t), v: round3(Math.min(1, Math.max(0, p.v))) }))
+    .sort((a, b) => a.t - b.t);
+  const problem = curveProblem(next, duration);
+  if (problem) throw new Error(problem);
+  return { ...edit, interference: { ...edit.interference, points: next } };
+}
+
+/** Sets the whole interference (Reset to the generated curve), or removes it (null). */
+export function setInterferenceCurve(edit: AudioEdit, value: InterferenceCurve | null): AudioEdit {
+  if (value === null) return { ...edit, interference: null };
+  return { ...edit, interference: { engine: value.engine, guides: value.guides.map((g) => ({ ...g })),
+                                    points: value.points.map((p) => ({ ...p })), flutter_db: value.flutter_db } };
+}
+
+export function setFlutter(edit: AudioEdit, db: number): AudioEdit {
+  if (!edit.interference) throw new Error("no interference curve on this recording");
+  if (!Number.isFinite(db) || db < 0 || db > 6) throw new Error("flutter is 0–6 dB");
+  return { ...edit, interference: { ...edit.interference, flutter_db: Math.round(db * 10) / 10 } };
+}
+
+/** Where source time t lands in the edited recording (trims, cuts, inserted silences), as the server splices. */
+export function editedTime(edit: AudioEdit, t: number): number {
+  let pos = t - edit.trim_start_s;
+  for (const c of edit.cuts) {
+    if (t >= c.end_s) pos -= c.end_s - c.start_s;
+    else if (t > c.start_s) pos -= t - c.start_s;
+  }
+  for (const s of edit.silences) if (s.at_s <= t) pos += s.dur_s;
+  return Math.max(0, pos);
+}
+
+/** The source time of a position in the edited recording (inverse of editedTime, for the playhead). */
+export function sourceTime(edit: AudioEdit, e: number, duration: number): number {
+  let lo = 0;
+  let hi = duration;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2;
+    if (editedTime(edit, mid) < e) lo = mid;
+    else hi = mid;
+  }
+  return hi;
 }
 
 /** Back to an unedited recording. The gap is kept: it is not an edit to the audio itself. */

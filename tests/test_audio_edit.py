@@ -343,58 +343,107 @@ def fake_static():
 
 
 class InterferenceTests(unittest.TestCase):
-    REGIONS = [{"label": "a", "kind": "partial", "start_s": 0.02, "end_s": 0.18, "intensity_db": 0},  # speech() is loud here
-               {"label": "b", "kind": "masked", "start_s": 0.6, "end_s": 0.9, "intensity_db": 0}]
+    GUIDES = [{"label": "a", "kind": "partial", "start_s": 0.02, "end_s": 0.18},
+              {"label": "b", "kind": "masked", "start_s": 0.6, "end_s": 0.9}]
+    POINTS = [{"t": 0, "v": 0.6}, {"t": 0.2, "v": 0.6}, {"t": 0.3, "v": 0.35}, {"t": 0.55, "v": 1},
+              {"t": 0.95, "v": 1}, {"t": 1.1, "v": 0.35}]
+    CURVE = {"guides": GUIDES, "points": POINTS, "flutter_db": 2.5}
 
-    def test_only_victor_933_and_region_rules(self):
-        e = ae.normalize({"interference": {"regions": self.REGIONS}}, V933)
-        self.assertEqual(e["interference"]["engine"], ae.INTERFERENCE_ENGINE)
+    def test_only_victor_933_and_curve_rules(self):
+        from common import interference as I
+        e = ae.normalize({"interference": self.CURVE}, V933)
+        self.assertEqual(e["interference"]["engine"], I.ENGINE)
         self.assertEqual(ae.normalize(e), e)
-        self.assertIn("interference 2 regions (1 masked, 1 partial)", ae.summary(e))
+        self.assertIn("interference curve (6 points; 2 guides, 1 masked)", ae.summary(e))
         with self.assertRaises(ae.EditError):  # every other recording is refused
-            ae.normalize({"interference": {"regions": self.REGIONS}}, SRC)
-        self.assertTrue(ae.problems(dict(e, for_source=SRC)))
-        bad_sets = ([dict(self.REGIONS[0], end_s=0.01)], [dict(self.REGIONS[0], kind="loud")],
-                    [dict(self.REGIONS[0], intensity_db=20)], [self.REGIONS[0], dict(self.REGIONS[1], start_s=0.1)])
-        for regions in bad_sets:
-            with self.assertRaises(ae.EditError, msg=regions):
-                ae.normalize({"interference": {"regions": regions}}, V933)
-        self.assertTrue(ae.problems(e, 0.8))  # a region past the end of the recording
+            ae.normalize({"interference": self.CURVE}, SRC)
+        with self.assertRaises(ae.EditError):  # the old region format needs the upgrade script
+            ae.normalize({"interference": {"engine": "interference/1", "regions": []}}, V933)
+        bad = (dict(self.CURVE, points=self.POINTS[:1]), dict(self.CURVE, points=[{"t": 0, "v": 0.3}, {"t": 0.001, "v": 1}]),
+               dict(self.CURVE, points=[{"t": 0, "v": 0.3}, {"t": 1, "v": 1.5}]), dict(self.CURVE, flutter_db=9),
+               dict(self.CURVE, guides=[dict(self.GUIDES[0], kind="loud")]))
+        for value in bad:
+            with self.assertRaises(ae.EditError, msg=value):
+                ae.normalize({"interference": value}, V933)
+        self.assertTrue(ae.problems(e, 0.5))  # a point past the end of the recording
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
         full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
         self.assertEqual(validate(e, full), [])
 
-    def test_masked_mutes_partial_ducks_and_nothing_else_changes(self):
+    def test_mapping(self):
+        from common import interference as I
+        self.assertEqual(I.speech_gain(I.BED_LEVEL), 1.0)
+        self.assertAlmostEqual(20 * math.log10(I.speech_gain(I.PARTIAL_LEVEL)), -5.0, places=6)
+        self.assertEqual(I.speech_gain(I.MASK_LEVEL), 0.0)
+        self.assertAlmostEqual(I.static_db(1.0), I.STATIC_AT_MASK_DB)
+        self.assertAlmostEqual(I.static_db(I.BED_LEVEL), I.STATIC_AT_MASK_DB - 14.7)
+        self.assertAlmostEqual(I.intensity_for_static_db(I.static_db(0.7)), 0.7, places=6)
+        self.assertEqual(I.static_gain(0.0), 0.0)
+        gains = [I.speech_gain(k / 100) for k in range(101)]
+        self.assertTrue(all(a >= b for a, b in zip(gains, gains[1:])))  # monotonic: more intensity, less speech
+
+    def test_render_masks_ducks_keeps_static_continuous(self):
         x = speech(1.2, amp=0.3)
         pcm = ae.float_to_pcm16(x)
-        e = ae.normalize({"interference": {"regions": self.REGIONS}}, V933)
+        e = ae.normalize({"interference": self.CURVE}, V933)
         with self.assertRaises(ae.EditError):  # never rendered without MCC's static
             ae.render(pcm, e)
-        y = ae.pcm16_to_float(ae.render(pcm, e, static=fake_static())["pcm"])
+        r = ae.render(pcm, e, static=fake_static())
+        y = ae.pcm16_to_float(r["pcm"])
         mute = dict(fake_static(), static=[0.0] * 8820)
         sp = ae.pcm16_to_float(ae.render(pcm, e, static=mute)["pcm"])  # the speech that is left
         self.assertEqual(len(y), len(x))
-        self.assertEqual(set(sp[int(0.6 * FS):int(0.9 * FS)]), {0.0})               # masked: no speech at all
-        self.assertTrue(any(y[int(0.6 * FS):int(0.9 * FS)]))                        # ...static instead
+        self.assertEqual(set(sp[int(0.6 * FS):int(0.9 * FS)]), {0.0})  # curve at 1: no speech at all
         ratio = max(abs(v) for v in sp[int(0.05 * FS):int(0.15 * FS)]) / max(abs(v) for v in x[int(0.05 * FS):int(0.15 * FS)])
-        self.assertAlmostEqual(20 * math.log10(ratio), -ae.PARTIAL_DUCK_DB, delta=0.1)  # partial: ducked
-        ramp = int(ae.INTERFERENCE_RAMP_MS * FS / 1000)
-        orig = ae.pcm16_to_float(pcm)
-        outside = [k for k in range(len(y)) if not (int(0.02 * FS) - ramp <= k < int(0.18 * FS) + ramp
-                                                     or int(0.6 * FS) - ramp <= k < int(0.9 * FS) + ramp)]
-        self.assertTrue(all(y[k] == orig[k] for k in outside))
-        self.assertEqual(y, ae.pcm16_to_float(ae.render(pcm, e, static=fake_static())["pcm"]))  # deterministic
+        self.assertAlmostEqual(20 * math.log10(ratio), -5.0, delta=0.2)  # curve at 0.6: -5 dB
+        noise = [a - b for a, b in zip(y, sp)]
+        frames = [max(abs(v) for v in noise[k:k + 441]) for k in range(0, len(noise) - 441, 441)]
+        self.assertTrue(all(f > 0 for f in frames))  # static never stops (the curve never reaches 0 here)
+        st = r["stats"]["interference"]
+        self.assertTrue(st["masked_hidden"])
+        self.assertEqual([g["hidden"] for g in st["guides"]], [False, True])
+        self.assertEqual(r["pcm"], ae.render(pcm, e, static=fake_static())["pcm"])  # deterministic
 
-    def test_regions_stay_on_the_source_timeline_under_trims_and_cuts(self):
+    def test_curve_stays_on_the_source_timeline_under_trims_and_cuts(self):
         pcm = ae.float_to_pcm16(speech(1.2, amp=0.3))
         mute = dict(fake_static(), static=[0.0] * 8820)
-        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.45, "end_s": 0.55}], "crossfade_ms": 0,
-                          "interference": {"regions": self.REGIONS}}, V933)
+        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.45, "end_s": 0.5}], "crossfade_ms": 0,
+                          "interference": self.CURVE}, V933)
         sp = ae.pcm16_to_float(ae.render(pcm, e, static=mute)["pcm"])
         a, b = ae.spliced_position(0.6, e), ae.spliced_position(0.9, e)
-        self.assertEqual((a, b), (round(0.4 * FS), round(0.7 * FS)))  # 0.1 s trim + 0.1 s cut before it
+        self.assertEqual((a, b), (round(0.45 * FS), round(0.75 * FS)))
         self.assertEqual(set(sp[a:b]), {0.0})
+
+    def test_default_curve_hides_every_masked_guide(self):
+        from common import interference as I
+        guides = [{"label": "p", "kind": "partial", "start_s": 0.3, "end_s": 0.8},
+                  {"label": "m", "kind": "masked", "start_s": 1.0, "end_s": 1.4},
+                  {"label": "m2", "kind": "masked", "start_s": 1.5, "end_s": 1.9}]
+        pts = I.default_points(guides, 3.0)
+        self.assertEqual(pts, I.default_points(guides, 3.0))  # deterministic
+        self.assertEqual(I.problems({"engine": I.ENGINE, "points": pts, "guides": guides, "flutter_db": 2.5}, 3.0), [])
+        c = I.control_curve(pts, 3000)
+        self.assertGreaterEqual(min(c[1000:1400]), I.MASK_LEVEL)
+        self.assertGreaterEqual(min(c[1500:1900]), I.MASK_LEVEL)
+        self.assertTrue(I.SPEECH_FULL < min(c[300:800]) < 0.75)
+        import random
+        for seed in range(200):  # any layout, even phrases a few ms apart: every masked phrase stays hidden
+            r = random.Random(seed)
+            t, gs = r.uniform(0, 0.2), []
+            for _ in range(r.randint(1, 9)):
+                t += r.uniform(0.006, 0.6)
+                d = r.uniform(0.05, 1.0)
+                gs.append({"label": "x", "kind": r.choice(I.KINDS), "start_s": round(t, 3), "end_s": round(t + d, 3)})
+                t += d
+            dur = round(t + r.uniform(0.01, 0.5), 3)
+            pts = I.default_points(gs, dur)
+            self.assertEqual(I.problems({"engine": I.ENGINE, "points": pts, "guides": gs, "flutter_db": 2}, dur), [], seed)
+            c = I.control_curve(pts, int(dur * 1000) + 1)
+            for g in gs:
+                if g["kind"] == "masked":
+                    seg = c[int(round(g["start_s"] * 1000)):int(round(g["end_s"] * 1000)) + 1]
+                    self.assertGreaterEqual(min(seg), I.MASK_LEVEL, (seed, g))
 
 
 class RadioClickTests(unittest.TestCase):
@@ -466,7 +515,7 @@ class ParityTests(unittest.TestCase):
 
     def test_interference_preview_equals_m6_build(self):
         e = ae.normalize({"radio": {"preset": "spain", "clicks": False},
-                          "interference": {"regions": InterferenceTests.REGIONS}}, V933)
+                          "interference": InterferenceTests.CURVE}, V933)
         prev = EditPreview(self.root, FFMPEG, Celt011)
         p = prev.render(self.src, e, None, 4.0, static=fake_static())
         built = derive_processed(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived",

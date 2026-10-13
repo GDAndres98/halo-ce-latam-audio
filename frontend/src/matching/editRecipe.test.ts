@@ -20,8 +20,14 @@ import {
   radioProblem,
   setEchoPreset,
   setEchoValue,
-  setInterference,
-  setRegionValue,
+  CURVE,
+  curveAt,
+  curveMin,
+  editedTime,
+  setCurvePoints,
+  setInterferenceCurve,
+  sourceTime,
+  speechDb,
   setRadioPreset,
   setRadioValue,
 } from "./editRecipe";
@@ -236,23 +242,31 @@ describe("echo", () => {
   });
 });
 
-describe("transmission interference (Victor 933)", () => {
-  const regions = [
-    { label: "Aquí", kind: "partial" as const, start_s: 0.12, end_s: 0.4, intensity_db: 0 },
-    { label: "33", kind: "masked" as const, start_s: 1.93, end_s: 2.51, intensity_db: 0 },
-  ];
-  it("adds, edits and removes regions", () => {
-    const on = setInterference(edit(), regions);
-    expect(on.interference?.regions).toHaveLength(2);
-    expect(setRegionValue(on, 1, "end_s", 2.6, 29).interference?.regions[1].end_s).toBe(2.6);
-    expect(setRegionValue(on, 0, "kind", "masked", 29).interference?.regions[0].kind).toBe("masked");
-    expect(setInterference(on, null).interference).toBeNull();
+describe("transmission interference curve (Victor 933)", () => {
+  const curve = {
+    guides: [{ label: "33", kind: "masked" as const, start_s: 1.93, end_s: 2.51 }],
+    points: [{ t: 0, v: 0.35 }, { t: 1.9, v: 1 }, { t: 2.54, v: 1 }, { t: 3, v: 0.35 }],
+    flutter_db: 2.5,
+  };
+  it("sets, validates and reads the curve", () => {
+    const on = setInterferenceCurve(edit(), curve);
+    const moved = setCurvePoints(on, [...curve.points, { t: 1.0, v: 0.6 }], 29);
+    expect(moved.interference?.points.map((p) => p.t)).toEqual([0, 1, 1.9, 2.54, 3]); // sorted
+    expect(() => setCurvePoints(on, [{ t: 0, v: 0.3 }], 29)).toThrow(/at least 2/);
+    expect(() => setCurvePoints(on, [{ t: 0, v: 0.3 }, { t: 0.001, v: 0.3 }], 29)).toThrow(/too close/);
+    expect(() => setCurvePoints(on, [{ t: 0, v: 0.3 }, { t: 40, v: 0.3 }], 29)).toThrow(/outside/);
+    expect(curveAt(curve.points, 0.95)).toBeCloseTo(0.675, 3);
+    expect(curveMin(curve.points, 1.93, 2.51)).toBe(1);
+    expect(setInterferenceCurve(on, null).interference).toBeNull();
   });
-  it("refuses reversed, overlapping, too long or too strong regions", () => {
-    const on = setInterference(edit(), regions);
-    expect(() => setRegionValue(on, 0, "end_s", 0.1, 29)).toThrow(/before it ends/);
-    expect(() => setRegionValue(on, 0, "end_s", 2.0, 29)).toThrow(/overlap/);
-    expect(() => setRegionValue(on, 1, "end_s", 40, 29)).toThrow(/after the recording/);
-    expect(() => setRegionValue(on, 1, "intensity_db", 20, 29)).toThrow(/intensity/);
+  it("maps intensity to the speech level like the server", () => {
+    expect(speechDb(CURVE.bed)).toBe(0);
+    expect(speechDb(CURVE.partial)).toBeCloseTo(-5, 5);
+    expect(speechDb(CURVE.mask)).toBeNull();
+  });
+  it("maps source time to the edited recording and back", () => {
+    const e = edit({ trim_start_s: 0.1, cuts: [{ start_s: 1, end_s: 1.5 }] });
+    expect(editedTime(e, 2)).toBeCloseTo(1.4, 6);
+    expect(sourceTime(e, 1.4, 4)).toBeCloseTo(2, 3);
   });
 });

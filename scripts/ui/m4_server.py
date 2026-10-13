@@ -479,6 +479,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, app.ce(q.get("mission", "all"), q.get("q"), q.get("offset", 0),
                                               q.get("limit", 100), q.get("level"), q.get("subs") or None,
                                               q.get("hide_used") == "1", q.get("keep_slot") or None))
+            if path == "/api/interference/reference":
+                return self._json(200, app.interference_reference(q.get("slot", ""), q.get("lang", "spanish")))
             if path == "/api/ce_line":
                 return self._json(200, app.ce_line(q.get("ref", "")))
             if path in AUDIO_PATHS:

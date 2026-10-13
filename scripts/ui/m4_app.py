@@ -34,7 +34,7 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import audio_edit, radio_clicks, radio_static  # noqa: E402
+from common import audio_edit, interference, radio_clicks, radio_static  # noqa: E402
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common import mapping_store  # noqa: E402
@@ -506,7 +506,7 @@ class M4App:
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
                 "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
                          "available": self.editor is not None, "engine": audio_edit.ENGINE},
-                "interference": {ref: d for ref in refs if (d := self.interference_defaults(ref))},
+                "interference": {ref: d for ref in refs if (d := self.interference_defaults(ref, slot_id))},
                 "ce_missions": self._mission_scope(level),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 
@@ -611,16 +611,53 @@ class M4App:
                 raise ApiError(503, f"radio static: {e}")
         return self._static
 
-    def interference_defaults(self, ce_line_ref):
-        """The aligned regions for a line that has the one-off interference treatment, or None."""
+    def interference_defaults(self, ce_line_ref, slot_id=None):
+        """For a line with the one-off interference treatment (Victor 933): the owner's 11 guides
+        (config/interference/<line>.json), the default curve generated from them, the intensity scale and the MCC
+        samples of the slot (reference overlay and A/B). None for every other line."""
         if ce_line_ref not in audio_edit.INTERFERENCE_LINES:
             return None
         p = self.root / "config" / "interference" / (ce_line_ref.split("#")[0] + ".json")
         if not p.is_file():
             return None
         d = json.loads(p.read_text(encoding="utf-8"))
-        return {"regions": [dict(r, intensity_db=r.get("intensity_db", 0)) for r in d["regions"]],
-                "kinds": d.get("kinds"), "alignment": d.get("alignment")}
+        guides = [{k: g[k] for k in ("label", "kind", "start_s", "end_s")} for g in d["guides"]]
+        try:
+            duration = self._wav_duration(self.ce_wav(ce_line_ref, "Spanish(Mexico)"))
+        except ApiError:
+            duration = None
+        out = {"guides": guides, "kinds": d.get("kinds"), "alignment": d.get("alignment"), "duration_s": duration,
+               "points": interference.default_points(guides, duration) if duration else None,
+               "scale": {"speech_full": interference.SPEECH_FULL, "partial": interference.PARTIAL_LEVEL,
+                         "mask": interference.MASK_LEVEL, "bed": interference.BED_LEVEL}}
+        if slot_id in self.slot_index:
+            level, rec, s = self.slot_index[slot_id]
+            en = rec["samples"]["english"]
+            out["mcc"] = {"level": level, "spanish": s["index"], "english": en[0]["index"] if en else None}
+        return out
+
+    def interference_reference(self, slot_id, lang):
+        """The MCC original's interference estimate (common/interference.reference_curve), for the Studio overlay.
+        Cached in work/m4/interference/ by the sample's data hash. Read-only otherwise."""
+        if slot_id not in self.slot_index or lang not in MCC_LANGS:
+            raise ApiError(404, "unknown slot or language")
+        level, rec, s = self.slot_index[slot_id]
+        sample = s if lang == "spanish" else (rec["samples"]["english"] or [None])[0]
+        if not sample:
+            raise ApiError(404, f"no {lang} recording")
+        cache = self.root / "work" / "m4" / "interference" / f"ref_{lang}_{sample['data_sha256'][:16]}.json"
+        if cache.is_file():
+            return json.loads(cache.read_text(encoding="utf-8"))
+        if not self.mcc_audio:
+            raise ApiError(503, "MCC audio decoding is not configured")
+        try:
+            x, fs = audio_edit.wav_mono_float(self.mcc_audio.wav(level, lang, sample))
+        except AudioUnavailable as e:
+            raise ApiError(503, str(e))
+        out = dict(interference.reference_curve(x, fs), language=lang, slot_id=slot_id)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(out), encoding="utf-8")
+        return out
 
     def preview_wav(self, key, kind):
         if not self.editor:

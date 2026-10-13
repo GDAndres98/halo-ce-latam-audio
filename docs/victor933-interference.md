@@ -1,11 +1,16 @@
 # Victor 933's damaged transmission (2026-10-13)
 
-Owner request (prompt 44): recreate MCC's damaged radio transmission on the CE es-MX recording
-`vo_scr_m06_00740_victor933`, replacing slot `es:c10_010_captpilot#0` (mapping `m-000482`). The interference
-hides spoiler information. This is a **one-off for this recording**, not a general word-masking system.
+Owner requests (prompts 44 and 45): recreate MCC's damaged radio transmission on the CE es-MX recording
+`vo_scr_m06_00740_victor933`, which replaces slot `es:c10_010_captpilot#0` (mapping `m-000482`). The
+interference hides spoiler information.
 
-The owner chose the 11 phrases and their kinds. The approved custom subtitle (`c-000023`) is unchanged, and the
-audio stays **needs rework** until the owner approves it.
+This is a **one-off for this recording**, not a general effects system. The owner chose the 11 phrases and their
+kinds. The approved custom subtitle (`c-000023`) is never changed, and the audio stays **needs rework** until
+the owner approves it.
+
+- **Prompt 44** (commit `e6c29e2`) masked 11 separate regions. It worked, but sounded chopped.
+- **Prompt 45** replaced the regions with an **interference curve** the owner shapes like an automation
+  envelope.
 
 ## 1. What MCC does
 
@@ -14,10 +19,10 @@ The MCC Spain and English recordings were compared with the CE es-MX source.
 **Method:**
 - 20 ms voicing: the normalised autocorrelation peak in the 2.5–12.5 ms range.
 - Level, plus spectral flatness in 10 ms frames.
-- Static = at least 120 ms that is unvoiced and 10 dB or more above the floor.
+- 5 ms envelopes at the burst edges.
 
-**The bursts are the same in both versions.** MCC Spain and MCC English share the static bursts at nearly
-identical times, so the dub kept the original static track:
+**The bursts are the same in both versions.** The static bursts sit at nearly identical times in MCC Spain and
+English, so the dub kept the original static track:
 
 | MCC Spain (s) | MCC English (s) |
 |---|---|
@@ -32,115 +37,173 @@ identical times, so the dub kept the original static track:
 | 21.67–22.43 | 21.75–22.45 |
 | — | 24.32–24.86 |
 
-What the bursts do:
-- **The speech is replaced, not covered.** Inside a burst the voicing (median 0.26–0.28) is the same as pure
-  noise; no speech survives underneath.
-- **No attack or decay ramps.** Speech flows straight into static and back.
-- **Level and texture:** the static sits about **9.3 dB below the voiced speech** in Spain (−20.9 vs −11.6 dB
-  median) and about 3 dB below it in English. It crackles: ±2.1 dB across 5 ms frames, peaks up to −13 dB.
-- **Radio EQ:** the Spain recording has the pilot band-pass (docs/radio-filter.md §1.2). There is a constant hiss
-  floor of about −34 dB between phrases, and no key-up click.
-- **Duration and pacing:** MCC Spain 28.43 s, MCC English 28.64 s, CE es-MX 29.22 s (28.75 s after the owner's
-  cuts and trim). The pacing is close, and the CE "33" falls exactly where MCC's first burst is.
+How the interference behaves:
+- **Rhythm:** bursts last 0.14–1.5 s and come in waves. The 20–22.5 s stretch is three bursts with brief
+  speech in between, and 4.35–5.85 s is one long wash.
+- **Inside a burst** the speech is replaced: voicing (median 0.26–0.28) equals pure noise. Between bursts the
+  speech is fully voiced. There are no slow fades: speech and static meet directly.
+- **Noise continues between bursts.** Spain has a constant hiss bed of about −34 dB (about 22 dB under the
+  voice). English is far noisier: its static runs only about 3 dB under the voice, and the hiss bed is louder.
+- **Texture:** crackle of ±2.1 dB in 5 ms frames, peaks up to −13 dB, and slower swells between bursts. Spain's
+  static sits about 9.3 dB under the voiced speech (−20.9 vs −11.6 dB median).
+- **Duration:** MCC Spain 28.43 s, MCC English 28.64 s, CE es-MX 29.22 s (28.75 s after the owner's cuts and
+  trim). The pacing is close, and the CE "33" falls exactly where MCC's first burst is.
 
-## 2. Alignment of the 11 regions
+The Studio's **MCC reference** overlay (§3.3) draws this as a curve. Spain shows clear bursts against the bed;
+English sits near full intensity most of the time (median 0.92), because its static is so loud.
 
-The tool is the Windows es-ES speech recognizer (System.Speech, part of Windows; nothing installed):
-- **Grammar alignment** on the owner's subtitle failed: the spoken text differs ("está capturado" against "fue
-  capturado").
-- **Dictation** gave word timings.
-- **Utterance 2** was anchored at +16.15 s on the recording's silences (20.25 s and 23.09 s), and the anchor
-  holds at every silence.
-- **Every edge** was snapped to the nearest energy valley (±50 ms) and then reviewed against the 10 ms envelope.
-  Fragment edges sit at consonant closures.
+## 2. The 11 phrase guides (owner decisions, prompt 44)
 
-Times are on the CE source timeline. The defaults live in `config/interference/vo_scr_m06_00740_victor933.json`.
+**Alignment:**
+- The Windows es-ES speech recognizer (System.Speech dictation, part of Windows; nothing installed) gave word
+  timings.
+- Utterance 2 was anchored at +16.15 s on the recording's silences (20.25 s, 23.09 s).
+- Every edge was snapped to the nearest energy valley (±50 ms) and reviewed against the 10 ms envelope.
 
-| # | Phrase | Effect | Start–end (s) | Note |
-|---|---|---|---|---|
-| 1 | Aquí | low but understandable | 0.12–0.40 | the line opens with 0.15 s of silence |
-| 2 | 33 (spoken "nueve **treinta y tres**") | not understandable | 1.93–2.51 | same place as MCC's first burst |
-| 3 | necesito ayuda inmediata | low but understandable | 5.23–6.64 | |
-| 4 | bajo un fuerte | low but understandable | 7.42–7.99 | |
-| 5 | …til aliení… | not understandable | 9.51–10.08 | from the "t" closure of "hostil" to the "g" of "alienígena" |
-| 6 | no es del Covenant | low but understandable | 10.37–11.28 | |
-| 7 | hostiles. Estamos | low but understandable | 13.91–14.96 | |
-| 8 | …an estruc… | not understandable | 16.11–16.59 | from the "a" of "gran" to the closure before "-tura" |
-| 9 | …empo podre… | not understandable | 18.99–19.57 | |
-| 10 | …víen ayuda si reciben esta transmis… | not understandable | 21.06–22.92 | |
-| 11 | intervalos | not understandable | 25.47–25.93 | |
+Source timeline. The guides are in `config/interference/vo_scr_m06_00740_victor933.json` and are copied into the
+recipe.
 
-Uncertain:
-- **1:** "quí" runs into "la" with no pause, so the end (0.40 s) is an estimate.
-- **5:** the recognizer heard "oscilaría en escena"; the edges come from the envelope.
-- **10:** there's no valley between "en-" and "-víen", so the start (21.06 s) is an estimate. The final "-ión"
-  of "transmisión" stays audible, as the phrase specifies.
+| # | Phrase | Kind | Start–end (s) |
+|---|---|---|---|
+| 1 | Aquí | partial (low but understandable) | 0.12–0.40 |
+| 2 | 33 (spoken "nueve **treinta y tres**") | masked (not understandable) | 1.93–2.51 |
+| 3 | necesito ayuda inmediata | partial | 5.23–6.64 |
+| 4 | bajo un fuerte | partial | 7.42–7.99 |
+| 5 | …til aliení… | masked | 9.51–10.08 |
+| 6 | no es del Covenant | partial | 10.37–11.28 |
+| 7 | hostiles. Estamos | partial | 13.91–14.96 |
+| 8 | …an estruc… | masked | 16.11–16.59 |
+| 9 | …empo podre… | masked | 18.99–19.57 |
+| 10 | …víen ayuda si reciben esta transmis… | masked | 21.06–22.92 |
+| 11 | intervalos | masked | 25.47–25.93 |
 
-The owner cuts (11.39–11.68 s and 23.22–23.40 s) lie in silences outside every region.
+Uncertain edges:
+- the end of 1 ("quí" runs straight into "la");
+- both edges of 5 (the recognizer heard "oscilaría en escena");
+- the start of 10 (there's no valley between "en-" and "-víen").
 
-## 3. Implementation
+The owner's cuts (11.39–11.68 s, 23.22–23.40 s) lie in silences.
 
-- **Recipe:** the optional field `audio.edit.interference` = `{engine: "interference/1", regions: [{label, kind,
-  start_s, end_s, intensity_db}]}` (schema `manual-mappings/3`). `audio_edit.normalize` and `problems` refuse it
-  for any recording other than `audio_edit.INTERFERENCE_LINES`. Regions must be in order, not overlapping, inside
-  the recording, with intensity between −12 and 12 dB.
-- **Render** (`audio_edit.interference_effect`, `audio-render/9`): step 0, on the **source timeline**, before
-  trims and cuts, so edits never move the masks. The length is unchanged.
-  - **masked:** speech gain goes to 0 inside the region, with half-cosine ramps of 15 ms just outside it. MCC
-    static is crossfaded in at the line's speech level − 9.3 dB + intensity.
-  - **partial:** speech is ducked by 5 dB + intensity, with static at the masked level − 14 dB + intensity.
-    These defaults come from the recognizer test in §4; the first attempt (8 dB duck, −4 dB static) left too
-    little understandable.
-  - **Speech level:** the median RMS of the line's active 20 ms frames.
-  - **Static:** looped, with a 20 ms equal-power crossfade, starting at a different offset in each region.
-    Deterministic.
-  - **Chain:** after the interference come the owner's edits, the radio filter (Spain preset, no clicks), the
-    level stage and CELT. The preview and M6 use the same code (`tests/test_audio_edit.py` parity test).
-- **Static texture:** `common/radio_static.py`, MCC Spain's own pure-static stretch 4.40–5.80 s of
-  `es:c10_010_captpilot#0` (samples 194,040–255,780). It comes from the pinned bank at fixed samples, is checked
-  against a SHA-256 pin (`7677792f…`) and is decoded on demand. No audio is in git.
-- **Studio:** a "Transmission interference" section in Audio editing that appears only for this recording. It
-  lists the 11 phrases with their effect, start, end and intensity, all editable and undoable. Each row has a
-  play button for that span of the original. "Reset to the aligned timings" and "Remove the interference" are
-  at the bottom. The automatic B preview plays the whole processed transmission, and Needs rework protection is
-  unchanged.
-- **Data:** `scripts/validate/apply_victor933_interference.py` added the 11 regions to `m-000482`, whose audio
-  was already needs rework. It backed up and verified that only that mapping changed. Rollback:
-  `--rollback work/migrations/20261013T172936_victor933_interference`.
+## 3. The interference curve (prompt 45)
 
-## 4. Verification (focused)
+### 3.1 Recipe and rendering (`scripts/common/interference.py`)
 
-- **Masked (6):** the speech left inside is 75–171 dB below the unmasked render (only filter ringing). Static is
-  at about −33 dB.
-- **Partial (5):** speech is exactly 5 dB down, with static under it.
-- **Intelligibility proxy:** the Windows es-ES dictation was run on the processed line without the band-pass
-  (which starves the recognizer).
-  - Masked phrases, all lost: "nueve treinta y tres" → "dictamen", "oscilaría en escena" → "dos de",
-    "a la estructura" → "una lectura" ("-tura" is meant to remain), "tiempo podrá" → "te de",
-    "envíe … transmisión" → gone, "intervalos" → "jerónimo".
-  - Partial phrases: "aquí", "necesita ayuda inmediata" and "…estamos" are recognized. "bajo un fuerte" and
-    "del Covenant" are not. The recognizer is harsher than a listener; raise or lower each region's intensity
-    by ear.
-- **Unmasked dialogue:** unchanged except the band-pass ringing within 7.6 ms of a region's ramp (up to 0.004,
-  about −48 dBFS). The length is equal.
-- **No clicks:** the largest sample step near region edges is 0.037, below the line's own 99.9th-percentile
-  step (0.038).
-- **No clipping:** the peak is −1.0 dBFS and there are no warnings.
-- **Tests:**
-  - `tests/test_audio_edit.py`: refused for other lines, rules, mute/duck, unchanged outside, deterministic,
-    stable under trims and cuts, preview = M6.
-  - `frontend` unit tests for the region rules.
-  - Browser test: `npm run test:interference` (disposable data). It shows 11 regions only on this line, edits
-    re-render, overlaps are refused, Reset works and the real mappings are unchanged.
+`audio.edit.interference` (engine `interference/2`, schema `manual-mappings/3`) holds:
+- `points`: `[{t, v}]` (time in source seconds, intensity 0–1), at least 2 ms apart;
+- `guides`: the 11 decisions;
+- `flutter_db`: 0–6, default 2.5.
+
+It is refused for every other recording.
+
+**Render** (`audio-render/10`, step 0 on the source timeline, before trims and cuts, so edits never move it):
+1. The curve is linear between points, sampled every 1 ms, and smoothed with a 3 ms one-pole filter run
+   **forward and backward**. The smoothing has no lag and leaves no corners to click.
+2. It is mapped nonlinearly to two gains, measured against the line's speech level (the median of its active
+   20 ms frames):
+
+| Intensity | Speech | Static (re. the speech level) |
+|---|---|---|
+| 0 | untouched | silent |
+| 0.35 | untouched (the hiss bed) | −24 dB |
+| 0.6 | −5 dB (low but understandable) | −20 dB |
+| 0.85 | −20 dB | −14 dB |
+| ≥ 0.95 | **removed** | −9.3 dB (MCC Spain's static vs voice) |
+
+3. **The static is one continuous stream for the whole line.**
+   - It is made of 160 ms sine-windowed grains (50 % overlap, constant power) taken from seeded random
+     positions in MCC Spain's own pure-static stretch (`common/radio_static.py`; 4.40–5.80 s of
+     `es:c10_010_captpilot#0`, pinned SHA-256, decoded on demand, no audio in git).
+   - Consecutive grains jump at least 200 ms, so it never loops audibly.
+   - A slow seeded "flutter" (low-passed noise, about 6 Hz, ±`flutter_db`) moves its level organically.
+4. Then come the owner's edits, the radio filter (custom 700–3300 Hz, 12 dB/oct, hiss −40 dBFS, clicks, as the
+   owner set it), the level stage and CELT. The preview and M6 run the same code, and renders are
+   deterministic.
+
+**The stats report every guide:** a masked one says whether it is fully hidden; a partial one gives how far its
+speech is ducked. The Studio shows the same live.
+
+### 3.2 The default curve (`interference.default_points`)
+
+Built from the guides, deterministic (seed 933):
+- **Bed:** a wobbling hiss bed (0.27–0.40) every 0.3 s.
+- **Partial phrases:** a swell to 0.6 (±0.05 wobble) over the phrase.
+- **Masked phrases:** a short build-up (0.5 at −200 ms, 0.7 at −80 ms), then a **full plateau from 30 ms before
+  to 30 ms after the phrase**, then a quick fade (0.68 at +100 ms, the bed by +280 ms).
+
+Masked phrases win structurally: no other point may sit inside a plateau or within 12 ms of it, and close
+dropouts merge. A test over 200 random layouts (1,000 when developed), with phrases as close as 6 ms, checks
+that every masked phrase stays at full intensity after smoothing.
+
+### 3.3 Studio: the interference lane (`frontend/src/components/match/InterferenceLane.vue`)
+
+The lane is shown only for this recording, in Audio editing. It draws:
+- **Bands:** red = speech removed (≥ 0.95), amber = ducked, blue = the hiss bed (≤ 0.35).
+- The CE waveform (server peaks, original timeline).
+- The 11 guides, numbered (red = masked, amber = partial).
+- The curve, with its points.
+- The optional **MCC reference** overlay (Spain or English, dashed; `GET /api/interference/reference`, cached
+  in `work/m4/interference/`). It is a visual reference only and never changes the curve.
+
+Controls:
+- **Points:** click empty space to add a point (and drag it); drag a point; double-click or press Delete to
+  remove one; arrow keys nudge the selected point (10 ms / 0.02). Its time and intensity can also be typed.
+- **Draw:** drag to paint a stretch of the curve; the stroke replaces the points under it.
+- **Zoom** 1–16×, scrolling sideways. **Flutter** in dB. **Reset curve** regenerates it from the guides.
+- **Transport:** play from the cursor (click the time ruler) as CE processed (the M6 render, mapped through
+  trims and cuts), CE original, MCC Spain or MCC English. Switching source while playing keeps the position;
+  MCC runs on its own timeline.
+- **Guide list:** live status per phrase. A masked phrase shows "hidden", or "audible!" when the curve lets
+  speech through. A partial phrase shows its speech level.
+- Every gesture is one undoable change (Ctrl+Z). The B player under "Listen and compare" plays the result,
+  against the MCC Spain original as A.
+
+**Data:** `scripts/validate/apply_victor933_interference.py`.
+- `--upgrade` turned `m-000482`'s old `interference/1` regions into guides plus the default curve.
+- `--reset-curve` regenerates the curve from the recipe's guides.
+
+The audio was already needs rework, and nothing else changed. Backups are in `work/migrations/*_victor933_*`.
+
+## 4. Verification (focused, prompt 45)
+
+**On the stored recipe, real recording, through the Studio preview path:**
+- **Masked phrases:** all 6 are hidden. The residual speech (static silenced) is about 175 dB under the
+  original; there is none.
+- **Partial phrases:** speech is 3.8–5.9 dB down, under the static.
+- **Static:** continuous over the whole line, never below −55 dB in any 50 ms frame (bed about −45 dB, bursts
+  up to −27 dB).
+- **Length:** unchanged. **Peak:** −1.0 dBFS. **No clicks:** the largest sample step is 0.152, against the
+  original recording's 0.155.
+
+**Intelligibility proxy** (Windows es-ES dictation on the curve without the band-pass):
+- **Every masked phrase is lost:** "nueve treinta y tres", "oscilaría en escena", "a la estructura", "tiempo
+  podrá", "envíe … transmisión", "intervalos".
+- **Partial phrases:** "aquí", "necesita(mos) … inmediata" and "…estamos" are recognized. "bajo un fuerte" and
+  "no es del Covenant" are not; they weren't with the region version either. The recognizer is harsher than a
+  listener.
+- **Unmasked lines** ("del descenso", "si alguien puede", "capitán", "un minuto") came through after the
+  dropout build-up was shortened.
+
+**Tests:**
+- `tests/test_audio_edit.py`:
+  - this line only, and the old format refused;
+  - the mapping, which is monotonic;
+  - masked → no speech, partial → −5 dB;
+  - continuous static, deterministic, same length, stable under trims and cuts;
+  - the default curve hides every masked guide in 200 random layouts;
+  - preview = M6.
+- Frontend unit tests for the curve rules, the mapping and the time mapping.
+- `npm run test:interference` (disposable data): the lane with its 11 guides; add, drag and Delete; Draw over a
+  masked phrase warns, then Ctrl+Z restores; zoom, the reference overlay and play from the cursor; save and
+  reload persist; Reset; no lane on another line; the real mappings unchanged.
 
 ## 5. What to listen for
 
-- **Masked phrases:** no syllable of "treinta y tres", "hostil alien…", "gran estruc…", "tiempo podre…",
-  "envíen … transmis…" or "intervalos" should come through. Listen most closely at the edges of region 10 (its
-  start is an estimate) and region 5.
-- **Partial phrases:** "bajo un fuerte" and "no es del Covenant" may be too buried. Try −3 dB intensity on those
-  rows, or +3 dB if a phrase sounds too clean.
-- **The static itself** is MCC's own crackle at Spain's level relative to the voice. Check that it doesn't
-  sound looped in region 10, the longest (1.9 s).
-- **Region 1 "Aquí"** is short and partial; check that the ramp doesn't clip the start of "la nave".
-- **Pacing:** the CE line is 0.3 s longer than MCC Spain's; nothing here changes the timing.
+- **The six masked phrases** should be unrecognizable, inside a natural wave of static rather than a cut. If a
+  dropout sounds too long or too abrupt, move its build-up and fade points, but keep its guide "hidden".
+- **"bajo un fuerte" and "no es del Covenant":** if they're too buried, lower the curve under them toward
+  0.45–0.5. The guide shows the speech level as you drag.
+- **The bed between phrases** (0.27–0.40): it should sound like a live channel, not added noise. Lower it if
+  it's too present, or raise **Flutter** for more movement.
+- **The A/B:** compare with MCC Spain (the reference overlay plus play from the cursor) for the rhythm of the
+  waves; the English original is much noisier overall.
+- **Edges near your cuts** (11.4 s, 23.2 s) and the end of the line: there should be no clicks.

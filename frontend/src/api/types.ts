@@ -114,26 +114,51 @@ export interface AudioEdit {
   /** Optional echo (2026-10-13, the "eco" lines); null or absent = off. */
   echo?: EchoEffect | null;
   /** One-off transmission interference (Victor 933's damaged transmission only); null or absent = off. */
-  interference?: { engine?: string; regions: InterferenceRegion[] } | null;
+  interference?: InterferenceCurve | null;
 }
 
 export type InterferenceKind = "partial" | "masked";
 
-/** One interference region, on the original recording's timeline (seconds). */
-export interface InterferenceRegion {
+/** A point of the interference curve: intensity 0..1 at a time of the original recording (seconds). */
+export interface CurvePoint {
+  t: number;
+  v: number;
+}
+
+/** One of the owner's phrase decisions, drawn on the curve's timeline (it never changes the audio by itself). */
+export interface InterferenceGuide {
   label: string;
   kind: InterferenceKind;
   start_s: number;
   end_s: number;
-  /** Shifts the static (and, for partial, the ducking) up or down, -12..12 dB. */
-  intensity_db: number;
 }
 
-/** The aligned regions for a line that has the one-off treatment (config/interference/<line>.json). */
+/** The recipe's interference (scripts/common/interference.py, engine interference/2). */
+export interface InterferenceCurve {
+  engine?: string;
+  points: CurvePoint[];
+  guides: InterferenceGuide[];
+  flutter_db: number;
+}
+
+/** What the server gives for a line with the one-off treatment (only Victor 933's). */
 export interface InterferenceDefaults {
-  regions: InterferenceRegion[];
+  guides: InterferenceGuide[];
+  /** The curve generated from the guides (Reset curve). */
+  points: CurvePoint[] | null;
+  duration_s: number | null;
   kinds?: Record<InterferenceKind, string>;
   alignment?: { method: string; uncertain: string[] };
+  scale: { speech_full: number; partial: number; mask: number; bed: number };
+  mcc?: { level: string; spanish: number; english: number | null };
+}
+
+/** The MCC original's interference estimate (a visual reference only). */
+export interface InterferenceReference {
+  frame_s: number;
+  values: number[];
+  duration_s: number;
+  language: "spanish" | "english";
 }
 
 export type EchoPreset = "spain" | "english" | "custom";

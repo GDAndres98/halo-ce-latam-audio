@@ -191,7 +191,7 @@ async function choose(ref: string) {
       <!-- 3. Audio editing -->
       <AudioEditor
         :key="detail.slot_id" :draft="draft" :locked="audioLocked"
-        :interference="detail.interference?.[draft.audioRef ?? ''] ?? null"
+        :interference="detail.interference?.[draft.audioRef ?? ''] ?? null" :slot-id="detail.slot_id"
       />
 
       <!-- 4. Listen & compare -->

@@ -1,29 +1,4 @@
-import type {
-  AudioEdit,
-  BuildDetail,
-  BuildJob,
-  BuildKind,
-  BuildPreview,
-  BuildScope,
-  DeployEvent,
-  DeployStatus,
-  InstallPlan,
-  ExportSettings,
-  LevelMode,
-  BuildsResponse,
-  CeLine,
-  CeResponse,
-  DataStatus,
-  ImportPreview,
-  EditPreviewResponse,
-  SaveBody,
-  SaveResponse,
-  SlotDetail,
-  SlotsResponse,
-  StateResponse,
-  SessionInfo,
-  NetworkInfo,
-} from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -191,6 +166,10 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_sha256: fileSha256, confirm: true }),
     }),
+
+  /** The MCC original's interference estimate for the Victor 933 lane (a reference only; read-only). */
+  interferenceReference: (slot: string, lang: "spanish" | "english") =>
+    request<InterferenceReference>(`/api/interference/reference${query({ slot, lang })}`),
 
   /** Renders an edit as M6 would, for listening only. Writes nothing to the mappings. */
   editPreview: (body: { slot_id: string; ce_line_ref: string; language: string; edit: AudioEdit }, signal?: AbortSignal) =>
