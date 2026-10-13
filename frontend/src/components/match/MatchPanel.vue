@@ -8,7 +8,7 @@
 //   5. Subtitles, with their own approval.
 // The save bar stays in view at the bottom: one Save draft writes audio, subtitle, flags and notes together.
 
-import { FileAudio, ListChecks } from "lucide-vue-next";
+import { FileAudio, ListChecks, Unlink } from "lucide-vue-next";
 import { computed } from "vue";
 import { audioUrl } from "../../api/client";
 import AudioButton from "../AudioButton.vue";
@@ -23,6 +23,7 @@ import AudioDecision from "./AudioDecision.vue";
 import AudioEditor from "./AudioEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
 import { FLAGS, FLAG_ORDER } from "./flags";
+import { canUnmatch } from "../../matching/draft";
 import SaveBar from "./SaveBar.vue";
 import SubtitleDecision from "./SubtitleDecision.vue";
 
@@ -63,6 +64,12 @@ const draftLines = computed<CeLine[]>(() =>
 );
 const activeFlags = computed(() => FLAG_ORDER.filter((name) => draft.value[name]).map((name) => FLAGS[name]));
 const matchTone = computed(() => (draft.value.matchStatus === "matched" ? "ok" : "muted"));
+const unmatchable = computed(() => canUnmatch(stored.value, draft.value));
+const unmatchTitle = computed(() =>
+  unmatchable.value.allowed
+    ? "Remove every Campaign Evolved line and keep Spain's audio (save the draft to keep it)"
+    : unmatchable.value.reason,
+);
 
 /** MCC's three subtitle tables for this line, in the order they matter for the LATAM build. */
 const MCC_TABLES: { key: string; label: string }[] = [
@@ -145,6 +152,16 @@ async function choose(ref: string) {
         <div class="status-row">
           <StatusBadge :label="`match: ${draft.matchStatus}`" :tone="matchTone" />
           <StatusBadge v-if="match.dirty()" label="unsaved changes" tone="warn" />
+          <button
+            type="button"
+            class="icon-label small-button"
+            :disabled="!unmatchable.allowed || switching"
+            :title="unmatchTitle"
+            data-testid="unmatch"
+            @click="match.unmatch()"
+          >
+            <Unlink :size="14" aria-hidden="true" /> Unmatch
+          </button>
           <span v-for="flag in activeFlags" :key="flag.name" class="badge flag-badge" :class="`flag-${flag.name}`" :title="flag.label">
             <component :is="flag.icon" :size="13" aria-hidden="true" /> {{ flag.label }}
           </span>

@@ -207,6 +207,39 @@ export interface ApprovalCheck {
   reason: string;
 }
 
+/** Whether the line has anything to unmatch, and whether its approvals allow it. */
+export function canUnmatch(stored: StoredDecision | null, draft: Draft): ApprovalCheck {
+  const matched = draft.matchStatus !== "unreviewed" || draft.ceRefs.length > 0 || draft.audioSource !== "keep_original";
+  if (!matched) return { allowed: false, reason: "This line is not matched." };
+  if (stored?.audio.status === "approved") {
+    return { allowed: false, reason: "The audio is approved. Mark it Needs rework before unmatching." };
+  }
+  if (stored?.subtitle.status === "approved" && draft.subtitleSource === "ce_locres") {
+    return { allowed: false, reason: "The subtitle comes from a Campaign Evolved line and is approved. Mark it Needs rework first." };
+  }
+  return { allowed: true, reason: "" };
+}
+
+/**
+ * Back to an unmatched line, in the draft only (saving is still the user's action): no Campaign Evolved
+ * lines, Spain's audio, no audio edits, and a Campaign Evolved subtitle back to MCC's own text. The flags
+ * that need a Campaign Evolved line (radio effect, different but fits) are cleared with it. A custom
+ * subtitle, Needs recording and the notes are the user's own and stay.
+ */
+export function unmatchDraft(draft: Draft): void {
+  draft.matchStatus = "unreviewed";
+  draft.ceRefs = [];
+  draft.audioSource = "keep_original";
+  draft.audioRef = null;
+  draft.edit = defaultEdit(draft.edit.gap_s);
+  if (draft.subtitleSource === "ce_locres") {
+    draft.subtitleSource = "keep_original";
+    draft.subtitleRef = null;
+  }
+  draft.radio = false;
+  draft.fits = false;
+}
+
 /** Whether the audio or subtitle decision can be approved right now. Approval is always an explicit
  * action on a saved draft: the user must save first, so what is approved is what they saw. */
 export function canApprove(field: ApprovalField, stored: StoredDecision | null, draft: Draft, baseline: Draft): ApprovalCheck {

@@ -15,11 +15,13 @@ import type { ApprovalField, CeLine, SaveAction, SaveResponse, SlotDetail } from
 import {
   buildReworkBody,
   buildSaveBody,
+  canUnmatch,
   completeDraft,
   draftFrom,
   draftKey,
   isDirty,
   proposeSubtitle,
+  unmatchDraft,
   type Draft,
   type SubtitleProposal,
 } from "../matching/draft";
@@ -117,6 +119,22 @@ export function useMatch() {
       draft.subtitleRef = null;
     }
     if (proposedSubtitle.value === ref) proposedSubtitle.value = null;
+  }
+
+  /** Unmatch the line (draft only; Save draft keeps it). Refused while an approval protects what it changes. */
+  function unmatch(): boolean {
+    if (!detail.value) return false;
+    const check = canUnmatch(detail.value.mapping, draft);
+    if (!check.allowed) {
+      error.value = check.reason;
+      return false;
+    }
+    unmatchDraft(draft);
+    proposedSubtitle.value = null;
+    proposal.value = null;
+    error.value = "";
+    message.value = "Unmatched. Save the draft to keep it (or undo by reloading the line without saving).";
+    return true;
   }
 
   // Lines selected in quick succession: only the answer for the latest selection is shown (an older answer
@@ -264,6 +282,7 @@ export function useMatch() {
     onSaved,
     chooseRecording,
     removeMatch,
+    unmatch,
   };
 }
 

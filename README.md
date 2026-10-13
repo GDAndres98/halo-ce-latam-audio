@@ -96,6 +96,11 @@ Open **Matching**. The screen has three columns.
      recordings of the line (play buttons and names with `#n`) and MCC's subtitles (SU, SP, EN). Below them,
      the chosen **Campaign Evolved replacement** and its key, the choice between keeping Spain's audio and a
      matched recording, the replacement's language, and the audio status.
+     **Unmatch** (next to the match status) takes the line back to unmatched in the draft: no Campaign Evolved
+     lines, Spain's audio, no audio edits, MCC's subtitle instead of a Campaign Evolved one, and the radio and
+     different-but-fits flags cleared. A custom subtitle, Needs recording and the notes stay. Save the draft to
+     keep it. It is unavailable while the audio (or a Campaign Evolved subtitle) is approved: mark it Needs
+     rework first.
   2. **Flags & notes:** *Needs radio effect* (radio tower; a flag only, no processing), *Needs recording*
      (microphone; no suitable recording exists yet), *Different but fits* (puzzle piece), and notes. The
      same icons are used in the MCC list, its flag filters and the Dashboard. Flags are independent of

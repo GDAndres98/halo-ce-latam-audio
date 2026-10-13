@@ -5,12 +5,15 @@ import {
   buildSaveBody,
   canApprove,
   canRework,
+  canUnmatch,
   defaultEdit,
   draftFrom,
   draftProblems,
   isDirty,
   proposeSubtitle,
   subtitleDirty,
+  unmatchDraft,
+  type Draft,
 } from "./draft";
 import type { CeLine } from "../api/types";
 
@@ -246,5 +249,45 @@ describe("proposing the subtitle of a chosen recording", () => {
     own.subtitleSource = "custom";
     own.customText = "Texto propio";
     expect(proposeSubtitle(own, draftFrom(fresh), null, ceLine("b#0", "Adiós"), "a#0")).toBe("kept");
+  });
+});
+
+describe("unmatching a line", () => {
+  const matched = (): Draft => ({
+    ...draftFrom(slot(null)),
+    matchStatus: "matched",
+    ceRefs: ["a#0", "b#0"],
+    audioSource: "ce",
+    audioRef: "a#0",
+    edit: { ...defaultEdit(), trim_start_s: 0.2 },
+    subtitleSource: "ce_locres",
+    subtitleRef: "a#0",
+    radio: true,
+    fits: true,
+    recording: true,
+    notes: "kept",
+  });
+
+  it("returns the draft to an unmatched line and keeps the user's own text and notes", () => {
+    const d = matched();
+    unmatchDraft(d);
+    expect(d).toMatchObject({ matchStatus: "unreviewed", ceRefs: [], audioSource: "keep_original", audioRef: null,
+      subtitleSource: "keep_original", subtitleRef: null, radio: false, fits: false, recording: true, notes: "kept" });
+    expect(d.edit).toEqual(defaultEdit());
+    expect(draftProblems(d)).toEqual([]);
+  });
+
+  it("keeps a custom subtitle", () => {
+    const d = { ...matched(), subtitleSource: "custom" as const, customText: "Mi texto" };
+    unmatchDraft(d);
+    expect([d.subtitleSource, d.customText]).toEqual(["custom", "Mi texto"]);
+  });
+
+  it("is refused while the audio is approved, and when nothing is matched", () => {
+    const approved = decision();
+    approved.audio.status = "approved";
+    expect(canUnmatch(approved, matched()).allowed).toBe(false);
+    expect(canUnmatch(null, matched()).allowed).toBe(true);
+    expect(canUnmatch(null, draftFrom(slot(null))).allowed).toBe(false);
   });
 });
