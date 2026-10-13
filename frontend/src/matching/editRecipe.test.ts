@@ -20,6 +20,8 @@ import {
   radioProblem,
   setEchoPreset,
   setEchoValue,
+  setInterference,
+  setRegionValue,
   setRadioPreset,
   setRadioValue,
 } from "./editRecipe";
@@ -231,5 +233,26 @@ describe("echo", () => {
 
   it("the intercom radio presets carry their presence frequency", () => {
     expect(setRadioPreset(edit(), "spain_eco").radio).toMatchObject({ presence_hz: 2500, clicks: false });
+  });
+});
+
+describe("transmission interference (Victor 933)", () => {
+  const regions = [
+    { label: "Aquí", kind: "partial" as const, start_s: 0.12, end_s: 0.4, intensity_db: 0 },
+    { label: "33", kind: "masked" as const, start_s: 1.93, end_s: 2.51, intensity_db: 0 },
+  ];
+  it("adds, edits and removes regions", () => {
+    const on = setInterference(edit(), regions);
+    expect(on.interference?.regions).toHaveLength(2);
+    expect(setRegionValue(on, 1, "end_s", 2.6, 29).interference?.regions[1].end_s).toBe(2.6);
+    expect(setRegionValue(on, 0, "kind", "masked", 29).interference?.regions[0].kind).toBe("masked");
+    expect(setInterference(on, null).interference).toBeNull();
+  });
+  it("refuses reversed, overlapping, too long or too strong regions", () => {
+    const on = setInterference(edit(), regions);
+    expect(() => setRegionValue(on, 0, "end_s", 0.1, 29)).toThrow(/before it ends/);
+    expect(() => setRegionValue(on, 0, "end_s", 2.0, 29)).toThrow(/overlap/);
+    expect(() => setRegionValue(on, 1, "end_s", 40, 29)).toThrow(/after the recording/);
+    expect(() => setRegionValue(on, 1, "intensity_db", 20, 29)).toThrow(/intensity/);
   });
 });

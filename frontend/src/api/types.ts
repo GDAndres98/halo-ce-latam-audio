@@ -113,6 +113,27 @@ export interface AudioEdit {
   radio?: RadioFilter | null;
   /** Optional echo (2026-10-13, the "eco" lines); null or absent = off. */
   echo?: EchoEffect | null;
+  /** One-off transmission interference (Victor 933's damaged transmission only); null or absent = off. */
+  interference?: { engine?: string; regions: InterferenceRegion[] } | null;
+}
+
+export type InterferenceKind = "partial" | "masked";
+
+/** One interference region, on the original recording's timeline (seconds). */
+export interface InterferenceRegion {
+  label: string;
+  kind: InterferenceKind;
+  start_s: number;
+  end_s: number;
+  /** Shifts the static (and, for partial, the ducking) up or down, -12..12 dB. */
+  intensity_db: number;
+}
+
+/** The aligned regions for a line that has the one-off treatment (config/interference/<line>.json). */
+export interface InterferenceDefaults {
+  regions: InterferenceRegion[];
+  kinds?: Record<InterferenceKind, string>;
+  alignment?: { method: string; uncertain: string[] };
 }
 
 export type EchoPreset = "spain" | "english" | "custom";
@@ -252,6 +273,8 @@ export interface SlotDetail {
   matched_lines: CeLine[];
   /** The stored recipe in short, and whether the server can render previews (ffmpeg and the encoder). */
   edit?: { identity: boolean; summary: string; available: boolean; engine: string };
+  /** Lines with the one-off interference treatment, by CE line ref (only Victor 933's). */
+  interference?: Record<string, InterferenceDefaults>;
   ce_missions: string[];
   sha256: Hashes;
 }

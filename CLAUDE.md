@@ -233,6 +233,15 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         (140 ms with repeats). Survey: `scripts/discovery/eco_survey.py`.
       - `scripts/validate/migrate_eco_effect.py` gave all 18 the Spain intercom + Spain echo and set them to
         needs rework, with matches kept (`docs/migrations/2026-10-13-eco-effect.md`). Not listened to yet.
+    - **Victor 933's damaged transmission (owner prompt 44, 2026-10-13):** `docs/victor933-interference.md`.
+      - A ONE-OFF for `vo_scr_m06_00740_victor933` (`m-000482`) only: recipe field `audio.edit.interference`
+        (11 owner-chosen regions; masked = speech muted under MCC static, partial = ducked). It is refused for
+        any other line (`audio_edit.INTERFERENCE_LINES`).
+      - Applied on the source timeline before edits (`audio-render/9`). The static is MCC Spain's own burst
+        (`scripts/common/radio_static.py`, pinned, decoded on demand).
+      - Aligned defaults are in `config/interference/vo_scr_m06_00740_victor933.json`; the Studio shows a
+        "Transmission interference" section for that line only. Browser test: `npm run test:interference`.
+      - Never extend it to other lines without the owner; never change the owner's subtitle `c-000023`.
     - **M-SYS catalogued (owner request, 2026-10-10):** `python
       scripts/catalog/build_ce_catalog.py --systemic` (also in `--all`) writes
       `work/ce/catalog/sys.jsonl`, the pseudo-mission `SYS` (`mission` null, `family` systemic).

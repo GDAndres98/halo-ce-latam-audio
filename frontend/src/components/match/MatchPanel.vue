@@ -189,7 +189,10 @@ async function choose(ref: string) {
       <FlagsNotes :draft="draft" />
 
       <!-- 3. Audio editing -->
-      <AudioEditor :key="detail.slot_id" :draft="draft" :locked="audioLocked" />
+      <AudioEditor
+        :key="detail.slot_id" :draft="draft" :locked="audioLocked"
+        :interference="detail.interference?.[draft.audioRef ?? ''] ?? null"
+      />
 
       <!-- 4. Listen & compare -->
       <AudioCompare

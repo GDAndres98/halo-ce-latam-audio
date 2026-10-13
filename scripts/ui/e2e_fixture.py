@@ -78,6 +78,8 @@ def main():
     if (REPO_ROOT / "config" / "audio_export.json").exists():
         (dest / "config").mkdir(exist_ok=True)
         shutil.copy2(REPO_ROOT / "config" / "audio_export.json", dest / "config" / "audio_export.json")
+    if (REPO_ROOT / "config" / "interference").is_dir():  # the one-off interference defaults (text only)
+        shutil.copytree(REPO_ROOT / "config" / "interference", dest / "config" / "interference", dirs_exist_ok=True)
     link = link_work(dest)
     # The pinned bank copies the MCC audio is decoded from on demand (read only; nothing writes there).
     if (REPO_ROOT / "reference-audio").is_dir():

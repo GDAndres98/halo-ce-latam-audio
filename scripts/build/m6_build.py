@@ -49,7 +49,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
-from common import audio_edit, radio_clicks  # noqa: E402
+from common import audio_edit, radio_clicks, radio_static  # noqa: E402
 from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
 from common.export_config import LEVEL_MODES, ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
@@ -176,7 +176,7 @@ def level_summary(cfg, slots):
             "loudness_vs_spain_db": dist([round(v, 2) for v in vs])}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None):
+def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None, static=None):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
     cfg: the export config (level mode and global gain, the same for every replacement); refs: Spain
     loudness per slot (the match target, or reported only); clicks: MCC's radio clicks
@@ -194,7 +194,7 @@ def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks
                 res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED,
                                        ref_lufs=refs.get(e["slot_id"]), global_gain_db=gain, level_mode=mode,
                                        profile="fmod", gain_source=cfg["source"], source_meta=meta,
-                                       clicks=clicks)
+                                       clicks=clicks, static=static)
             except audio_edit.EditError as ex:
                 raise SystemExit(f"{e['slot_id']}: audio cannot be processed: {ex}")
         else:  # unedited, global_gain mode with no gain: the original path, byte for byte
@@ -458,12 +458,19 @@ def build_audio(out, targets, original, args, cfg, pins, app):
         except Exception as ex:  # noqa: BLE001 (decode failure or pin mismatch: the build stops)
             raise SystemExit(f"radio clicks unavailable: {ex}")
         checks["radio_clicks_match_pins"] = clicks["sha256"] == radio_clicks.PINNED
+    static = None
+    if any((e.get("edit") or {}).get("interference") for e in targets):
+        try:
+            static = radio_static.load(MccAudio(REPO_ROOT, vgmstream_decoder(exe)), app.slot_index)
+        except Exception as ex:  # noqa: BLE001 (decode failure or pin mismatch: the build stops)
+            raise SystemExit(f"radio static unavailable: {ex}")
+        checks["radio_static_matches_pin"] = static["sha256"] == radio_static.PINNED
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
     print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks)
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2

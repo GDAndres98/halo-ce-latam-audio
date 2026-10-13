@@ -15,7 +15,9 @@ import { computed, ref, watch } from "vue";
 import {
   Crop,
   Hourglass,
+  Play,
   Radio,
+  RadioTower,
   Waves,
   Replace,
   RotateCcw,
@@ -27,7 +29,7 @@ import {
   Undo2,
 } from "lucide-vue-next";
 import { audioUrl } from "../../api/client";
-import type { AudioEdit, EchoPreset, RadioFilter, RadioPreset } from "../../api/types";
+import type { AudioEdit, EchoPreset, InterferenceDefaults, InterferenceKind, RadioFilter, RadioPreset } from "../../api/types";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
 import {
@@ -56,13 +58,16 @@ import {
   setRadioValue,
   setEchoPreset,
   setEchoValue,
+  setInterference,
+  setRegionValue,
+  INTERFERENCE_INTENSITY,
   setSilenceLength,
   type Span,
 } from "../../matching/editRecipe";
 import type { Draft } from "../../matching/draft";
 import WaveformView from "../waveform/WaveformView.vue";
 
-const props = defineProps<{ draft: Draft; locked: boolean }>();
+const props = defineProps<{ draft: Draft; locked: boolean; interference?: InterferenceDefaults | null }>();
 
 const replacement = ref<InstanceType<typeof WaveformView> | null>(null);
 const duration = ref(0);
@@ -197,6 +202,12 @@ function onEchoPreset(event: Event) {
 function onEchoOptional(event: Event, key: "feedback_db" | "damping_hz" | "slap_db") {
   const on = (event.target as HTMLInputElement).checked;
   attempt(() => setEchoValue(props.draft.edit, key, on ? ECHO_DEFAULTS[key] : null));
+}
+
+/** Victor 933 only: the aligned regions (config/interference/<line>.json), added or restored. */
+function applyAlignedRegions() {
+  const regions = props.interference?.regions;
+  if (regions) attempt(() => setInterference(props.draft.edit, regions));
 }
 
 function onClicksToggle(event: Event) {
@@ -467,6 +478,65 @@ useShortcuts({
           </template>
         </fieldset>
       </section>
+
+      <section v-if="interference" class="radio-filter interference" aria-label="Transmission interference" data-testid="interference">
+        <header class="radio-head">
+          <h4><RadioTower :size="14" aria-hidden="true" /> Transmission interference</h4>
+          <span class="small muted">Victor 933's damaged transmission only. Times are on the original recording; trims and cuts never move them.</span>
+        </header>
+        <p v-if="!draft.edit.interference" class="small">
+          <button type="button" class="icon-label small-button" :disabled="!canEdit" @click="applyAlignedRegions">
+            <RadioTower :size="14" aria-hidden="true" /> Add the {{ interference.regions.length }} aligned regions
+          </button>
+        </p>
+        <template v-else>
+          <table class="interference-table small">
+            <thead>
+              <tr><th>#</th><th>Phrase</th><th>Effect</th><th>Start (s)</th><th>End (s)</th><th>Intensity (dB)</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in draft.edit.interference.regions" :key="i" :data-kind="r.kind" data-testid="interference-region">
+                <td class="mono">{{ i + 1 }}</td>
+                <td>{{ r.label }}</td>
+                <td>
+                  <select :value="r.kind" :disabled="!canEdit" :aria-label="`Effect of region ${i + 1}`"
+                          @change="attempt(() => setRegionValue(draft.edit, i, 'kind', ($event.target as HTMLSelectElement).value as InterferenceKind, duration))">
+                    <option value="partial">Low but understandable</option>
+                    <option value="masked">Not understandable</option>
+                  </select>
+                </td>
+                <td><input :value="r.start_s" type="number" step="0.01" min="0" :disabled="!canEdit" :aria-label="`Start of region ${i + 1} (s)`"
+                           @change="onNumber($event, (v) => setRegionValue(draft.edit, i, 'start_s', v, duration), () => r.start_s)" /></td>
+                <td><input :value="r.end_s" type="number" step="0.01" min="0" :disabled="!canEdit" :aria-label="`End of region ${i + 1} (s)`"
+                           @change="onNumber($event, (v) => setRegionValue(draft.edit, i, 'end_s', v, duration), () => r.end_s)" /></td>
+                <td><input :value="r.intensity_db" type="number" step="1" :min="INTERFERENCE_INTENSITY[0]" :max="INTERFERENCE_INTENSITY[1]" :disabled="!canEdit"
+                           :aria-label="`Intensity of region ${i + 1} (dB)`"
+                           @change="onNumber($event, (v) => setRegionValue(draft.edit, i, 'intensity_db', v, duration), () => r.intensity_db)" /></td>
+                <td>
+                  <button type="button" class="icon-label small-button" :disabled="!duration" :aria-label="`Play region ${i + 1} of the original`"
+                          title="Play this span of the original recording (the processed result is B under Listen and compare)"
+                          @click="replacement?.playRange(r.start_s - 0.3, r.end_s + 0.3)">
+                    <Play :size="13" aria-hidden="true" />
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="small muted">
+            Low but understandable: speech ducked under quieter static. Not understandable: speech muted, replaced by MCC's own static.
+            Intensity raises or lowers the static (and the ducking). The whole processed transmission is B under “Listen and compare”.
+          </p>
+          <p class="small">
+            <button type="button" class="icon-label small-button" :disabled="!canEdit" @click="applyAlignedRegions">
+              <RotateCcw :size="14" aria-hidden="true" /> Reset to the aligned timings
+            </button>
+            <button type="button" class="icon-label small-button" :disabled="!canEdit" @click="attempt(() => setInterference(draft.edit, null))">
+              <Trash2 :size="14" aria-hidden="true" /> Remove the interference
+            </button>
+          </p>
+        </template>
+      </section>
+
 
 
       <div v-if="draft.edit.cuts.length" class="cut-list">

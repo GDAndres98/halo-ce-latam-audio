@@ -268,6 +268,7 @@ class DspTests(unittest.TestCase):
         # a recipe saved before the field existed is valid and has no clicks
         old = dict(e, radio={k: v for k, v in e["radio"].items() if k != "clicks"})
         self.assertEqual(ae.problems(old), [])
+        self.assertFalse(ae.normalize(old)["radio"]["clicks"])  # re-saving never turns clicks on
         self.assertEqual(len(ae.render(pcm, old)["pcm"]) // 2, n)
         self.assertIn("no clicks", ae.summary(ae.normalize({"radio": {"preset": "spain", "clicks": False}}, SRC)))
         with self.assertRaises(ae.EditError):
@@ -331,6 +332,69 @@ class EchoTests(unittest.TestCase):
         self.assertEqual(len(r1["pcm"]) // 2, len(pcm) // 2 + ae.echo_tail_samples(e))
         self.assertEqual(r1["stats"]["echo"]["preset"], "spain")
         self.assertLessEqual(r1["stats"]["output_peak_dbfs"], ae.PEAK_CEILING_DB + 0.01)
+
+
+V933 = {"ce_line_ref": "vo_scr_m06_00740_victor933#0", "language": "Spanish(Mexico)"}
+
+
+def fake_static():
+    tex = ae.pcm16_to_float(ae.float_to_pcm16([0.05 * math.sin(i * 1.7) * math.sin(i / 37) for i in range(8820)]))
+    return {"static": tex, "sha256": "c" * 64, "reference": {"slot_id": "es:fake#0"}}
+
+
+class InterferenceTests(unittest.TestCase):
+    REGIONS = [{"label": "a", "kind": "partial", "start_s": 0.02, "end_s": 0.18, "intensity_db": 0},  # speech() is loud here
+               {"label": "b", "kind": "masked", "start_s": 0.6, "end_s": 0.9, "intensity_db": 0}]
+
+    def test_only_victor_933_and_region_rules(self):
+        e = ae.normalize({"interference": {"regions": self.REGIONS}}, V933)
+        self.assertEqual(e["interference"]["engine"], ae.INTERFERENCE_ENGINE)
+        self.assertEqual(ae.normalize(e), e)
+        self.assertIn("interference 2 regions (1 masked, 1 partial)", ae.summary(e))
+        with self.assertRaises(ae.EditError):  # every other recording is refused
+            ae.normalize({"interference": {"regions": self.REGIONS}}, SRC)
+        self.assertTrue(ae.problems(dict(e, for_source=SRC)))
+        bad_sets = ([dict(self.REGIONS[0], end_s=0.01)], [dict(self.REGIONS[0], kind="loud")],
+                    [dict(self.REGIONS[0], intensity_db=20)], [self.REGIONS[0], dict(self.REGIONS[1], start_s=0.1)])
+        for regions in bad_sets:
+            with self.assertRaises(ae.EditError, msg=regions):
+                ae.normalize({"interference": {"regions": regions}}, V933)
+        self.assertTrue(ae.problems(e, 0.8))  # a region past the end of the recording
+        from common.jsonschema_lite import validate
+        schema = load_schema("manual-mappings-3")
+        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        self.assertEqual(validate(e, full), [])
+
+    def test_masked_mutes_partial_ducks_and_nothing_else_changes(self):
+        x = speech(1.2, amp=0.3)
+        pcm = ae.float_to_pcm16(x)
+        e = ae.normalize({"interference": {"regions": self.REGIONS}}, V933)
+        with self.assertRaises(ae.EditError):  # never rendered without MCC's static
+            ae.render(pcm, e)
+        y = ae.pcm16_to_float(ae.render(pcm, e, static=fake_static())["pcm"])
+        mute = dict(fake_static(), static=[0.0] * 8820)
+        sp = ae.pcm16_to_float(ae.render(pcm, e, static=mute)["pcm"])  # the speech that is left
+        self.assertEqual(len(y), len(x))
+        self.assertEqual(set(sp[int(0.6 * FS):int(0.9 * FS)]), {0.0})               # masked: no speech at all
+        self.assertTrue(any(y[int(0.6 * FS):int(0.9 * FS)]))                        # ...static instead
+        ratio = max(abs(v) for v in sp[int(0.05 * FS):int(0.15 * FS)]) / max(abs(v) for v in x[int(0.05 * FS):int(0.15 * FS)])
+        self.assertAlmostEqual(20 * math.log10(ratio), -ae.PARTIAL_DUCK_DB, delta=0.1)  # partial: ducked
+        ramp = int(ae.INTERFERENCE_RAMP_MS * FS / 1000)
+        orig = ae.pcm16_to_float(pcm)
+        outside = [k for k in range(len(y)) if not (int(0.02 * FS) - ramp <= k < int(0.18 * FS) + ramp
+                                                     or int(0.6 * FS) - ramp <= k < int(0.9 * FS) + ramp)]
+        self.assertTrue(all(y[k] == orig[k] for k in outside))
+        self.assertEqual(y, ae.pcm16_to_float(ae.render(pcm, e, static=fake_static())["pcm"]))  # deterministic
+
+    def test_regions_stay_on_the_source_timeline_under_trims_and_cuts(self):
+        pcm = ae.float_to_pcm16(speech(1.2, amp=0.3))
+        mute = dict(fake_static(), static=[0.0] * 8820)
+        e = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.45, "end_s": 0.55}], "crossfade_ms": 0,
+                          "interference": {"regions": self.REGIONS}}, V933)
+        sp = ae.pcm16_to_float(ae.render(pcm, e, static=mute)["pcm"])
+        a, b = ae.spliced_position(0.6, e), ae.spliced_position(0.9, e)
+        self.assertEqual((a, b), (round(0.4 * FS), round(0.7 * FS)))  # 0.1 s trim + 0.1 s cut before it
+        self.assertEqual(set(sp[a:b]), {0.0})
 
 
 class RadioClickTests(unittest.TestCase):
@@ -399,6 +463,19 @@ class ParityTests(unittest.TestCase):
         recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
         self.assertIn("radio spain", recipe["steps"][1]["summary"])
         self.assertIn("radio_clicks", [s["op"] for s in recipe["steps"]])
+
+    def test_interference_preview_equals_m6_build(self):
+        e = ae.normalize({"radio": {"preset": "spain", "clicks": False},
+                          "interference": {"regions": InterferenceTests.REGIONS}}, V933)
+        prev = EditPreview(self.root, FFMPEG, Celt011)
+        p = prev.render(self.src, e, None, 4.0, static=fake_static())
+        built = derive_processed(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived",
+                                 global_gain_db=4.0, static=fake_static())
+        self.assertEqual(self.pcm_of(prev.path(p["key"], "edited")), built["pcm"])
+        n = len(built["pcm"])
+        self.assertEqual(self.pcm_of(prev.path(p["key"], "encoded")), built["decoded"][CODEC_DELAY * 2:CODEC_DELAY * 2 + n])
+        recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
+        self.assertIn("interference", [s["op"] for s in recipe["steps"]])
 
     def test_unedited_line_preview_equals_the_build(self):
         prev = EditPreview(self.root, FFMPEG, Celt011)

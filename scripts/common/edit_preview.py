@@ -50,7 +50,7 @@ class EditPreview:
             raise ValueError("bad preview key or kind")
         return self.dir / key / f"{kind}.wav"
 
-    def render(self, src_wav, edit, ref_lufs, global_gain_db, level_mode="global_gain", clicks=None):
+    def render(self, src_wav, edit, ref_lufs, global_gain_db, level_mode="global_gain", clicks=None, static=None):
         """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError.
         Same processing as M6 for every line: recipe, then the build-level level mode (global export gain,
         or match Spain with ref_lufs as the target)."""
@@ -59,13 +59,14 @@ class EditPreview:
             key = hashlib.sha256(json.dumps({"engine": audio_edit.RENDER_ENGINE, "pcm": hashlib.sha256(pcm).hexdigest(),
                                              "edit": edit, "ref": ref_lufs, "global_gain_db": global_gain_db,
                                              "level_mode": level_mode,
-                                             "clicks": clicks["sha256"] if clicks else None},
+                                             "clicks": clicks["sha256"] if clicks else None,
+                                             "static": static["sha256"] if static else None},
                                             sort_keys=True).encode()).hexdigest()[:24]
             out = self.dir / key
             if (out / "stats.json").is_file():
                 return {"key": key, "stats": json.loads((out / "stats.json").read_text(encoding="utf-8"))}
             r = audio_edit.render(pcm, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db, level_mode=level_mode,
-                                  clicks=clicks)
+                                  clicks=clicks, static=static)
             edited, stats = r["pcm"], r["stats"]
             if self._celt is None:
                 self._celt = self._celt_factory()

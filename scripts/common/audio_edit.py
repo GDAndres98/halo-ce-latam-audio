@@ -38,6 +38,8 @@ as a BUILD-LEVEL mode (owner decision after measurements, docs/m6-build.md §2.3
 Times are seconds on the SOURCE recording's timeline (the editor's waveform). Processing order
 (`render`, RENDER_ENGINE), on the 44.1 kHz mono PCM the pipeline already produces:
 
+    0. transmission interference (`interference`, only Victor 933's line): masked / partial regions on the source
+       timeline, MCC static from common/radio_static.py (docs/victor933-interference.md)
     1. edit: keep [trim_start, end - trim_end] minus the cuts (equal-power crossfade at each junction),
        fade in / out, then inserted silences (half-cosine fades of crossfade_ms / 2 on both sides;
        digital silence, ignored by BS.1770 gating)
@@ -72,7 +74,7 @@ from array import array
 from collections import deque
 
 ENGINE = "audio-edit/1"            # recipe format
-RENDER_ENGINE = "audio-render/8"   # 2: no speed/manual gain; 3: no limiter; 4: no matching; 5: level modes; 6: radio; 7: clicks; 8: echo
+RENDER_ENGINE = "audio-render/9"   # ...; 6: radio; 7: clicks; 8: echo; 9: transmission interference
 REMOVED_FIELDS = ("speed", "gain_db")
 # Removed 2026-10-11 (owner): the limiter and loudness matching. A stored `limiter` (migrate_remove_limiter.py
 # removed them from the mappings) or a `loudness` that is off is ignored and dropped on save.
@@ -122,6 +124,19 @@ ECHO_LIMITS = {"slap_ms": (5, 80), "slap_db": (-40, -3), "delay_ms": (50, 600), 
                "feedback_db": (-40, -3), "diffusion": (0, 1), "damping_hz": (1000, 16000)}
 ECHO_TAIL_FLOOR_DB = -60   # the echo rings out until its repeats are this far down (at most ECHO_MAX_TAIL_S)
 ECHO_MAX_TAIL_S = 2.0
+# Transmission interference (2026-10-13; docs/victor933-interference.md): a ONE-OFF treatment for Victor 933's
+# damaged transmission, allowed only for the lines below. Regions on the source timeline (seconds), so trims and
+# cuts never move them: "masked" mutes the speech and puts MCC's own static in its place (common/radio_static.py);
+# "partial" ducks the speech under quieter static. intensity_db shifts both (louder static, deeper duck).
+INTERFERENCE_LINES = ("vo_scr_m06_00740_victor933#0",)
+INTERFERENCE_ENGINE = "interference/1"
+INTERFERENCE_KINDS = ("partial", "masked")
+INTERFERENCE_LIMITS = {"intensity_db": (-12, 12), "regions": 20, "label": 80}
+STATIC_BELOW_SPEECH_DB = 9.3   # MCC Spain: static median -20.9 dB vs voiced speech -11.6 dB (20 ms frames)
+PARTIAL_DUCK_DB = 5.0          # partial: speech this much lower...
+PARTIAL_STATIC_DB = -14.0      # ...under static this much quieter than in a masked region (recognizer test, doc §4)
+INTERFERENCE_RAMP_MS = 15.0    # speech fades out / in over this, just outside the region (none of it audible inside)
+STATIC_LOOP_XFADE_MS = 20.0
 
 
 class EditError(ValueError):
@@ -134,7 +149,8 @@ def is_identity(edit):
     Removed fields (speed, gain_db) are ignored here; `removed_fields` reports them."""
     e = edit or {}
     return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts") and not e.get("silences")
-            and not e.get("fade_in_ms") and not e.get("fade_out_ms") and not e.get("radio") and not e.get("echo"))
+            and not e.get("fade_in_ms") and not e.get("fade_out_ms") and not e.get("radio") and not e.get("echo")
+            and not e.get("interference"))
 
 
 def removed_fields(edit):
@@ -177,7 +193,10 @@ def normalize_radio(radio):
     ph = radio["presence_hz"] if "presence_hz" in radio else (base.get("presence_hz") if preset != "custom" else None)
     if ph is not None:  # only stored when set: recipes without it keep their exact form
         out["presence_hz"] = _r(_num(ph, "radio presence_hz"), 0)
-    clicks = radio.get("clicks", base["clicks"])
+    # a bare preset request gets the preset's clicks; a stored filter (it has its values) without the field has
+    # none: the field came after those recipes were saved (and the clicks migration left some off on purpose)
+    explicit = any(k in radio for k in RADIO_FIELDS)
+    clicks = radio.get("clicks", False if explicit else base["clicks"])
     if not isinstance(clicks, bool):
         raise EditError("radio clicks must be true or false")
     out["clicks"] = clicks
@@ -272,6 +291,71 @@ def echo_summary(echo):
     return s
 
 
+def normalize_interference(value, ce_line_ref):
+    """Owner input -> canonical interference, or None (off). Only for INTERFERENCE_LINES."""
+    if value is None or value is False:
+        return None
+    if ce_line_ref not in INTERFERENCE_LINES:
+        raise EditError("transmission interference exists only for Victor 933's damaged transmission "
+                        f"({', '.join(INTERFERENCE_LINES)})")
+    if not isinstance(value, dict) or not isinstance(value.get("regions"), list):
+        raise EditError("interference is {regions: [...]}")
+    unknown = set(value) - {"engine", "regions"}
+    if unknown:
+        raise EditError(f"unknown interference field(s) {sorted(unknown)}")
+    regions = []
+    for r in value["regions"]:
+        if not isinstance(r, dict) or set(r) - {"label", "kind", "start_s", "end_s", "intensity_db"} \
+                or not {"kind", "start_s", "end_s"} <= set(r):
+            raise EditError("each interference region is {label, kind, start_s, end_s, intensity_db}")
+        label = r.get("label", "")
+        if not isinstance(label, str):
+            raise EditError("an interference label is text")
+        regions.append({"label": label.strip(), "kind": r["kind"], "start_s": _r(_num(r["start_s"], "region start"), 3),
+                        "end_s": _r(_num(r["end_s"], "region end"), 3),
+                        "intensity_db": _r(_num(r.get("intensity_db", 0), "region intensity"), 1)})
+    regions.sort(key=lambda r: r["start_s"])
+    out = {"engine": INTERFERENCE_ENGINE, "regions": regions}
+    bad = interference_problems(out)
+    if bad:
+        raise EditError("; ".join(bad))
+    return out if regions else None
+
+
+def interference_problems(value, duration_s=None):
+    if not value:
+        return []
+    out = []
+    if value.get("engine") != INTERFERENCE_ENGINE:
+        out.append(f"unknown interference engine {value.get('engine')!r}")
+    regions = value.get("regions") or []
+    if len(regions) > INTERFERENCE_LIMITS["regions"]:
+        out.append(f"at most {INTERFERENCE_LIMITS['regions']} interference regions")
+    prev = None
+    lo, hi = INTERFERENCE_LIMITS["intensity_db"]
+    for i, r in enumerate(regions, 1):
+        if r.get("kind") not in INTERFERENCE_KINDS:
+            out.append(f"region {i}: kind must be one of {', '.join(INTERFERENCE_KINDS)}")
+        if not 0 <= r["start_s"] < r["end_s"]:
+            out.append(f"region {i}: {r['start_s']}-{r['end_s']} s is empty or reversed")
+        if not lo <= r.get("intensity_db", 0) <= hi:
+            out.append(f"region {i}: intensity {r.get('intensity_db')} dB outside {lo}..{hi}")
+        if len(r.get("label", "")) > INTERFERENCE_LIMITS["label"]:
+            out.append(f"region {i}: label longer than {INTERFERENCE_LIMITS['label']} characters")
+        if prev is not None and r["start_s"] < prev:
+            out.append(f"region {i} overlaps the region before it")
+        prev = r["end_s"]
+        if duration_s is not None and r["end_s"] > duration_s:
+            out.append(f"region {i} ends after the recording ({duration_s:.3f} s)")
+    return out
+
+
+def interference_summary(value):
+    rs = value["regions"]
+    m = sum(1 for r in rs if r["kind"] == "masked")
+    return f"interference {len(rs)} regions ({m} masked, {len(rs) - m} partial)"
+
+
 def normalize(edit, for_source=None):
     """Owner input -> canonical recipe (rounded, defaults filled, cuts sorted). Identity -> EDIT_ZERO.
     Raises EditError for anything malformed or out of range (duration checks: `problems`)."""
@@ -285,7 +369,7 @@ def normalize(edit, for_source=None):
     lo = e.pop("loudness", None)
     if lo is not None and (not isinstance(lo, dict) or lo.get("mode", "off") != "off" or lo.get("offset_db", 0)):
         raise EditError("loudness matching was removed (2026-10-11): the global export gain is the only level setting")
-    unknown = set(e) - set(EDIT_ZERO) - set(DEFAULTS) - {"engine", "for_source", "radio", "echo"}
+    unknown = set(e) - set(EDIT_ZERO) - set(DEFAULTS) - {"engine", "for_source", "radio", "echo", "interference"}
     if unknown:
         raise EditError(f"unknown edit field(s) {sorted(unknown)}")
     out = {"trim_start_s": _r(_num(e.get("trim_start_s", 0), "trim_start_s"), 3),
@@ -314,6 +398,11 @@ def normalize(edit, for_source=None):
     echo = normalize_echo(e.get("echo"))
     if echo:
         rec["echo"] = echo
+    if e.get("interference"):
+        src = for_source or e.get("for_source") or {}
+        inter = normalize_interference(e["interference"], src.get("ce_line_ref"))
+        if inter:
+            rec["interference"] = inter
     if is_identity(rec):
         return dict(EDIT_ZERO, gap_s=out["gap_s"])
     fs = for_source or e.get("for_source")
@@ -343,6 +432,10 @@ def problems(edit, duration_s=None):
             out.append(f"{k} {v} outside {lo}..{hi}")
     out += radio_problems(e.get("radio"))
     out += echo_problems(e.get("echo"))
+    if e.get("interference"):
+        if (e.get("for_source") or {}).get("ce_line_ref") not in INTERFERENCE_LINES:
+            out.append("transmission interference exists only for " + ", ".join(INTERFERENCE_LINES))
+        out += interference_problems(e["interference"], duration_s)
     ts, te = e.get("trim_start_s", 0), e.get("trim_end_s", 0)
     if ts < 0 or te < 0:
         out.append("trims must be >= 0")
@@ -395,6 +488,8 @@ def summary(edit):
         bits.append(radio_summary(e["radio"]))
     if e.get("echo"):
         bits.append(echo_summary(e["echo"]))
+    if e.get("interference"):
+        bits.append(interference_summary(e["interference"]))
     return " · ".join(bits)
 
 
@@ -703,6 +798,75 @@ def echo_effect(x, echo, fs=SAMPLE_RATE):
     return out, {"preset": echo["preset"], "summary": echo_summary(echo), "tail_s": round(tail / fs, 3)}
 
 
+def _speech_reference_rms(x, fs):
+    """Median RMS of the line's active 20 ms frames (within 20 dB of its 95th-percentile frame): the speech level
+    the static is set against, as measured on the MCC original (STATIC_BELOW_SPEECH_DB)."""
+    n = max(1, int(0.02 * fs))
+    rms = [math.sqrt(sum(v * v for v in x[i:i + n]) / n) for i in range(0, len(x) - n + 1, n)]
+    rms = [r for r in rms if r > 0]
+    if not rms:
+        return 0.0
+    top = sorted(rms)[int(0.95 * (len(rms) - 1))]
+    active = sorted(r for r in rms if r >= top * 0.1)
+    return active[len(active) // 2]
+
+
+def _static_for(static, n, offset, fs):
+    """n samples of the static texture starting at `offset`, looped with an equal-power crossfade."""
+    L = len(static)
+    xf = min(int(STATIC_LOOP_XFADE_MS * fs / 1000), L // 4)
+    body = L - xf
+    out = [0.0] * n
+    for i in range(n):
+        p = (offset + i) % body
+        v = static[p]
+        if p < xf and (offset + i) >= body:  # the start of a later pass: blend with the end of the previous one
+            t = (p + 0.5) / xf
+            v = static[p] * math.sin(t * math.pi / 2) + static[body + p] * math.cos(t * math.pi / 2)
+        out[i] = v
+    return out
+
+
+def interference_effect(x, value, static, fs=SAMPLE_RATE):
+    """Victor 933's damaged transmission on the SOURCE recording -> (samples, stats). Same length, deterministic.
+    masked: speech gain 0 inside the region (ramps of INTERFERENCE_RAMP_MS just outside it), static at
+            STATIC_BELOW_SPEECH_DB under the line's speech level (+ intensity_db), faded in/out over the ramps.
+    partial: speech PARTIAL_DUCK_DB lower (+ intensity_db), static PARTIAL_STATIC_DB under the masked level
+            (+ intensity_db)."""
+    if not static:
+        raise EditError("transmission interference needs MCC's static (common/radio_static.py); it could not be decoded")
+    tex = static["static"]
+    t_rms = math.sqrt(sum(v * v for v in tex) / len(tex)) or 1.0
+    s_rms = _speech_reference_rms(x, fs)
+    ramp = max(1, int(INTERFERENCE_RAMP_MS * fs / 1000))
+    y = list(x)
+    regions = value["regions"]
+    for k, r in enumerate(regions):
+        a, b = int(round(r["start_s"] * fs)), int(round(r["end_s"] * fs))
+        a, b = max(0, min(a, len(x))), max(0, min(b, len(x)))
+        it = r.get("intensity_db", 0)
+        if r["kind"] == "masked":
+            speech_g, static_db = 0.0, -STATIC_BELOW_SPEECH_DB + it
+        else:
+            speech_g, static_db = 10 ** (-(PARTIAL_DUCK_DB + it) / 20), -STATIC_BELOW_SPEECH_DB + PARTIAL_STATIC_DB + it
+        g_static = s_rms / t_rms * 10 ** (static_db / 20)
+        lo, hi = max(0, a - ramp), min(len(x), b + ramp)
+        noise = _static_for(tex, hi - lo, (k * 16273) % len(tex), fs)  # a different stretch for every region
+        for i in range(lo, hi):
+            if i < a:      # ramp into the region
+                w = _half_cos(i - lo, a - lo) if a > lo else 1.0
+            elif i >= b:   # ramp out of it
+                w = _half_cos(hi - 1 - i, hi - b) if hi > b else 1.0
+            else:
+                w = 1.0
+            sg = 1.0 - w * (1.0 - speech_g)
+            y[i] = x[i] * sg + noise[i - lo] * g_static * w
+    m = sum(1 for r in regions if r["kind"] == "masked")
+    return y, {"engine": INTERFERENCE_ENGINE, "regions": len(regions), "masked": m, "partial": len(regions) - m,
+               "speech_reference_dbfs": round(20 * math.log10(s_rms), 2) if s_rms > 0 else None,
+               "static_sha256": static["sha256"], "static_reference": static["reference"]["slot_id"]}
+
+
 def global_gain(y, gain_db, ceiling_db=PEAK_CEILING_DB):
     """Linear export gain, never limited: -> (samples, applied dB, shortfall dB). A positive gain is
     reduced so the peak stays <= ceiling_db (never below 0 dB); the shortfall is what could not be
@@ -765,7 +929,8 @@ def match_spain(y, measured_lufs, ref_lufs, ceiling_db=PEAK_CEILING_DB, max_limi
                "limiter_fraction": frac}
 
 
-def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE, clicks=None):
+def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE, clicks=None,
+           static=None):
     """44.1 kHz mono 16-bit PCM + recipe + level (build-level mode) -> {"pcm": bytes, "stats": {...}}.
     Deterministic. ref_lufs: loudness of the original MCC recording (the target in match_spain mode,
     reported only in global_gain mode). In global_gain mode an identity recipe with no global gain returns
@@ -780,6 +945,9 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
         raise EditError("; ".join(bad))
     identity = is_identity(edit)
     warnings, segs, inserted = [], [(0, n)], 0
+    interference = None
+    if edit.get("interference"):  # 0. transmission interference, on the source timeline (before trims and cuts)
+        x, interference = interference_effect(x, edit["interference"], static, fs)
     y = x
     if not identity:  # 1. trims, cuts, fades, inserted silences
         segs = kept_segments(n, edit, fs)
@@ -844,7 +1012,7 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
              "level_mode": level_mode, "level_mode_used": used_mode,
              "global_gain_requested_db": global_gain_db if used_mode == "global_gain" else 0.0,
              "global_gain_applied_db": g_applied, "global_gain_shortfall_db": g_short,
-             "match": match, "radio": radio, "echo": echo,
+             "match": match, "radio": radio, "echo": echo, "interference": interference,
              "total_gain_db": match["applied_db"] if match else g_applied,
              "output_lufs": _rnd(loudness(final, fs)[0]), "output_peak_dbfs": _rnd(peak_db(final)),
              "warnings": warnings}

@@ -34,7 +34,7 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import audio_edit, radio_clicks  # noqa: E402
+from common import audio_edit, radio_clicks, radio_static  # noqa: E402
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common import mapping_store  # noqa: E402
@@ -183,6 +183,7 @@ class M4App:
         self.root = Path(root)
         self.mcc_audio, self.ce_audio, self.editor = mcc_audio, ce_audio, editor
         self._clicks = None  # MCC's radio clicks, decoded on the first preview that needs them
+        self._static = None  # MCC's radio static (Victor 933's interference), likewise
         self.today = today or (lambda: dt.date.today().isoformat())
         self.run_validator = run_validator
         self._save_lock = threading.Lock()
@@ -505,6 +506,7 @@ class M4App:
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
                 "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
                          "available": self.editor is not None, "engine": audio_edit.ENGINE},
+                "interference": {ref: d for ref in refs if (d := self.interference_defaults(ref))},
                 "ce_missions": self._mission_scope(level),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 
@@ -579,7 +581,8 @@ class M4App:
             raise ApiError(500, str(e))
         try:
             clicks = self.radio_clicks() if (edit.get("radio") or {}).get("clicks") else None
-            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"], clicks)
+            static = self.radio_static() if edit.get("interference") else None
+            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"], clicks, static)
         except audio_edit.EditError as e:
             raise ApiError(422, f"edit: {e}")
         return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_edit.summary(edit),
@@ -596,6 +599,28 @@ class M4App:
             except (AudioUnavailable, radio_clicks.ClickError) as e:
                 raise ApiError(503, f"radio clicks: {e}")
         return self._clicks
+
+    def radio_static(self):
+        """MCC's radio static (common/radio_static.py), decoded once from the pinned bank."""
+        if self._static is None:
+            if not self.mcc_audio:
+                raise ApiError(503, "the transmission interference needs MCC audio decoding (vgmstream)")
+            try:
+                self._static = radio_static.load(self.mcc_audio, self.slot_index)
+            except (AudioUnavailable, radio_static.StaticError) as e:
+                raise ApiError(503, f"radio static: {e}")
+        return self._static
+
+    def interference_defaults(self, ce_line_ref):
+        """The aligned regions for a line that has the one-off interference treatment, or None."""
+        if ce_line_ref not in audio_edit.INTERFERENCE_LINES:
+            return None
+        p = self.root / "config" / "interference" / (ce_line_ref.split("#")[0] + ".json")
+        if not p.is_file():
+            return None
+        d = json.loads(p.read_text(encoding="utf-8"))
+        return {"regions": [dict(r, intensity_db=r.get("intensity_db", 0)) for r in d["regions"]],
+                "kinds": d.get("kinds"), "alignment": d.get("alignment")}
 
     def preview_wav(self, key, kind):
         if not self.editor:

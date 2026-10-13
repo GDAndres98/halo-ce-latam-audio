@@ -6,7 +6,7 @@
 // previews and for the build (scripts/common/audio_edit.py), so these rules only decide what the recipe
 // contains; the server decides what it sounds like.
 
-import type { AudioEdit, EchoEffect, EchoPreset, RadioFilter, RadioPreset } from "../api/types";
+import type { AudioEdit, EchoEffect, EchoPreset, InterferenceRegion, RadioFilter, RadioPreset } from "../api/types";
 
 /** A span of the original recording, in seconds. */
 export interface Span {
@@ -223,6 +223,39 @@ export function echoProblem(e: EchoEffect): string | null {
     if (v !== null && (!Number.isFinite(v) || v < lo || v > hi)) return `${key.replace(/_/g, " ")} must be ${lo}–${hi}`;
   }
   return null;
+}
+
+// ---- Transmission interference (Victor 933 only). Same rules as audio_edit.interference_problems.
+export const INTERFERENCE_INTENSITY = [-12, 12] as const;
+
+/** Sets the regions (a copy), or removes the interference (null). */
+export function setInterference(edit: AudioEdit, regions: InterferenceRegion[] | null): AudioEdit {
+  if (regions === null) return { ...edit, interference: null };
+  return { ...edit, interference: { regions: regions.map((r) => ({ ...r, intensity_db: r.intensity_db ?? 0 })) } };
+}
+
+/** Changes one value of one region; refuses an empty, reversed, overlapping or out-of-range region. */
+export function setRegionValue<K extends keyof InterferenceRegion>(
+  edit: AudioEdit,
+  index: number,
+  key: K,
+  value: InterferenceRegion[K],
+  duration: number,
+): AudioEdit {
+  const regions = edit.interference?.regions;
+  if (!regions || !regions[index]) throw new Error("no such interference region");
+  const next = regions.map((r, i) => (i === index ? { ...r, [key]: typeof value === "number" ? round3(value) : value } : r));
+  const r = next[index];
+  if (!Number.isFinite(r.start_s) || !Number.isFinite(r.end_s) || r.start_s < 0 || r.end_s <= r.start_s) {
+    throw new Error("a region must start before it ends");
+  }
+  if (duration > 0 && r.end_s > duration) throw new Error("the region ends after the recording");
+  if ((index > 0 && r.start_s < next[index - 1].end_s) || (index < next.length - 1 && r.end_s > next[index + 1].start_s)) {
+    throw new Error("regions may not overlap");
+  }
+  const [lo, hi] = INTERFERENCE_INTENSITY;
+  if (!Number.isFinite(r.intensity_db) || r.intensity_db < lo || r.intensity_db > hi) throw new Error(`intensity must be ${lo}–${hi} dB`);
+  return { ...edit, interference: { ...edit.interference, regions: next } };
 }
 
 /** Back to an unedited recording. The gap is kept: it is not an edit to the audio itself. */

@@ -57,6 +57,7 @@ export function defaultEdit(gapS = 0): AudioEdit {
     crossfade_ms: 20,
     radio: null,
     echo: null,
+    interference: null,
   };
 }
 

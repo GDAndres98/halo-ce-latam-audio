@@ -358,6 +358,13 @@ function seek(seconds: number) {
   position.value = wave.getCurrentTime();
 }
 
+/** Plays one span of the recording (an interference region). */
+function playRange(start: number, end: number) {
+  if (!wave || !duration.value) return;
+  lastPlayed = null;
+  void wave.play(Math.max(0, start), Math.min(duration.value, end));
+}
+
 /** Plays from a position (A/B switching keeps the position). */
 function playFrom(seconds: number) {
   if (!wave || !duration.value) return;
@@ -386,6 +393,7 @@ defineExpose({
   playFromStart,
   playFrom,
   playSelection,
+  playRange,
   stop,
   replay,
   clearSelection,

@@ -167,6 +167,7 @@ applies when it builds the bank.
 | Silences list | `+0.25 s @ 0.90 s ×`: × removes one. Cuts and trims drop any silence that ends up inside them. |
 | Trim start / end, Fade in / out, Crossfade | exact values. Trimming an edge for the first time adds a 10 ms fade there; set it to 0 if you don't want one. |
 | **Reset edits** | back to the unedited recording (the radio filter is kept; it has its own Off) |
+| **Transmission interference** | Only on Victor 933's damaged transmission (`vo_scr_m06_00740_victor933`): the 11 aligned phrases, each "Low but understandable" or "Not understandable", with start, end, intensity and ▶ (that span of the original). Reset / Remove. See `docs/victor933-interference.md`. |
 | **Echo** | Off / **Spain echo** / **English echo** / Custom: delay, echo level, repeats, diffusion, damping, slap. For the cryo assistant's intercom ("eco" lines, with the radio presets *Spain/English intercom*). The line gets longer by the ring-out. See `docs/radio-filter.md` §5. |
 | **Radio filter** | Off / **Spain radio** / **English radio** / Spain or English **intercom** (eco lines) / Custom, plus low cut, high cut, slope, presence, drive, hiss and **MCC clicks** (Spain's key-up click before the line and the release/squelch after it; on in Spain radio). Changing a value makes it Custom. Heard in the preview like every other edit. See `docs/radio-filter.md`. |
 

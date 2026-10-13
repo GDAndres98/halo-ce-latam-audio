@@ -282,3 +282,26 @@
 .radio-filter .edit-grid label .muted {
   font-weight: 400;
 }
+
+/* ---- Transmission interference (Victor 933 only). */
+.interference-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.3rem 0;
+}
+
+.interference-table th,
+.interference-table td {
+  padding: 0.15rem 0.3rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.interference-table input {
+  width: 5.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.interference-table tr[data-kind="masked"] td:nth-child(2) {
+  color: var(--warn);
+}

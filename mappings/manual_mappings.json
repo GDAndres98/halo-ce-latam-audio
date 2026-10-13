@@ -41871,7 +41871,90 @@
             "slope_db_oct": 36,
             "presence_db": 0,
             "drive_db": 0,
-            "noise_dbfs": null
+            "noise_dbfs": null,
+            "clicks": false
+          },
+          "interference": {
+            "engine": "interference/1",
+            "regions": [
+              {
+                "label": "Aquí",
+                "kind": "partial",
+                "start_s": 0.12,
+                "end_s": 0.4,
+                "intensity_db": 0
+              },
+              {
+                "label": "33 (Víctor 9-33)",
+                "kind": "masked",
+                "start_s": 1.93,
+                "end_s": 2.51,
+                "intensity_db": 0
+              },
+              {
+                "label": "necesito ayuda inmediata",
+                "kind": "partial",
+                "start_s": 5.23,
+                "end_s": 6.64,
+                "intensity_db": 0
+              },
+              {
+                "label": "bajo un fuerte",
+                "kind": "partial",
+                "start_s": 7.42,
+                "end_s": 7.99,
+                "intensity_db": 0
+              },
+              {
+                "label": "…til aliení…",
+                "kind": "masked",
+                "start_s": 9.51,
+                "end_s": 10.08,
+                "intensity_db": 0
+              },
+              {
+                "label": "no es del Covenant",
+                "kind": "partial",
+                "start_s": 10.37,
+                "end_s": 11.28,
+                "intensity_db": 0
+              },
+              {
+                "label": "hostiles. Estamos",
+                "kind": "partial",
+                "start_s": 13.91,
+                "end_s": 14.96,
+                "intensity_db": 0
+              },
+              {
+                "label": "…an estruc…",
+                "kind": "masked",
+                "start_s": 16.11,
+                "end_s": 16.59,
+                "intensity_db": 0
+              },
+              {
+                "label": "…empo podre…",
+                "kind": "masked",
+                "start_s": 18.99,
+                "end_s": 19.57,
+                "intensity_db": 0
+              },
+              {
+                "label": "…víen ayuda si reciben esta transmis…",
+                "kind": "masked",
+                "start_s": 21.06,
+                "end_s": 22.92,
+                "intensity_db": 0
+              },
+              {
+                "label": "intervalos",
+                "kind": "masked",
+                "start_s": 25.47,
+                "end_s": 25.93,
+                "intensity_db": 0
+              }
+            ]
           }
         },
         "fingerprint": null,

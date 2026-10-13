@@ -143,6 +143,21 @@
                                  "diffusion": {"type": "number", "minimum": 0, "maximum": 1},
                                  "damping_hz": {"type": ["number", "null"], "minimum": 1000, "maximum": 16000}}
                 },
+                "interference": {
+                  "type": "object",
+                  "required": ["engine", "regions"],
+                  "additionalProperties": false,
+                  "description": "One-off transmission interference (owner request 2026-10-13), allowed only for Victor 933's damaged transmission (audio_edit.INTERFERENCE_LINES; docs/victor933-interference.md). Regions on the source timeline: masked = speech muted under MCC static, partial = speech ducked under quieter static.",
+                  "properties": {"engine": {"const": "interference/1"},
+                                 "regions": {"type": "array", "items": {
+                                   "type": "object", "required": ["label", "kind", "start_s", "end_s", "intensity_db"],
+                                   "additionalProperties": false,
+                                   "properties": {"label": {"type": "string", "maxLength": 80},
+                                                  "kind": {"enum": ["partial", "masked"]},
+                                                  "start_s": {"type": "number", "minimum": 0},
+                                                  "end_s": {"type": "number", "minimum": 0},
+                                                  "intensity_db": {"type": "number", "minimum": -12, "maximum": 12}}}}}
+                },
                 "loudness": {
                   "type": "object", "required": ["mode", "offset_db"], "additionalProperties": false,
                   "description": "Legacy (loudness matching removed 2026-10-11): only 'off' remains in older recipes.",
