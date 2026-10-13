@@ -49,7 +49,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
-from common import audio_edit, radio_clicks, radio_static  # noqa: E402
+from common import audio_edit, interference, radio_clicks, radio_static  # noqa: E402
 from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
 from common.export_config import LEVEL_MODES, ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
@@ -459,7 +459,7 @@ def build_audio(out, targets, original, args, cfg, pins, app):
             raise SystemExit(f"radio clicks unavailable: {ex}")
         checks["radio_clicks_match_pins"] = clicks["sha256"] == radio_clicks.PINNED
     static = None
-    if any((e.get("edit") or {}).get("interference") for e in targets):
+    if any(interference.needs_mcc_static((e.get("edit") or {}).get("interference")) for e in targets):
         try:
             static = radio_static.load(MccAudio(REPO_ROOT, vgmstream_decoder(exe)), app.slot_index)
         except Exception as ex:  # noqa: BLE001 (decode failure or pin mismatch: the build stops)

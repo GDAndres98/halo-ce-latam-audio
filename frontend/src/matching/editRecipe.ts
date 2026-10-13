@@ -289,7 +289,14 @@ export function setCurvePoints(edit: AudioEdit, points: CurvePoint[], duration: 
 export function setInterferenceCurve(edit: AudioEdit, value: InterferenceCurve | null): AudioEdit {
   if (value === null) return { ...edit, interference: null };
   return { ...edit, interference: { engine: value.engine, guides: value.guides.map((g) => ({ ...g })),
-                                    points: value.points.map((p) => ({ ...p })), flutter_db: value.flutter_db } };
+                                    points: value.points.map((p) => ({ ...p })), flutter_db: value.flutter_db,
+                                    texture: value.texture ?? "synthetic" } };
+}
+
+/** The static's source: made from scratch ("synthetic") or MCC Spain's sample ("mcc"). */
+export function setTexture(edit: AudioEdit, texture: "synthetic" | "mcc"): AudioEdit {
+  if (!edit.interference) throw new Error("no interference curve on this recording");
+  return { ...edit, interference: { ...edit.interference, texture } };
 }
 
 export function setFlutter(edit: AudioEdit, db: number): AudioEdit {

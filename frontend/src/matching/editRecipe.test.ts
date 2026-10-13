@@ -26,6 +26,7 @@ import {
   editedTime,
   setCurvePoints,
   setInterferenceCurve,
+  setTexture,
   sourceTime,
   speechDb,
   setRadioPreset,
@@ -258,6 +259,11 @@ describe("transmission interference curve (Victor 933)", () => {
     expect(curveAt(curve.points, 0.95)).toBeCloseTo(0.675, 3);
     expect(curveMin(curve.points, 1.93, 2.51)).toBe(1);
     expect(setInterferenceCurve(on, null).interference).toBeNull();
+  });
+  it("chooses the static's source; a new curve is synthetic", () => {
+    const on = setInterferenceCurve(edit(), curve);
+    expect(on.interference?.texture).toBe("synthetic");
+    expect(setTexture(on, "mcc").interference?.texture).toBe("mcc");
   });
   it("maps intensity to the speech level like the server", () => {
     expect(speechDb(CURVE.bed)).toBe(0);

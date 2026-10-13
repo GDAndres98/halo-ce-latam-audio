@@ -160,7 +160,8 @@
                                                   "kind": {"enum": ["partial", "masked"]},
                                                   "start_s": {"type": "number", "minimum": 0},
                                                   "end_s": {"type": "number", "minimum": 0}}}},
-                                 "flutter_db": {"type": "number", "minimum": 0, "maximum": 6}}
+                                 "flutter_db": {"type": "number", "minimum": 0, "maximum": 6},
+                                 "texture": {"enum": ["synthetic", "mcc"], "description": "The static: made from scratch, or MCC Spain's sample (absent = mcc)."}}
                 },
                 "loudness": {
                   "type": "object", "required": ["mode", "offset_db"], "additionalProperties": false,

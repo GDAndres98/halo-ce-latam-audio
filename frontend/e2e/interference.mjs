@@ -135,6 +135,16 @@ async function main() {
       check(/hidden/.test(back), `guide 2 after undo: ${back}`);
     });
 
+    await step("the static source can be synthetic (made from scratch) or MCC Spain's sample", async () => {
+      const select = section().getByLabel("Static source");
+      check((await select.inputValue()) === "synthetic", `static source ${await select.inputValue()}`);
+      let stats = await nextPreview(() => select.selectOption("mcc"));
+      check(stats.interference.texture === "mcc" && stats.interference.static_sha256, "mcc texture");
+      stats = await nextPreview(() => select.selectOption("synthetic"));
+      check(stats.interference.texture === "synthetic" && stats.interference.static_sha256 === null, "synthetic texture");
+      check(stats.interference.masked_hidden === true, "masked phrases not hidden");
+    });
+
     await step("zoom, MCC reference overlay and play from the cursor", async () => {
       await section().getByRole("button", { name: "Zoom in" }).click();
       check((await section().getByTestId("lane-zoom").innerText()) === "2×", "zoom");

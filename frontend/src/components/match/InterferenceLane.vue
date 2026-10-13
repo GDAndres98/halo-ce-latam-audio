@@ -34,6 +34,7 @@ const emit = defineEmits<{
   points: [points: CurvePoint[]];
   reset: [];
   flutter: [db: number];
+  texture: [texture: "synthetic" | "mcc"];
 }>();
 
 const HEIGHT = 220;
@@ -462,6 +463,15 @@ const sources = [
           <option value="off">Off</option>
           <option value="spanish">Spain (dashed)</option>
           <option value="english">English (dashed)</option>
+        </select>
+      </label>
+      <label class="inline small">Static
+        <select
+          :value="edit.interference?.texture ?? 'mcc'" :disabled="!canEdit" aria-label="Static source"
+          @change="emit('texture', ($event.target as HTMLSelectElement).value as 'synthetic' | 'mcc')"
+        >
+          <option value="synthetic">Synthetic (made from scratch)</option>
+          <option value="mcc">MCC Spain sample</option>
         </select>
       </label>
       <label class="inline small">Flutter (dB)

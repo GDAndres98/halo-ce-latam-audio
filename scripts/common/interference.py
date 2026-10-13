@@ -6,7 +6,8 @@ The recipe field `audio.edit.interference` (engine interference/2):
     {"engine": "interference/2",
      "points": [{"t": 0.0, "v": 0.35}, ...],     # the owner's curve: intensity 0..1 at source seconds
      "guides": [{"label", "kind": "partial"|"masked", "start_s", "end_s"}, ...],   # the 11 owner decisions
-     "flutter_db": 2.5}                           # organic level wobble of the static (0..6 dB)
+     "flutter_db": 2.5,                           # organic level wobble of the static (0..6 dB)
+     "texture": "synthetic"}                      # the static: "synthetic" (made from scratch) or "mcc"
 
 Times are on the SOURCE recording (before trims and cuts), so editing never moves the interference. The curve
 is linear between points, sampled at CONTROL_RATE and smoothed forward AND backward (zero phase, no lag), then
@@ -19,8 +20,9 @@ mapped (nonlinear) to two gains, measured against the line's speech level:
     0.85        -20 dB                                     -14 dB
     >= 0.95     removed             (spoiler hidden)       -9.3 dB  (MCC Spain: static vs voiced speech)
 
-The static is ONE continuous stream for the whole line: grains of MCC's own static (common/radio_static.py)
-taken from seeded random positions, 160 ms sine-windowed, 50 % overlap (constant power, never a loop), with a
+The static is ONE continuous stream for the whole line, from `texture`: "synthetic" (made from scratch, fitted to
+MCC Spain's static: synthetic_texture) or "mcc" (absent = mcc: grains of MCC's own static, common/radio_static.py,
+taken from seeded random positions, 160 ms sine-windowed, 50 % overlap, constant power, never a loop), with a
 slow seeded flutter on its level. Deterministic; the line's length and pacing are unchanged.
 
 guides only inform: they are drawn in the Studio, initialise the curve (`default_points`) and are reported
@@ -33,6 +35,7 @@ import random
 LINES = ("vo_scr_m06_00740_victor933#0",)
 ENGINE = "interference/2"
 KINDS = ("partial", "masked")
+TEXTURES = ("synthetic", "mcc")  # absent = "mcc" (the recipes from before the choice existed)
 CONTROL_RATE = 1000           # curve samples per second
 SMOOTH_MS = 3.0               # zero-phase smoothing of the curve (removes corners: no clicks, no lag)
 MIN_SPACING_S = 0.002
@@ -106,7 +109,7 @@ def normalize(value, ce_line_ref):
     if value.get("engine") not in (None, ENGINE):
         raise InterferenceError(f"interference {value.get('engine')} is the old region format: run "
                                 "scripts/validate/apply_victor933_interference.py --upgrade")
-    unknown = set(value) - {"engine", "points", "guides", "flutter_db"}
+    unknown = set(value) - {"engine", "points", "guides", "flutter_db", "texture"}
     if unknown:
         raise InterferenceError(f"unknown interference field(s) {sorted(unknown)}")
     points = []
@@ -124,7 +127,8 @@ def normalize(value, ce_line_ref):
                        "start_s": _r(_num(g["start_s"], "guide start"), 3), "end_s": _r(_num(g["end_s"], "guide end"), 3)})
     guides.sort(key=lambda g: g["start_s"])
     out = {"engine": ENGINE, "points": points, "guides": guides,
-           "flutter_db": _r(_num(value.get("flutter_db", 2.5), "flutter_db"), 1)}
+           "flutter_db": _r(_num(value.get("flutter_db", 2.5), "flutter_db"), 1),
+           "texture": value.get("texture", "mcc")}
     bad = problems(out)
     if bad:
         raise InterferenceError("; ".join(bad))
@@ -164,6 +168,8 @@ def problems(value, duration_s=None):
         if prev is not None and g["start_s"] < prev:
             out.append(f"guide {k} overlaps the guide before it")
         prev = g["end_s"]
+    if value.get("texture", "mcc") not in TEXTURES:
+        out.append(f"texture must be one of {', '.join(TEXTURES)}")
     lo, hi = LIMITS["flutter_db"]
     if not lo <= value.get("flutter_db", 0) <= hi:
         out.append(f"flutter {value.get('flutter_db')} dB outside {lo}..{hi}")
@@ -172,7 +178,13 @@ def problems(value, duration_s=None):
 
 def summary(value):
     m = sum(1 for g in value["guides"] if g["kind"] == "masked")
-    return f"interference curve ({len(value['points'])} points; {len(value['guides'])} guides, {m} masked)"
+    tex = "synthetic static" if value.get("texture") == "synthetic" else "MCC static"
+    return f"interference curve ({len(value['points'])} points; {len(value['guides'])} guides, {m} masked; {tex})"
+
+
+def needs_mcc_static(value):
+    """True when rendering needs MCC's static sample (common/radio_static.py)."""
+    return bool(value) and value.get("texture", "mcc") == "mcc"
 
 
 # ----------------------------------------------------------------------------- the default curve
@@ -324,7 +336,8 @@ def speech_rms(x, fs):
 
 def apply(x, value, static, fs):
     """Interference on the SOURCE samples -> (samples, stats). Same length, deterministic."""
-    if not static:
+    synthetic = value.get("texture", "mcc") == "synthetic"
+    if not synthetic and not static:
         raise InterferenceError("the transmission interference needs MCC's static (common/radio_static.py); "
                                 "it could not be decoded")
     n = len(x)
@@ -334,7 +347,7 @@ def apply(x, value, static, fs):
     s_ref = speech_rms(x, fs)
     gs = [speech_gain(c) for c in curve]
     gn = [s_ref * static_gain(c) * 10 ** (value["flutter_db"] * f / 20) for c, f in zip(curve, fl)]
-    tex = texture(static["static"], n, fs)
+    tex = synthetic_texture(n, fs) if synthetic else texture(static["static"], n, fs)
     y = [0.0] * n
     step = CONTROL_RATE / fs
     for i in range(n):
@@ -356,7 +369,9 @@ def apply(x, value, static, fs):
     return y, {"engine": ENGINE, "points": len(value["points"]), "guides": guides,
                "masked_hidden": all(g["hidden"] for g in guides if g["kind"] == "masked"),
                "speech_reference_dbfs": round(20 * math.log10(s_ref), 2) if s_ref > 0 else None,
-               "static_sha256": static["sha256"], "static_reference": static["reference"]["slot_id"]}
+               "texture": "synthetic" if synthetic else "mcc",
+               "static_sha256": None if synthetic else static["sha256"],
+               "static_reference": None if synthetic else static["reference"]["slot_id"]}
 
 
 # ----------------------------------------------------------------------------- MCC reference (Studio overlay only)
@@ -400,3 +415,77 @@ def reference_curve(x, fs, frame_s=0.02):
     sm = [sum(raw[max(0, k - 1):k + 2]) / len(raw[max(0, k - 1):k + 2]) for k in range(len(raw))]
     return {"frame_s": frame_s, "values": [round(v, 3) for v in sm], "duration_s": round(len(x) / fs, 3),
             "speech_level_dbfs": round(ref, 1)}
+
+
+# ----------------------------------------------------------------------------- synthetic static (texture "synthetic")
+# Static made from scratch (owner request, 2026-10-13), shaped to MCC Spain's static (measured on the pinned
+# 4.40-5.80 s burst): band-limited about 300-4000 Hz with humps at ~500 Hz (+7 dB) and ~2 kHz (+8.5 dB), near-
+# Gaussian (kurtosis 3.3, crest 13.8 dB), ~2 dB level variation over 5 ms frames, ~1 dB over 50 ms.
+SYNTH = {"hp_hz": 320, "hp_order": 4, "lp_hz": 3600, "lp_order": 4, "peaks": ((500, 9.0, 2.0), (2000, 11.0, 1.8)),
+         "crackle_per_s": 40, "crackle_db": -10.0, "flicker_db": 1.5, "flicker_hz": 30.0,
+         "flicker_slow_db": 0.6, "flicker_slow_hz": 5.0}
+# Fit (docs/victor933-interference.md §3.3): 1/3-octave spectrum within 2.9 dB rms of MCC's static (125 Hz-8 kHz); level
+# std over 5 ms frames 1.91 dB (MCC 2.07), over 50 ms 0.99 dB (0.95); kurtosis 3.44 (3.28); crest 13.1 dB (13.8).
+
+
+def _butter_qs(order):
+    return [1 / (2 * math.cos((2 * k - 1) * math.pi / (2 * order))) for k in range(1, order // 2 + 1)]
+
+
+def _biquad(x, b, a):
+    b0, b1, b2 = (v / a[0] for v in b)
+    a1, a2 = a[1] / a[0], a[2] / a[0]
+    y, x1, x2, y1, y2 = [0.0] * len(x), 0.0, 0.0, 0.0, 0.0
+    for i, v in enumerate(x):
+        o = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, v, y1, o
+        y[i] = o
+    return y
+
+
+def _rbj(kind, f0, fs, q=0.7071, gain_db=0.0):
+    w = 2 * math.pi * f0 / fs
+    cw, al = math.cos(w), math.sin(w) / (2 * q)
+    if kind == "hp":
+        return ((1 + cw) / 2, -(1 + cw), (1 + cw) / 2), (1 + al, -2 * cw, 1 - al)
+    if kind == "lp":
+        return ((1 - cw) / 2, 1 - cw, (1 - cw) / 2), (1 + al, -2 * cw, 1 - al)
+    A = 10 ** (gain_db / 40)
+    return (1 + al * A, -2 * cw, 1 - al * A), (1 + al / A, -2 * cw, 1 - al / A)
+
+
+def synthetic_texture(n, fs, seed=SEED):
+    """n samples of static made from scratch, unit RMS, deterministic: seeded white noise plus sparse crackle
+    (decaying 1-4 ms pops), a random flicker, then Butterworth high- and low-pass filters and the two humps of
+    SYNTH (fitted to MCC Spain's static: tests/test_audio_edit.py and docs/victor933-interference.md §3.3)."""
+    rng = random.Random(seed + 7)
+    x = [rng.gauss(0.0, 1.0) for _ in range(n)]
+    pops = int(SYNTH["crackle_per_s"] * n / fs)
+    amp = 10 ** (SYNTH["crackle_db"] / 20)
+    for _ in range(pops):
+        at, length = rng.randrange(0, max(1, n)), int(rng.uniform(0.001, 0.004) * fs)
+        g = amp * math.exp(rng.gauss(0.0, 0.6)) * 3.0
+        for i in range(length):
+            if at + i < n:
+                x[at + i] += g * rng.gauss(0.0, 1.0) * math.exp(-4.0 * i / max(1, length))
+    mods = []  # level flicker in dB: a fast (crackle-scale) and a slow component, each unit std
+    for hz in (SYNTH["flicker_hz"], SYNTH["flicker_slow_hz"]):
+        a = math.exp(-2 * math.pi * hz / fs)
+        y1 = y2 = 0.0
+        m = []
+        for _ in range(n):
+            y1 = a * y1 + (1 - a) * rng.gauss(0.0, 1.0)
+            y2 = a * y2 + (1 - a) * y1
+            m.append(y2)
+        sd = math.sqrt(sum(v * v for v in m) / max(1, n)) or 1.0
+        mods.append([v / sd for v in m])
+    for i in range(n):
+        x[i] *= 10 ** ((SYNTH["flicker_db"] * mods[0][i] + SYNTH["flicker_slow_db"] * mods[1][i]) / 20)
+    for q in _butter_qs(SYNTH["hp_order"]):
+        x = _biquad(x, *_rbj("hp", SYNTH["hp_hz"], fs, q))
+    for q in _butter_qs(SYNTH["lp_order"]):
+        x = _biquad(x, *_rbj("lp", SYNTH["lp_hz"], fs, q))
+    for f0, gain, q in SYNTH["peaks"]:
+        x = _biquad(x, *_rbj("peak", f0, fs, q, gain))
+    rms = math.sqrt(sum(v * v for v in x) / max(1, n)) or 1.0
+    return [v / rms for v in x]

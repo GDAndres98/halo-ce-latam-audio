@@ -581,7 +581,7 @@ class M4App:
             raise ApiError(500, str(e))
         try:
             clicks = self.radio_clicks() if (edit.get("radio") or {}).get("clicks") else None
-            static = self.radio_static() if edit.get("interference") else None
+            static = self.radio_static() if interference.needs_mcc_static(edit.get("interference")) else None
             r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"], clicks, static)
         except audio_edit.EditError as e:
             raise ApiError(422, f"edit: {e}")

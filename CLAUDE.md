@@ -238,7 +238,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         engine `interference/2` since prompt 45, in `scripts/common/interference.py`. It is refused for any other
         line.
       - The field holds an intensity curve (points t/v) plus the 11 owner-chosen phrase guides. The curve drives
-        speech ducking (removed at >= 0.95) and continuous granular MCC static with flutter.
+        speech ducking (removed at >= 0.95) and continuous static with flutter. The static's `texture` is
+        "synthetic" (made from scratch, fitted to MCC's; the stored recipe's choice) or "mcc" (granular MCC Spain
+        sample).
       - Applied on the source timeline before edits (`audio-render/10`). The static is MCC Spain's own burst
         (`scripts/common/radio_static.py`, pinned, decoded on demand).
       - Guides are in `config/interference/vo_scr_m06_00740_victor933.json`; the default curve is generated

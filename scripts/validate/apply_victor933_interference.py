@@ -8,7 +8,8 @@ an approved line is refused, never re-opened here. Nothing else changes.
 
 --upgrade (owner prompt 45): a recipe that still holds the old interference/1 regions gets the curve instead;
 the regions' labels, kinds and times become the guides (unchanged decisions). --reset-curve regenerates the
-curve from the recipe's guides (the Studio's "Reset curve" does the same for the draft).
+curve from the recipe's guides (the Studio's "Reset curve" does the same for the draft). --texture synthetic|mcc
+sets the static's source (synthetic = made from scratch; owner request 2026-10-13), keeping the curve.
 
     python scripts/validate/apply_victor933_interference.py [--upgrade]              # dry run
     python scripts/validate/apply_victor933_interference.py [--upgrade] --write      # backup, apply, verify
@@ -37,7 +38,7 @@ def sha(p):
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
-def plan(doc, guides, duration_s, upgrade=False, reset_curve=False):
+def plan(doc, guides, duration_s, upgrade=False, reset_curve=False, texture=None):
     new = copy.deepcopy(doc)
     targets = [s for s in new["slots"] if s["audio"]["source"] == "ce"
                and [x["ce_line_ref"] for x in s["audio"]["sources"]] == [REF]]
@@ -47,13 +48,21 @@ def plan(doc, guides, duration_s, upgrade=False, reset_curve=False):
     if s["audio"]["status"] == "approved":
         raise SystemExit(f"{s['mapping_id']} audio is approved: mark it Needs rework in the Studio first")
     current = s["audio"]["edit"].get("interference")
+    if texture and current and current.get("engine") == interference.ENGINE and not reset_curve:
+        before = s["audio"]["edit"]
+        s["audio"]["edit"] = audio_edit.normalize(dict(before, interference=dict(current, texture=texture)))
+        if s["audio"]["edit"] == before:
+            return new, None
+        return new, {"mapping_id": s["mapping_id"], "slot_id": s["slot_id"], "audio": s["audio"]["status"],
+                     "summary": audio_edit.summary(s["audio"]["edit"])}
     if current and not (upgrade and current.get("engine") != interference.ENGINE) and not reset_curve:
         return new, None
     if current and current.get("engine") != interference.ENGINE:  # the old regions: their decisions become the guides
         guides = [{k: r[k] for k in ("label", "kind", "start_s", "end_s")} for r in current["regions"]]
     elif current:  # --reset-curve: the recipe's own guides, a freshly generated curve
         guides = current["guides"]
-    value = {"guides": guides, "points": interference.default_points(guides, duration_s), "flutter_db": 2.5}
+    value = {"guides": guides, "points": interference.default_points(guides, duration_s), "flutter_db": 2.5,
+             "texture": texture or (current or {}).get("texture", "synthetic")}
     before = s["audio"]["edit"]
     s["audio"]["edit"] = audio_edit.normalize(dict(before, interference=value))
     if s["audio"]["edit"] == before:
@@ -70,6 +79,8 @@ def main():
     ap.add_argument("--upgrade", action="store_true", help="replace old interference/1 regions by the curve")
     ap.add_argument("--reset-curve", action="store_true",
                     help="replace the stored curve by the generated default (the guides are kept); audio not approved only")
+    ap.add_argument("--texture", choices=interference.TEXTURES,
+                    help="set the static's source (synthetic = made from scratch, mcc = MCC Spain's sample)")
     a = ap.parse_args()
     root, path = a.root, a.root / MAPPINGS
     if a.rollback:
@@ -86,7 +97,7 @@ def main():
     app = make_app(root, DEFAULT_VGMSTREAM)
     duration = app._wav_duration(app.ce_wav(REF, "Spanish(Mexico)"))
     doc, loaded = mapping_store.load(path)
-    new, change = plan(doc, guides, duration, upgrade=a.upgrade, reset_curve=a.reset_curve)
+    new, change = plan(doc, guides, duration, upgrade=a.upgrade, reset_curve=a.reset_curve, texture=a.texture)
     if not change:
         print("nothing to do: the recipe already holds this interference curve")
         return 0

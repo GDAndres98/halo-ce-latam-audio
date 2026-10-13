@@ -139,6 +139,8 @@ export interface InterferenceCurve {
   points: CurvePoint[];
   guides: InterferenceGuide[];
   flutter_db: number;
+  /** The static: made from scratch, or MCC Spain's sample (absent = "mcc"). */
+  texture?: "synthetic" | "mcc";
 }
 
 /** What the server gives for a line with the one-off treatment (only Victor 933's). */

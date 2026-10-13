@@ -11959,7 +11959,7 @@
         "revision": 1
       },
       "audio": {
-        "status": "needs_rework",
+        "status": "approved",
         "source": "ce",
         "sources": [
           {
@@ -11970,7 +11970,7 @@
         ],
         "edit": {
           "trim_start_s": 0,
-          "trim_end_s": 0,
+          "trim_end_s": 0.913,
           "gap_s": 0,
           "engine": "audio-edit/1",
           "for_source": {
@@ -11981,10 +11981,6 @@
             {
               "start_s": 0,
               "end_s": 1.389
-            },
-            {
-              "start_s": 2.768,
-              "end_s": 2.905
             }
           ],
           "silences": [],
@@ -11992,39 +11988,54 @@
           "fade_out_ms": 0,
           "crossfade_ms": 20,
           "radio": {
-            "preset": "spain_eco",
-            "low_hz": 350,
-            "high_hz": 8000,
+            "preset": "custom",
+            "low_hz": 700,
+            "high_hz": 3300,
             "slope_db_oct": 36,
-            "presence_db": 8,
+            "presence_db": 0,
             "drive_db": 0,
             "noise_dbfs": null,
-            "presence_hz": 2500,
             "clicks": false
           },
           "echo": {
-            "preset": "spain",
+            "preset": "custom",
             "slap_ms": 30,
             "slap_db": null,
             "delay_ms": 140,
             "echo_db": -11,
-            "feedback_db": -15,
+            "feedback_db": null,
             "diffusion": 1,
             "damping_hz": 4000
           }
         },
-        "fingerprint": null,
-        "approved_at": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:ass03#0",
+            "index": 5525,
+            "data_sha256": "e310fedec44cd27a8ebbe6c7586c34b3c732dfc41720c792ae60e9e3841b9295"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m01_cin01_sc05_cryo_00420_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 716456658,
+                  "wem_sha256": "2d7153c5fa5b6ba3ea6e7c918b8c48a6a001dbd07f4b7baccd10ce0b1f0c89cf"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-13",
         "revision": 3
       },
       "subtitle": {
         "status": "approved",
-        "source": "ce_locres",
-        "ce_locres": {
-          "ce_line_ref": "vo_cin_m01_cin01_sc05_cryo_00420_cortana#0",
-          "culture": "es-MX"
-        },
-        "custom_ref": null,
+        "source": "custom",
+        "ce_locres": null,
+        "custom_ref": "c-000035",
         "mcc_key_hash": null,
         "mcc_key_verification": null,
         "fingerprint": {
@@ -12033,17 +12044,14 @@
             "index": 5525,
             "data_sha256": "e310fedec44cd27a8ebbe6c7586c34b3c732dfc41720c792ae60e9e3841b9295"
           },
-          "source": "ce_locres",
-          "ce_locres": {
-            "ce_line_ref": "vo_cin_m01_cin01_sc05_cryo_00420_cortana#0",
-            "culture": "es-MX",
-            "namespace": "VO_CIN_M01PILLAROFAUTUMN",
-            "key": "VO_CIN_M01_cin01_sc05_cryo_00420_Cortana",
-            "source_hash": 88468595
+          "source": "custom",
+          "custom": {
+            "custom_ref": "c-000035",
+            "text_sha256": "7c94c087ee0565c2f325467f680c5a40bb1532f72156565697c81624b5da1631"
           }
         },
-        "approved_at": "2026-10-08",
-        "revision": 1
+        "approved_at": "2026-10-13",
+        "revision": 2
       },
       "radio_effect": {
         "needed": true,
@@ -42422,7 +42430,8 @@
                 "end_s": 25.93
               }
             ],
-            "flutter_db": 2.5
+            "flutter_db": 2.5,
+            "texture": "synthetic"
           }
         },
         "fingerprint": null,

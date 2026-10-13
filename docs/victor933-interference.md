@@ -49,7 +49,7 @@ How the interference behaves:
 - **Duration:** MCC Spain 28.43 s, MCC English 28.64 s, CE es-MX 29.22 s (28.75 s after the owner's cuts and
   trim). The pacing is close, and the CE "33" falls exactly where MCC's first burst is.
 
-The Studio's **MCC reference** overlay (§3.3) draws this as a curve. Spain shows clear bursts against the bed;
+The Studio's **MCC reference** overlay (§3.4) draws this as a curve. Spain shows clear bursts against the bed;
 English sits near full intensity most of the time (median 0.92), because its static is so loud.
 
 ## 2. The 11 phrase guides (owner decisions, prompt 44)
@@ -109,12 +109,16 @@ It is refused for every other recording.
 | 0.85 | −20 dB | −14 dB |
 | ≥ 0.95 | **removed** | −9.3 dB (MCC Spain's static vs voice) |
 
-3. **The static is one continuous stream for the whole line.**
-   - It is made of 160 ms sine-windowed grains (50 % overlap, constant power) taken from seeded random
+3. **The static is one continuous stream for the whole line**, from one of two sources (`texture`):
+   - **`synthetic`** (the stored recipe's choice since 2026-10-13): made from scratch and fitted to MCC Spain's
+     static (§3.3). Nothing is decoded from the game for it.
+   - **`mcc`** (absent = mcc): 160 ms sine-windowed grains (50 % overlap, constant power) from seeded random
      positions in MCC Spain's own pure-static stretch (`common/radio_static.py`; 4.40–5.80 s of
-     `es:c10_010_captpilot#0`, pinned SHA-256, decoded on demand, no audio in git).
-   - Consecutive grains jump at least 200 ms, so it never loops audibly.
-   - A slow seeded "flutter" (low-passed noise, about 6 Hz, ±`flutter_db`) moves its level organically.
+     `es:c10_010_captpilot#0`, pinned SHA-256, decoded on demand, no audio in git). Consecutive grains jump at
+     least 200 ms, so it never loops audibly.
+
+   Either way, a slow seeded "flutter" (low-passed noise, about 6 Hz, ±`flutter_db`) moves its level
+   organically.
 4. Then come the owner's edits, the radio filter (custom 700–3300 Hz, 12 dB/oct, hiss −40 dBFS, clicks, as the
    owner set it), the level stage and CELT. The preview and M6 run the same code, and renders are
    deterministic.
@@ -134,7 +138,29 @@ Masked phrases win structurally: no other point may sit inside a plateau or with
 dropouts merge. A test over 200 random layouts (1,000 when developed), with phrases as close as 6 ms, checks
 that every masked phrase stays at full intensity after smoothing.
 
-### 3.3 Studio: the interference lane (`frontend/src/components/match/InterferenceLane.vue`)
+### 3.3 Synthetic static (owner request, 2026-10-13)
+
+`interference.synthetic_texture`, deterministic (seeded):
+1. White noise, plus sparse crackle (about 40 pops per second, 1–4 ms each).
+2. A level flicker in dB with a fast component (about 30 Hz, 1.5 dB) and a slow one (about 5 Hz, 0.6 dB).
+3. A 4th-order high-pass at 320 Hz and low-pass at 3.6 kHz, plus peaks of +9 dB at 500 Hz (Q 2) and +11 dB at
+   2 kHz (Q 1.8).
+
+**Fitted against MCC Spain's static stretch:**
+
+| Measure | MCC Spain | Synthetic |
+|---|---|---|
+| 1/3-octave spectrum difference, 125 Hz–8 kHz | — | 2.9 dB RMS |
+| Level std, 5 ms frames | 2.07 dB | 1.91 dB |
+| Level std, 50 ms frames | 0.95 dB | 0.99 dB |
+| Kurtosis | 3.28 | 3.44 |
+| Crest | 13.8 dB | 13.1 dB |
+
+On the real line it renders as continuously as the sample version: −55.7 / −45.2 / −25.8 dB min / median / max
+over 50 ms frames, with all six masked phrases hidden, no clicks and the same length. The lane's **Static**
+selector switches between the two sources.
+
+### 3.4 Studio: the interference lane (`frontend/src/components/match/InterferenceLane.vue`)
 
 The lane is shown only for this recording, in Audio editing. It draws:
 - **Bands:** red = speech removed (≥ 0.95), amber = ducked, blue = the hiss bed (≤ 0.35).
@@ -148,7 +174,8 @@ Controls:
 - **Points:** click empty space to add a point (and drag it); drag a point; double-click or press Delete to
   remove one; arrow keys nudge the selected point (10 ms / 0.02). Its time and intensity can also be typed.
 - **Draw:** drag to paint a stretch of the curve; the stroke replaces the points under it.
-- **Zoom** 1–16×, scrolling sideways. **Flutter** in dB. **Reset curve** regenerates it from the guides.
+- **Zoom** 1–16×, scrolling sideways. **Static**: synthetic or MCC Spain sample. **Flutter** in dB. **Reset
+  curve** regenerates it from the guides.
 - **Transport:** play from the cursor (click the time ruler) as CE processed (the M6 render, mapped through
   trims and cuts), CE original, MCC Spain or MCC English. Switching source while playing keeps the position;
   MCC runs on its own timeline.
@@ -160,6 +187,7 @@ Controls:
 **Data:** `scripts/validate/apply_victor933_interference.py`.
 - `--upgrade` turned `m-000482`'s old `interference/1` regions into guides plus the default curve.
 - `--reset-curve` regenerates the curve from the recipe's guides.
+- `--texture synthetic|mcc` sets the static's source (now synthetic).
 
 The audio was already needs rework, and nothing else changed. Backups are in `work/migrations/*_victor933_*`.
 

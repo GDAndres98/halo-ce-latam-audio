@@ -354,7 +354,7 @@ class InterferenceTests(unittest.TestCase):
         e = ae.normalize({"interference": self.CURVE}, V933)
         self.assertEqual(e["interference"]["engine"], I.ENGINE)
         self.assertEqual(ae.normalize(e), e)
-        self.assertIn("interference curve (6 points; 2 guides, 1 masked)", ae.summary(e))
+        self.assertIn("interference curve (6 points; 2 guides, 1 masked; MCC static)", ae.summary(e))
         with self.assertRaises(ae.EditError):  # every other recording is refused
             ae.normalize({"interference": self.CURVE}, SRC)
         with self.assertRaises(ae.EditError):  # the old region format needs the upgrade script
@@ -404,6 +404,44 @@ class InterferenceTests(unittest.TestCase):
         self.assertTrue(st["masked_hidden"])
         self.assertEqual([g["hidden"] for g in st["guides"]], [False, True])
         self.assertEqual(r["pcm"], ae.render(pcm, e, static=fake_static())["pcm"])  # deterministic
+
+    def test_synthetic_static_needs_no_mcc_audio(self):
+        from common import interference as I
+        pcm = ae.float_to_pcm16(speech(1.2, amp=0.3))
+        e = ae.normalize({"interference": dict(self.CURVE, texture="synthetic")}, V933)
+        self.assertEqual(e["interference"]["texture"], "synthetic")
+        self.assertFalse(I.needs_mcc_static(e["interference"]))
+        self.assertIn("synthetic static", ae.summary(e))
+        r = ae.render(pcm, e)  # no MCC static passed: made from scratch
+        self.assertEqual(r["pcm"], ae.render(pcm, e)["pcm"])  # deterministic
+        st = r["stats"]["interference"]
+        self.assertEqual((st["texture"], st["static_sha256"]), ("synthetic", None))
+        self.assertTrue(st["masked_hidden"])
+        y, x = ae.pcm16_to_float(r["pcm"]), ae.pcm16_to_float(pcm)
+        self.assertEqual(len(y), len(x))
+        self.assertTrue(any(y[int(0.6 * FS):int(0.9 * FS)]))  # static where the speech is removed
+        self.assertTrue(I.needs_mcc_static(ae.normalize({"interference": self.CURVE}, V933)["interference"]))  # absent = mcc
+        with self.assertRaises(ae.EditError):
+            ae.normalize({"interference": dict(self.CURVE, texture="pink")}, V933)
+
+    def test_synthetic_static_keeps_its_fitted_spectrum(self):
+        from common import interference as I
+
+        def band_db(sig, lo, hi):  # energy in [lo, hi) Hz by Goertzel at 50 Hz steps
+            n, tot = len(sig), 0.0
+            for f in range(lo, hi, 50):
+                w = 2 * math.pi * f / FS
+                c, s1, s2 = 2 * math.cos(w), 0.0, 0.0
+                for v in sig:
+                    s1, s2 = v + c * s1 - s2, s1
+                tot += s1 * s1 + s2 * s2 - c * s1 * s2
+            return 10 * math.log10(tot / n + 1e-20)
+        x = I.synthetic_texture(8820, FS)
+        self.assertEqual(x, I.synthetic_texture(8820, FS))
+        self.assertAlmostEqual(math.sqrt(sum(v * v for v in x) / len(x)), 1.0, places=6)
+        body = band_db(x, 400, 2600)
+        self.assertLess(band_db(x, 60, 160), body - 15)    # MCC: -23 dB at 125 Hz
+        self.assertLess(band_db(x, 6000, 9000), body - 15)  # MCC: -24 dB at 6.3 kHz, -35 dB at 8 kHz
 
     def test_curve_stays_on_the_source_timeline_under_trims_and_cuts(self):
         pcm = ae.float_to_pcm16(speech(1.2, amp=0.3))

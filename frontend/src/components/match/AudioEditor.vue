@@ -59,6 +59,7 @@ import {
   setEchoValue,
   setCurvePoints,
   setFlutter,
+  setTexture,
   setInterferenceCurve,
   setSilenceLength,
   type Span,
@@ -214,6 +215,7 @@ function applyDefaultCurve() {
       guides: current?.guides ?? info.guides,
       points: info.points as CurvePoint[],
       flutter_db: current?.flutter_db ?? 2.5,
+      texture: current?.texture ?? "synthetic",
     }),
   );
 }
@@ -494,6 +496,7 @@ useShortcuts({
           :language="draft.audioLanguage" :source-url="replacementUrl ?? ''" :duration="duration" :can-edit="canEdit"
           @points="(p) => attempt(() => setCurvePoints(draft.edit, p, duration))"
           @flutter="(v) => attempt(() => setFlutter(draft.edit, v))"
+          @texture="(t) => attempt(() => setTexture(draft.edit, t))"
           @reset="applyDefaultCurve"
         />
         <section v-else class="radio-filter interference" aria-label="Transmission interference" data-testid="interference">
