@@ -9,7 +9,21 @@ A recipe lives in a mapping's `audio.edit` (manual-mappings/3). The identity rec
      "cuts": [{"start_s": 1.20, "end_s": 1.45}],      # interior sections removed (source seconds)
      "silences": [{"at_s": 0.80, "dur_s": 0.30}],     # silence inserted at a source time (exact length)
      "fade_in_ms": 10, "fade_out_ms": 10,             # half-cosine fades on the edited edges
-     "crossfade_ms": 20}                              # equal-power crossfade at every cut
+     "crossfade_ms": 20,                              # equal-power crossfade at every cut
+     "radio": {"preset": "spain", "low_hz": 700, "high_hz": 3300, "slope_db_oct": 36,   # optional radio
+               "presence_db": 0, "drive_db": 0, "noise_dbfs": None,                   # filter (2026-10-13)
+               "clicks": True}}                                                       # + MCC's clicks
+
+Radio filter (owner request, 2026-10-13; `radio`, optional, null/absent = off): the MCC originals of the
+pilot-style radio lines have the effect baked into the bank samples (the game applies none), so a CE
+replacement gets it here, before the level stage. A Butterworth band-pass (high-pass at low_hz, low-pass at
+high_hz, `slope_db_oct` 12/24/36 on each side), an optional peaking "presence" boost at the band's geometric
+centre, an optional tanh saturation (`drive_db`) and optional channel hiss (`noise_dbfs`, white noise from a
+fixed seed through the same band-pass, so renders stay deterministic). The presets are fitted from the MCC
+recordings (docs/radio-filter.md): `spain` (steep 700–3300 Hz, clean) and `english` (gentle 1000–5000 Hz,
+presence lift, light drive, hiss). `preset` is a label only: the stored numbers are what renders.
+`clicks` (optional, absent = false) puts MCC's own Spain radio key-up click before the line and the
+release/squelch after it (common/radio_clicks.py); the `spain` preset has them on.
 
 Removed 2026-10-09 (owner feedback): `speed` (pitch-preserving tempo sounded unnatural) and `gain_db`
 (per-line manual gain; replaced by one global export gain). A stored recipe that still has either
@@ -27,6 +41,9 @@ Times are seconds on the SOURCE recording's timeline (the editor's waveform). Pr
     1. edit: keep [trim_start, end - trim_end] minus the cuts (equal-power crossfade at each junction),
        fade in / out, then inserted silences (half-cosine fades of crossfade_ms / 2 on both sides;
        digital silence, ignored by BS.1770 gating)
+    1b. the radio filter, when the recipe has one (band-pass, presence, drive, hiss)
+    1c. the echo, when the recipe has one (slap tap, echo with feedback / diffusion / damping; the line gets
+       longer by the echo's ring-out)
     2. the level, by the build-level mode in config/audio_export.json (common/export_config.py):
        global_gain (default)  the global export gain (default +4 dB), applied exactly once, linearly, to
                               every CE replacement. Never limited: if the peak would pass -1 dBFS the gain
@@ -39,12 +56,14 @@ Times are seconds on the SOURCE recording's timeline (the editor's waveform). Pr
                               MATCH_MAX_LIMITING_DB off any peak (the shortfall is reported). The global
                               gain is not used. Without a measurable Spain reference the line falls back
                               to the global gain (reported).
+    2b. radio clicks (`radio.clicks`): MCC's Spain key-up click before the line and release/squelch after it,
+       at the level they have in the game (not filtered, not gained; common/radio_clicks.py)
     3. round to 16-bit
 
 The loudness of the line and of the original MCC recording are measured and reported.
 
-Nothing here reads mappings, approves anything or writes files. The radio flag is separate
-(`radio_effect`) and no effect is ever applied here.
+Nothing here reads mappings, approves anything or writes files. The slot's "Needs radio effect" flag
+(`radio_effect`) stays separate: only a recipe's own `radio` filter is applied.
 """
 import math
 import sys
@@ -53,7 +72,7 @@ from array import array
 from collections import deque
 
 ENGINE = "audio-edit/1"            # recipe format
-RENDER_ENGINE = "audio-render/5"   # 2: no speed/manual gain; 3: no limiter; 4: no matching; 5: level modes
+RENDER_ENGINE = "audio-render/8"   # 2: no speed/manual gain; 3: no limiter; 4: no matching; 5: level modes; 6: radio; 7: clicks; 8: echo
 REMOVED_FIELDS = ("speed", "gain_db")
 # Removed 2026-10-11 (owner): the limiter and loudness matching. A stored `limiter` (migrate_remove_limiter.py
 # removed them from the mappings) or a `loudness` that is off is ignored and dropped on save.
@@ -69,6 +88,40 @@ PEAK_CEILING_DB = -1.0     # headroom for the codec; also keeps M6's "no new cli
 LEVEL_MODES = ("global_gain", "match_spain")
 MATCH_MAX_LIMITING_DB = 6.0  # match_spain: the most the limiter may take off a peak (owner, 2026-10-11)
 LIMITER = {"lookahead_ms": 5.0, "release_ms": 80.0}
+# Radio filter (2026-10-13). Presets fitted from the MCC radio lines' spectra (docs/radio-filter.md).
+RADIO_PRESETS = {
+    "spain": {"low_hz": 700, "high_hz": 3300, "slope_db_oct": 36, "presence_db": 0, "drive_db": 0, "noise_dbfs": None,
+              "clicks": True},
+    "english": {"low_hz": 1000, "high_hz": 5000, "slope_db_oct": 12, "presence_db": 6, "drive_db": 6, "noise_dbfs": -50,
+                "clicks": False},
+    # the cryo assistant's intercom ("eco" lines), fitted 2026-10-13 (docs/radio-filter.md §5); used with an echo
+    "spain_eco": {"low_hz": 350, "high_hz": 8000, "slope_db_oct": 36, "presence_db": 8, "presence_hz": 2500,
+                  "drive_db": 0, "noise_dbfs": None, "clicks": False},
+    "english_eco": {"low_hz": 150, "high_hz": 2250, "slope_db_oct": 12, "presence_db": 8, "presence_hz": 400,
+                    "drive_db": 0, "noise_dbfs": None, "clicks": False},
+}
+RADIO_FIELDS = ("low_hz", "high_hz", "slope_db_oct", "presence_db", "drive_db", "noise_dbfs")
+RADIO_LIMITS = {"low_hz": (100, 2000), "high_hz": (1000, 10000), "presence_db": (-6, 12), "drive_db": (0, 24),
+                "noise_dbfs": (-80, -30)}
+RADIO_SLOPES = (12, 24, 36)
+RADIO_MIN_RATIO = 1.5      # high_hz must be at least this many times low_hz
+RADIO_NOISE_SEED = 0x5AD10
+PRESENCE_HZ = (200, 8000)  # optional presence centre; absent = the band's geometric centre
+# Echo (2026-10-13, the "eco" lines; docs/radio-filter.md §5): an optional short "slap" tap plus a main echo with
+# optional feedback (repeats), diffusion (allpass smear: the repeats stop being exact copies) and damping (a
+# low-pass in the echo path). Presets fitted from the MCC recordings.
+ECHO_PRESETS = {
+    "spain": {"slap_ms": 30, "slap_db": None, "delay_ms": 140, "echo_db": -11, "feedback_db": -15, "diffusion": 1,
+              "damping_hz": 4000},
+    "english": {"slap_ms": 30, "slap_db": -12, "delay_ms": 150, "echo_db": -12, "feedback_db": None, "diffusion": 0,
+                "damping_hz": None},
+}
+ECHO_FIELDS = ("slap_ms", "slap_db", "delay_ms", "echo_db", "feedback_db", "diffusion", "damping_hz")
+ECHO_NULLABLE = ("slap_db", "feedback_db", "damping_hz")
+ECHO_LIMITS = {"slap_ms": (5, 80), "slap_db": (-40, -3), "delay_ms": (50, 600), "echo_db": (-40, -3),
+               "feedback_db": (-40, -3), "diffusion": (0, 1), "damping_hz": (1000, 16000)}
+ECHO_TAIL_FLOOR_DB = -60   # the echo rings out until its repeats are this far down (at most ECHO_MAX_TAIL_S)
+ECHO_MAX_TAIL_S = 2.0
 
 
 class EditError(ValueError):
@@ -81,7 +134,7 @@ def is_identity(edit):
     Removed fields (speed, gain_db) are ignored here; `removed_fields` reports them."""
     e = edit or {}
     return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts") and not e.get("silences")
-            and not e.get("fade_in_ms") and not e.get("fade_out_ms"))
+            and not e.get("fade_in_ms") and not e.get("fade_out_ms") and not e.get("radio") and not e.get("echo"))
 
 
 def removed_fields(edit):
@@ -100,6 +153,125 @@ def _r(x, nd):
     return int(x) if x == int(x) else x
 
 
+def normalize_radio(radio):
+    """Owner input -> canonical radio filter, or None (off). A preset name alone fills the preset's values;
+    `preset` is kept as a label ('custom' when it is not one of RADIO_PRESETS). Ranges: `radio_problems`."""
+    if radio is None or radio is False:
+        return None
+    if not isinstance(radio, dict):
+        raise EditError("radio must be an object or null")
+    unknown = set(radio) - set(RADIO_FIELDS) - {"preset", "clicks", "presence_hz"}
+    if unknown:
+        raise EditError(f"unknown radio field(s) {sorted(unknown)}")
+    preset = radio.get("preset", "custom")
+    if not isinstance(preset, str) or preset not in (*RADIO_PRESETS, "custom"):
+        raise EditError(f"unknown radio preset {preset!r}")
+    base = RADIO_PRESETS.get(preset, RADIO_PRESETS["spain"])
+    out = {"preset": preset}
+    for k in RADIO_FIELDS:
+        v = radio.get(k, base[k])
+        if k == "noise_dbfs" and v is None:
+            out[k] = None
+            continue
+        out[k] = _r(_num(v, f"radio {k}"), 1 if k in ("presence_db", "drive_db", "noise_dbfs") else 0)
+    ph = radio["presence_hz"] if "presence_hz" in radio else (base.get("presence_hz") if preset != "custom" else None)
+    if ph is not None:  # only stored when set: recipes without it keep their exact form
+        out["presence_hz"] = _r(_num(ph, "radio presence_hz"), 0)
+    clicks = radio.get("clicks", base["clicks"])
+    if not isinstance(clicks, bool):
+        raise EditError("radio clicks must be true or false")
+    out["clicks"] = clicks
+    bad = radio_problems(out)
+    if bad:
+        raise EditError("; ".join(bad))
+    return out
+
+
+def radio_problems(radio):
+    if not radio:
+        return []
+    out = []
+    if radio.get("preset") not in (*RADIO_PRESETS, "custom"):
+        out.append(f"unknown radio preset {radio.get('preset')!r}")
+    missing = [k for k in RADIO_FIELDS if k not in radio]
+    if missing:
+        return out + [f"radio is missing {', '.join(missing)}"]
+    if not isinstance(radio.get("clicks", False), bool):  # absent = no clicks (recipes from before the field)
+        out.append("radio clicks must be true or false")
+    ph = radio.get("presence_hz")
+    if ph is not None and not PRESENCE_HZ[0] <= ph <= PRESENCE_HZ[1]:
+        out.append(f"radio presence_hz {ph} outside {PRESENCE_HZ[0]}..{PRESENCE_HZ[1]}")
+    for k, (lo, hi) in RADIO_LIMITS.items():
+        v = radio[k]
+        if v is not None and not lo <= v <= hi:
+            out.append(f"radio {k} {v} outside {lo}..{hi}")
+    if radio["slope_db_oct"] not in RADIO_SLOPES:
+        out.append(f"radio slope {radio['slope_db_oct']} dB/oct is not one of {', '.join(map(str, RADIO_SLOPES))}")
+    if radio["high_hz"] < radio["low_hz"] * RADIO_MIN_RATIO:
+        out.append(f"radio band {radio['low_hz']}–{radio['high_hz']} Hz is too narrow "
+                   f"(high must be at least {RADIO_MIN_RATIO:g} × low)")
+    return out
+
+
+def normalize_echo(echo):
+    """Owner input -> canonical echo, or None (off). A preset name alone fills the preset's values."""
+    if echo is None or echo is False:
+        return None
+    if not isinstance(echo, dict):
+        raise EditError("echo must be an object or null")
+    unknown = set(echo) - set(ECHO_FIELDS) - {"preset"}
+    if unknown:
+        raise EditError(f"unknown echo field(s) {sorted(unknown)}")
+    preset = echo.get("preset", "custom")
+    if not isinstance(preset, str) or preset not in (*ECHO_PRESETS, "custom"):
+        raise EditError(f"unknown echo preset {preset!r}")
+    base = ECHO_PRESETS.get(preset, ECHO_PRESETS["spain"])
+    out = {"preset": preset}
+    for k in ECHO_FIELDS:
+        v = echo.get(k, base[k])
+        out[k] = None if (v is None and k in ECHO_NULLABLE) else _r(_num(v, f"echo {k}"), 2 if k == "diffusion" else 1)
+    bad = echo_problems(out)
+    if bad:
+        raise EditError("; ".join(bad))
+    return out
+
+
+def echo_problems(echo):
+    if not echo:
+        return []
+    out = []
+    if echo.get("preset") not in (*ECHO_PRESETS, "custom"):
+        out.append(f"unknown echo preset {echo.get('preset')!r}")
+    missing = [k for k in ECHO_FIELDS if k not in echo]
+    if missing:
+        return out + [f"echo is missing {', '.join(missing)}"]
+    for k, (lo, hi) in ECHO_LIMITS.items():
+        v = echo[k]
+        if v is None and k in ECHO_NULLABLE:
+            continue
+        if v is None or not lo <= v <= hi:
+            out.append(f"echo {k} {v} outside {lo}..{hi}")
+    return out
+
+
+def echo_summary(echo):
+    """e.g. 'echo spain 140 ms' or 'echo custom 150 ms -12 dB, slap 30 ms -12 dB'."""
+    e = echo
+    s = f"echo {e['preset']} {e['delay_ms']:g} ms"
+    if e["preset"] != "custom" and all(e[k] == ECHO_PRESETS[e["preset"]][k] for k in ECHO_FIELDS):
+        return s
+    s += f" {e['echo_db']:g} dB"
+    if e["feedback_db"] is not None:
+        s += f", feedback {e['feedback_db']:g} dB"
+    if e["slap_db"] is not None:
+        s += f", slap {e['slap_ms']:g} ms {e['slap_db']:g} dB"
+    if e["diffusion"]:
+        s += f", diffusion {e['diffusion']:g}"
+    if e["damping_hz"] is not None:
+        s += f", damping {e['damping_hz']:g} Hz"
+    return s
+
+
 def normalize(edit, for_source=None):
     """Owner input -> canonical recipe (rounded, defaults filled, cuts sorted). Identity -> EDIT_ZERO.
     Raises EditError for anything malformed or out of range (duration checks: `problems`)."""
@@ -113,7 +285,7 @@ def normalize(edit, for_source=None):
     lo = e.pop("loudness", None)
     if lo is not None and (not isinstance(lo, dict) or lo.get("mode", "off") != "off" or lo.get("offset_db", 0)):
         raise EditError("loudness matching was removed (2026-10-11): the global export gain is the only level setting")
-    unknown = set(e) - set(EDIT_ZERO) - set(DEFAULTS) - {"engine", "for_source"}
+    unknown = set(e) - set(EDIT_ZERO) - set(DEFAULTS) - {"engine", "for_source", "radio", "echo"}
     if unknown:
         raise EditError(f"unknown edit field(s) {sorted(unknown)}")
     out = {"trim_start_s": _r(_num(e.get("trim_start_s", 0), "trim_start_s"), 3),
@@ -136,6 +308,12 @@ def normalize(edit, for_source=None):
            "fade_in_ms": _r(_num(e.get("fade_in_ms", 0), "fade_in_ms"), 0),
            "fade_out_ms": _r(_num(e.get("fade_out_ms", 0), "fade_out_ms"), 0),
            "crossfade_ms": _r(_num(e.get("crossfade_ms", DEFAULTS["crossfade_ms"]), "crossfade_ms"), 0)}
+    radio = normalize_radio(e.get("radio"))
+    if radio:  # only present when on: recipes without a radio filter keep their exact earlier form
+        rec["radio"] = radio
+    echo = normalize_echo(e.get("echo"))
+    if echo:
+        rec["echo"] = echo
     if is_identity(rec):
         return dict(EDIT_ZERO, gap_s=out["gap_s"])
     fs = for_source or e.get("for_source")
@@ -163,6 +341,8 @@ def problems(edit, duration_s=None):
         v = e.get(k, DEFAULTS.get(k))
         if v is not None and not lo <= v <= hi:
             out.append(f"{k} {v} outside {lo}..{hi}")
+    out += radio_problems(e.get("radio"))
+    out += echo_problems(e.get("echo"))
     ts, te = e.get("trim_start_s", 0), e.get("trim_end_s", 0)
     if ts < 0 or te < 0:
         out.append("trims must be >= 0")
@@ -211,7 +391,30 @@ def summary(edit):
                     f"({sum(c['dur_s'] for c in e['silences']):.2f} s)")
     if e["fade_in_ms"] or e["fade_out_ms"]:
         bits.append(f"fades {e['fade_in_ms']:g}/{e['fade_out_ms']:g} ms")
+    if e.get("radio"):
+        bits.append(radio_summary(e["radio"]))
+    if e.get("echo"):
+        bits.append(echo_summary(e["echo"]))
     return " · ".join(bits)
+
+
+def radio_summary(radio):
+    """e.g. 'radio spain 700–3300 Hz' or 'radio custom 600–3500 Hz, 24 dB/oct, presence +3 dB, hiss -55 dBFS'."""
+    r = radio
+    s = f"radio {r['preset']} {r['low_hz']:g}–{r['high_hz']:g} Hz"
+    clicks = r.get("clicks", False)
+    if r["preset"] != "custom" and all(r[k] == RADIO_PRESETS[r["preset"]][k] for k in RADIO_FIELDS)             and clicks == RADIO_PRESETS[r["preset"]]["clicks"] \
+            and r.get("presence_hz") == RADIO_PRESETS[r["preset"]].get("presence_hz"):
+        return s
+    s += f", {r['slope_db_oct']:g} dB/oct"
+    if r["presence_db"]:
+        s += f", presence {r['presence_db']:+g} dB" + (f" at {r['presence_hz']:g} Hz" if r.get("presence_hz") else "")
+    if r["drive_db"]:
+        s += f", drive {r['drive_db']:g} dB"
+    if r["noise_dbfs"] is not None:
+        s += f", hiss {r['noise_dbfs']:g} dBFS"
+    s += ", clicks" if clicks else ", no clicks"
+    return s
 
 
 # --------------------------------------------------------------------------- PCM helpers
@@ -386,6 +589,120 @@ def fade(x, fade_in, fade_out):
     return x
 
 
+def _biquad(x, b, a):
+    """Direct form I biquad; b, a unnormalized (a[0] divides)."""
+    b0, b1, b2 = (v / a[0] for v in b)
+    a1, a2 = a[1] / a[0], a[2] / a[0]
+    y, x1, x2, y1, y2 = [0.0] * len(x), 0.0, 0.0, 0.0, 0.0
+    for i, v in enumerate(x):
+        o = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1, y2, y1 = x1, v, y1, o
+        y[i] = o
+    return y
+
+
+def radio_sections(radio, fs=SAMPLE_RATE):
+    """The radio filter's biquads (RBJ cookbook, bilinear with prewarping): Butterworth high-pass and
+    low-pass of order slope/6 each (sections with Q = 1 / (2 cos((2k-1)π / 2N))), then the presence peak."""
+    order = int(radio["slope_db_oct"] // 6)
+    qs = [1 / (2 * math.cos((2 * k - 1) * math.pi / (2 * order))) for k in range(1, order // 2 + 1)]
+    out = []
+    for kind, fc in (("hp", radio["low_hz"]), ("lp", min(radio["high_hz"], 0.45 * fs))):
+        w = 2 * math.pi * fc / fs
+        cw, sw = math.cos(w), math.sin(w)
+        for q in qs:
+            al = sw / (2 * q)
+            a = (1 + al, -2 * cw, 1 - al)
+            b = ((1 + cw) / 2, -(1 + cw), (1 + cw) / 2) if kind == "hp" else ((1 - cw) / 2, 1 - cw, (1 - cw) / 2)
+            out.append((b, a))
+    if radio["presence_db"]:
+        f0 = radio.get("presence_hz") or math.sqrt(radio["low_hz"] * radio["high_hz"])
+        w = 2 * math.pi * f0 / fs
+        A, al = 10 ** (radio["presence_db"] / 40), math.sin(w) / 2  # Q = 1
+        out.append(((1 + al * A, -2 * math.cos(w), 1 - al * A), (1 + al / A, -2 * math.cos(w), 1 - al / A)))
+    return out
+
+
+def radio_filter(x, radio, fs=SAMPLE_RATE):
+    """The recipe's radio filter -> (samples, stats). Deterministic (the hiss uses a fixed seed). The level
+    stage that follows sets the loudness, so the drive only shapes the waveform (tanh, unity at full scale)."""
+    import random
+    y = list(x)
+    for b, a in radio_sections(radio, fs):
+        y = _biquad(y, b, a)
+    if radio["drive_db"]:
+        g = 10 ** (radio["drive_db"] / 20)
+        norm = math.tanh(g)
+        y = [math.tanh(g * v) / norm for v in y]
+    if radio["noise_dbfs"] is not None and y:
+        rng = random.Random(RADIO_NOISE_SEED)
+        n = [rng.gauss(0.0, 1.0) for _ in range(len(y))]
+        for b, a in radio_sections(dict(radio, presence_db=0), fs):
+            n = _biquad(n, b, a)
+        rms = math.sqrt(sum(v * v for v in n) / len(n)) or 1.0
+        k = 10 ** (radio["noise_dbfs"] / 20) / rms
+        y = [v + k * w for v, w in zip(y, n)]
+    return y, {"preset": radio["preset"], "summary": radio_summary(radio), "sections": len(radio_sections(radio, fs))}
+
+
+def _allpass(x, m, g):
+    """Schroeder allpass of delay m samples: y[n] = -g x[n] + x[n-m] + g y[n-m]."""
+    y = [0.0] * len(x)
+    for n, v in enumerate(x):
+        if n >= m:
+            y[n] = -g * v + x[n - m] + g * y[n - m]
+        else:
+            y[n] = -g * v
+    return y
+
+
+def echo_tail_samples(echo, fs=SAMPLE_RATE):
+    """How long the echo rings after the line: until the repeats are ECHO_TAIL_FLOOR_DB down (capped)."""
+    d = echo["delay_ms"] / 1000
+    if echo["feedback_db"] is None:
+        t = d
+    else:
+        repeats = max(1, math.ceil((ECHO_TAIL_FLOOR_DB - echo["echo_db"]) / echo["feedback_db"]))
+        t = d * (repeats + 1)
+    t = max(t, (echo["slap_ms"] / 1000) if echo["slap_db"] is not None else 0) + 0.05
+    return int(round(min(t, ECHO_MAX_TAIL_S) * fs))
+
+
+def echo_effect(x, echo, fs=SAMPLE_RATE):
+    """The recipe's echo -> (samples, stats). The line is extended by the echo's ring-out. Deterministic.
+
+        wet = [diffusion: three allpasses, 4.7 / 7.3 / 11.3 ms, g = 0.7 x diffusion](line)
+        w[n] = wet[n - D] + fb x lowpass(w[n - D])          (fb = 0 without feedback; lowpass = damping)
+        out = line + echo_gain x w + slap_gain x line[n - S]
+    """
+    tail = echo_tail_samples(echo, fs)
+    src = list(x) + [0.0] * tail
+    wet = src
+    if echo["diffusion"]:
+        g = 0.7 * echo["diffusion"]
+        for ms in (4.7, 7.3, 11.3):
+            wet = _allpass(wet, max(1, int(round(ms * fs / 1000))), g)
+    D = max(1, int(round(echo["delay_ms"] * fs / 1000)))
+    fb = 0.0 if echo["feedback_db"] is None else 10 ** (echo["feedback_db"] / 20)
+    damp = echo["damping_hz"] is not None
+    a = math.exp(-2 * math.pi * echo["damping_hz"] / fs) if damp else 0.0
+    w = [0.0] * len(src)
+    state = 0.0
+    for n in range(D, len(src)):
+        prev = w[n - D]
+        if damp:
+            state = (1 - a) * prev + a * state
+            prev = state
+        w[n] = wet[n - D] + fb * prev
+    ge = 10 ** (echo["echo_db"] / 20)
+    out = [v + ge * u for v, u in zip(src, w)]
+    if echo["slap_db"] is not None:
+        S, gs = max(1, int(round(echo["slap_ms"] * fs / 1000))), 10 ** (echo["slap_db"] / 20)
+        for n in range(S, len(out)):
+            out[n] += gs * src[n - S]
+    return out, {"preset": echo["preset"], "summary": echo_summary(echo), "tail_s": round(tail / fs, 3)}
+
+
 def global_gain(y, gain_db, ceiling_db=PEAK_CEILING_DB):
     """Linear export gain, never limited: -> (samples, applied dB, shortfall dB). A positive gain is
     reduced so the peak stays <= ceiling_db (never below 0 dB); the shortfall is what could not be
@@ -448,11 +765,12 @@ def match_spain(y, measured_lufs, ref_lufs, ceiling_db=PEAK_CEILING_DB, max_limi
                "limiter_fraction": frac}
 
 
-def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE):
+def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE, clicks=None):
     """44.1 kHz mono 16-bit PCM + recipe + level (build-level mode) -> {"pcm": bytes, "stats": {...}}.
     Deterministic. ref_lufs: loudness of the original MCC recording (the target in match_spain mode,
     reported only in global_gain mode). In global_gain mode an identity recipe with no global gain returns
-    the input unchanged."""
+    the input unchanged. clicks: the MCC radio clicks (common/radio_clicks.from_wav), needed only when the
+    recipe's radio filter has clicks on."""
     if level_mode not in LEVEL_MODES:
         raise EditError(f"unknown level mode {level_mode!r}")
     x = pcm16_to_float(pcm)
@@ -471,6 +789,22 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
             pts = [(spliced_position(c["at_s"], edit, fs), int(round(c["dur_s"] * fs))) for c in edit["silences"]]
             inserted = sum(k for _, k in pts)
             y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
+    radio = echo = None
+    if edit.get("radio"):  # 1b. radio filter
+        y, radio = radio_filter(y, edit["radio"], fs)
+    if edit.get("echo"):  # 1c. echo
+        y, echo = echo_effect(y, edit["echo"], fs)
+    if radio or echo:
+        pk = peak_db(y)
+        trim = 0.0
+        if pk is not None and pk > PEAK_CEILING_DB:  # filter ringing / drive / hiss / echo build-up: a linear trim
+            g = 10 ** ((PEAK_CEILING_DB - pk) / 20)
+            y = [v * g for v in y]
+            trim = round(PEAK_CEILING_DB - pk, 2)
+            warnings.append(f"effects: peak trimmed by {-trim:.1f} dB to stay at {PEAK_CEILING_DB:g} dBFS")
+        for st_ in (radio, echo):
+            if st_:
+                st_["trim_db"] = trim
     edited = len(y)
     measured, method = loudness(y, fs)
     z = y
@@ -491,6 +825,13 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
         if g_short > 0:
             warnings.append(f"global gain: only {g_applied:+.1f} of {global_gain_db:+.1f} dB applied "
                             f"({g_short:.1f} dB short: the peak would pass {PEAK_CEILING_DB:g} dBFS)")
+    if radio and edit["radio"].get("clicks"):  # 2b. MCC key-up / key-down clicks, at their game level
+        if not clicks:
+            raise EditError("the radio clicks need MCC's Spain reference recording (common/radio_clicks.py); "
+                            "it could not be decoded")
+        z = list(clicks["in"]) + list(z) + list(clicks["out"])
+        radio["clicks"] = {"in_s": round(len(clicks["in"]) / fs, 3), "out_s": round(len(clicks["out"]) / fs, 3),
+                           "sha256": clicks["sha256"], "reference": clicks["reference"]["slot_id"]}
     out = float_to_pcm16(z)  # 3. 16-bit
     final = pcm16_to_float(out)
     stats = {"engine": RENDER_ENGINE, "recipe_format": ENGINE, "identity": identity,
@@ -503,7 +844,7 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
              "level_mode": level_mode, "level_mode_used": used_mode,
              "global_gain_requested_db": global_gain_db if used_mode == "global_gain" else 0.0,
              "global_gain_applied_db": g_applied, "global_gain_shortfall_db": g_short,
-             "match": match,
+             "match": match, "radio": radio, "echo": echo,
              "total_gain_db": match["applied_db"] if match else g_applied,
              "output_lufs": _rnd(loudness(final, fs)[0]), "output_peak_dbfs": _rnd(peak_db(final)),
              "warnings": warnings}

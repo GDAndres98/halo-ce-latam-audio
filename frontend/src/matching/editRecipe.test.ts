@@ -15,6 +15,13 @@ import {
   setFade,
   setKeep,
   setSilenceLength,
+  ECHO_PRESETS,
+  RADIO_PRESETS,
+  radioProblem,
+  setEchoPreset,
+  setEchoValue,
+  setRadioPreset,
+  setRadioValue,
 } from "./editRecipe";
 
 const DURATION = 4;
@@ -173,5 +180,56 @@ describe("inserting silence", () => {
     expect(pause.cuts).toEqual([{ start_s: 1, end_s: 2 }]);
     expect(pause.silences).toEqual([{ at_s: 1, dur_s: 0.4 }]);
     expect(editedSeconds(pause, DURATION)).toBe(3.4);
+  });
+});
+
+describe("radio filter", () => {
+  it("turns a preset on and off", () => {
+    const on = setRadioPreset(edit(), "spain");
+    expect(on.radio).toEqual({ ...RADIO_PRESETS.spain, preset: "spain" });
+    expect(setRadioPreset(on, null).radio).toBeNull();
+    expect(setRadioPreset(on, "english").radio?.noise_dbfs).toBe(-50);
+  });
+
+  it("becomes custom when a value changes, and keeps the values when Custom is chosen", () => {
+    const custom = setRadioValue(setRadioPreset(edit(), "spain"), "low_hz", 600);
+    expect(custom.radio).toMatchObject({ preset: "custom", low_hz: 600, high_hz: 3300 });
+    expect(setRadioPreset(custom, "custom").radio?.low_hz).toBe(600);
+  });
+
+  it("refuses what the server would refuse", () => {
+    const on = setRadioPreset(edit(), "spain");
+    expect(() => setRadioValue(on, "low_hz", 50)).toThrow();
+    expect(() => setRadioValue(on, "high_hz", 1000)).toThrow(/narrow/);
+    expect(() => setRadioValue(on, "noise_dbfs", -10)).toThrow();
+    expect(() => setRadioValue(edit(), "low_hz", 600)).toThrow(/on first/);
+    expect(radioProblem({ ...RADIO_PRESETS.english, preset: "english" })).toBeNull();
+  });
+
+  it("is kept by Reset edits (it has its own Off)", () => {
+    const on = setRadioPreset(edit({ trim_start_s: 0.2 }), "spain");
+    expect(resetEdits(on).radio?.preset).toBe("spain");
+  });
+});
+
+describe("echo", () => {
+  it("turns a preset on and off, and becomes custom when a value changes", () => {
+    const on = setEchoPreset(edit(), "spain");
+    expect(on.echo).toEqual({ ...ECHO_PRESETS.spain, preset: "spain" });
+    expect(setEchoPreset(on, null).echo).toBeNull();
+    const custom = setEchoValue(on, "delay_ms", 200);
+    expect(custom.echo).toMatchObject({ preset: "custom", delay_ms: 200, echo_db: ECHO_PRESETS.spain.echo_db });
+    expect(setEchoValue(custom, "feedback_db", null).echo?.feedback_db).toBeNull();
+  });
+
+  it("refuses what the server would refuse", () => {
+    const on = setEchoPreset(edit(), "english");
+    expect(() => setEchoValue(on, "delay_ms", 10)).toThrow();
+    expect(() => setEchoValue(on, "diffusion", 2)).toThrow();
+    expect(() => setEchoValue(edit(), "delay_ms", 100)).toThrow(/on first/);
+  });
+
+  it("the intercom radio presets carry their presence frequency", () => {
+    expect(setRadioPreset(edit(), "spain_eco").radio).toMatchObject({ presence_hz: 2500, clicks: false });
   });
 });

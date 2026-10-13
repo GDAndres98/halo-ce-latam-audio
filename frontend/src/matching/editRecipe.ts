@@ -6,7 +6,7 @@
 // previews and for the build (scripts/common/audio_edit.py), so these rules only decide what the recipe
 // contains; the server decides what it sounds like.
 
-import type { AudioEdit } from "../api/types";
+import type { AudioEdit, EchoEffect, EchoPreset, RadioFilter, RadioPreset } from "../api/types";
 
 /** A span of the original recording, in seconds. */
 export interface Span {
@@ -136,6 +136,93 @@ export function replaceWithSilence(edit: AudioEdit, span: Span, ms: number, dura
 export function setFade(edit: AudioEdit, which: "in" | "out", ms: number): AudioEdit {
   const value = clamp(Math.round(ms), 0, MAX_FADE_MS);
   return which === "in" ? { ...edit, fade_in_ms: value } : { ...edit, fade_out_ms: value };
+}
+
+// ---- Radio filter (2026-10-13). Same presets and limits as the server (audio_edit.RADIO_PRESETS /
+// RADIO_LIMITS); the server checks again and renders it.
+export const RADIO_PRESETS: Record<Exclude<RadioPreset, "custom">, Omit<RadioFilter, "preset">> = {
+  spain: { low_hz: 700, high_hz: 3300, slope_db_oct: 36, presence_db: 0, drive_db: 0, noise_dbfs: null, clicks: true },
+  english: { low_hz: 1000, high_hz: 5000, slope_db_oct: 12, presence_db: 6, drive_db: 6, noise_dbfs: -50, clicks: false },
+  spain_eco: { low_hz: 350, high_hz: 8000, slope_db_oct: 36, presence_db: 8, presence_hz: 2500, drive_db: 0, noise_dbfs: null, clicks: false },
+  english_eco: { low_hz: 150, high_hz: 2250, slope_db_oct: 12, presence_db: 8, presence_hz: 400, drive_db: 0, noise_dbfs: null, clicks: false },
+};
+export const RADIO_LIMITS = {
+  low_hz: [100, 2000],
+  high_hz: [1000, 10000],
+  presence_db: [-6, 12],
+  drive_db: [0, 24],
+  noise_dbfs: [-80, -30],
+} as const;
+export const RADIO_SLOPES = [12, 24, 36] as const;
+const RADIO_MIN_RATIO = 1.5;
+/** Hiss level a field starts at when hiss is switched on. */
+export const DEFAULT_HISS_DBFS = -55;
+
+/** Turns the radio filter off (null) or sets it to a preset's values. */
+export function setRadioPreset(edit: AudioEdit, preset: RadioPreset | null): AudioEdit {
+  if (preset === null) return { ...edit, radio: null };
+  const base = preset === "custom" ? (edit.radio ?? { ...RADIO_PRESETS.spain, preset: "custom" }) : RADIO_PRESETS[preset];
+  return { ...edit, radio: { ...base, preset } as RadioFilter };
+}
+
+/** Changes one value of the radio filter; the filter becomes "custom" (no longer a preset's values). */
+export function setRadioValue<K extends keyof Omit<RadioFilter, "preset">>(edit: AudioEdit, key: K, value: RadioFilter[K]): AudioEdit {
+  if (!edit.radio) throw new Error("turn the radio filter on first");
+  const next = { ...edit.radio, [key]: value, preset: "custom" as RadioPreset };
+  const problem = radioProblem(next);
+  if (problem) throw new Error(problem);
+  return { ...edit, radio: next };
+}
+
+/** Why a radio filter would be refused by the server, or null. */
+export function radioProblem(r: RadioFilter): string | null {
+  for (const [key, [lo, hi]] of Object.entries(RADIO_LIMITS) as [keyof typeof RADIO_LIMITS, readonly [number, number]][]) {
+    const v = r[key];
+    if (v !== null && (!Number.isFinite(v) || v < lo || v > hi)) return `${key.replace(/_/g, " ")} must be ${lo}–${hi}`;
+  }
+  if (!(RADIO_SLOPES as readonly number[]).includes(r.slope_db_oct)) return `slope must be ${RADIO_SLOPES.join(", ")} dB/oct`;
+  if (r.high_hz < r.low_hz * RADIO_MIN_RATIO) return `the band is too narrow: high must be at least ${RADIO_MIN_RATIO} × low`;
+  return null;
+}
+
+// ---- Echo (2026-10-13, the "eco" lines). Same presets and limits as the server (audio_edit.ECHO_PRESETS /
+// ECHO_LIMITS).
+export const ECHO_PRESETS: Record<Exclude<EchoPreset, "custom">, Omit<EchoEffect, "preset">> = {
+  spain: { slap_ms: 30, slap_db: null, delay_ms: 140, echo_db: -11, feedback_db: -15, diffusion: 1, damping_hz: 4000 },
+  english: { slap_ms: 30, slap_db: -12, delay_ms: 150, echo_db: -12, feedback_db: null, diffusion: 0, damping_hz: null },
+};
+export const ECHO_LIMITS = {
+  slap_ms: [5, 80],
+  slap_db: [-40, -3],
+  delay_ms: [50, 600],
+  echo_db: [-40, -3],
+  feedback_db: [-40, -3],
+  diffusion: [0, 1],
+  damping_hz: [1000, 16000],
+} as const;
+/** Values a switched-on optional echo field starts at. */
+export const ECHO_DEFAULTS = { slap_db: -12, feedback_db: -9, damping_hz: 4000 } as const;
+
+export function setEchoPreset(edit: AudioEdit, preset: EchoPreset | null): AudioEdit {
+  if (preset === null) return { ...edit, echo: null };
+  const base = preset === "custom" ? (edit.echo ?? { ...ECHO_PRESETS.spain, preset: "custom" }) : ECHO_PRESETS[preset];
+  return { ...edit, echo: { ...base, preset } as EchoEffect };
+}
+
+export function setEchoValue<K extends keyof Omit<EchoEffect, "preset">>(edit: AudioEdit, key: K, value: EchoEffect[K]): AudioEdit {
+  if (!edit.echo) throw new Error("turn the echo on first");
+  const next = { ...edit.echo, [key]: value, preset: "custom" as EchoPreset };
+  const problem = echoProblem(next);
+  if (problem) throw new Error(problem);
+  return { ...edit, echo: next };
+}
+
+export function echoProblem(e: EchoEffect): string | null {
+  for (const [key, [lo, hi]] of Object.entries(ECHO_LIMITS) as [keyof typeof ECHO_LIMITS, readonly [number, number]][]) {
+    const v = e[key];
+    if (v !== null && (!Number.isFinite(v) || v < lo || v > hi)) return `${key.replace(/_/g, " ")} must be ${lo}–${hi}`;
+  }
+  return null;
 }
 
 /** Back to an unedited recording. The gap is kept: it is not an edit to the audio itself. */

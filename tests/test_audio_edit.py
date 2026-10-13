@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "ui"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import audio_edit as ae  # noqa: E402
+from common import radio_clicks  # noqa: E402
 from common.audio_pipeline import CODEC_DELAY, derive, derive_processed, to_mcc_pcm  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.edit_preview import EditPreview  # noqa: E402
@@ -43,6 +44,13 @@ def speech(seconds=1.5, fs=FS, amp=0.3):
         env = max(0.0, math.sin(2 * math.pi * 2.5 * k / fs)) * (0.05 if 0.45 * n < k < 0.55 * n else 1.0)
         out.append(amp * env * sum(math.sin(2 * math.pi * 140 * h * k / fs) / h for h in range(1, 6)) / 2.3)
     return out
+
+
+def fake_clicks():
+    """Stand-ins for MCC's clicks (the real ones come from the pinned bank, tested in RadioClickTests)."""
+    a = ae.pcm16_to_float(ae.float_to_pcm16([0.2 * math.sin(i / 3) for i in range(441)]))
+    b = ae.pcm16_to_float(ae.float_to_pcm16([0.1 * math.sin(i / 5) for i in range(882)]))
+    return {"in": a, "out": b, "sha256": {"in": "a" * 64, "out": "b" * 64}, "reference": {"slot_id": "es:fake#0"}}
 
 
 def write_wav(path, x, fs=FS):
@@ -119,6 +127,29 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(ae.removed_fields(dict(r, speed=1, gain_db=0)), ["speed", "gain_db"])
         self.assertTrue(ae.problems(dict(ae.EDIT_ZERO, speed=1.2)))  # reported even on an identity recipe
 
+    def test_radio_recipe_rules(self):
+        r = ae.normalize({"radio": {"preset": "spain"}}, SRC)
+        self.assertFalse(ae.is_identity(r))  # a radio filter alone is an edit (bound to its source)
+        self.assertEqual(r["radio"], dict(ae.RADIO_PRESETS["spain"], preset="spain"))
+        self.assertEqual(ae.normalize(r), r)  # idempotent
+        self.assertEqual(ae.summary(r), "radio spain 700–3300 Hz")
+        self.assertEqual(ae.normalize({"radio": None}), ae.EDIT_ZERO)  # off: no field, as before
+        self.assertNotIn("radio", ae.normalize({"trim_start_s": 0.1}, SRC))
+        c = ae.normalize({"radio": {"preset": "custom", "low_hz": 600, "high_hz": 3500, "slope_db_oct": 24,
+                                    "presence_db": 3, "drive_db": 0, "noise_dbfs": -55}}, SRC)
+        self.assertIn("hiss -55 dBFS", ae.summary(c))
+        for bad in ({"preset": "walkie"}, {"preset": "custom", "low_hz": 50}, {"preset": "custom", "slope_db_oct": 18},
+                    {"preset": "custom", "low_hz": 2000, "high_hz": 2500}, {"preset": "custom", "noise_dbfs": -10},
+                    {"preset": "spain", "wet": 1}, "spain"):
+            with self.assertRaises(ae.EditError, msg=bad):
+                ae.normalize({"radio": bad}, SRC)
+        from common.jsonschema_lite import validate
+        schema = load_schema("manual-mappings-3")
+        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        self.assertEqual(validate(r, full), [])
+        self.assertEqual(validate(c, full), [])
+        self.assertTrue(validate(dict(r, radio=dict(r["radio"], slope_db_oct=18)), full))
+
 
 class DspTests(unittest.TestCase):
     def test_bs1770_reference(self):
@@ -190,6 +221,136 @@ class DspTests(unittest.TestCase):
         legacy = ae.render(pcm, dict(e, limiter=True, loudness={"mode": "off", "offset_db": 0}))
         self.assertEqual(legacy["pcm"], r1["pcm"])
 
+    def test_radio_band_pass_response(self):
+        def gain_db(radio, f):
+            x = [0.5 * math.sin(2 * math.pi * f * i / FS) for i in range(8000)]
+            y, _ = ae.radio_filter(x, radio)
+            rms = lambda v: math.sqrt(sum(s * s for s in v) / len(v))  # noqa: E731
+            return 20 * math.log10(rms(y[4000:]) / rms(x[4000:]))
+        spain = ae.normalize_radio({"preset": "spain"})
+        self.assertAlmostEqual(gain_db(spain, 1500), 0, delta=0.5)   # pass band
+        self.assertLess(gain_db(spain, 300), -30)                    # steep low cut, as the MCC Spain lines
+        self.assertLess(gain_db(spain, 6300), -30)                   # and high cut
+        gentle = ae.normalize_radio(dict(spain, preset="custom", slope_db_oct=12))
+        self.assertGreater(gain_db(gentle, 300), gain_db(spain, 300) + 10)
+        lifted = ae.normalize_radio(dict(spain, preset="custom", presence_db=6))
+        self.assertAlmostEqual(gain_db(lifted, 1520), 6, delta=1.0)  # peak at the band's geometric centre
+
+    def test_radio_render_is_deterministic_and_bounded(self):
+        pcm = ae.float_to_pcm16(speech(1.0, amp=0.9))
+        e = ae.normalize({"radio": {"preset": "english"}}, SRC)  # drive and hiss
+        r1, r2 = ae.render(pcm, e, global_gain_db=4.0), ae.render(pcm, e, global_gain_db=4.0)
+        self.assertEqual(r1["pcm"], r2["pcm"])
+        self.assertEqual(len(r1["pcm"]), len(pcm))  # the filter never changes the length
+        st = r1["stats"]
+        self.assertEqual(st["radio"]["preset"], "english")
+        self.assertLessEqual(st["output_peak_dbfs"], ae.PEAK_CEILING_DB + 0.01)
+        self.assertIsNone(ae.render(pcm, ae.normalize({"trim_start_s": 0.1}, SRC))["stats"]["radio"])
+        quiet = ae.render(ae.float_to_pcm16([0.0] * FS), ae.normalize({"radio": {"preset": "english"}}, SRC))
+        self.assertGreater(max(abs(v) for v in ae.pcm16_to_float(quiet["pcm"])), 0)  # hiss in silence
+
+    def test_radio_clicks_go_around_the_line_at_their_own_level(self):
+        pcm = ae.float_to_pcm16(speech(1.0, amp=0.3))
+        e = ae.normalize({"radio": {"preset": "spain"}}, SRC)
+        self.assertTrue(e["radio"]["clicks"])  # the Spain preset has them
+        with self.assertRaises(ae.EditError):  # never rendered without the MCC clicks
+            ae.render(pcm, e)
+        c = fake_clicks()
+        r = ae.render(pcm, e, global_gain_db=4.0, clicks=c)
+        y = ae.pcm16_to_float(r["pcm"])
+        n = len(pcm) // 2
+        self.assertEqual(len(y), len(c["in"]) + n + len(c["out"]))
+        self.assertEqual(y[:len(c["in"])], c["in"])          # unfiltered, not gained
+        self.assertEqual(y[len(y) - len(c["out"]):], c["out"])
+        self.assertEqual(r["stats"]["radio"]["clicks"]["in_s"], 0.01)
+        off = ae.render(pcm, ae.normalize({"radio": {"preset": "spain", "clicks": False}}, SRC), global_gain_db=4.0, clicks=c)
+        self.assertEqual(len(off["pcm"]) // 2, n)
+        # a recipe saved before the field existed is valid and has no clicks
+        old = dict(e, radio={k: v for k, v in e["radio"].items() if k != "clicks"})
+        self.assertEqual(ae.problems(old), [])
+        self.assertEqual(len(ae.render(pcm, old)["pcm"]) // 2, n)
+        self.assertIn("no clicks", ae.summary(ae.normalize({"radio": {"preset": "spain", "clicks": False}}, SRC)))
+        with self.assertRaises(ae.EditError):
+            ae.normalize({"radio": {"preset": "spain", "clicks": "yes"}}, SRC)
+
+
+class EchoTests(unittest.TestCase):
+    def test_echo_rules_and_schema(self):
+        r = ae.normalize({"radio": {"preset": "spain_eco"}, "echo": {"preset": "spain"}}, SRC)
+        self.assertEqual(r["echo"], dict(ae.ECHO_PRESETS["spain"], preset="spain"))
+        self.assertEqual(r["radio"]["presence_hz"], 2500)
+        self.assertFalse(r["radio"]["clicks"])
+        self.assertEqual(ae.normalize(r), r)  # idempotent
+        self.assertEqual(ae.summary(r), "radio spain_eco 350–8000 Hz · echo spain 140 ms")
+        self.assertFalse(ae.is_identity(ae.normalize({"echo": {"preset": "english"}}, SRC)))
+        self.assertNotIn("presence_hz", ae.normalize({"radio": {"preset": "spain"}}, SRC)["radio"])  # unchanged form
+        c = ae.normalize({"echo": {"preset": "custom", "delay_ms": 200, "feedback_db": None, "slap_db": None}}, SRC)
+        self.assertIn("echo custom 200 ms", ae.summary(c))
+        for bad in ({"preset": "cave"}, {"preset": "custom", "delay_ms": 10}, {"preset": "custom", "diffusion": 2},
+                    {"preset": "custom", "echo_db": 0}, {"preset": "spain", "wet": 1}, "spain"):
+            with self.assertRaises(ae.EditError, msg=bad):
+                ae.normalize({"echo": bad}, SRC)
+        with self.assertRaises(ae.EditError):
+            ae.normalize({"radio": {"preset": "custom", "presence_db": 3, "presence_hz": 50}}, SRC)
+        from common.jsonschema_lite import validate
+        schema = load_schema("manual-mappings-3")
+        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        self.assertEqual(validate(r, full), [])
+        self.assertEqual(validate(c, full), [])
+        self.assertTrue(validate(dict(r, echo=dict(r["echo"], delay_ms=5)), full))
+
+    def test_english_echo_is_two_clean_taps(self):
+        x = [0.0] * FS
+        x[1000] = 0.5  # an impulse shows the taps exactly
+        e = ae.normalize_echo({"preset": "english"})
+        y, st = ae.echo_effect(x, e)
+        self.assertEqual(len(y), FS + ae.echo_tail_samples(e))
+        self.assertEqual(st["tail_s"], round(ae.echo_tail_samples(e) / FS, 3))
+        g = 10 ** (-12 / 20) * 0.5
+        self.assertAlmostEqual(y[1000 + int(round(0.030 * FS))], g, places=6)   # slap at 30 ms
+        self.assertAlmostEqual(y[1000 + int(round(0.150 * FS))], g, places=6)   # echo at 150 ms
+        self.assertAlmostEqual(y[1000 + int(round(0.300 * FS))], 0.0, places=9)  # no feedback: no second repeat
+
+    def test_spain_echo_repeats_decay_and_render_is_deterministic(self):
+        x = [0.0] * FS
+        x[1000] = 0.5
+        e = ae.normalize_echo({"preset": "spain"})
+        y, _ = ae.echo_effect(x, e)
+        D = int(round(0.140 * FS))
+
+        def energy(at):
+            return sum(v * v for v in y[1000 + at - 300:1000 + at + 1200])
+        first, second, third = energy(D), energy(2 * D), energy(3 * D)
+        self.assertGreater(first, second)
+        self.assertGreater(second, third)
+        self.assertGreater(third, 0)
+        pcm = ae.float_to_pcm16(speech(1.0, amp=0.3))
+        rec = ae.normalize({"radio": {"preset": "spain_eco"}, "echo": {"preset": "spain"}}, SRC)
+        r1, r2 = ae.render(pcm, rec, global_gain_db=4.0), ae.render(pcm, rec, global_gain_db=4.0)
+        self.assertEqual(r1["pcm"], r2["pcm"])
+        self.assertEqual(len(r1["pcm"]) // 2, len(pcm) // 2 + ae.echo_tail_samples(e))
+        self.assertEqual(r1["stats"]["echo"]["preset"], "spain")
+        self.assertLessEqual(r1["stats"]["output_peak_dbfs"], ae.PEAK_CEILING_DB + 0.01)
+
+
+class RadioClickTests(unittest.TestCase):
+    def test_cut_takes_the_fixed_ranges_with_fades(self):
+        x = [0.5] * radio_clicks.REFERENCE_SAMPLES
+        c = radio_clicks.cut(x)
+        self.assertEqual((len(c["in"]), len(c["out"])), (radio_clicks.IN_END, radio_clicks.OUT_LEN))
+        self.assertEqual(c["in"][0], 0.5)
+        self.assertLess(c["in"][-1], 0.01)     # faded into the line
+        self.assertLess(c["out"][0], 0.01)     # faded in from the line
+        self.assertEqual(c["out"][-1], 0.5)
+        with self.assertRaises(radio_clicks.ClickError):
+            radio_clicks.cut([0.0] * 1000)     # not the reference recording
+
+    def test_a_different_recording_is_refused_by_the_pins(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = write_wav(Path(d) / "ref.wav", [0.1] * radio_clicks.REFERENCE_SAMPLES)
+            with self.assertRaises(radio_clicks.ClickError):
+                radio_clicks.from_wav(p)
+
 
 @unittest.skipUnless(FFMPEG and HAVE_CELT, "ffmpeg and libcelt needed")
 class ParityTests(unittest.TestCase):
@@ -227,6 +388,17 @@ class ParityTests(unittest.TestCase):
         self.assertEqual(prev.render(self.src, e, -15.0, 3.0)["key"], p["key"])  # cached
         self.assertNotEqual(prev.render(self.src, e, -15.0, 0.0)["key"], p["key"])  # gain is part of the preview
         self.assertEqual(self.pcm_of(self.src)[:100], ae.float_to_pcm16(speech(1.7, fs=48000, amp=0.08))[:100])  # original intact
+
+    def test_radio_preview_equals_m6_build(self):
+        e = ae.normalize({"trim_start_s": 0.05, "radio": {"preset": "spain"}}, SRC)
+        prev = EditPreview(self.root, FFMPEG, Celt011)
+        p = prev.render(self.src, e, None, 4.0, clicks=fake_clicks())
+        built = derive_processed(self.src, e, ffmpeg=FFMPEG, celt=self.celt, out_root=self.root / "derived",
+                                 global_gain_db=4.0, clicks=fake_clicks())
+        self.assertEqual(self.pcm_of(prev.path(p["key"], "edited")), built["pcm"])
+        recipe = json.loads((built["dir"] / "recipe.json").read_text(encoding="utf-8"))
+        self.assertIn("radio spain", recipe["steps"][1]["summary"])
+        self.assertIn("radio_clicks", [s["op"] for s in recipe["steps"]])
 
     def test_unedited_line_preview_equals_the_build(self):
         prev = EditPreview(self.root, FFMPEG, Celt011)

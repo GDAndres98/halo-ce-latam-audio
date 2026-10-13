@@ -34,7 +34,7 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import audio_edit  # noqa: E402
+from common import audio_edit, radio_clicks  # noqa: E402
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common import mapping_store  # noqa: E402
@@ -182,6 +182,7 @@ class M4App:
     def __init__(self, root, *, mcc_audio=None, ce_audio=None, editor=None, today=None, run_validator=True):
         self.root = Path(root)
         self.mcc_audio, self.ce_audio, self.editor = mcc_audio, ce_audio, editor
+        self._clicks = None  # MCC's radio clicks, decoded on the first preview that needs them
         self.today = today or (lambda: dt.date.today().isoformat())
         self.run_validator = run_validator
         self._save_lock = threading.Lock()
@@ -577,12 +578,24 @@ class M4App:
         except ConfigError as e:
             raise ApiError(500, str(e))
         try:
-            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"])
+            clicks = self.radio_clicks() if (edit.get("radio") or {}).get("clicks") else None
+            r = self.editor.render(wav, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"], clicks)
         except audio_edit.EditError as e:
             raise ApiError(422, f"edit: {e}")
         return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_edit.summary(edit),
                 "identity": audio_edit.is_identity(edit), "mcc_reference_lufs": mcc_ref, "export_config": cfg,
                 "urls": {k: f"/audio/preview?key={r['key']}&kind={k}" for k in ("edited", "encoded")}}
+
+    def radio_clicks(self):
+        """MCC's Spain radio clicks (common/radio_clicks.py), decoded once from the pinned bank."""
+        if self._clicks is None:
+            if not self.mcc_audio:
+                raise ApiError(503, "the radio clicks need MCC audio decoding (vgmstream)")
+            try:
+                self._clicks = radio_clicks.load(self.mcc_audio, self.slot_index)
+            except (AudioUnavailable, radio_clicks.ClickError) as e:
+                raise ApiError(503, f"radio clicks: {e}")
+        return self._clicks
 
     def preview_wav(self, key, kind):
         if not self.editor:

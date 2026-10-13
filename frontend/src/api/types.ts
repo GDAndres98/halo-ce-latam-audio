@@ -109,6 +109,45 @@ export interface AudioEdit {
   fade_in_ms: number;
   fade_out_ms: number;
   crossfade_ms: number;
+  /** Optional radio filter (2026-10-13); null or absent = off. Rendered by scripts/common/audio_edit.py. */
+  radio?: RadioFilter | null;
+  /** Optional echo (2026-10-13, the "eco" lines); null or absent = off. */
+  echo?: EchoEffect | null;
+}
+
+export type EchoPreset = "spain" | "english" | "custom";
+
+/** The recipe's echo: a short slap tap and a main echo with feedback, diffusion and damping. */
+export interface EchoEffect {
+  preset: EchoPreset;
+  slap_ms: number;
+  /** null = no slap. */
+  slap_db: number | null;
+  delay_ms: number;
+  echo_db: number;
+  /** null = a single repeat. */
+  feedback_db: number | null;
+  diffusion: number;
+  /** null = no damping. */
+  damping_hz: number | null;
+}
+
+export type RadioPreset = "spain" | "english" | "spain_eco" | "english_eco" | "custom";
+
+/** The recipe's radio filter: a band-pass with presence, drive and hiss. `preset` is a label; the numbers render. */
+export interface RadioFilter {
+  preset: RadioPreset;
+  low_hz: number;
+  high_hz: number;
+  slope_db_oct: 12 | 24 | 36;
+  presence_db: number;
+  /** Optional presence centre (Hz); absent = the band's geometric centre. */
+  presence_hz?: number;
+  drive_db: number;
+  /** Channel hiss level; null = none. */
+  noise_dbfs: number | null;
+  /** MCC's Spain radio key-up click before the line and release/squelch after it. Absent = off. */
+  clicks?: boolean;
 }
 
 /** The decision as stored in mappings/manual_mappings.json (returned inside /api/slot). */

@@ -19,7 +19,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   - Unmatched lines and custom subtitles are supported. Unmatched lines
     keep Spain audio by default.
 - **v1.1 (potential):** non-destructive radio-effect repair. Preserve
-  originals and recipe metadata. **Do not implement effects yet.**
+  originals and recipe metadata. The owner lifted "no effects yet" for the
+  pilot-style radio filter and the cryo assistant's "eco" intercom echo (2026-10-13, see "Radio filter" and
+  "Eco lines" below); other effects are still not approved.
 - **v1.0 blockers:**
   - **B1:** MCC subtitle replacement — **✅ resolved
     (user-reported, 2026-10-08).** Edited `*_Halo1.bin` text displays
@@ -200,9 +202,37 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         "as encoded" preview is byte-identical to the bank decode.
       - M6 renders every line with the same code (`audio_pipeline.derive_processed`). With the
         gain at 0, unedited lines are byte-identical to before.
-      - The recipe is part of the approved audio object (needs rework to change). The radio flag is
-        never applied.
+      - The recipe is part of the approved audio object (needs rework to change). The "Needs radio
+        effect" flag is never applied; only the recipe's own `radio` filter is.
       - Guide: `docs/m4-user-guide.md` §4.1. Owner hands-on test pending.
+    - **Radio filter (owner, 2026-10-13):** `docs/radio-filter.md`.
+      - MCC's radio sound is baked into the bank samples (Spain: steep band-pass about 700–3300 Hz,
+        clean; English: gentler, with a presence lift and hiss). CE es-MX is dry. Survey:
+        `python scripts/discovery/radio_survey.py`.
+      - Optional recipe field `audio.edit.radio` (presets `spain` / `english` / `custom`), applied after
+        the edits and before the level stage (`audio-render/6`). It is set in the Studio under Audio
+        editing → Radio filter. Browser test: `npm run test:radio`.
+      - Owner-authorized migration `scripts/validate/migrate_radio_preset.py` gave the 40 pilot-style lines
+        (flagged, no notes) the Spain preset and set 39 approved ones to needs rework
+        (`docs/migrations/2026-10-13-radio-preset.md`). Re-approval is the owner's. The 18 "eco" lines
+        are out of scope.
+      - `radio.clicks` (owner feedback, same day) joins MCC's own Spain key-up and release/squelch clicks
+        around the line, after the level stage, at game level (`audio-render/7`). They are cut from
+        `es:A30_220_bisenti#0` in the pinned bank at fixed samples, with SHA-256 pins
+        (`scripts/common/radio_clicks.py`); nothing is synthesised or stored in git.
+        `migrate_radio_clicks.py` turned them on for the 35 lines whose Spain original opens with the click;
+        `sgt05g`, `lif_01`, `lif_05`, `c10_010_captpilot` and `D40_411_Pilot` were left off
+        (`docs/migrations/2026-10-13-radio-clicks.md`).
+      - Not listened to yet; `sgt05g`, `D40_411_Pilot` and `c10_010_captpilot` have little or no
+        band-pass in Spain's original.
+    - **Eco lines (owner, 2026-10-13):** `docs/radio-filter.md` §5. The 18 "eco" lines (cryo assistant) get
+      an intercom EQ (`radio` presets `spain_eco` / `english_eco`, optional `presence_hz`) plus the new
+      recipe field `audio.edit.echo` (slap tap, echo with feedback / diffusion / damping; the line gets longer by
+      the ring-out; `audio-render/8`).
+      - MCC English has two clean taps (30 and 150 ms, about −12 dB); MCC Spain has one smeared echo
+        (140 ms with repeats). Survey: `scripts/discovery/eco_survey.py`.
+      - `scripts/validate/migrate_eco_effect.py` gave all 18 the Spain intercom + Spain echo and set them to
+        needs rework, with matches kept (`docs/migrations/2026-10-13-eco-effect.md`). Not listened to yet.
     - **M-SYS catalogued (owner request, 2026-10-10):** `python
       scripts/catalog/build_ce_catalog.py --systemic` (also in `--all`) writes
       `work/ce/catalog/sys.jsonl`, the pseudo-mission `SYS` (`mission` null, `family` systemic).
@@ -522,7 +552,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - No `verifications.json` entry yet. The `subtitle_load` entry (next free ID;
       `v-000015` is B2 E1) waits for the owner's details.
     - Never copy into the install or launch MCC yourself.
-- Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, M-SYS (CE `Systemic` catalog), stereo replacement, v1.1 radio effects. Audio processing (resample,
+- Not started: B2 E4+, WC-2/3, M5 (owner work), M6, M8, M-SYS (CE `Systemic` catalog), stereo replacement, v1.1 effects other than the radio filter and the eco echo. Audio processing (resample,
   trims, FX), FSB repacking, map changes, any install change,
   packaging and any upload are still not approved (beyond M6 builds the
   owner installs from the Studio; M6 subtitle generation was requested

@@ -166,7 +166,9 @@ applies when it builds the bank.
 | **Replace selection with silence** | sets a pause to an exact length: cuts the selection and puts exactly the given silence in its place. Select a pause and enter `0.10` to shorten it to 0.1 s, or a longer value to lengthen it. |
 | Silences list | `+0.25 s @ 0.90 s ×`: × removes one. Cuts and trims drop any silence that ends up inside them. |
 | Trim start / end, Fade in / out, Crossfade | exact values. Trimming an edge for the first time adds a 10 ms fade there; set it to 0 if you don't want one. |
-| **Reset edits** | back to the unedited recording |
+| **Reset edits** | back to the unedited recording (the radio filter is kept; it has its own Off) |
+| **Echo** | Off / **Spain echo** / **English echo** / Custom: delay, echo level, repeats, diffusion, damping, slap. For the cryo assistant's intercom ("eco" lines, with the radio presets *Spain/English intercom*). The line gets longer by the ring-out. See `docs/radio-filter.md` §5. |
+| **Radio filter** | Off / **Spain radio** / **English radio** / Spain or English **intercom** (eco lines) / Custom, plus low cut, high cut, slope, presence, drive, hiss and **MCC clicks** (Spain's key-up click before the line and the release/squelch after it; on in Spain radio). Changing a value makes it Custom. Heard in the preview like every other edit. See `docs/radio-filter.md`. |
 
 **Removed (owner, 2026-10-09):**
 - **Speed** sounded unnatural.
@@ -179,7 +181,7 @@ limiter. They gave a line its own level; the global export gain is now the only 
 `docs/migrations/2026-10-11-reset-loudness-match.md` and `docs/migrations/2026-10-11-remove-limiter.md`.
 
 **Order of operations** (always the same, in M4 and M6): original es-MX WAV → trims, cuts, fades,
-inserted silences → **global export gain** → 16-bit → CELT. Recipe
+inserted silences → **radio filter** (if set) → **echo** (if set) → **global export gain** → **MCC radio clicks** (if set) → 16-bit → CELT. Recipe
 times are on the source's timeline (the top waveform).
 
 **About inserted silences:**
@@ -198,7 +200,8 @@ times are on the source's timeline (the top waveform).
   and select, but changing or resetting the edit needs **Mark needs rework…** (revision + 1).
 - **An edit belongs to one recording.** If you switch the line or its language, the edit is reset.
   Choosing *keep Spain* or several lines clears it when you save.
-- **The radio flag** stays as it is. No radio processing is applied. Editing never changes it.
+- **The radio flag** ("Needs radio effect") is a reminder only; editing never changes it. The filter
+  itself is the recipe's **Radio filter** (added 2026-10-13). The editor notes when a flagged line has none.
 - **Invalid recipes are refused:** for example a trim past the end, overlapping cuts, or keeping
   less than 0.05 s. Nothing is written.
 

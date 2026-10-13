@@ -17,6 +17,7 @@
     "compare:m4": "node e2e/compare-m4.mjs",
     "test:ux": "node e2e/ux.mjs",
     "test:editor": "node e2e/editor.mjs",
+    "test:radio": "node e2e/radio.mjs",
     "test:workflow": "node e2e/workflow.mjs",
     "test:data": "node e2e/data.mjs",
     "test:navigation": "node e2e/navigation.mjs",

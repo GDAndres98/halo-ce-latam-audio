@@ -24,7 +24,7 @@ export const FLAGS: Record<FlagName, FlagInfo> = {
   radio: {
     name: "radio",
     label: "Needs radio effect",
-    hint: "Flag only: no radio processing is applied yet (v1.1). Applies to a chosen Campaign Evolved recording.",
+    hint: "A reminder that this line needs the radio sound. The filter itself is set under Audio editing → Radio filter.",
     icon: RadioTower,
     filter: "radio",
   },

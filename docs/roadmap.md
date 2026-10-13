@@ -505,7 +505,14 @@ Evaluate each option, with its cost and what it keeps of v1.0:
 Flagged lines get processed copies via recipes. A/B listening is
 recorded in `verifications.json`. The owner's flag already exists:
 `radio_effect.needed` in `manual-mappings/3`, set in M4 (2026-10-08).
-No effect is implemented.
+
+**Pilot-style radio implemented early (owner, 2026-10-13):** the recipe's
+`audio.edit.radio` band-pass filter, with Spain and English presets fitted
+from the MCC recordings, is set in the Studio's audio editor
+(`docs/radio-filter.md`). The 40 pilot-style lines got the Spain preset
+and went back to review (`docs/migrations/2026-10-13-radio-preset.md`).
+The 18 cryo-assistant "eco" lines got their own intercom EQ + echo the
+same day (`docs/radio-filter.md` §5, `docs/migrations/2026-10-13-eco-effect.md`).
 
 ## 4. First-mission catalog generation plan (M1 + M2)
 

@@ -3,7 +3,8 @@
 //
 // What the user can do: drag across the waveform to select, drag the two handles of the kept part (trims),
 // keep or cut the selection (several cuts are allowed), remove cuts, insert silences (at the playhead or the
-// start of the selection, or in place of the selection) and set fades. There is no level control here: the
+// start of the selection, or in place of the selection), set fades and a radio filter (presets fitted from the
+// MCC radio lines, docs/radio-filter.md). There is no level control here: the
 // global export gain (Build & Test) is the only level setting. Every change goes through editRecipe.ts and can be undone. The result is rendered automatically
 // as the build renders it and heard as B under "Listen and compare" (composables/useEditPreview.ts). The original WAV is never changed; the recipe is saved with the audio decision (Save draft), and
 // approved audio must be marked Needs rework first (the server refuses the change otherwise).
@@ -14,6 +15,8 @@ import { computed, ref, watch } from "vue";
 import {
   Crop,
   Hourglass,
+  Radio,
+  Waves,
   Replace,
   RotateCcw,
   Scissors,
@@ -24,7 +27,7 @@ import {
   Undo2,
 } from "lucide-vue-next";
 import { audioUrl } from "../../api/client";
-import type { AudioEdit } from "../../api/types";
+import type { AudioEdit, EchoPreset, RadioFilter, RadioPreset } from "../../api/types";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
 import {
@@ -32,6 +35,11 @@ import {
   MAX_FADE_MS,
   MAX_SILENCE_MS,
   MIN_SILENCE_MS,
+  DEFAULT_HISS_DBFS,
+  ECHO_DEFAULTS,
+  ECHO_LIMITS,
+  RADIO_LIMITS,
+  RADIO_SLOPES,
   addCut,
   addSilence,
   editedSeconds,
@@ -44,6 +52,10 @@ import {
   resetEdits,
   setFade,
   setKeep,
+  setRadioPreset,
+  setRadioValue,
+  setEchoPreset,
+  setEchoValue,
   setSilenceLength,
   type Span,
 } from "../../matching/editRecipe";
@@ -162,6 +174,39 @@ function replaceSelectionWithSilence() {
   if (attempt(() => replaceWithSilence(props.draft.edit, s, silenceMs.value, duration.value))) {
     replacement.value?.clearSelection();
   }
+}
+
+// ---- Radio filter: a preset, or its values one by one (any change makes it "custom"). Undoable like the rest.
+function onRadioPreset(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  attempt(() => setRadioPreset(props.draft.edit, value === "off" ? null : (value as RadioPreset)));
+}
+
+function onRadioSlope(event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value) as RadioFilter["slope_db_oct"];
+  attempt(() => setRadioValue(props.draft.edit, "slope_db_oct", value));
+}
+
+// ---- Echo: a preset, or its values one by one (any change makes it "custom").
+function onEchoPreset(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  attempt(() => setEchoPreset(props.draft.edit, value === "off" ? null : (value as EchoPreset)));
+}
+
+/** The optional echo values (repeats, damping, slap): a checkbox switches them on at a default, or off (null). */
+function onEchoOptional(event: Event, key: "feedback_db" | "damping_hz" | "slap_db") {
+  const on = (event.target as HTMLInputElement).checked;
+  attempt(() => setEchoValue(props.draft.edit, key, on ? ECHO_DEFAULTS[key] : null));
+}
+
+function onClicksToggle(event: Event) {
+  const on = (event.target as HTMLInputElement).checked;
+  attempt(() => setRadioValue(props.draft.edit, "clicks", on));
+}
+
+function onHissToggle(event: Event) {
+  const on = (event.target as HTMLInputElement).checked;
+  attempt(() => setRadioValue(props.draft.edit, "noise_dbfs", on ? DEFAULT_HISS_DBFS : null));
 }
 
 // Editing keys; they only act on an editable recording and never fire while typing in a field.
@@ -284,6 +329,145 @@ useShortcuts({
           />
         </label>
       </fieldset>
+
+      <section class="radio-filter" aria-label="Radio filter" data-testid="radio-filter">
+        <header class="radio-head">
+          <h4><Radio :size="14" aria-hidden="true" /> Radio filter</h4>
+          <span v-if="draft.radio && !draft.edit.radio" class="small warn">This line is flagged “Needs radio effect”.</span>
+          <span v-else class="small muted">Heard in the automatic preview (B). Applied after the edits, before the level.</span>
+        </header>
+        <fieldset :disabled="locked" class="edit-grid">
+          <label>Preset
+            <select :value="draft.edit.radio?.preset ?? 'off'" :disabled="!canEdit" aria-label="Radio filter preset" @change="onRadioPreset">
+              <option value="off">Off</option>
+              <option value="spain">Spain radio (MCC Spain lines)</option>
+              <option value="english">English radio (MCC English lines)</option>
+              <option value="spain_eco">Spain intercom (eco lines)</option>
+              <option value="english_eco">English intercom (eco lines)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <template v-if="draft.edit.radio">
+            <label>Low cut (Hz)
+              <input
+                :value="draft.edit.radio.low_hz" type="number" :min="RADIO_LIMITS.low_hz[0]" :max="RADIO_LIMITS.low_hz[1]" step="50"
+                :disabled="!canEdit" aria-label="Radio low cut (Hz)"
+                @change="onNumber($event, (v) => setRadioValue(draft.edit, 'low_hz', v), () => draft.edit.radio?.low_hz ?? 0)"
+              />
+            </label>
+            <label>High cut (Hz)
+              <input
+                :value="draft.edit.radio.high_hz" type="number" :min="RADIO_LIMITS.high_hz[0]" :max="RADIO_LIMITS.high_hz[1]" step="100"
+                :disabled="!canEdit" aria-label="Radio high cut (Hz)"
+                @change="onNumber($event, (v) => setRadioValue(draft.edit, 'high_hz', v), () => draft.edit.radio?.high_hz ?? 0)"
+              />
+            </label>
+            <label>Slope (dB/oct)
+              <select :value="draft.edit.radio.slope_db_oct" :disabled="!canEdit" aria-label="Radio slope (dB per octave)" @change="onRadioSlope">
+                <option v-for="s in RADIO_SLOPES" :key="s" :value="s">{{ s }}{{ s === 12 ? " (gentle)" : s === 36 ? " (steep)" : "" }}</option>
+              </select>
+            </label>
+            <label>Presence (dB)
+              <input
+                :value="draft.edit.radio.presence_db" type="number" :min="RADIO_LIMITS.presence_db[0]" :max="RADIO_LIMITS.presence_db[1]" step="1"
+                :disabled="!canEdit" aria-label="Radio presence (dB)"
+                @change="onNumber($event, (v) => setRadioValue(draft.edit, 'presence_db', v), () => draft.edit.radio?.presence_db ?? 0)"
+              />
+            </label>
+            <label>Drive (dB)
+              <input
+                :value="draft.edit.radio.drive_db" type="number" :min="RADIO_LIMITS.drive_db[0]" :max="RADIO_LIMITS.drive_db[1]" step="1"
+                :disabled="!canEdit" aria-label="Radio drive (dB)"
+                @change="onNumber($event, (v) => setRadioValue(draft.edit, 'drive_db', v), () => draft.edit.radio?.drive_db ?? 0)"
+              />
+            </label>
+            <label>
+              <span><input type="checkbox" :checked="draft.edit.radio.noise_dbfs !== null" :disabled="!canEdit" aria-label="Add hiss" @change="onHissToggle" /> Hiss (dBFS)</span>
+              <input
+                :value="draft.edit.radio.noise_dbfs ?? ''" type="number" :min="RADIO_LIMITS.noise_dbfs[0]" :max="RADIO_LIMITS.noise_dbfs[1]" step="1"
+                :disabled="!canEdit || draft.edit.radio.noise_dbfs === null" aria-label="Radio hiss level (dBFS)"
+                @change="onNumber($event, (v) => setRadioValue(draft.edit, 'noise_dbfs', v), () => draft.edit.radio?.noise_dbfs ?? DEFAULT_HISS_DBFS)"
+              />
+            </label>
+            <label>
+              <span><input type="checkbox" :checked="Boolean(draft.edit.radio.clicks)" :disabled="!canEdit" aria-label="Add MCC radio clicks" @change="onClicksToggle" /> MCC clicks</span>
+              <span class="small muted">Key-up click before the line, release and squelch after it (from MCC's Spain lines).</span>
+            </label>
+          </template>
+        </fieldset>
+      </section>
+
+      <section class="radio-filter" aria-label="Echo" data-testid="echo-effect">
+        <header class="radio-head">
+          <h4><Waves :size="14" aria-hidden="true" /> Echo</h4>
+          <span class="small muted">The cryo assistant's intercom ("eco"). The line gets longer by the echo's ring-out.</span>
+        </header>
+        <fieldset :disabled="locked" class="edit-grid">
+          <label>Preset
+            <select :value="draft.edit.echo?.preset ?? 'off'" :disabled="!canEdit" aria-label="Echo preset" @change="onEchoPreset">
+              <option value="off">Off</option>
+              <option value="spain">Spain echo (MCC Spain eco lines)</option>
+              <option value="english">English echo (MCC English eco lines)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <template v-if="draft.edit.echo">
+            <label>Delay (ms)
+              <input
+                :value="draft.edit.echo.delay_ms" type="number" :min="ECHO_LIMITS.delay_ms[0]" :max="ECHO_LIMITS.delay_ms[1]" step="5"
+                :disabled="!canEdit" aria-label="Echo delay (ms)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'delay_ms', v), () => draft.edit.echo?.delay_ms ?? 0)"
+              />
+            </label>
+            <label>Echo level (dB)
+              <input
+                :value="draft.edit.echo.echo_db" type="number" :min="ECHO_LIMITS.echo_db[0]" :max="ECHO_LIMITS.echo_db[1]" step="1"
+                :disabled="!canEdit" aria-label="Echo level (dB)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'echo_db', v), () => draft.edit.echo?.echo_db ?? 0)"
+              />
+            </label>
+            <label>
+              <span><input type="checkbox" :checked="draft.edit.echo.feedback_db !== null" :disabled="!canEdit" aria-label="Echo repeats" @change="onEchoOptional($event, 'feedback_db')" /> Repeats (dB)</span>
+              <input
+                :value="draft.edit.echo.feedback_db ?? ''" type="number" :min="ECHO_LIMITS.feedback_db[0]" :max="ECHO_LIMITS.feedback_db[1]" step="1"
+                :disabled="!canEdit || draft.edit.echo.feedback_db === null" aria-label="Echo feedback (dB)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'feedback_db', v), () => draft.edit.echo?.feedback_db ?? ECHO_DEFAULTS.feedback_db)"
+              />
+            </label>
+            <label>Diffusion (0–1)
+              <input
+                :value="draft.edit.echo.diffusion" type="number" min="0" max="1" step="0.1"
+                :disabled="!canEdit" aria-label="Echo diffusion"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'diffusion', v), () => draft.edit.echo?.diffusion ?? 0)"
+              />
+            </label>
+            <label>
+              <span><input type="checkbox" :checked="draft.edit.echo.damping_hz !== null" :disabled="!canEdit" aria-label="Echo damping" @change="onEchoOptional($event, 'damping_hz')" /> Damping (Hz)</span>
+              <input
+                :value="draft.edit.echo.damping_hz ?? ''" type="number" :min="ECHO_LIMITS.damping_hz[0]" :max="ECHO_LIMITS.damping_hz[1]" step="250"
+                :disabled="!canEdit || draft.edit.echo.damping_hz === null" aria-label="Echo damping (Hz)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'damping_hz', v), () => draft.edit.echo?.damping_hz ?? ECHO_DEFAULTS.damping_hz)"
+              />
+            </label>
+            <label>
+              <span><input type="checkbox" :checked="draft.edit.echo.slap_db !== null" :disabled="!canEdit" aria-label="Echo slap" @change="onEchoOptional($event, 'slap_db')" /> Slap (dB)</span>
+              <input
+                :value="draft.edit.echo.slap_db ?? ''" type="number" :min="ECHO_LIMITS.slap_db[0]" :max="ECHO_LIMITS.slap_db[1]" step="1"
+                :disabled="!canEdit || draft.edit.echo.slap_db === null" aria-label="Echo slap level (dB)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'slap_db', v), () => draft.edit.echo?.slap_db ?? ECHO_DEFAULTS.slap_db)"
+              />
+            </label>
+            <label>Slap delay (ms)
+              <input
+                :value="draft.edit.echo.slap_ms" type="number" :min="ECHO_LIMITS.slap_ms[0]" :max="ECHO_LIMITS.slap_ms[1]" step="1"
+                :disabled="!canEdit || draft.edit.echo.slap_db === null" aria-label="Echo slap delay (ms)"
+                @change="onNumber($event, (v) => setEchoValue(draft.edit, 'slap_ms', v), () => draft.edit.echo?.slap_ms ?? 30)"
+              />
+            </label>
+          </template>
+        </fieldset>
+      </section>
+
 
       <div v-if="draft.edit.cuts.length" class="cut-list">
         <p class="small muted">Cuts (times on the original recording)</p>
