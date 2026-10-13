@@ -446,6 +446,11 @@
   background: var(--well);
 }
 
+/* The MCC original has a download button after the copy button. */
+.source-card.mcc-source {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
 .source-card.ce-source {
   border-left-color: var(--ok);
 }

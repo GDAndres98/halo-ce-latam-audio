@@ -17,6 +17,7 @@ import { useEditPreview } from "../../composables/useEditPreview";
 import type { MatchState } from "../../composables/useMatch";
 import StatusBadge from "../StatusBadge.vue";
 import CopyButton from "../ui/CopyButton.vue";
+import DownloadLink from "../ui/DownloadLink.vue";
 import StateMessage from "../ui/StateMessage.vue";
 import AudioCompare from "../waveform/AudioCompare.vue";
 import AudioDecision from "./AudioDecision.vue";
@@ -109,6 +110,13 @@ async function choose(ref: string) {
           <span class="source-tag">MCC original</span>
           <code class="source-key" data-testid="mcc-key" :title="shownKey">{{ shownKey }}</code>
           <CopyButton :text="shownKey" label="Copy the MCC key" data-testid="copy-mcc-key" />
+          <DownloadLink
+            v-if="mccUrl && !switching"
+            :url="mccUrl"
+            :file-name="`${detail.level}_${detail.slot_id.replace(/^es:/, '')}_spain.wav`"
+            label="Download the MCC Spain recording (WAV)"
+            data-testid="download-mcc-spain"
+          />
           <p v-if="switching" class="source-meta small muted">Loading this line…</p>
           <div v-else class="source-meta line-title">
             <h2>{{ detail.tag_name }}</h2>
@@ -126,6 +134,12 @@ async function choose(ref: string) {
                 :title="`English ${englishName(sample)}`"
               />
               <span class="mono small">{{ englishName(sample) }}</span>
+              <DownloadLink
+                :url="audioUrl.mcc(detail.level, 'english', sample.index)"
+                :file-name="`${detail.level}_${sample.name_in_bank}_${sample.ordinal_in_tag}_english.wav`"
+                :label="`Download English ${englishName(sample)} (WAV)`"
+                data-testid="download-mcc-english"
+              />
             </li>
           </ul>
         </div>

@@ -92,7 +92,8 @@ Open **Matching**. The screen has three columns.
 - **Centre: the decision for the selected line**, in working order. The save bar stays in view at the
   bottom.
   1. **Replacement audio.** At the top, the **MCC original** key of the selected line (for example
-     `es:A10_010_cryotech#0`, with a copy button), shown as soon as you select the line. Then MCC's English
+     `es:A10_010_cryotech#0`, with a copy button and a download button for its Spain recording as a WAV), shown as
+     soon as you select the line. Each MCC English recording also has a download button. Then MCC's English
      recordings of the line (play buttons and names with `#n`) and MCC's subtitles (SU, SP, EN). Below them,
      the chosen **Campaign Evolved replacement** and its key, the choice between keeping Spain's audio and a
      matched recording, the replacement's language, and the audio status.
