@@ -5,7 +5,7 @@
 import { KeyRound, LogIn, ShieldAlert } from "lucide-vue-next";
 import { ref } from "vue";
 import { ApiError } from "../api/client";
-import { session, signIn } from "../auth/session";
+import { session, signIn, signInWithAccess } from "../auth/session";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
 
@@ -31,7 +31,15 @@ async function submit() {
 
 <template>
   <section class="login-view">
-    <form class="panel login-panel" aria-labelledby="login-title" @submit.prevent="submit">
+    <div v-if="session.accessSignIn || session.info?.sso" class="panel login-panel" aria-labelledby="login-title">
+      <PanelHeader title="Sign in" title-id="login-title" :icon="KeyRound" />
+      <p class="small muted">This Studio is protected by Cloudflare Access. Sign in with your authorized account.</p>
+      <StateMessage v-if="session.reason" kind="warning" class="small">{{ session.reason }}</StateMessage>
+      <button type="button" class="primary icon-label" data-testid="access-sign-in" @click="signInWithAccess">
+        <LogIn :size="16" aria-hidden="true" /> Sign in with Cloudflare Access
+      </button>
+    </div>
+    <form v-else class="panel login-panel" aria-labelledby="login-title" @submit.prevent="submit">
       <PanelHeader title="Sign in" title-id="login-title" :icon="KeyRound" />
       <p class="small muted">
         This Studio runs on the host computer. Sign in with the account its owner made for you.

@@ -20,6 +20,9 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt", // a new version waits for "Reload" (or the next launch): never mid-edit
       injectRegister: false, // registered by src/pwa.ts
+      // Behind Cloudflare Access (docs/deploy-cloudflare.md) the manifest needs the Access cookie, which browsers
+      // only send for a manifest link with crossorigin="use-credentials".
+      useCredentials: true,
       includeAssets: ["favicon.svg", "icons/favicon-32.png", "icons/apple-touch-icon-180.png"],
       manifest: {
         id: "./",

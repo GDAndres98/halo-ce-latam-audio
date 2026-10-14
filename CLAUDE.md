@@ -260,9 +260,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       opt-in remote listener (`--lan` / `config/studio_server.json`, sign-in, CSRF, roles editor/admin).
       Accounts: `scripts/ui/studio_users.py` (scrypt hashes in git-ignored `config/studio_users.json`). Saves
       check the line's own version (`loaded_slot_sha256`); live updates via SSE `/api/events`. Internet access
-      is Tailscale Serve only. **Never** enable Tailscale Funnel, forward router ports, change firewall rules,
+      is Tailscale Serve, or the owner's Cloudflare Tunnel + Access (below). **Never** enable Tailscale Funnel, forward router ports, change firewall rules,
       or create accounts/enable remote access on the owner's machine yourself; never let a remote listener
       install into the game. Test: `npm run test:remote` (disposable data).
+    - **Cloudflare deployment (owner prompt 47, 2026-10-14):** `docs/deploy-cloudflare.md`. The owner's
+      `https://studio.andresgustavo.com` (tunnel `halo-studio`, dashboard-managed, `Cloudflared` service; route →
+      `http://localhost:8080`; Access app on the whole hostname) reaches the remote listener on `127.0.0.1:8080`
+      with `remote.auth: "cloudflare_access"` in git-ignored `config/studio_server.json`: every request needs a
+      `Cf-Access-Jwt-Assertion` that `scripts/ui/cf_access.py` verifies (RS256, iss, aud, type app, times, email
+      in `cloudflare_access.users`); no password sign-in there, installs still local-only. Start/stop/status/
+      startup task: `scripts/deploy/studio.ps1` (`m4_server.py --stop` = clean stop file). Tests:
+      `tests/test_cf_access.py`. Never read the tunnel token or change the Cloudflare config yourself.
     - **Mobile layout (owner prompt 46, 2026-10-13):** `docs/mobile.md`. Same Vue app and server, no
       backend change: `<html data-layout="phone|tablet|desktop">` from `frontend/src/layout/useLayoutMode.ts`
       (media queries, not innerWidth), styles in `frontend/src/styles/mobile.css`. Phones get one pane at a time

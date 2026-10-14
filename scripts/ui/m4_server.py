@@ -12,6 +12,11 @@ Two listeners share one application and one decisions database (docs/remote-acce
   other computers on the LAN or through Tailscale. Every API and audio request needs a signed-in account
   (scripts/ui/studio_users.py); writes need the session's CSRF token. Game installs are refused whatever the
   role; builds, the level setting and data import/export need the admin role.
+  With "remote": {"auth": "cloudflare_access"} the remote listener sits behind a Cloudflare Tunnel: every
+  request, the page's own files included, must carry a Cloudflare Access token that this server verifies
+  (cf_access.py; docs/deploy-cloudflare.md). There is no password sign-in on it then.
+
+Stop a running server cleanly: python scripts/ui/m4_server.py --stop (or scripts/deploy/studio.ps1 stop).
 
 The built Studio (frontend/dist, `npm run build`) is served at / on both; the classic page is at /classic on
 the local listener only. Never matches anything by itself. Saves only through mapping_store, and decodes
@@ -21,7 +26,8 @@ API (all JSON unless noted):
     GET  /api/session                             who is signed in, role, permissions, CSRF token
     POST /api/login                               {username, password} (remote listener)
     POST /api/logout
-    GET  /api/events                              Server-Sent Events: decisions changed (any client, any tool)
+    GET  /api/sso/continue                        Cloudflare Access mode: back to the Studio after signing in
+    GET  /api/events                             Server-Sent Events: decisions changed (any client, any tool)
     GET  /api/network                             listeners and the addresses to connect from another computer
     GET  /api/state                               levels + progress, CE missions, file hashes
     GET  /api/slots?level=a10|all&status=&q=      slot list (status: undecided|matched|no_equivalent|
@@ -51,9 +57,13 @@ API (all JSON unless noted):
 import argparse
 import datetime as dt
 import gzip
+import hashlib
+import hmac
 import json
 import mimetypes
+import os
 import queue
+import secrets
 import shutil
 import socket
 import ssl
@@ -76,6 +86,7 @@ from build_api import BuildBoard  # noqa: E402
 from common.export_config import ConfigError, load_export_config, save_global_gain  # noqa: E402
 from live_feed import LiveFeed  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
+from cf_access import HEADER as ACCESS_HEADER, AccessError, AccessVerifier  # noqa: E402
 from studio_auth import AuthError, Authenticator, SessionStore, UserStore, csrf_ok  # noqa: E402
 from studio_net import ConfigError as NetConfigError, HostPolicy, connection_info, load_server_config  # noqa: E402
 
@@ -108,13 +119,19 @@ STUDIO_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-i
               "media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; "
               "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
 AUDIO_PATHS = ("/audio/mcc", "/audio/ce", "/audio/preview")
+ACCESS_LOGOUT = "/cdn-cgi/access/logout"  # Cloudflare Access ends its own session at this path of the app's host
+# Headers a proxy adds. The trusted local listener refuses requests that carry any of them.
+PROXY_HEADERS = ("X-Forwarded-For", "Forwarded", "X-Forwarded-Host", "Tailscale-User-Login", "Cf-Connecting-Ip",
+                 "Cf-Ray", ACCESS_HEADER)
+STOP_FILE = "server.stop"  # in the state folder (work/studio/): its appearance shuts the server down cleanly
 
 
 class Listener:
     """What one listening address allows. kind "local": the host's own trusted address; "remote": sign-in."""
 
-    def __init__(self, kind, cfg, port, auth=None, secure_tls=False):
+    def __init__(self, kind, cfg, port, auth=None, secure_tls=False, access=None, csrf_key=None):
         self.kind, self.cfg, self.port, self.auth, self.tls = kind, cfg, port, auth, secure_tls
+        self.access, self.csrf_key = access, csrf_key  # Cloudflare Access mode: the verifier and the CSRF key
         self.policy = HostPolicy(cfg, kind, port)
 
     @property
@@ -276,6 +293,9 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         # ------------------------------------------------------------ who is asking
         def _peer(self):
             ip = self.client_address[0]
+            cf = self.headers.get("Cf-Connecting-Ip")
+            if listener.access and cf and ip in ("127.0.0.1", "::1"):  # cloudflared on this computer
+                return cf.strip()[:64]
             fwd = self.headers.get("X-Forwarded-For")
             if fwd and ip in ("127.0.0.1", "::1"):  # a proxy on this computer (tailscale serve) names the client
                 return fwd.split(",")[0].strip()[:64]
@@ -297,6 +317,10 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         def _session(self):
             if not listener.remote:
                 return {"username": "host", "role": "admin", "csrf": None, "local": True}
+            if listener.access:  # verified in _guard on every request
+                who = self._access_identity
+                csrf = hmac.new(listener.csrf_key, f"csrf|{who['email']}".encode(), hashlib.sha256).hexdigest()
+                return {"username": who["email"], "role": who["role"], "csrf": csrf, "local": False}
             s = listener.auth.session(self._cookie_token())
             return dict(s, local=False) if s else None
 
@@ -315,6 +339,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             return {"listener": listener.kind, "auth_required": listener.remote, "authenticated": bool(s),
                     "user": s and s["username"], "role": s and s["role"], "csrf": s and s.get("csrf"),
                     "local_admin": not listener.remote, "https": self._https(),
+                    "sso": "cloudflare_access" if listener.access else None,
+                    "logout_url": ACCESS_LOGOUT if listener.access else None,
                     "permissions": self._permissions(s)}
 
         # ------------------------------------------------------------ checks
@@ -327,16 +353,25 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             if not listener.remote:
                 # The trusted local listener must not be reached through a proxy (that would make a remote
                 # visitor look local): forwarded requests are refused here; proxies belong on the remote port.
-                for h in ("X-Forwarded-For", "Forwarded", "X-Forwarded-Host", "Tailscale-User-Login"):
+                for h in PROXY_HEADERS:
                     if self.headers.get(h):
                         raise ApiError(403, "the local administrator address does not accept proxied requests; "
                                             "point the proxy at the remote listener's port")
+            elif listener.access:
+                # Behind Cloudflare Access: every request, static files included, needs a valid Access token.
+                # Fail closed: no token, a bad one, or one for an account not in the settings is refused.
+                try:
+                    self._access_identity = listener.access.verify(self.headers.get(ACCESS_HEADER))
+                except AccessError as e:
+                    raise ApiError(e.status, e.message)
 
         def _authorize(self, path, s):
             if self.command in ("GET", "HEAD"):
                 if path in PUBLIC_GETS or not (path.startswith("/api/") or path.startswith("/audio/")):
                     return
             elif path in PUBLIC_POSTS:
+                if listener.access and path == "/api/login":
+                    raise ApiError(404, "sign-in is through Cloudflare Access on this address")
                 return
             if not s:
                 raise ApiError(401, "sign in first")
@@ -405,12 +440,18 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 self.wfile.write(f"retry: 3000\nevent: hello\ndata: {json.dumps(hello)}\n\n".encode())
                 self.wfile.flush()
                 token = self._cookie_token()
+                access_token = self.headers.get(ACCESS_HEADER)
                 while True:
                     try:
                         ev = q.get(timeout=20)
                         self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8"))
                     except queue.Empty:
-                        if listener.remote and not listener.auth.session(token):
+                        if listener.access:
+                            try:
+                                listener.access.verify(access_token)
+                            except AccessError:
+                                return  # the Access sign-in expired: the page reconnects through Access
+                        elif listener.remote and not listener.auth.session(token):
                             return  # signed out or expired: the page sees the 401 on its next request
                         self.wfile.write(b": ping\n\n")
                     self.wfile.flush()
@@ -460,12 +501,17 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._send(200, NO_BUILD_PAGE, "text/html; charset=utf-8")
             if path == "/api/session":
                 return self._json(200, self._session_info(s))
+            if path == "/api/sso/continue" and listener.access:
+                # Opened as a page after Cloudflare Access signed the visitor in again; a fixed target only.
+                return self._send(302, b"", "text/plain", {"Location": "/#/match"})
             if path == "/api/events":
                 return self._events(s)
             if path == "/api/network":
                 info = connection_info(listener.cfg, shared.remote_running)
                 info.update(this_listener=listener.kind, https=self._https(), remote_users=None, signed_in=None)
-                if shared.sessions and self._permissions(s)["admin"]:  # who can sign in and who is: admins only
+                if listener.access and self._permissions(s)["admin"]:
+                    info["remote_users"] = sorted(f"{k} ({v})" for k, v in listener.access.users.items())
+                elif shared.sessions and self._permissions(s)["admin"]:  # who can sign in and who is: admins only
                     info["remote_users"] = sorted(f"{k} ({v['role']})" for k, v in shared.users.users().items())
                     info["signed_in"] = [{"user": x["username"], "from": x["address"], "last_seen": x["last_seen"]}
                                          for x in shared.sessions.active()]
@@ -528,6 +574,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 info = self._session_info(dict(user, csrf=csrf))
                 return 200, info, {"Set-Cookie": self._set_cookie(token, max_age)}
             if path == "/api/logout":
+                if listener.access:  # the Access session is Cloudflare's: the page goes to its logout address
+                    return 200, {"signed_out": False, "logout_url": ACCESS_LOGOUT}, None
                 if listener.remote:
                     token = self._cookie_token()
                     if token:
@@ -666,7 +714,10 @@ def main():
     ap.add_argument("--no-open", action="store_true", help="don't open a browser tab")
     ap.add_argument("--mcc-root", type=Path, help="TESTS ONLY: a throw-away copy of the game folder to install into")
     ap.add_argument("--deploy-state", type=Path, help="TESTS ONLY: backups and install state for --mcc-root")
+    ap.add_argument("--stop", action="store_true", help="stop the running server cleanly, then exit")
     args = ap.parse_args()
+    if args.stop:
+        raise SystemExit(request_stop(args.root, args.config))
 
     over = {"local": {}, "remote": {}}
     if args.port:
@@ -710,7 +761,24 @@ def main():
         print(f"note: {cfg['static_path']} has no built Studio; run `npm run build` in frontend/ "
               "(the classic page is served at / meanwhile)")
 
-    if cfg["remote"]["enabled"]:
+    access = None
+    if cfg["remote"]["enabled"] and cfg["remote"]["auth"] == "cloudflare_access":
+        access = AccessVerifier(cfg["cloudflare_access"])
+        try:
+            print(f"Cloudflare Access: {access.warm()} signing key(s) from {access.team}")
+        except Exception as e:  # noqa: BLE001 - offline at start-up: requests are refused until keys arrive
+            print(f"warning: cannot fetch the Cloudflare Access keys yet ({type(e).__name__}); every remote "
+                  "request is refused until they can be fetched")
+        remote = Listener("remote", cfg, cfg["remote"]["port"], access=access,
+                          csrf_key=_access_csrf_key(Path(cfg["sessions_path"]).parent))
+        srv = _bind(cfg["remote"]["host"], cfg["remote"]["port"],
+                    make_handler(app, builds=builds, listener=remote, shared=shared))
+        servers.append(srv)
+        shared.remote_running = True
+        print(f"Remote access on http://{cfg['remote']['host']}:{cfg['remote']['port']} for the Cloudflare Tunnel "
+              f"only (Cloudflare Access verified on every request; {len(access.users)} account(s)).\n"
+              f"  Public address: {cfg['public_url']}")
+    elif cfg["remote"]["enabled"]:
         users = UserStore(cfg["users_path"])
         if users.count() == 0:
             raise SystemExit("remote access needs at least one account; create one first:\n"
@@ -739,9 +807,15 @@ def main():
 
     for srv in servers[1:]:
         threading.Thread(target=srv.serve_forever, daemon=True, name="remote-listener").start()
+    state_dir = Path(cfg["sessions_path"]).parent
+    stop_file = state_dir / STOP_FILE
+    stop_file.unlink(missing_ok=True)
+    _write_pid_file(state_dir, cfg, bool(access))
+    threading.Thread(target=_watch_stop_file, args=(stop_file, servers[0], builds), daemon=True,
+                     name="stop-watch").start()
     if not args.no_open:
         webbrowser.open(url)
-    print("Ctrl+C stops.")
+    print("Ctrl+C stops (or: python scripts/ui/m4_server.py --stop).", flush=True)
     try:
         servers[0].serve_forever()
     except KeyboardInterrupt:
@@ -750,6 +824,68 @@ def main():
         feed.stop()
         for srv in servers:
             srv.server_close()
+        (state_dir / "server.json").unlink(missing_ok=True)
+        print("Studio stopped.", flush=True)
+
+
+def _access_csrf_key(state_dir):
+    """A random key kept in the state folder (git-ignored work/studio/): CSRF tokens in Cloudflare Access mode
+    are HMAC(key, account), so they survive a server restart and differ per account."""
+    p = Path(state_dir) / "access_csrf.key"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if not p.is_file() or p.stat().st_size != 32:
+        p.write_bytes(secrets.token_bytes(32))
+    return p.read_bytes()
+
+
+def _write_pid_file(state_dir, cfg, access):
+    """work/studio/server.json: which process serves which addresses (scripts/deploy/studio.ps1 reads it)."""
+    info = {"pid": os.getpid(), "started_at": dt.datetime.now().isoformat(timespec="seconds"),
+            "local": f"http://{cfg['local']['host']}:{cfg['local']['port']}/",
+            "remote": (f"http://{cfg['remote']['host']}:{cfg['remote']['port']}/" if cfg["remote"]["enabled"]
+                       else None),
+            "remote_auth": cfg["remote"]["auth"] if cfg["remote"]["enabled"] else None,
+            "public_url": cfg.get("public_url") if access else None}
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "server.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+
+
+def _watch_stop_file(stop_file, server, builds):
+    """Clean shutdown on request (`--stop` creates the file): waits for a running build or install to end first,
+    so an install's backup / rollback is never cut short."""
+    while True:
+        time.sleep(1)
+        if not stop_file.exists():
+            continue
+        if any(j.get("state") == "running" for j in list(builds._jobs.values())):
+            continue  # stop as soon as the job is over
+        stop_file.unlink(missing_ok=True)
+        print("stop requested; shutting down", flush=True)
+        server.shutdown()
+        return
+
+
+def request_stop(root, config=None, timeout=60):
+    """`--stop`: ask the running server to shut down and wait for it. -> exit code."""
+    try:
+        cfg = load_server_config(root, config, {})
+    except NetConfigError as e:
+        raise SystemExit(f"server settings: {e}")
+    state_dir = Path(cfg["sessions_path"]).parent
+    pid_file = state_dir / "server.json"
+    if not pid_file.is_file():
+        print("no Studio server is running (work/studio/server.json is absent)")
+        return 0
+    (state_dir / STOP_FILE).write_text("stop\n", encoding="utf-8")
+    end = time.time() + timeout
+    while time.time() < end:
+        if not pid_file.exists():
+            print("Studio stopped.")
+            return 0
+        time.sleep(0.5)
+    print(f"the server did not stop within {timeout} s (a build or install may still be running); "
+          f"{STOP_FILE} stays, so it stops when that ends")
+    return 1
 
 
 if __name__ == "__main__":

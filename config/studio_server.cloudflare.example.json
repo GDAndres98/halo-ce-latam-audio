@@ -1,0 +1,20 @@
+{
+  "schema": "studio-server/1",
+  "local": { "host": "127.0.0.1", "port": 8765 },
+  "remote": { "enabled": true, "host": "127.0.0.1", "port": 8080, "tls_cert": null, "tls_key": null,
+              "auth": "cloudflare_access" },
+  "allowed_hosts": [],
+  "allowed_origins": [],
+  "public_url": "https://studio.example.com",
+  "session": { "idle_hours": 72, "max_days": 14 },
+  "secure_cookies": true,
+  "users_file": "config/studio_users.json",
+  "sessions_file": "work/studio/sessions.sqlite",
+  "audit_file": "work/studio/audit.jsonl",
+  "static_dir": "frontend/dist",
+  "cloudflare_access": {
+    "team_domain": "your-team.cloudflareaccess.com",
+    "aud": ["<the Access application's 64-character AUD tag>"],
+    "users": { "you@example.com": "admin" }
+  }
+}

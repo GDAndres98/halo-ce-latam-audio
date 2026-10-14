@@ -122,6 +122,10 @@ Remove-NetFirewallRule -DisplayName "Halo Localization Studio (LAN)"
 
 ## 5. Secure internet access (Tailscale, recommended)
 
+> The owner's own public address, **https://studio.andresgustavo.com**, uses a Cloudflare Tunnel with
+> Cloudflare Access instead (owner, 2026-10-14). That setup, with the Studio verifying Access tokens itself, is in
+> [deploy-cloudflare.md](deploy-cloudflare.md).
+
 **Never forward a router port to the Studio, and never put it on the public internet.**
 
 [Tailscale](https://tailscale.com/kb/1151/what-is-tailscale) makes a private, encrypted network (a
@@ -257,6 +261,8 @@ refused, so a typo never silently keeps a default. Command-line options override
 | `remote.enabled` | `false` | Listen for other computers. `--lan` |
 | `remote.host`, `remote.port` | `0.0.0.0`, `8766` | `0.0.0.0` means every network; `127.0.0.1` means through Tailscale Serve only. `--remote-host`, `--remote-port` |
 | `remote.tls_cert`, `remote.tls_key` | `null` | HTTPS on the remote listener (PEM files). |
+| `remote.auth` | `"password"` | `"cloudflare_access"`: behind a Cloudflare Tunnel; every request needs a verified Access token for one of `cloudflare_access.users` ([deploy-cloudflare.md](deploy-cloudflare.md)). |
+| `cloudflare_access` | empty | `team_domain`, `aud` (the Access application's AUD tag), `users` (e-mail → role). |
 | `allowed_hosts` | `[]` | Extra host names to accept (for example the Tailscale name). `--allowed-host` |
 | `allowed_origins` | `[]` | Extra browser origins (`https://name`). `--allowed-origin` |
 | `public_url` | `null` | The address to show to other computers; its host and origin are accepted. |

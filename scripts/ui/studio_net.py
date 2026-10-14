@@ -21,7 +21,11 @@ SCHEMA = "studio-server/1"
 DEFAULTS = {
     "schema": SCHEMA,
     "local": {"host": "127.0.0.1", "port": 8765},
-    "remote": {"enabled": False, "host": "0.0.0.0", "port": 8766, "tls_cert": None, "tls_key": None},
+    # auth "password": Studio accounts (studio_users.py). "cloudflare_access": the remote listener sits behind a
+    # Cloudflare Tunnel + Access application and every request must carry a valid Access token for one of
+    # cloudflare_access.users (cf_access.py, docs/deploy-cloudflare.md); password sign-in is then off.
+    "remote": {"enabled": False, "host": "0.0.0.0", "port": 8766, "tls_cert": None, "tls_key": None,
+               "auth": "password"},
     # Extra host names the remote listener answers to (e.g. "studio-pc.tail1234.ts.net"). The machine's own
     # names and addresses are always accepted.
     "allowed_hosts": [],
@@ -37,6 +41,9 @@ DEFAULTS = {
     # Append-only log of write requests (who, from where, what, result).
     "audit_file": "work/studio/audit.jsonl",
     "static_dir": "frontend/dist",
+    # Cloudflare Access application (public values, not secrets): the team domain, the application's AUD tag,
+    # and the Access e-mail addresses allowed in, each with a Studio role.
+    "cloudflare_access": {"team_domain": None, "aud": [], "users": {}},
 }
 
 
@@ -52,7 +59,8 @@ def _merge(base, over, where="config"):
         if isinstance(base[k], dict):
             if not isinstance(v, dict):
                 raise ConfigError(f"{where}.{k} must be an object")
-            out[k] = _merge(base[k], v, f"{where}.{k}")
+            # An empty default object is a free-form map (cloudflare_access.users: e-mail -> role).
+            out[k] = _merge(base[k], v, f"{where}.{k}") if base[k] else copy.deepcopy(v)
         else:
             out[k] = v
     return out
@@ -86,6 +94,22 @@ def load_server_config(root, path=None, overrides=None):
         raise ConfigError("the remote listener needs its own port")
     if bool(cfg["remote"]["tls_cert"]) != bool(cfg["remote"]["tls_key"]):
         raise ConfigError("remote.tls_cert and remote.tls_key go together")
+    if cfg["remote"]["auth"] not in ("password", "cloudflare_access"):
+        raise ConfigError("remote.auth must be \"password\" or \"cloudflare_access\"")
+    if cfg["remote"]["enabled"] and cfg["remote"]["auth"] == "cloudflare_access":
+        from cf_access import check_settings  # noqa: PLC0415
+        try:
+            check_settings(cfg["cloudflare_access"])
+        except ValueError as e:
+            raise ConfigError(str(e))
+        # cloudflared runs on this computer: the listener must not be reachable any other way.
+        if not _is_loopback(cfg["remote"]["host"]):
+            raise ConfigError("with remote.auth \"cloudflare_access\", remote.host must be 127.0.0.1 (cloudflared "
+                              "connects locally; nothing else may reach the listener)")
+        if cfg["remote"]["tls_cert"]:
+            raise ConfigError("with remote.auth \"cloudflare_access\", Cloudflare terminates HTTPS: leave tls_cert unset")
+        if not str(cfg.get("public_url") or "").startswith("https://"):
+            raise ConfigError("with remote.auth \"cloudflare_access\", public_url must be the https:// address")
     if not _is_loopback(cfg["local"]["host"]):
         raise ConfigError("local.host must be a loopback address (127.0.0.1, ::1 or localhost): it is the "
                           "no-sign-in administrator address; use the remote listener for other computers")
@@ -210,6 +234,8 @@ def connection_info(cfg, remote_running):
     urls = []
     if remote_running:
         hosts = addrs if rc["host"] in ("0.0.0.0", "::", "") else [rc["host"]]
+        if rc["auth"] == "cloudflare_access":
+            hosts = []  # only the public https address works: direct requests have no Access token
         urls = [{"url": f"{scheme}://{a}:{rc['port']}/", "kind": describe_address(a) if a[0].isdigit() else "name",
                  "encrypted": scheme == "https"} for a in hosts]
     if cfg.get("public_url"):
@@ -218,7 +244,7 @@ def connection_info(cfg, remote_running):
     return {
         "local_url": f"http://{cfg['local']['host']}:{cfg['local']['port']}/",
         "remote": {"enabled": bool(rc["enabled"]), "running": remote_running, "host": rc["host"],
-                   "port": rc["port"], "tls": bool(cfg["tls"])},
+                   "port": rc["port"], "tls": bool(cfg["tls"]), "auth": rc["auth"]},
         "urls": urls,
         "addresses": [{"address": a, "kind": describe_address(a)} for a in addrs],
         "hostname": socket.gethostname(),

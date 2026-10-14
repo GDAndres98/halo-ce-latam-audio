@@ -144,7 +144,9 @@ screen, without the browser's address bar, and keeps you signed in.
    [remote-access.md §5](remote-access.md#5-secure-internet-access-tailscale-recommended)). Browsers only install
    apps from secure addresses, so the plain-http LAN address works in the browser but cannot be installed.
    Tailscale keeps the Studio private: it is reachable only from your own devices, never from the public internet.
-2. Sign in.
+   Or the owner's Cloudflare address, `https://studio.andresgustavo.com`, where Cloudflare Access signs you in
+   ([deploy-cloudflare.md](deploy-cloudflare.md)).
+2. Sign in (with Cloudflare Access on the Cloudflare address).
 3. Install:
    - **Android (Chrome, Edge):** **Install app** in the Studio's menu, or the browser's *Install app* /
      *Add to Home screen*.

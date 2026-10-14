@@ -15,24 +15,34 @@ export function setCsrfToken(token: string | null): void {
   csrfToken = token;
 }
 
-// Told when the server answers 401: the session ended (signed out, expired, password changed).
-const unauthorizedListeners: (() => void)[] = [];
-export function onUnauthorized(listener: () => void): void {
+// Told when the server answers 401: the session ended (signed out, expired, password changed). `access` is
+// true when Cloudflare Access (docs/deploy-cloudflare.md) answered instead of the Studio: its sign-in expired.
+const unauthorizedListeners: ((access: boolean) => void)[] = [];
+export function onUnauthorized(listener: (access: boolean) => void): void {
   unauthorizedListeners.push(listener);
 }
+
+/** The message of an expired Cloudflare Access sign-in (the request was redirected to its login page). */
+export const ACCESS_EXPIRED = "Your Cloudflare Access sign-in has expired.";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.method === "POST" && csrfToken) headers.set("X-Studio-CSRF", csrfToken);
   let res: Response;
   try {
-    res = await fetch(path, { ...init, headers, credentials: "same-origin" });
+    // The Studio's API never redirects. A redirect means Cloudflare Access is sending the browser to its login
+    // page (expired sign-in); "manual" makes it visible here instead of a cross-site fetch that fails.
+    res = await fetch(path, { ...init, headers, credentials: "same-origin", redirect: "manual" });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new ApiError(0, "The Studio server cannot be reached. Check the connection to the host computer.");
   }
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400 && res.status !== 304)) {
+    unauthorizedListeners.forEach((listener) => listener(true));
+    throw new ApiError(401, ACCESS_EXPIRED);
+  }
   const body = (await res.json().catch(() => ({}))) as { error?: string; details?: string[] };
-  if (res.status === 401 && path !== "/api/login") unauthorizedListeners.forEach((listener) => listener());
+  if (res.status === 401 && path !== "/api/login") unauthorizedListeners.forEach((listener) => listener(false));
   if (!res.ok) throw new ApiError(res.status, body.error ?? res.statusText, body.details ?? []);
   return body as T;
 }
@@ -54,7 +64,7 @@ export const api = {
   /** Who is signed in on this address, the role and what it may do. Never needs a session. */
   session: () => request<SessionInfo>("/api/session"),
   login: (username: string, password: string) => request<SessionInfo>("/api/login", postJson({ username, password })),
-  logout: () => request<{ signed_out: boolean }>("/api/logout", postJson({})),
+  logout: () => request<{ signed_out: boolean; logout_url?: string }>("/api/logout", postJson({})),
   /** Listeners and the addresses to open from another computer. */
   network: () => request<NetworkInfo>("/api/network"),
 

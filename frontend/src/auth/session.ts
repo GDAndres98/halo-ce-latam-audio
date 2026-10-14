@@ -14,6 +14,8 @@ const state = reactive({
   info: null as SessionInfo | null,
   /** Why the page is showing the sign-in form (expired session, signed out, unreachable server). */
   reason: "",
+  /** Cloudflare Access must sign the visitor in again (its sign-in expired): show its button, not the form. */
+  accessSignIn: false,
 });
 
 export const session = readonly(state);
@@ -32,6 +34,7 @@ export async function loadSession(): Promise<void> {
   try {
     adopt(await api.session());
     state.reason = "";
+    state.accessSignIn = false;
   } catch (e) {
     state.reason = e instanceof Error ? e.message : String(e);
   } finally {
@@ -45,7 +48,17 @@ export async function signIn(username: string, password: string): Promise<void> 
   state.reason = "";
 }
 
+/** Cloudflare Access mode: the browser goes through Access's login page and comes back to the Studio. A
+ * server route, so the installed app's service worker never answers it from its cache. */
+export function signInWithAccess(): void {
+  window.location.assign("/api/sso/continue");
+}
+
 export async function signOut(): Promise<void> {
+  if (state.info?.sso === "cloudflare_access") {
+    window.location.assign(state.info.logout_url || "/cdn-cgi/access/logout"); // Cloudflare's own session
+    return;
+  }
   try {
     await api.logout();
   } catch (e) {
@@ -57,7 +70,14 @@ export async function signOut(): Promise<void> {
 
 // A 401 anywhere means the session ended: show the sign-in form. Unsaved typing stays in the browser session
 // (see useMatch), so signing in again returns to it.
-onUnauthorized(() => {
+onUnauthorized((access) => {
+  if (access) {
+    state.accessSignIn = true;
+    if (state.info) state.info = { ...state.info, authenticated: false, user: null, role: null, csrf: null };
+    setCsrfToken(null);
+    state.reason = "Your Cloudflare Access sign-in has expired. Sign in again; unsaved edits on this device are kept.";
+    return;
+  }
   if (state.info?.auth_required && state.info.authenticated) {
     state.info = { ...state.info, authenticated: false, user: null, role: null, csrf: null };
     setCsrfToken(null);

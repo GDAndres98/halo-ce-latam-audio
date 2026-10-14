@@ -61,6 +61,10 @@ export interface SessionInfo {
   /** The host computer's own address (no sign-in; the only place game files can be installed or restored). */
   local_admin: boolean;
   https: boolean;
+  /** "cloudflare_access": the address is behind Cloudflare Access, which signs people in (no password form). */
+  sso?: "cloudflare_access" | null;
+  /** Where signing out goes in that mode (Cloudflare's own logout page). */
+  logout_url?: string | null;
   permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean };
 }
 

@@ -63,7 +63,7 @@ watch(signedIn, (yes) => (yes ? startLiveUpdates() : stopLiveUpdates()), { immed
   </header>
   <main :class="{ wide: route.name === 'match' && signedIn }">
     <StateMessage v-if="!session.loaded" kind="loading">Connecting to the Studio…</StateMessage>
-    <HostUnreachable v-else-if="!session.info" :reason="session.reason" :retry="loadSession" />
+    <HostUnreachable v-else-if="!session.info && !session.accessSignIn" :reason="session.reason" :retry="loadSession" />
     <LoginView v-else-if="!signedIn" />
     <RouterView v-else />
   </main>
