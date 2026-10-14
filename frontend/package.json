@@ -28,6 +28,7 @@
     "test:level": "node e2e/level.mjs",
     "test:theme": "node e2e/theme.mjs",
     "test:remote": "node e2e/remote.mjs",
+    "test:mobile": "node e2e/mobile.mjs",
     "perf": "node e2e/perf.mjs",
     "docs:screenshots": "node e2e/screenshots.mjs"
   },

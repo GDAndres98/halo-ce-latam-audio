@@ -10,10 +10,16 @@
 // approved audio must be marked Needs rework first (the server refuses the change otherwise).
 //
 // Speed and per-line gain do not exist here (removed 2026-10-09); volume is the global export gain.
+//
+// On a phone or tablet the editor can fill the screen ("Full screen"): the same component, only restyled, so
+// nothing reloads and the undo history stays. There the selection can also be typed in (start and end, in
+// seconds) and the original and the edited result can be played without leaving the editor.
 
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   Crop,
+  Maximize2,
+  Minimize2,
   Hourglass,
   Play,
   Radio,
@@ -28,6 +34,7 @@ import {
   Undo2,
 } from "lucide-vue-next";
 import { audioUrl } from "../../api/client";
+import AudioButton from "../AudioButton.vue";
 import type { AudioEdit, CurvePoint, EchoPreset, InterferenceDefaults, RadioFilter, RadioPreset } from "../../api/types";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
@@ -68,7 +75,15 @@ import type { Draft } from "../../matching/draft";
 import WaveformView from "../waveform/WaveformView.vue";
 import InterferenceLane from "./InterferenceLane.vue";
 
-const props = defineProps<{ draft: Draft; locked: boolean; interference?: InterferenceDefaults | null; slotId?: string }>();
+const props = defineProps<{
+  draft: Draft;
+  locked: boolean;
+  interference?: InterferenceDefaults | null;
+  slotId?: string;
+  /** Spain's original and the edited result (null while it renders), playable from the full-screen editor. */
+  originalUrl?: string | null;
+  previewUrl?: string | null;
+}>();
 
 const replacement = ref<InstanceType<typeof WaveformView> | null>(null);
 const duration = ref(0);
@@ -230,21 +245,59 @@ function onHissToggle(event: Event) {
   attempt(() => setRadioValue(props.draft.edit, "noise_dbfs", on ? DEFAULT_HISS_DBFS : null));
 }
 
+// ---- Full screen (phones and tablets). The page behind it does not scroll while it is open.
+const expanded = ref(false);
+function setExpanded(on: boolean) {
+  expanded.value = on;
+  document.documentElement.classList.toggle("editor-expanded", on);
+}
+onBeforeUnmount(() => document.documentElement.classList.remove("editor-expanded"));
+
+/** A selection edge typed in (seconds). The other edge stays; a refused value puts the field back. */
+function onSelectionField(event: Event, edge: "start" | "end") {
+  const field = event.target as HTMLInputElement;
+  const value = Number(field.value);
+  const current = selection.value ?? { start: replacement.value?.position ?? 0, end: duration.value };
+  if (field.value.trim() !== "" && Number.isFinite(value)) {
+    replacement.value?.select(
+      edge === "start"
+        ? { start: value, end: Math.max(current.end, value + 0.05) }
+        : { start: Math.min(current.start, value - 0.05), end: value },
+    );
+  }
+  field.value = selection.value ? String(selection.value[edge]) : "";
+}
+
 // Editing keys; they only act on an editable recording and never fire while typing in a field.
 useShortcuts({
   w: () => replacement.value?.togglePlay(),
   x: cutSelection,
   t: keepSelection,
   "ctrl+z": undo,
+  escape: () => expanded.value && setExpanded(false),
 });
 </script>
 
 <template>
-  <section class="block editor" aria-label="Audio editing">
+  <section class="block editor" :class="{ expanded }" aria-label="Audio editing" data-section="editor">
     <header class="block-head">
       <h3><SlidersHorizontal :size="15" aria-hidden="true" /> Audio editing</h3>
-      <span v-if="usesCe" class="small muted">Edits are a recipe; the original recording is never changed.</span>
+      <span v-if="usesCe" class="small muted editor-note">Edits are a recipe; the original recording is never changed.</span>
+      <button
+        v-if="usesCe"
+        type="button" class="icon-label touch-only expand-editor" :aria-pressed="expanded" data-testid="expand-editor"
+        @click="setExpanded(!expanded)"
+      >
+        <Minimize2 v-if="expanded" :size="16" aria-hidden="true" />
+        <Maximize2 v-else :size="16" aria-hidden="true" />
+        {{ expanded ? "Done" : "Full screen" }}
+      </button>
     </header>
+    <div v-if="expanded" class="expanded-listen" role="group" aria-label="Listen while editing">
+      <AudioButton v-if="originalUrl" :url="originalUrl" label="Original" title="Spain's original recording" />
+      <AudioButton v-if="previewUrl" :url="previewUrl" label="Edited result" title="The edited replacement, as the build renders it" />
+      <span v-else class="small muted">Rendering the edited result…</span>
+    </div>
     <p v-if="!usesCe" class="note">Editing applies to a Campaign Evolved recording. Choose one to edit it.</p>
 
     <template v-else>
@@ -306,7 +359,26 @@ useShortcuts({
         @keep-change="onKeepChange"
         @selection-change="(s) => (selection = s)"
       />
-      <p v-if="editable" class="small muted hint">
+      <div v-if="editable" class="selection-fields" :class="{ shown: expanded }" data-testid="selection-fields">
+        <label>Selection start (s)
+          <input
+            :value="selection?.start ?? ''" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!canEdit"
+            aria-label="Selection start (s)" @change="onSelectionField($event, 'start')"
+          />
+        </label>
+        <label>Selection end (s)
+          <input
+            :value="selection?.end ?? ''" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!canEdit"
+            aria-label="Selection end (s)" @change="onSelectionField($event, 'end')"
+          />
+        </label>
+      </div>
+      <p v-if="editable" class="small muted hint touch-only">
+        Tap to move the playhead. Drag sideways to select (swipe up or down to scroll the page), then trim to it or
+        cut it; the selection can also be typed in above. Drag the wide cyan handles to trim. Zoomed in, switch
+        Select / Pan to scroll along the recording.
+      </p>
+      <p v-if="editable" class="small muted hint pointer-only">
         Click to move the playhead. Drag across the waveform to select, then trim to it or cut it. Drag the cyan
         handles at the ends to trim. Insert silence places it at the playhead (or the selection's start); green
         markers show the inserted silences. <kbd>W</kbd> play · <kbd>T</kbd> trim · <kbd>X</kbd> cut · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo.

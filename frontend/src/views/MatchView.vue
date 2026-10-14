@@ -2,9 +2,15 @@
 // The matching workspace: MCC lines (left), the decision for the selected line (centre), and Campaign
 // Evolved candidates (right). The selected line and every filter are kept in the URL, so reloading or
 // going back returns to the same place.
+//
+// The same three panels serve every screen size (layout/layoutMode.ts). On a desktop they sit side by side
+// and can be resized. On a tablet one list sits beside the Matching panel; on a phone one pane is shown at a
+// time, with a bottom navigation (WorkspaceTabs), the open line kept in view (MatchContextBar) and Save in reach
+// (MobileActionStrip). Only CSS changes between layouts: nothing is mounted again, so the draft, the players,
+// the searches and the lists survive switching panes or turning the phone. The pane is in the URL (`pane=`).
 
 import { LayoutTemplate } from "lucide-vue-next";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
 import type { LevelProgress, SlotRow } from "../api/types";
@@ -12,12 +18,17 @@ import { stop, togglePlay } from "../audio/player";
 import { stopCurrent } from "../audio/transport";
 import CeColumn from "../components/match/CeColumn.vue";
 import MccColumn from "../components/match/MccColumn.vue";
+import MatchContextBar from "../components/match/MatchContextBar.vue";
 import MatchPanel from "../components/match/MatchPanel.vue";
+import MobileActionStrip from "../components/match/MobileActionStrip.vue";
+import WorkspaceTabs from "../components/match/WorkspaceTabs.vue";
 import ShortcutsButton from "../components/match/ShortcutsButton.vue";
 import { confirmAction } from "../composables/useConfirm";
 import { useMatch } from "../composables/useMatch";
 import { useShortcuts } from "../composables/useShortcuts";
 import SplitHandle from "../layout/SplitHandle.vue";
+import { paneFrom, type Pane } from "../layout/layoutMode";
+import { layoutMode } from "../layout/useLayoutMode";
 import { useWorkspaceLayout } from "../layout/useWorkspaceLayout";
 import { onChange, onReconnect } from "../live/changes";
 
@@ -57,7 +68,7 @@ function setQuery(changes: Record<string, string | undefined>) {
     if (value === undefined || value === "" || value === "all" && key === "cm") delete query[key];
     else query[key] = value;
   }
-  void router.replace({ query });
+  return router.replace({ query });
 }
 
 const mccLevel = computed({ get: () => param("level", "a10"), set: (v: string) => setQuery({ level: v }) });
@@ -67,6 +78,66 @@ const ceMission = computed({ get: () => param("cm", "all"), set: (v: string) => 
 const ceQuery = computed({ get: () => param("cq", ""), set: (v: string) => setQuery({ cq: v }) });
 const ceSubtitles = computed({ get: () => param("cs", ""), set: (v: string) => setQuery({ cs: v }) });
 const ceHideUsed = computed({ get: () => route.query.ch === "1", set: (v: boolean) => setQuery({ ch: v ? "1" : undefined }) });
+
+// ---- Panes (phone and tablet). `pane` is what a phone shows; a tablet shows the Matching panel beside the
+// last list chosen (`list`). A desktop shows everything and ignores both.
+const pane = computed<Pane>(() => paneFrom(route.query.pane, selectedSlot.value ? "match" : "mcc"));
+const list = ref<"mcc" | "ce">(route.query.pane === "ce" ? "ce" : "mcc");
+const tabPane = computed<Pane>(() => (layoutMode.value === "tablet" ? list.value : pane.value));
+
+/** Where each pane was scrolled: the page on a phone, the list's own scroll on a tablet. */
+const scrolled = new Map<Pane, { page: number; column: number }>();
+const columnOf = (p: Pane) => workspaceEl.value?.querySelector<HTMLElement>(`#pane-${p}`) ?? null;
+
+async function setPane(next: Pane, options: { top?: boolean } = {}) {
+  const shown = tabPane.value;
+  if (next === shown && !options.top) {
+    // Pressing the current tab again goes back to the top of it, as in most phone apps.
+    if (layoutMode.value === "phone") window.scrollTo({ top: 0 });
+    else columnOf(next)?.scrollTo({ top: 0 });
+    return;
+  }
+  scrolled.set(shown, { page: window.scrollY, column: columnOf(shown)?.scrollTop ?? 0 });
+  if (options.top) scrolled.delete(next);
+  if (next !== "match") list.value = next;
+  await setQuery({ pane: next });
+  await nextTick();
+  const saved = scrolled.get(next) ?? { page: 0, column: 0 };
+  if (layoutMode.value === "phone") window.scrollTo({ top: saved.page });
+  else if (layoutMode.value === "tablet") {
+    const column = columnOf(next);
+    if (column) column.scrollTop = saved.column;
+  }
+}
+
+/** Phone: brings a section of the decision into view (the context bar's chips). */
+function jumpTo(section: string) {
+  workspaceEl.value?.querySelector(`#pane-match [data-section="${section}"]`)?.scrollIntoView({ block: "start" });
+}
+
+// Phone: the bottom bars step aside while the on-screen keyboard is up (a field is being typed in), so they
+// never cover the field or the text.
+const typing = ref(false);
+const TEXT_ENTRY =
+  'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]), textarea';
+const onFocusIn = (e: FocusEvent) => (typing.value = e.target instanceof Element && e.target.matches(TEXT_ENTRY));
+const onFocusOut = () => (typing.value = false);
+
+// Phone: the save strip hides while the save bar itself is on screen.
+const saveBarVisible = ref(false);
+let saveBarObserver: IntersectionObserver | null = null;
+function observeSaveBar() {
+  saveBarObserver?.disconnect();
+  saveBarVisible.value = false;
+  const bar = workspaceEl.value?.querySelector("#pane-match .save-bar");
+  if (!bar || typeof IntersectionObserver === "undefined") return;
+  saveBarObserver = new IntersectionObserver((entries) => (saveBarVisible.value = entries.some((e) => e.isIntersecting)));
+  saveBarObserver.observe(bar);
+}
+watch(
+  () => Boolean(match.detail.value),
+  () => void nextTick(observeSaveBar),
+);
 
 // ---- Selecting a line. Leaving a line with unsaved changes asks first. The draft is also kept for this
 // stored version in the browser session, so answering "leave" does not lose it entirely.
@@ -84,7 +155,13 @@ async function selectSlot(slotId: string) {
     });
     if (!leave) return;
   }
-  setQuery({ slot: slotId });
+  // On a phone, choosing a line opens it: the Matching pane, from its top.
+  if (layoutMode.value === "phone") {
+    // Remember where the list was first: with a line in the URL the default pane becomes Matching.
+    scrolled.set(tabPane.value, { page: window.scrollY, column: 0 });
+    await setQuery({ slot: slotId, pane: tabPane.value });
+    await setPane("match", { top: true });
+  } else void setQuery({ slot: slotId });
 }
 
 watch(
@@ -114,6 +191,9 @@ const stopReconnect = onReconnect(() => {
 onBeforeUnmount(() => {
   stopChanges();
   stopReconnect();
+  saveBarObserver?.disconnect();
+  document.removeEventListener("focusin", onFocusIn);
+  document.removeEventListener("focusout", onFocusOut);
 });
 
 /** Save the draft (no approval), then open the next unmatched line of the list. */
@@ -178,6 +258,8 @@ useShortcuts({
 });
 
 onMounted(async () => {
+  document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("focusout", onFocusOut);
   // The line first: /api/state can be slow, and a line loaded after it would replace whatever the user
   // already started on that line.
   if (selectedSlot.value) void match.load(selectedSlot.value);
@@ -192,49 +274,76 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="layout-bar">
-    <ShortcutsButton />
-    <button type="button" class="icon-label" :disabled="layout.isDefault.value" @click="layout.reset()">
-      <LayoutTemplate :size="15" aria-hidden="true" /> Reset layout
-    </button>
-  </div>
-  <div ref="workspaceEl" class="workspace" :class="{ resizing: layout.dragging.value !== null }">
-    <MccColumn
-      ref="mccColumn"
-      v-model:level="mccLevel"
-      v-model:status="mccStatus"
-      v-model:query="mccQuery"
-      :levels="levels"
-      :selected-id="selectedSlot"
-      @select="selectSlot"
+  <div class="match-view" :class="{ typing }">
+    <div class="layout-bar">
+      <ShortcutsButton />
+      <button type="button" class="icon-label" :disabled="layout.isDefault.value" @click="layout.reset()">
+        <LayoutTemplate :size="15" aria-hidden="true" /> Reset layout
+      </button>
+    </div>
+    <!-- Phone and tablet only (hidden on a desktop by the stylesheet). -->
+    <MatchContextBar
+      :match="match" :slot-id="selectedSlot" :mcc-url="mccUrl" :pane="pane"
+      @jump="jumpTo" @browse="setPane('mcc')"
     />
-    <SplitHandle
-      side="left"
-      :width="layout.widths.value.left"
-      :dragging="layout.dragging.value === 'left'"
-      @drag-start="layout.startDrag('left', $event)"
-      @step="(direction, coarse) => layout.step('left', direction, coarse)"
+    <WorkspaceTabs
+      :pane="tabPane" :dirty="Boolean(match.detail.value) && match.dirty()"
+      :chosen="match.detail.value ? match.draft.ceRefs.length : 0"
+      @select="setPane"
     />
-    <MatchPanel :match="match" :slot-id="selectedSlot" @save-next="saveAndNext" />
-    <SplitHandle
-      side="right"
-      :width="layout.widths.value.right"
-      :dragging="layout.dragging.value === 'right'"
-      @drag-start="layout.startDrag('right', $event)"
-      @step="(direction, coarse) => layout.step('right', direction, coarse)"
-    />
-    <CeColumn
-      ref="ceColumn"
-      v-model:mission="ceMission"
-      v-model:query="ceQuery"
-      v-model:hide-used="ceHideUsed"
-      v-model:subtitles="ceSubtitles"
-      :missions="missions"
-      :slot-id="selectedSlot"
-      :focused-ref="focusedRef"
-      :chosen-refs="match.detail.value ? match.draft.ceRefs : []"
-      @focus="focusedRef = $event"
-      @use="useCandidate"
+    <div ref="workspaceEl" class="workspace" :class="{ resizing: layout.dragging.value !== null }">
+      <MccColumn
+        id="pane-mcc"
+        ref="mccColumn"
+        v-model:level="mccLevel"
+        v-model:status="mccStatus"
+        v-model:query="mccQuery"
+        :class="{ 'pane-active': pane === 'mcc', 'list-active': list === 'mcc' }"
+        :levels="levels"
+        :selected-id="selectedSlot"
+        @select="selectSlot"
+      />
+      <SplitHandle
+        side="left"
+        :width="layout.widths.value.left"
+        :dragging="layout.dragging.value === 'left'"
+        @drag-start="layout.startDrag('left', $event)"
+        @step="(direction, coarse) => layout.step('left', direction, coarse)"
+      />
+      <MatchPanel
+        id="pane-match"
+        :class="{ 'pane-active': pane === 'match' }"
+        :match="match"
+        :slot-id="selectedSlot"
+        @save-next="saveAndNext"
+        @browse="setPane('mcc')"
+      />
+      <SplitHandle
+        side="right"
+        :width="layout.widths.value.right"
+        :dragging="layout.dragging.value === 'right'"
+        @drag-start="layout.startDrag('right', $event)"
+        @step="(direction, coarse) => layout.step('right', direction, coarse)"
+      />
+      <CeColumn
+        id="pane-ce"
+        ref="ceColumn"
+        v-model:mission="ceMission"
+        v-model:query="ceQuery"
+        v-model:hide-used="ceHideUsed"
+        v-model:subtitles="ceSubtitles"
+        :class="{ 'pane-active': pane === 'ce', 'list-active': list === 'ce' }"
+        :missions="missions"
+        :slot-id="selectedSlot"
+        :focused-ref="focusedRef"
+        :chosen-refs="match.detail.value ? match.draft.ceRefs : []"
+        @focus="focusedRef = $event"
+        @use="useCandidate"
+      />
+    </div>
+    <MobileActionStrip
+      :match="match" :pane="pane" :save-bar-visible="saveBarVisible"
+      @save-next="saveAndNext" @review="setPane('match')"
     />
   </div>
 </template>

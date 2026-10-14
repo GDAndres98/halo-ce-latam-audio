@@ -1,0 +1,821 @@
+/* Phones, tablets and touch screens. Loaded last; nothing here applies to a desktop window used with a mouse.
+
+   The layout is chosen once, in script (layout/useLayoutMode.ts), and written to <html data-layout="…">:
+     desktop  the three resizable panels (workspace.css), unchanged
+     tablet   a list (MCC or Campaign Evolved, switched by a segmented control) beside the Matching panel
+     phone    one pane at a time, the open line kept in view at the top, the navigation at the bottom
+   Touch sizing follows the pointer instead ((pointer: coarse)), so a tablet held sideways, which gets the
+   desktop layout, still gets finger-sized controls. */
+
+:root {
+  --tabbar-h: 3.75rem;
+  --touch-min: 44px; /* the smallest comfortable target for a finger (rem would follow the 15 px root font) */
+}
+
+/* ---- Shown or hidden by device ------------------------------------------------------------------------ */
+
+.match-context,
+.workspace-tabs,
+.action-strip,
+.menu-toggle,
+.selection-fields {
+  display: none;
+}
+
+.selection-fields.shown {
+  display: grid;
+}
+
+/* Touch-only extras (Play A / Play B, Full screen, touch hints) stay off a desktop used with a mouse. */
+@media not all and (pointer: coarse) {
+  html[data-layout="desktop"] .touch-only {
+    display: none;
+  }
+}
+
+/* Keyboard hints ("(Ctrl+S)", "(s)", key caps) mean nothing on a phone. */
+html[data-layout="phone"] .pointer-only,
+html[data-layout="tablet"] .pointer-only,
+html[data-layout="phone"] .kbd-hint,
+html[data-layout="tablet"] .kbd-hint {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  html .pointer-only,
+  html .kbd-hint {
+    display: none;
+  }
+
+  html .selection-fields {
+    display: grid;
+  }
+}
+
+html[data-layout="phone"] .selection-fields,
+html[data-layout="tablet"] .selection-fields {
+  display: grid;
+}
+
+/* ---- Finger-sized controls --------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  button,
+  a.button,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+    min-height: var(--touch-min);
+  }
+
+  button.link {
+    min-height: 0;
+    padding: 0.4rem 0;
+  }
+
+  .icon-only {
+    min-width: var(--touch-min);
+    justify-content: center;
+  }
+
+  /* Phones zoom into any field whose text is smaller than 16 px; at 16 px they do not. Important on purpose:
+     several screens set smaller field text with more specific selectors. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.3rem;
+    height: 1.3rem;
+    flex: none;
+  }
+
+  /* Choices (audio source, subtitle source, flags): the whole row is the target. */
+  .choice .opt,
+  .flag-list .opt,
+  .matched .opt,
+  .ce-subtitle .opt {
+    align-items: center;
+    min-height: var(--touch-min);
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: rgba(2, 8, 24, 0.45);
+  }
+
+  .choice .opt:has(input:checked),
+  .flag-list .opt:has(input:checked),
+  .ce-subtitle .opt:has(input:checked) {
+    border-color: var(--frame);
+    background: linear-gradient(90deg, rgba(47, 140, 255, 0.22), rgba(47, 140, 255, 0.05));
+  }
+
+  .choice,
+  .flag-list {
+    gap: 0.4rem;
+  }
+
+  .wave-transport button,
+  .compare .toolbar button,
+  .editor .toolbar button {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.76rem;
+  }
+
+  .wave-transport .icon-only {
+    padding: 0.45rem;
+  }
+
+  /* No hover on a touch screen: the lit frame would stay on after a tap. */
+  button:not(:disabled):hover {
+    box-shadow: none;
+  }
+
+  /* The waveform claims sideways drags (select, trim) and leaves up-and-down swipes to the page. Zoomed in, the
+     Pan switch hands sideways drags back to the waveform's own scrolling. WaveSurfer draws in a shadow root:
+     its scroll area is reached through ::part. */
+  .wave-host.touch-select ::part(scroll) {
+    touch-action: pan-y;
+  }
+
+  .wave-host.touch-pan ::part(scroll) {
+    touch-action: pan-x pan-y;
+  }
+
+  .wave-transport .pan-toggle[aria-pressed="true"] {
+    color: var(--warn);
+    border-color: var(--warn);
+  }
+}
+
+/* ---- Application header: the menu folds behind a button on phones and tablets ------------------------ */
+
+html[data-layout="phone"] .top,
+html[data-layout="tablet"] .top {
+  gap: 0.45rem 1rem;
+  padding: 0.45rem 0.9rem;
+}
+
+/* On a phone the header scrolls away; the open line's bar takes the top of the screen instead. */
+html[data-layout="phone"] .top {
+  position: static;
+  padding-top: max(0.45rem, env(safe-area-inset-top));
+}
+
+html[data-layout="phone"] .menu-toggle,
+html[data-layout="tablet"] .menu-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+}
+
+html[data-layout="phone"] .top nav:not(.open),
+html[data-layout="tablet"] .top nav:not(.open),
+html[data-layout="phone"] .top .who:not(.open),
+html[data-layout="tablet"] .top .who:not(.open) {
+  display: none;
+}
+
+html[data-layout="phone"] .top nav.open,
+html[data-layout="tablet"] .top nav.open {
+  flex-basis: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  padding-bottom: 0.3rem;
+}
+
+html[data-layout="phone"] .top nav.open a,
+html[data-layout="tablet"] .top nav.open a {
+  min-height: var(--touch-min);
+  font-size: 0.78rem;
+}
+
+html[data-layout="phone"] .top .who.open,
+html[data-layout="tablet"] .top .who.open {
+  flex-basis: 100%;
+  margin-left: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 420px) {
+  .brand .wordmark span {
+    display: none;
+  }
+
+  .brand .wordmark strong {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+  }
+
+  .brand {
+    gap: 0.45rem;
+  }
+
+  .brand .emblem {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* ---- Phone: one pane at a time ------------------------------------------------------------------------ */
+
+/* Anything scrolled into view (a focused field, a jump) lands clear of the sticky bar at the top and the
+   fixed bars at the bottom. */
+html[data-layout="phone"] {
+  scroll-padding-top: 7rem;
+  scroll-padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 6rem);
+}
+
+html[data-layout="phone"] main.wide {
+  padding: 0 0.75rem;
+}
+
+html[data-layout="phone"] .layout-bar,
+html[data-layout="phone"] .split-handle {
+  display: none;
+}
+
+html[data-layout="phone"] .workspace {
+  display: block;
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 0.9rem);
+}
+
+/* Room for the save strip above the navigation while it is shown. */
+html[data-layout="phone"] .match-view:has(.action-strip) .workspace {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 7rem);
+}
+
+/* Hidden panes stay mounted (display only), so their state survives switching. The page scrolls, not the
+   pane: the browser's address bar can then fold away. */
+html[data-layout="phone"] .workspace > .column {
+  display: none;
+  max-height: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+  padding: 0.75rem 0.7rem;
+}
+
+html[data-layout="phone"] .workspace > .column.pane-active {
+  display: block;
+}
+
+html[data-layout="phone"] .column > h2 {
+  position: static;
+  margin: -0.75rem -0.7rem 0.7rem;
+  padding: 0.6rem 0.7rem 0.5rem;
+}
+
+html[data-layout="phone"] .column.mcc .row-item.selected::after {
+  display: none;
+}
+
+html[data-layout="phone"] .save-bar {
+  position: static;
+  margin: 0.6rem -0.7rem -0.75rem;
+}
+
+/* Buttons and fields never widen the page: long labels wrap, menus fit their row. */
+html[data-layout="phone"] button.icon-label {
+  white-space: normal;
+}
+
+html[data-layout="phone"] .badge {
+  white-space: normal;
+  max-width: 100%;
+}
+
+html[data-layout="phone"] select,
+html[data-layout="phone"] label.inline {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Long keys and refs (no spaces) wrap instead of widening the page. */
+html[data-layout="phone"] .mono,
+html[data-layout="phone"] .tag {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+html[data-layout="phone"] .matched li,
+html[data-layout="phone"] .opt {
+  min-width: 0;
+}
+
+/* ---- Phone: the open line, kept at the top ---- */
+html[data-layout="phone"] .match-context {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  margin: 0 -0.75rem 0.6rem;
+  padding: 0.4rem 0.75rem;
+  background: linear-gradient(180deg, rgba(6, 21, 53, 0.98), rgba(3, 11, 31, 0.97));
+  border-bottom: 2px solid var(--frame);
+  box-shadow: 0 2px 12px -4px var(--frame-glow);
+}
+
+.context-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.context-key {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  color: #ffffff;
+}
+
+.context-marks {
+  display: inline-flex;
+  flex: none;
+  gap: 0.25rem;
+}
+
+.section-chips {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.4rem -0.75rem 0;
+  padding: 0 0.75rem 0.1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.section-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.section-chips .chip {
+  flex: none;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  border-radius: 999px;
+}
+
+/* ---- Phone: bottom navigation ---- */
+html[data-layout="phone"] .workspace-tabs {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: linear-gradient(180deg, rgba(4, 14, 38, 0.98), rgba(2, 8, 24, 0.99));
+  border-top: 2px solid var(--frame);
+  box-shadow: 0 -2px 14px -4px var(--frame-glow);
+}
+
+.tabs-inner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-tabs .tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  min-height: var(--tabbar-h);
+  padding: 0.35rem 0.25rem;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: var(--menu);
+}
+
+.workspace-tabs .tab:not(:disabled):hover,
+.workspace-tabs .tab:not(:disabled):active {
+  background: none;
+  box-shadow: none;
+  transform: none;
+}
+
+.workspace-tabs .tab[aria-selected="true"] {
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(47, 140, 255, 0.24), rgba(47, 140, 255, 0.04));
+}
+
+.workspace-tabs .tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--frame);
+  box-shadow: 0 0 8px var(--frame);
+}
+
+.workspace-tabs .tab svg {
+  flex: none;
+}
+
+/* "Campaign Evolved" takes two short lines on a narrow phone rather than being cut off. */
+.tab-label {
+  max-width: 100%;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.tab-dot {
+  position: absolute;
+  top: 0.45rem;
+  left: calc(50% + 0.7rem);
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 6px var(--warn);
+}
+
+.tab-count {
+  position: absolute;
+  top: 0.3rem;
+  left: calc(50% + 0.65rem);
+  min-width: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.15rem;
+  text-align: center;
+  color: #03091a;
+  background: var(--green);
+}
+
+/* ---- Phone: Save in reach, above the navigation ---- */
+html[data-layout="phone"] .action-strip {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 2px);
+  z-index: 29;
+  padding: 0.45rem max(0.75rem, env(safe-area-inset-right)) 0.45rem max(0.75rem, env(safe-area-inset-left));
+  background: rgba(3, 10, 30, 0.97);
+  border-top: 1px solid var(--frame-dim);
+}
+
+.strip-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+}
+
+.strip-note > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.strip-note.ok > span {
+  color: var(--ok);
+}
+
+.strip-note:last-child {
+  margin-bottom: 0;
+}
+
+.strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.strip-actions > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* While a field is being typed in, the on-screen keyboard needs the space: the bottom bars step aside. */
+html[data-layout="phone"] .match-view.typing .workspace-tabs,
+html[data-layout="phone"] .match-view.typing .action-strip {
+  display: none;
+}
+
+/* A phone held sideways: shorter bars, the icon beside the word. */
+@media (max-height: 500px) {
+  html[data-layout="phone"] {
+    --tabbar-h: 2.85rem;
+  }
+
+  html[data-layout="phone"] .workspace-tabs .tab {
+    flex-direction: row;
+    gap: 0.45rem;
+  }
+
+  html[data-layout="phone"] .match-context {
+    position: static; /* too little height to keep it on screen */
+  }
+}
+
+/* ---- Phone: lists ---- */
+html[data-layout="phone"] .column.ce .use {
+  flex: 1 1 100%;
+  justify-content: center;
+  margin: 0.3rem 0 0;
+}
+
+html[data-layout="phone"] .row-item {
+  padding: 0.6rem 0.65rem;
+}
+
+/* ---- Phone: the decision panel ---- */
+html[data-layout="phone"] .center .block h3 {
+  font-size: 0.82rem;
+}
+
+html[data-layout="phone"] .texts {
+  grid-template-columns: 1fr;
+  gap: 0.1rem;
+}
+
+html[data-layout="phone"] .texts dd {
+  margin-bottom: 0.35rem;
+}
+
+html[data-layout="phone"] .source-card.mcc-source {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* Listen and compare, for one thumb: Original | Replacement, then A then B | A/B, then Stop. */
+html[data-layout="phone"] .compare-head .toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  gap: 0.4rem;
+}
+
+html[data-layout="phone"] .compare-head .toolbar button {
+  justify-content: center;
+}
+
+html[data-layout="phone"] .compare-head .toolbar [data-testid="play-a"] { order: 1; }
+html[data-layout="phone"] .compare-head .toolbar [data-testid="play-b"] { order: 2; }
+html[data-layout="phone"] .compare-head .toolbar button:nth-child(2) { order: 3; }
+html[data-layout="phone"] .compare-head .toolbar button:nth-child(1) { order: 4; }
+html[data-layout="phone"] .compare-head .toolbar button:nth-child(5) { order: 5; grid-column: 1 / -1; }
+
+html[data-layout="phone"] .wave-transport .zoom {
+  margin-left: 0;
+}
+
+/* Editing tools: two per row, the silence tools on their own rows. */
+html[data-layout="phone"] .editor .toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+html[data-layout="phone"] .editor .toolbar button {
+  justify-content: center;
+}
+
+html[data-layout="phone"] .editor .toolbar .sep {
+  display: none;
+}
+
+html[data-layout="phone"] .editor .silence-tools {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+html[data-layout="phone"] .editor .silence-tools > label {
+  grid-column: 1 / -1;
+  justify-content: space-between;
+}
+
+html[data-layout="phone"] .editor .silence-tools input {
+  width: 7rem;
+}
+
+html[data-layout="phone"] .edit-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+html[data-layout="phone"] .cut-list li input {
+  width: 6rem;
+}
+
+/* Subtitles: large, readable text; a roomy box to write in. */
+html[data-layout="phone"] .subtitle-preview .subtitle-text {
+  font-size: 1.15rem;
+  line-height: 1.45;
+}
+
+html[data-layout="phone"] .custom-subtitle textarea {
+  min-height: 7.5rem;
+  line-height: 1.45;
+}
+
+/* Save and approvals: whole-width buttons, one decision per row. */
+html[data-layout="phone"] .save-bar .row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+html[data-layout="phone"] .save-bar .row > button {
+  justify-content: center;
+  white-space: normal;
+}
+
+html[data-layout="phone"] .save-bar .row > :not(button) {
+  grid-column: 1 / -1;
+}
+
+html[data-layout="phone"] .approval-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+html[data-layout="phone"] .approval-controls {
+  justify-content: space-between;
+}
+
+html[data-layout="phone"] .approval-row > button {
+  justify-content: center;
+}
+
+/* ---- Selection typed in by number (touch screens and the full-screen editor) ---- */
+.selection-fields {
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 0.3rem 0;
+}
+
+.selection-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--menu);
+}
+
+.selection-fields input {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Full-screen audio editor (phones and tablets) ---- */
+.editor .expand-editor {
+  margin-left: auto;
+}
+
+.editor.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(0.6rem, env(safe-area-inset-top)) max(0.9rem, env(safe-area-inset-right))
+    calc(1.25rem + env(safe-area-inset-bottom)) max(0.9rem, env(safe-area-inset-left));
+  border: none;
+  background: linear-gradient(180deg, #061535, #01040c 70%);
+}
+
+.editor.expanded > .block-head {
+  position: sticky;
+  top: calc(-1 * max(0.6rem, env(safe-area-inset-top)));
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 -0.9rem;
+  padding: 0.45rem 0.9rem;
+  background: #061535;
+  border-bottom: 2px solid var(--frame);
+}
+
+.editor.expanded > .block-head h3 {
+  margin: 0;
+}
+
+.editor.expanded .editor-note {
+  display: none;
+}
+
+.expanded-listen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.2rem;
+}
+
+html.editor-expanded,
+html.editor-expanded body {
+  overflow: hidden;
+}
+
+/* ---- Tablet: a list beside the Matching panel ---------------------------------------------------------- */
+
+html[data-layout="tablet"] .layout-bar,
+html[data-layout="tablet"] .split-handle {
+  display: none;
+}
+
+html[data-layout="tablet"] .workspace-tabs {
+  display: block;
+  margin: 0 0 0.6rem;
+}
+
+html[data-layout="tablet"] .workspace-tabs .tab-match {
+  display: none;
+}
+
+html[data-layout="tablet"] .tabs-inner {
+  grid-template-columns: 1fr 1fr;
+  width: min(100%, 26rem);
+  border: var(--frame-width) solid var(--frame-dim);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: rgba(2, 8, 24, 0.8);
+}
+
+html[data-layout="tablet"] .workspace-tabs .tab {
+  flex-direction: row;
+  gap: 0.5rem;
+  min-height: var(--touch-min);
+  font-size: 0.66rem;
+}
+
+html[data-layout="tablet"] .workspace {
+  grid-template-columns: minmax(16.5rem, 38%) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+html[data-layout="tablet"] .workspace > .column.mcc,
+html[data-layout="tablet"] .workspace > .column.ce {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+html[data-layout="tablet"] .workspace > .column.center {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+html[data-layout="tablet"] .workspace > .column.mcc:not(.list-active),
+html[data-layout="tablet"] .workspace > .column.ce:not(.list-active) {
+  display: none;
+}
+
+/* Each pane scrolls on its own, as on a desktop (header, page margins and the list switcher above). */
+html[data-layout="tablet"] .column {
+  max-height: calc(100dvh - 8.4rem);
+}
+
+html[data-layout="tablet"] .controls {
+  grid-template-columns: 1fr;
+}
+
+html[data-layout="tablet"] .column.ce .use {
+  flex: 1 1 100%;
+  justify-content: center;
+  margin: 0.3rem 0 0;
+}
+
+/* In the row-style tabs (tablet, phone held sideways) the count and the unsaved dot follow the word. */
+html[data-layout="tablet"] .tab-count,
+html[data-layout="tablet"] .tab-dot {
+  position: static;
+}
+
+@media (max-height: 500px) {
+  html[data-layout="phone"] .tab-count,
+  html[data-layout="phone"] .tab-dot {
+    position: static;
+  }
+}

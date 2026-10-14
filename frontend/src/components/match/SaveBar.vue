@@ -50,7 +50,7 @@ async function approveBoth() {
 </script>
 
 <template>
-  <section class="save-bar action-band" aria-label="Save the decision">
+  <section class="save-bar action-band" aria-label="Save the decision" data-section="save">
     <ul v-if="problems.length" class="problems">
       <li v-for="p in problems" :key="p">{{ p }}</li>
     </ul>
@@ -64,7 +64,7 @@ async function approveBoth() {
         data-testid="save-draft"
         @click="match.save()"
       >
-        <Save :size="16" aria-hidden="true" /> Save draft (Ctrl+S)
+        <Save :size="16" aria-hidden="true" /> Save draft<span class="kbd-hint"> (Ctrl+S)</span>
       </button>
       <button
         type="button"

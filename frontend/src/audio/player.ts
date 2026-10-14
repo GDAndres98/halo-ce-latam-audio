@@ -4,7 +4,8 @@
 import { reactive, readonly } from "vue";
 import { endPlayback, startPlayback, type Playback } from "./transport";
 
-const state = reactive({ url: null as string | null, playing: false, error: "" });
+// `loading`: asked to play, waiting for the first audio (a slow connection, a recording decoded on demand).
+const state = reactive({ url: null as string | null, playing: false, loading: false, error: "" });
 let audio: HTMLAudioElement | null = null;
 
 export const playerState = readonly(state);
@@ -25,6 +26,7 @@ export function togglePlay(url: string): void {
     state.playing = false;
     endPlayback(clipPlayer);
   };
+  audio.onplaying = () => (state.loading = false);
   state.url = url;
   state.error = "";
   void play(audio);
@@ -33,11 +35,16 @@ export function togglePlay(url: string): void {
 async function play(clip: HTMLAudioElement): Promise<void> {
   try {
     startPlayback(clipPlayer);
+    state.loading = clip.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
     await clip.play();
+    if (clip !== audio) return; // another clip was started meanwhile
     state.playing = true;
+    state.loading = false;
   } catch {
+    if (clip !== audio) return; // this clip was replaced before it could play: not an error
     // Browsers refuse playback on some failed loads; the message says what to check.
     state.playing = false;
+    state.loading = false;
     state.error = "This recording could not be played. Check that the game files and extracted audio are present.";
   }
 }
@@ -45,6 +52,7 @@ async function play(clip: HTMLAudioElement): Promise<void> {
 export function pause(): void {
   audio?.pause();
   state.playing = false;
+  state.loading = false;
   endPlayback(clipPlayer);
 }
 
@@ -56,7 +64,13 @@ export function stop(): void {
   audio = null;
   state.url = null;
   state.playing = false;
+  state.loading = false;
   endPlayback(clipPlayer);
+}
+
+/** Whether the clip at `url` was asked to play and its audio has not arrived yet. */
+export function isLoading(url: string): boolean {
+  return state.url === url && state.loading;
 }
 
 /** Whether the clip at `url` is the one currently playing. */

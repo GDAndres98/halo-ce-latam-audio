@@ -9,15 +9,20 @@
 //
 // WaveSurfer.js draws the waveform and owns the audio element; regions, the time ruler and the hover time
 // come from its plugins.
+//
+// Touch screens: a tap seeks, a sideways drag selects, and an up-or-down swipe scrolls the page (the waveform
+// only claims sideways movement, see waveform.css). The handles are wide enough for a finger. Zoomed in, a
+// Select / Pan switch decides what a sideways drag does: select, or scroll along the recording.
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import WaveSurfer from "wavesurfer.js";
 import HoverPlugin from "wavesurfer.js/dist/plugins/hover.esm.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.esm.js";
 import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
-import { AudioWaveform, Crosshair, Maximize, Pause, Play, RotateCcw, Square, X, ZoomIn, ZoomOut } from "lucide-vue-next";
+import { AudioWaveform, Crosshair, Hand, Maximize, Pause, Play, RotateCcw, Square, TextCursor, X, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { endPlayback, startPlayback, type Playback } from "../../audio/transport";
 import { formatPosition } from "../../audio/format";
+import { coarsePointer } from "../../layout/useLayoutMode";
 import { loadPeaks } from "../../audio/peaks";
 import type { Span } from "../../matching/editRecipe";
 import { COLOURS } from "../../theme/tokens";
@@ -77,6 +82,10 @@ const WAVE = "#3f6fae"; // unplayed part: a dim menu blue
 const PLAYED = "#9fd0ff"; // played part: the lit menu blue
 const ZOOM_LEVELS = [1, 2, 4, 8, 16, 32]; // multiples of the width that fits the whole recording
 const MIN_SELECTION_S = 0.01;
+/** On a touch screen, a drag narrower than this (pixels) is a slip of the finger while scrolling, not a selection. */
+const MIN_TOUCH_SELECTION_PX = 12;
+/** Width of a region handle for a finger (pixels); it straddles the edge it moves. */
+const TOUCH_HANDLE_PX = 26;
 
 /** The label with its A / B tag, for screen readers and toolbars. */
 const fullLabel = computed(() => (props.channel ? `${props.channel} · ${props.label}` : props.label));
@@ -89,11 +98,16 @@ const loading = ref(false);
 const selection = ref<Span | null>(null);
 const zoomIndex = ref(0);
 const error = ref("");
+/** Zoomed in on a touch screen: a sideways drag scrolls along the recording instead of selecting. */
+const panMode = ref(false);
+const touchSelect = computed(() => props.editable && !panMode.value);
 
 let wave: WaveSurfer | null = null;
 let regions: ReturnType<typeof RegionsPlugin.create> | null = null;
 let stopDragSelection: (() => void) | null = null;
 let lastPlayed: Span | null = null;
+/** The media element is being unlocked for later playback (prime()): its play and pause are not the user's. */
+let priming = false;
 
 const owner: Playback = { pause: () => wave?.pause() };
 
@@ -135,10 +149,12 @@ onMounted(() => {
   wave.on("timeupdate", (time) => (position.value = time));
   wave.on("interaction", (time) => (position.value = time));
   wave.on("play", () => {
+    if (priming) return;
     playing.value = true;
     startPlayback(owner);
   });
   wave.on("pause", () => {
+    if (priming) return;
     playing.value = false;
     endPlayback(owner);
   });
@@ -154,6 +170,10 @@ onMounted(() => {
 
   regions.on("region-created", (region) => {
     if (region.id.startsWith("studio-")) return;
+    if (coarsePointer.value && pixels(region) < MIN_TOUCH_SELECTION_PX) {
+      region.remove();
+      return;
+    }
     // A drag across the waveform: it becomes the selection, replacing the previous one.
     for (const other of regions?.getRegions() ?? []) if (other !== region && other.id === SELECTION) other.remove();
     region.setOptions({ id: SELECTION, color: SELECTED });
@@ -195,6 +215,12 @@ watch(
   { deep: true },
 );
 
+/** The on-screen width of a region, in pixels. */
+function pixels(region: Region): number {
+  const width = wave?.getWrapper().clientWidth ?? 0;
+  return duration.value ? ((region.end - region.start) / duration.value) * width : 0;
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -203,7 +229,7 @@ function round(value: number): number {
 function setDragSelection(on: boolean) {
   stopDragSelection?.();
   stopDragSelection = null;
-  if (on && regions) stopDragSelection = regions.enableDragSelection({ color: SELECTED, drag: true, resize: true });
+  if (on && !panMode.value && regions) stopDragSelection = regions.enableDragSelection({ color: SELECTED, drag: true, resize: true });
 }
 
 function setSelection(span: Span | null) {
@@ -251,10 +277,23 @@ function passive(region: Region) {
   if (region.element) region.element.style.pointerEvents = "none";
 }
 
-/** The resize handles of the kept part and the selection, visible on the dark theme and easy to grab. */
+/** The resize handles of the kept part and the selection, visible on the dark theme and easy to grab. On a
+ * touch screen they are a finger wide and centred on the edge, with the lit line in the middle. */
 function styleHandles(region: Region) {
   region.element?.querySelectorAll<HTMLElement>('[part*="region-handle"]').forEach((handle) => {
     handle.style.pointerEvents = "all";
+    if (coarsePointer.value) {
+      const left = handle.getAttribute("part")?.includes("region-handle-left");
+      const half = TOUCH_HANDLE_PX / 2;
+      handle.style.width = `${TOUCH_HANDLE_PX}px`;
+      handle.style[left ? "left" : "right"] = `-${half}px`;
+      handle.style.border = "none";
+      handle.style.touchAction = "none";
+      handle.style.background =
+        `linear-gradient(90deg, transparent ${half - 2}px, ${COLOURS.cyan} ${half - 2}px ${half + 2}px, transparent ${half + 2}px),` +
+        "rgba(127, 227, 255, 0.14)";
+      return;
+    }
     handle.style.width = "8px";
     handle.style.background = "rgba(127, 227, 255, 0.25)";
     handle.style.borderColor = COLOURS.cyan;
@@ -304,12 +343,57 @@ function applyZoom() {
 
 function zoom(step: number) {
   zoomIndex.value = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, zoomIndex.value + step));
+  if (zoomIndex.value === 0) setPanMode(false); // nothing to pan when the whole recording fits
   applyZoom();
 }
 
 function fit() {
   zoomIndex.value = 0;
+  setPanMode(false);
   applyZoom();
+}
+
+/** Touch screens, zoomed in: a sideways drag pans along the recording (true) or selects (false). */
+function setPanMode(on: boolean) {
+  if (panMode.value === on) return;
+  panMode.value = on;
+  setDragSelection(props.editable);
+}
+
+/** Selects a span typed in by number (the editor's selection fields), as if it had been dragged. */
+function select(span: Span) {
+  if (!regions || !duration.value || !props.editable) return;
+  const start = Math.max(0, Math.min(span.start, duration.value));
+  const end = Math.max(0, Math.min(span.end, duration.value));
+  if (end - start < MIN_SELECTION_S) return;
+  regions.getRegions().forEach((r) => r.id === SELECTION && r.remove());
+  styleHandles(regions.addRegion({ id: SELECTION, start, end, color: SELECTED, drag: true, resize: true }));
+  setSelection({ start, end });
+}
+
+/**
+ * Lets this player start later without a tap of its own ("A then B" starts B when A ends). Phone browsers
+ * (Safari on iOS) only let a media element play from a script once it was played during a tap: this plays it
+ * silently for an instant, during the tap that started A. Nothing is heard and no other player is paused.
+ */
+function prime() {
+  const media = wave?.getMediaElement();
+  if (!media || !media.paused || priming) return;
+  priming = true;
+  const wasMuted = media.muted;
+  media.muted = true;
+  const done = () => {
+    media.pause();
+    media.muted = wasMuted;
+    priming = false;
+  };
+  try {
+    const started = media.play();
+    if (started) started.then(done, done);
+    else done();
+  } catch {
+    done();
+  }
 }
 
 /** Play or pause. With a selection, playing plays the selection; otherwise it plays from the playhead. */
@@ -389,6 +473,8 @@ function clearSelection() {
 }
 
 defineExpose({
+  select,
+  prime,
   togglePlay,
   playFromStart,
   playFrom,
@@ -422,6 +508,7 @@ defineExpose({
     <div
       ref="host"
       class="wave-host"
+      :class="{ 'touch-select': touchSelect, 'touch-pan': panMode }"
       role="img"
       :aria-label="`${fullLabel} waveform`"
       :data-duration="duration"
@@ -452,6 +539,16 @@ defineExpose({
           <X :size="14" aria-hidden="true" />
         </button>
       </span>
+      <button
+        v-if="coarsePointer && editable && zoomIndex > 0"
+        type="button" class="icon-label pan-toggle" :aria-pressed="panMode" data-testid="pan-toggle"
+        :title="panMode ? 'Dragging scrolls along the recording; tap to select by dragging' : 'Dragging selects; tap to scroll along the recording by dragging'"
+        @click="setPanMode(!panMode)"
+      >
+        <Hand v-if="panMode" :size="16" aria-hidden="true" />
+        <TextCursor v-else :size="16" aria-hidden="true" />
+        {{ panMode ? "Pan" : "Select" }}
+      </button>
       <span class="zoom" role="group" aria-label="Zoom">
         <button type="button" class="icon-only" :disabled="!duration || zoomIndex === 0" title="Zoom out" aria-label="Zoom out" @click="zoom(-1)">
           <ZoomOut :size="16" aria-hidden="true" />

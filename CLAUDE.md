@@ -263,6 +263,11 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       is Tailscale Serve only. **Never** enable Tailscale Funnel, forward router ports, change firewall rules,
       or create accounts/enable remote access on the owner's machine yourself; never let a remote listener
       install into the game. Test: `npm run test:remote` (disposable data).
+    - **Mobile layout (owner prompt 46, 2026-10-13):** `docs/mobile.md`. Same Vue app and server, no
+      backend change: `<html data-layout="phone|tablet|desktop">` from `frontend/src/layout/useLayoutMode.ts`
+      (media queries, not innerWidth), styles in `frontend/src/styles/mobile.css`. Phones get one pane at a time
+      (bottom nav, `pane=` in the URL), tablets a list beside Matching; all panels stay mounted. Desktop
+      (>= 1000 px) is unchanged. Test: `npm run test:mobile` (touch via CDP, disposable data).
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

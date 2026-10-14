@@ -6,7 +6,8 @@
      shell      backdrop, top band and navigation, main area
      workspace  the matching screen (three panels, lists, centre panel, action band)
      waveform   waveforms and the audio editor
-     pages      dashboard, Build & Test, Data */
+     pages      dashboard, Build & Test, Data
+     mobile     tablets, phones and touch screens (the layout is in <html data-layout>) */
 @import "./base.css";
 @import "./controls.css";
 @import "./panels.css";
@@ -14,3 +15,4 @@
 @import "./workspace.css";
 @import "./waveform.css";
 @import "./pages.css";
+@import "./mobile.css";

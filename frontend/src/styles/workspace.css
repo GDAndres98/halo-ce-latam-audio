@@ -1,6 +1,6 @@
 /* Matching workspace: three panels separated by dividers (SplitHandle). The widths of the side panels are
    CSS variables set by useWorkspaceLayout; the centre panel takes the rest and never drops below 420 px.
-   Below 1000 px the panels stack, and the dividers are hidden. */
+   Below 1000 px the tablet and phone layouts take over (mobile.css). */
 
 .layout-bar {
   display: flex;
@@ -572,33 +572,7 @@ span.source-key {
   color: var(--frame-dim);
 }
 
-@media (max-width: 1000px) {
-  .workspace {
-    grid-template-columns: 1fr;
-    gap: 0.85rem;
-  }
-
-  .split-handle {
-    display: none;
-  }
-
-  .column {
-    max-height: none;
-    overflow: visible;
-  }
-
-  .column > h2 {
-    position: static;
-  }
-
-  .column.mcc .row-item.selected::after {
-    display: none;
-  }
-
-  .save-bar {
-    position: static;
-  }
-}
+/* Narrower windows (tablets, phones) get their own layouts: see mobile.css. */
 
 @media (max-width: 640px) {
   .controls {

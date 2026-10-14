@@ -5,11 +5,12 @@
 //      change (see composables/useEditPreview.ts); also the unedited recording or the edit as encoded.
 // A / B switches between them at the same position; "A then B" plays the original and then the replacement.
 // Only one recording ever plays (see audio/transport.ts), and nothing plays by itself.
+// On touch screens two more buttons play A or B from the start, so the comparison works with one thumb.
 //
 // While the edited recording is being rendered, B has no URL: an outdated preview is never offered.
 
 import { computed, ref, watch } from "vue";
-import { ArrowRightLeft, Headphones, ListVideo, LoaderCircle, Square, TriangleAlert } from "lucide-vue-next";
+import { ArrowRightLeft, Headphones, ListVideo, LoaderCircle, Play, Square, TriangleAlert } from "lucide-vue-next";
 import WaveformView from "./WaveformView.vue";
 import { formatSeconds } from "../../audio/format";
 import { useShortcuts } from "../../composables/useShortcuts";
@@ -108,7 +109,13 @@ function switchAB() {
 function playSequence() {
   if (!original.value || !other.value?.duration) return;
   thenB = true;
+  other.value.prime(); // B starts without a tap of its own when A ends (phone browsers need this)
   original.value.playFromStart();
+}
+
+function playOnly(player: InstanceType<typeof WaveformView> | null) {
+  thenB = false;
+  player?.playFromStart();
 }
 
 function onOriginalFinished() {
@@ -127,7 +134,7 @@ useShortcuts({ a: switchAB, b: playSequence });
 </script>
 
 <template>
-  <section class="block compare" aria-label="Compare the original and the replacement">
+  <section class="block compare" aria-label="Compare the original and the replacement" data-section="compare">
     <header class="compare-head">
       <h3><Headphones :size="15" aria-hidden="true" /> Listen and compare</h3>
       <div class="toolbar" role="toolbar" aria-label="Comparison">
@@ -148,6 +155,18 @@ useShortcuts({ a: switchAB, b: playSequence });
           @click="playSequence"
         >
           <ListVideo :size="16" aria-hidden="true" /> A then B
+        </button>
+        <button
+          type="button" class="icon-label touch-only" :disabled="!original?.duration"
+          data-testid="play-a" @click="playOnly(original)"
+        >
+          <Play :size="16" aria-hidden="true" /> Original (A)
+        </button>
+        <button
+          type="button" class="icon-label touch-only" :disabled="!other?.duration"
+          data-testid="play-b" @click="playOnly(other)"
+        >
+          <Play :size="16" aria-hidden="true" /> Replacement (B)
         </button>
         <button type="button" class="icon-label" title="Stop both (Esc)" @click="stopAll">
           <Square :size="14" aria-hidden="true" /> Stop

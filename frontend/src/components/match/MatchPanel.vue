@@ -33,7 +33,7 @@ const props = defineProps<{
   /** The MCC line selected in the list (from the URL): shown at once, even while its decision loads. */
   slotId: string | null;
 }>();
-const emit = defineEmits<{ saveNext: [] }>();
+const emit = defineEmits<{ saveNext: []; browse: [] }>();
 
 const detail = computed(() => props.match.detail.value);
 const shownKey = computed(() => props.slotId ?? detail.value?.slot_id ?? "");
@@ -217,6 +217,7 @@ async function choose(ref: string) {
       <AudioEditor
         :key="detail.slot_id" :draft="draft" :locked="audioLocked"
         :interference="detail.interference?.[draft.audioRef ?? ''] ?? null" :slot-id="detail.slot_id"
+        :original-url="mccUrl" :preview-url="replacement.edited"
       />
 
       <!-- 4. Listen & compare -->
@@ -249,8 +250,10 @@ async function choose(ref: string) {
     <StateMessage v-else-if="match.error.value" kind="error">{{ match.error.value }}</StateMessage>
     <div v-else class="center-empty">
       <ListChecks :size="56" aria-hidden="true" />
-      <p>Choose an MCC line on the left to start matching.</p>
-      <p class="small"><kbd>J</kbd> / <kbd>K</kbd> step through the lines · <kbd>U</kbd> next unmatched</p>
+      <p class="pointer-only">Choose an MCC line on the left to start matching.</p>
+      <p class="small pointer-only"><kbd>J</kbd> / <kbd>K</kbd> step through the lines · <kbd>U</kbd> next unmatched</p>
+      <p class="touch-only">Choose an MCC line to start matching.</p>
+      <button type="button" class="primary icon-label touch-only" data-testid="browse-mcc" @click="emit('browse')">Browse MCC lines</button>
     </div>
   </section>
 </template>
