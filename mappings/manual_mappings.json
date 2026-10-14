@@ -42439,26 +42439,15 @@
         "revision": 2
       },
       "subtitle": {
-        "status": "approved",
+        "status": "needs_rework",
         "source": "custom",
         "ce_locres": null,
         "custom_ref": "c-000023",
         "mcc_key_hash": null,
         "mcc_key_verification": null,
-        "fingerprint": {
-          "mcc": {
-            "slot_id": "es:c10_010_captpilot#0",
-            "index": 572,
-            "data_sha256": "d0ccc5570a96395bd9d8ad6838085a3a269f579625cbbff17e6ba2c4c3c37a16"
-          },
-          "source": "custom",
-          "custom": {
-            "custom_ref": "c-000023",
-            "text_sha256": "3d38e348f34d7387b534b5b0d166854d5a3dc61dc3ae313521f13e41062fe460"
-          }
-        },
-        "approved_at": "2026-10-10",
-        "revision": 1
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 2
       },
       "radio_effect": {
         "needed": true,

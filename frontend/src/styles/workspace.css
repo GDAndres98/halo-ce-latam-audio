@@ -455,6 +455,14 @@
   border-left-color: var(--ok);
 }
 
+.ce-downloads {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .source-card.ce-source.empty {
   border-left-color: var(--line-strong);
 }

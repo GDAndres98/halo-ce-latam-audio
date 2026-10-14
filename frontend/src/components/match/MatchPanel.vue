@@ -59,6 +59,12 @@ const replacement = computed(() => {
   return { unedited, edited: current?.edited ?? null, encoded: current?.encoded ?? null };
 });
 
+/** Short language code for file names and the download button ("es-MX"). */
+const LANGUAGE_CODES: Record<string, string> = { "Spanish(Mexico)": "es-MX", "English(US)": "en-US", "Spanish(Spain)": "es-ES" };
+const languageCode = computed(() => LANGUAGE_CODES[draft.value.audioLanguage] ?? draft.value.audioLanguage);
+/** The CE line ref as a file name part: vo_scr_m06_00740_victor933#0 -> vo_scr_m06_00740_victor933_0. */
+const ceFileBase = computed(() => (draft.value.audioRef ?? "").replace("#", "_"));
+
 /** The draft's Campaign Evolved lines with their subtitles (saved matches and recordings chosen since). */
 const draftLines = computed<CeLine[]>(() =>
   draft.value.ceRefs.map((ref) => props.match.lines.get(ref)).filter((line): line is CeLine => Boolean(line)),
@@ -159,6 +165,25 @@ async function choose(ref: string) {
           <template v-if="draft.audioSource === 'ce' && draft.audioRef">
             <code class="source-key" data-testid="ce-key" :title="draft.audioRef">{{ draft.audioRef }}</code>
             <CopyButton :text="draft.audioRef" label="Copy the Campaign Evolved key" />
+            <span class="ce-downloads">
+              <DownloadLink
+                v-if="replacement.unedited"
+                :url="replacement.unedited"
+                :file-name="`${ceFileBase}_${languageCode}.wav`"
+                :text="languageCode"
+                :label="`Download the Campaign Evolved ${languageCode} recording (WAV)`"
+                data-testid="download-ce"
+              />
+              <DownloadLink
+                v-if="replacement.edited"
+                :url="replacement.edited"
+                :file-name="`${detail.level}_${detail.slot_id.replace(/^es:/, '')}_${ceFileBase}_${languageCode}_draft.wav`"
+                text="Draft"
+                label="Download the edited draft (WAV): the current edits as the build renders them, before encoding"
+                data-testid="download-ce-draft"
+              />
+              <span v-else-if="preview.rendering.value" class="small muted" data-testid="draft-rendering">rendering the draft…</span>
+            </span>
           </template>
           <span v-else class="source-key muted">None: Spain's audio stays</span>
         </div>

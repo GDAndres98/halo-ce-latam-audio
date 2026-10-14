@@ -19,6 +19,7 @@
     "test:editor": "node e2e/editor.mjs",
     "test:radio": "node e2e/radio.mjs",
     "test:interference": "node e2e/interference.mjs",
+    "test:downloads": "node e2e/downloads.mjs",
     "test:workflow": "node e2e/workflow.mjs",
     "test:data": "node e2e/data.mjs",
     "test:navigation": "node e2e/navigation.mjs",
