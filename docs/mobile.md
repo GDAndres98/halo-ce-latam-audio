@@ -14,6 +14,7 @@ written to the host's database (`mappings/manual_mappings.db`), the same one the
 - [6. Subtitles, saving and approvals](#6-subtitles-saving-and-approvals)
 - [7. Limits](#7-limits)
 - [8. For developers](#8-for-developers)
+- [9. Install it as an app](#9-install-it-as-an-app)
 
 ## 1. Connect
 
@@ -131,3 +132,46 @@ their difference are shown below. While a recording loads on a slow connection, 
 - Test: `npm run test:mobile` drives an emulated phone with real touch events (Chrome DevTools Protocol) on
   disposable data, then the same page sideways, as a tablet and as a desktop, and checks for sideways overflow
   at 360, 390, 430, 768 and 1024 px. It needs Microsoft Edge.
+
+## 9. Install it as an app
+
+The Studio can be installed on a phone or tablet as **Halo Studio**. It then opens from its own icon, full
+screen, without the browser's address bar, and keeps you signed in.
+
+**Install**
+
+1. Open the Studio's **https** address: the Tailscale address (`https://studio-pc.tail1234.ts.net/`,
+   [remote-access.md §5](remote-access.md#5-secure-internet-access-tailscale-recommended)). Browsers only install
+   apps from secure addresses, so the plain-http LAN address works in the browser but cannot be installed.
+   Tailscale keeps the Studio private: it is reachable only from your own devices, never from the public internet.
+2. Sign in.
+3. Install:
+   - **Android (Chrome, Edge):** **Install app** in the Studio's menu, or the browser's *Install app* /
+     *Add to Home screen*.
+   - **iPhone, iPad (Safari):** Share → **Add to Home Screen**.
+
+The **Network** page shows the right steps for the device you are on.
+
+**What it keeps on the phone.** Only the Studio's own built files (its screens, styles, fonts and icons), so it
+can open and explain when the host cannot be reached. Recordings, waveforms, previews, decisions, subtitles and
+API answers are never stored by the app: they always come from the host while it is connected. Your session is
+the same HttpOnly cookie as in the browser (it expires as configured on the host,
+`session.max_days`); no token is kept in the page's storage. There is no offline matching.
+
+**When the host is unreachable.** The app still opens and says whether the phone is offline or the host cannot
+be reached, with what to check (host on and awake, `npm run host` running, Wi-Fi or Tailscale connected). It
+reconnects by itself when the connection returns, or press **Try again**. Unsaved edits are kept for the session.
+
+**Updates.** After the host is updated and rebuilt (`npm run host` builds every time), the app shows *A new
+version of the Studio is available* with **Reload**. It never reloads by itself in the middle of an edit, and
+the next launch uses the new version anyway. Unsaved edits survive the reload.
+
+**For developers.** `vite-plugin-pwa` (generateSW) in `frontend/vite.config.ts`: the manifest, and a service
+worker that precaches the built files only, with no run-time caching. Its navigation fallback excludes `/api`,
+`/audio` and `/classic`. Registration, the update prompt and the install offer are in `frontend/src/pwa.ts`
+(`PwaBanner.vue`, `InstallApp.vue`); the unreachable screen is `HostUnreachable.vue`. The server serves
+`sw.js`, `index.html` and the manifest with `Cache-Control: no-cache` (ETag revalidation), so a rebuild is seen at
+once; hashed assets stay immutable. The icons are drawn by `npm run icons` (`frontend/scripts/make-icons.mjs`,
+renders with Edge) into `frontend/public/`. The worker is not active under `npm run dev`. The Studio is expected
+at the root of its address (`/`), as `npm run host` and Tailscale Serve provide. `npm run test:pwa` checks it all
+against the production server.

@@ -210,7 +210,8 @@ renews certificates by itself and needs no firewall rule, which is why it is the
 Signing out is at the top right. Unsaved typing stays in that browser's session if the session ends; sign in
 again and it is still there.
 
-Phones and tablets connect the same way and get a touch layout: see [mobile.md](mobile.md).
+Phones and tablets connect the same way and get a touch layout, and can install the Studio as an app from the
+https (Tailscale) address: see [mobile.md](mobile.md).
 
 ## 7. Working together
 

@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import App from "./App.vue";
 import { router } from "./router";
+import { startPwa } from "./pwa";
 import { applyTheme } from "./theme/tokens";
 // Sets <html data-layout> (desktop, tablet or phone) before the first render, so no layout flashes.
 import "./layout/useLayoutMode";
@@ -10,5 +11,6 @@ import "@fontsource-variable/saira/index.css";
 import "./styles/index.css";
 
 applyTheme();
+startPwa();
 
 createApp(App).use(router).mount("#app");

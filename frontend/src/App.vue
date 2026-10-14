@@ -7,6 +7,9 @@ import { startLiveUpdates, stopLiveUpdates } from "./live/changes";
 import AppBackdrop from "./components/AppBackdrop.vue";
 import AppEmblem from "./components/AppEmblem.vue";
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
+import HostUnreachable from "./components/HostUnreachable.vue";
+import InstallApp from "./components/InstallApp.vue";
+import PwaBanner from "./components/PwaBanner.vue";
 import StateMessage from "./components/ui/StateMessage.vue";
 import LoginView from "./views/LoginView.vue";
 
@@ -50,6 +53,7 @@ watch(signedIn, (yes) => (yes ? startLiveUpdates() : stopLiveUpdates()), { immed
       <RouterLink to="/builds"><Hammer :size="15" aria-hidden="true" /> Build &amp; Test</RouterLink>
       <RouterLink to="/data"><Database :size="15" aria-hidden="true" /> Data</RouterLink>
       <RouterLink to="/network"><Network :size="15" aria-hidden="true" /> Network</RouterLink>
+      <InstallApp compact />
       <a v-if="session.info?.local_admin" class="classic" :href="classicUrl" target="_blank" rel="noopener">Classic page <ExternalLink :size="13" aria-hidden="true" /></a>
     </nav>
     <div v-if="signedIn && session.info?.auth_required" class="who" :class="{ open: navOpen }" data-testid="signed-in-user">
@@ -59,12 +63,10 @@ watch(signedIn, (yes) => (yes ? startLiveUpdates() : stopLiveUpdates()), { immed
   </header>
   <main :class="{ wide: route.name === 'match' && signedIn }">
     <StateMessage v-if="!session.loaded" kind="loading">Connecting to the Studio…</StateMessage>
-    <template v-else-if="!session.info">
-      <StateMessage kind="error">{{ session.reason || "The Studio server cannot be reached." }}</StateMessage>
-      <button type="button" @click="loadSession">Try again</button>
-    </template>
+    <HostUnreachable v-else-if="!session.info" :reason="session.reason" :retry="loadSession" />
     <LoginView v-else-if="!signedIn" />
     <RouterView v-else />
   </main>
+  <PwaBanner />
   <ConfirmDialog />
 </template>

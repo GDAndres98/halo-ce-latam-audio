@@ -268,6 +268,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       (media queries, not innerWidth), styles in `frontend/src/styles/mobile.css`. Phones get one pane at a time
       (bottom nav, `pane=` in the URL), tablets a list beside Matching; all panels stay mounted. Desktop
       (>= 1000 px) is unchanged. Test: `npm run test:mobile` (touch via CDP, disposable data).
+      Installable PWA ("Halo Studio", `vite-plugin-pwa` 1.3.0, owner-requested): app-shell precache only, never
+      `/api`, `/audio`, `/classic`; update via a Reload prompt; icons from `npm run icons`. HTTPS (Tailscale) to
+      install. Test: `npm run test:pwa` (docs/mobile.md §9).
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

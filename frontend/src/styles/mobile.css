@@ -819,3 +819,63 @@ html[data-layout="tablet"] .tab-dot {
     position: static;
   }
 }
+
+/* ---- Installed app (pwa.ts): the update banner, the install offer, the unreachable host ------------------ */
+.pwa-banner {
+  position: fixed;
+  left: 50%;
+  top: max(0.6rem, env(safe-area-inset-top));
+  z-index: 70;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.8rem;
+  width: min(calc(100% - 1.5rem), 34rem);
+  padding: 0.55rem 0.8rem;
+  border: var(--frame-width) solid var(--frame);
+  border-radius: var(--radius-control);
+  background: rgba(4, 14, 38, 0.98);
+  box-shadow: 0 0 16px var(--frame-glow);
+  font-size: 0.9rem;
+}
+
+.install-panel p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+}
+
+.top nav .install-button {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+}
+
+.host-unreachable {
+  max-width: 34rem;
+  margin: 2rem auto;
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+}
+
+.host-unreachable h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.host-unreachable ul,
+.host-unreachable p {
+  margin: 0;
+}
+
+/* Safe areas: a phone with a notch, held sideways, keeps the page clear of it. */
+html[data-layout="phone"] main.wide {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+}

@@ -13,6 +13,7 @@ import PageHeader from "../components/ui/PageHeader.vue";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
 import StatusBadge from "../components/StatusBadge.vue";
+import InstallApp from "../components/InstallApp.vue";
 
 const info = ref<NetworkInfo | null>(null);
 const error = ref("");
@@ -72,6 +73,7 @@ onMounted(refresh);
     </PageHeader>
     <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
     <StateMessage v-else-if="!info" kind="loading">Reading the network settings…</StateMessage>
+    <InstallApp />
 
     <template v-if="info">
       <section class="panel" data-testid="network-mode">

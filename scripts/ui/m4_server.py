@@ -100,7 +100,8 @@ STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
                 ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
                 ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
                 ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".webp": "image/webp",
-                ".txt": "text/plain; charset=utf-8", ".map": "application/json"}
+                ".txt": "text/plain; charset=utf-8", ".map": "application/json",
+                ".webmanifest": "application/manifest+json"}  # the installable app's manifest (docs/mobile.md)
 COMPRESSIBLE = ("application/json", "text/", "image/svg+xml")
 # The built page only loads its own files (fonts and scripts are bundled); media may be a blob URL (WaveSurfer).
 STUDIO_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "

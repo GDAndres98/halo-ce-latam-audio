@@ -187,8 +187,19 @@ Approval has no shortcut.
 
 **Panels.** Drag the dividers between the three panels, or focus a divider and use the arrow keys (Shift for
 bigger steps). Each side panel has a minimum width, and the centre panel keeps at least 420 px. Widths are
-kept on the computer and restored on the next visit; *Reset layout* returns to the defaults. On a narrow
-window the panels stack and the dividers are hidden.
+kept on the computer and restored on the next visit; *Reset layout* returns to the defaults.
+
+**Phones and tablets.** Below 1000 px the Studio switches to touch layouts: on a phone one pane at a time
+(**MCC | Matching | Campaign Evolved**, bottom navigation, the open line's key and status always in view, Save in
+thumb reach); on an upright tablet a list beside the Matching panel. The waveform editor works with a finger
+(tap to seek, drag to select, finger-wide trim handles, a full-screen mode with typed values). See
+[docs/mobile.md](docs/mobile.md).
+
+**Install it as an app.** On a phone, the Studio installs as **Halo Studio** (Android: *Install app*; iPhone:
+Safari → Share → *Add to Home Screen*). It opens full screen from its own icon, stays signed in, and says
+clearly when the host computer cannot be reached. Installing needs the host's **https** address (Tailscale, see
+below): the app keeps only its own screens on the phone, never recordings, decisions or the session. See
+[docs/mobile.md §9](docs/mobile.md#9-install-it-as-an-app).
 
 **Data.** Decisions live in `mappings/manual_mappings.db` (SQLite), with the custom subtitles, the mission
 progress and their change history. `mappings/manual_mappings.json` is the export every save writes, checked on
@@ -351,7 +362,8 @@ npm run dev          # starts the API and the Vite dev server together; open htt
 shown on the **Network** page from the other computer's browser. They need no game files, tools or audio:
 everything streams from the host. Use Tailscale for access over the internet. Installing into or restoring the
 game is only possible on the host's own address. Setup, firewall, Tailscale and troubleshooting:
-[docs/remote-access.md](docs/remote-access.md).
+[docs/remote-access.md](docs/remote-access.md). Phones use the same address, and can install the Studio as an
+app from the https (Tailscale) address: [docs/mobile.md](docs/mobile.md).
 
 ## Architecture
 
@@ -393,8 +405,9 @@ selections that turn near-white. Confirmations use the Studio's own dialog, not 
 - **Design notes:** [docs/ui-design-system.md](docs/ui-design-system.md).
 - **Tokens:** colours, fonts and shapes are defined once, in `frontend/src/theme/tokens.ts`. Styles are in
   `frontend/src/styles/`, one file per area. Reusable pieces are in `frontend/src/components/ui/`.
-- **Fonts and art:** Michroma and Saira, both SIL OFL, are bundled. The emblem and backdrop are original
-  SVG. No Halo artwork, fonts, logos or sounds are used.
+- **Fonts and art:** Michroma and Saira, both SIL OFL, are bundled. The emblem, the app icon (the emblem's ring
+  around an audio waveform; drawn by `npm run icons`, `frontend/scripts/make-icons.mjs`) and the backdrop are
+  original SVG. No Halo artwork, fonts, logos or sounds are used.
 - **Checks:** unit tests check the contrast of every text colour against its surface (WCAG AA).
   `npm run test:theme` checks the live pages in a browser.
 
@@ -417,6 +430,9 @@ npm run test:subtitles                        # subtitle and combined builds: pr
 npm run test:level -- --build <name>          # Level choice, Level column, installed-level warning (any global-gain audio build)
 npm run test:theme                            # browser checks of the theme: every screen, dialog, fonts, contrast, motion, widths
 npm run test:remote                           # remote access: sign-in, roles, live updates (disposable data)
+npm run test:mobile                           # phone (touch), sideways, tablet and desktop layouts; no sideways overflow
+npm run test:pwa                              # installable app: manifest, icons, installability, no private caching,
+                                              # unreachable host, offline, update prompt (production server)
 npm run perf                                  # browser benchmark of the workflow (docs/studio-performance.md)
 npm run compare:m4                            # the same task in the classic page and the Studio, timed
 npm run docs:screenshots                      # regenerate the README images in docs/images/ (dialogue text hidden)
