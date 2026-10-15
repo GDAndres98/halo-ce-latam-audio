@@ -145,6 +145,8 @@ export const RADIO_PRESETS: Record<Exclude<RadioPreset, "custom">, Omit<RadioFil
   english: { low_hz: 1000, high_hz: 5000, slope_db_oct: 12, presence_db: 6, drive_db: 6, noise_dbfs: -50, clicks: false },
   spain_eco: { low_hz: 350, high_hz: 8000, slope_db_oct: 36, presence_db: 8, presence_hz: 2500, drive_db: 0, noise_dbfs: null, clicks: false },
   english_eco: { low_hz: 150, high_hz: 2250, slope_db_oct: 12, presence_db: 8, presence_hz: 400, drive_db: 0, noise_dbfs: null, clicks: false },
+  soldier: { low_hz: 1000, high_hz: 5000, slope_db_oct: 24, presence_db: 0, drive_db: 1, noise_dbfs: -70, clicks: true },
+  pilot: { low_hz: 700, high_hz: 3300, slope_db_oct: 24, presence_db: 0, drive_db: 0, noise_dbfs: -60, clicks: true },
 };
 export const RADIO_LIMITS = {
   low_hz: [100, 2000],

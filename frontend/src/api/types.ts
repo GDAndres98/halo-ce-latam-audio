@@ -184,7 +184,7 @@ export interface EchoEffect {
   damping_hz: number | null;
 }
 
-export type RadioPreset = "spain" | "english" | "spain_eco" | "english_eco" | "custom";
+export type RadioPreset = "spain" | "english" | "spain_eco" | "english_eco" | "soldier" | "pilot" | "custom";
 
 /** The recipe's radio filter: a band-pass with presence, drive and hiss. `preset` is a label; the numbers render. */
 export interface RadioFilter {

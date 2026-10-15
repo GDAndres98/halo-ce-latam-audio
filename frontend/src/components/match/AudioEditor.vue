@@ -437,6 +437,8 @@ useShortcuts({
               <option value="english">English radio (MCC English lines)</option>
               <option value="spain_eco">Spain intercom (eco lines)</option>
               <option value="english_eco">English intercom (eco lines)</option>
+              <option value="soldier">Soldier radio</option>
+              <option value="pilot">Pilot radio</option>
               <option value="custom">Custom</option>
             </select>
           </label>

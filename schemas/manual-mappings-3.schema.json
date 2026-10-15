@@ -119,7 +119,7 @@
                   "required": ["preset", "low_hz", "high_hz", "slope_db_oct", "presence_db", "drive_db", "noise_dbfs"],
                   "additionalProperties": false,
                   "description": "Optional radio filter (owner request 2026-10-13; added without a migration, absent = no filter): band-pass low_hz..high_hz with slope_db_oct on each side, presence peak at the band centre, tanh drive, channel hiss (noise_dbfs, null = none), optional MCC clicks. Applied by common/audio_edit.py after the edits, before the level stage. preset is a label; the stored numbers are what renders. Part of the audio decision.",
-                  "properties": {"preset": {"enum": ["spain", "english", "spain_eco", "english_eco", "custom"]},
+                  "properties": {"preset": {"enum": ["spain", "english", "spain_eco", "english_eco", "soldier", "pilot", "custom"]},
                                  "low_hz": {"type": "number", "minimum": 100, "maximum": 2000},
                                  "high_hz": {"type": "number", "minimum": 1000, "maximum": 10000},
                                  "slope_db_oct": {"enum": [12, 24, 36]},

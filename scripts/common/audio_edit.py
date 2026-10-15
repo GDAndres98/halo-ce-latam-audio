@@ -104,6 +104,11 @@ RADIO_PRESETS = {
                   "drive_db": 0, "noise_dbfs": None, "clicks": False},
     "english_eco": {"low_hz": 150, "high_hz": 2250, "slope_db_oct": 12, "presence_db": 8, "presence_hz": 400,
                     "drive_db": 0, "noise_dbfs": None, "clicks": False},
+    # the owner's own settings (2026-10-15), tuned by ear in the Studio (soldier retuned the same day)
+    "soldier": {"low_hz": 1000, "high_hz": 5000, "slope_db_oct": 24, "presence_db": 0, "drive_db": 1, "noise_dbfs": -70,
+                "clicks": True},
+    "pilot": {"low_hz": 700, "high_hz": 3300, "slope_db_oct": 24, "presence_db": 0, "drive_db": 0, "noise_dbfs": -60,
+              "clicks": True},
 }
 RADIO_FIELDS = ("low_hz", "high_hz", "slope_db_oct", "presence_db", "drive_db", "noise_dbfs")
 RADIO_LIMITS = {"low_hz": (100, 2000), "high_hz": (1000, 10000), "presence_db": (-6, 12), "drive_db": (0, 24),

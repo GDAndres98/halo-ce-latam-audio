@@ -762,3 +762,64 @@ def remove_limiter(path, loaded_sha256, *, history_dir=None, now=None):
         raise StoreError("schema: " + "; ".join(errs[:5]))
     return _write(path, current, new, loaded_sha256, history_dir, now,
                   changed_ids=changed_mapping_ids(old, new)), changes
+
+
+# --------------------------------------------------------------------------- radio preset retune (2026-10-15)
+def retune_radio_preset(doc, preset, values):
+    """Pure. -> (new_doc, changes). Every recipe whose radio filter is labelled `preset` gets `values` (the
+    preset's new numbers and clicks); a label means the stored numbers were that preset's (any change makes it
+    'custom'). presence_hz is kept as stored. Nothing else changes. changes: [{mapping_id, slot_id,
+    audio_status, audio_revision, previous}]."""
+    new = json.loads(json.dumps(doc))
+    changes = []
+    for s in new.get("slots", []):
+        radio = (s["audio"].get("edit") or {}).get("radio")
+        if radio and radio.get("preset") == preset and any(radio.get(k) != v for k, v in values.items()):
+            changes.append({"mapping_id": s["mapping_id"], "slot_id": s["slot_id"],
+                            "audio_status": s["audio"]["status"], "audio_revision": s["audio"]["revision"],
+                            "previous": dict(radio)})
+            radio.update(values)
+    return new, changes
+
+
+def proof_only_radio_retuned(old_doc, new_doc, preset, values):
+    """Problems if new_doc differs from old_doc in anything but the `values` of radio filters labelled `preset`."""
+    problems = []
+    if {k: v for k, v in old_doc.items() if k != "slots"} != {k: v for k, v in new_doc.items() if k != "slots"}:
+        problems.append("top-level fields changed")
+    if [s["mapping_id"] for s in old_doc["slots"]] != [s["mapping_id"] for s in new_doc["slots"]]:
+        return problems + ["mapping ids or order changed"]
+    for o, n in zip(old_doc["slots"], new_doc["slots"]):
+        if o == n:
+            continue
+        orad, nrad = (o["audio"].get("edit") or {}).get("radio"), (n["audio"].get("edit") or {}).get("radio")
+        strip = lambda s: {**s, "audio": {**s["audio"], "edit": {k: v for k, v in s["audio"]["edit"].items() if k != "radio"}}}
+        if strip(o) != strip(n):
+            problems.append(f"{o['mapping_id']}: something besides audio.edit.radio changed")
+        elif not orad or orad.get("preset") != preset or {**orad, **values} != nrad:
+            problems.append(f"{o['mapping_id']}: radio changed beyond the {preset} preset's values")
+    return problems
+
+
+def retune_radio(path, loaded_sha256, preset, values, *, history_dir=None, now=None):
+    """Owner-authorized (2026-10-15: the Soldier radio preset was retuned and the owner asked every line using
+    it to follow) update of the radio filters labelled `preset`, approved ones included, WITHOUT touching
+    approvals (status, revision, approved_at, fingerprint stay; nothing becomes needs_rework). Same stale
+    check, .history/ backup and database-first write as every save. Refuses unless the result provably differs
+    only in those values. -> (new sha256 or None, changes)."""
+    path = Path(path)
+    current = _current(path)
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changes = retune_radio_preset(old, preset, values)
+    if not changes:
+        return None, []
+    bad = proof_only_radio_retuned(old, new, preset, values)
+    if bad:
+        raise ProtectedError("; ".join(bad))
+    errs = schema_errors(new, load_schema(SCHEMA_NAME), changed_mapping_ids(old, new))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now,
+                  changed_ids=changed_mapping_ids(old, new)), changes

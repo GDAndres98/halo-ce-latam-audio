@@ -134,6 +134,11 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(ae.normalize(r), r)  # idempotent
         self.assertEqual(ae.summary(r), "radio spain 700–3300 Hz")
         self.assertEqual(ae.normalize({"radio": None}), ae.EDIT_ZERO)  # off: no field, as before
+        for name in ("soldier", "pilot"):  # owner presets (2026-10-15): clicks on, no presence_hz
+            p = ae.normalize({"radio": {"preset": name}}, SRC)["radio"]
+            self.assertEqual(p, dict(ae.RADIO_PRESETS[name], preset=name))
+            self.assertTrue(p["clicks"])
+            self.assertNotIn("presence_hz", p)
         self.assertNotIn("radio", ae.normalize({"trim_start_s": 0.1}, SRC))
         c = ae.normalize({"radio": {"preset": "custom", "low_hz": 600, "high_hz": 3500, "slope_db_oct": 24,
                                     "presence_db": 3, "drive_db": 0, "noise_dbfs": -55}}, SRC)

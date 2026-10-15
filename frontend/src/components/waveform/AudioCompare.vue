@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The two recordings of the line, one above the other, both read-only:
-//   A: the original MCC recording (Spain), never changed.
+//   A: the original MCC recording, never changed: Spain by default, or one of the line's MCC English takes.
 //   B: the Campaign Evolved replacement. By default the edited recording, rendered automatically after every
 //      change (see composables/useEditPreview.ts); also the unedited recording or the edit as encoded.
 // A / B switches between them at the same position; "A then B" plays the original and then the replacement.
@@ -19,6 +19,8 @@ export type ReplacementKind = "unedited" | "edited" | "encoded";
 
 const props = defineProps<{
   mccUrl: string | null;
+  /** The line's MCC English takes; A can play one of them instead of Spain's. */
+  mccEnglish?: { label: string; url: string }[];
   /** `edited` and `encoded` are set only for a preview of the current recipe. */
   replacement: Record<ReplacementKind, string | null>;
   /** The server can render the edited recording (false: B can only play the unedited one). */
@@ -38,6 +40,18 @@ const otherSeconds = ref<number | null>(null);
 const defaultKind = (): ReplacementKind => (props.canRender ? "edited" : "unedited");
 const kind = ref<ReplacementKind>(defaultKind());
 let thenB = false;
+
+/** What A plays: "spain" or the index of an English take in mccEnglish. */
+const originalChoice = ref<"spain" | number>("spain");
+const originalUrl = computed(() =>
+  originalChoice.value === "spain" ? props.mccUrl : (props.mccEnglish?.[originalChoice.value]?.url ?? props.mccUrl),
+);
+const originalLabel = computed(() =>
+  originalChoice.value === "spain"
+    ? "Original MCC (Spain, read-only)"
+    : `Original MCC (English ${props.mccEnglish?.[originalChoice.value]?.label ?? ""}, read-only)`,
+);
+watch(originalUrl, () => (originalSeconds.value = null));
 
 const KIND_LABEL: Record<ReplacementKind, string> = {
   unedited: "Campaign Evolved LATAM (unedited)",
@@ -174,12 +188,21 @@ useShortcuts({ a: switchAB, b: playSequence });
       </div>
     </header>
 
+    <div v-if="mccEnglish?.length" class="compare-source">
+      <label class="inline small">A plays
+        <select v-model="originalChoice" aria-label="Which MCC recording A plays" data-testid="compare-a-source">
+          <option value="spain">MCC Spain (original)</option>
+          <option v-for="(take, i) in mccEnglish" :key="take.url" :value="i">MCC English {{ take.label }}</option>
+        </select>
+      </label>
+    </div>
+
     <WaveformView
       ref="original"
-      :url="mccUrl"
+      :url="originalUrl"
       :height="64"
       channel="A"
-      label="Original MCC (Spain, read-only)"
+      :label="originalLabel"
       @duration="(s) => (originalSeconds = s)"
       @finish="onOriginalFinished"
     />
@@ -218,7 +241,7 @@ useShortcuts({ a: switchAB, b: playSequence });
     />
 
     <dl class="durations compact">
-      <dt>A · Original</dt><dd class="mono" data-testid="duration-a">{{ formatSeconds(originalSeconds) }}</dd>
+      <dt>A · {{ originalChoice === "spain" ? "Original" : "MCC English" }}</dt><dd class="mono" data-testid="duration-a">{{ formatSeconds(originalSeconds) }}</dd>
       <dt>B · {{ kind === "unedited" ? "Unedited" : "Edited" }}</dt><dd class="mono" data-testid="duration-b">{{ otherUrl ? formatSeconds(otherSeconds) : "—" }}</dd>
       <dt>Difference</dt>
       <dd class="mono" data-testid="duration-diff">{{ difference === null ? "—" : `${difference >= 0 ? "+" : ""}${difference.toFixed(3)} s` }}</dd>

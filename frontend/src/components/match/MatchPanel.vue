@@ -48,6 +48,13 @@ const audioLocked = computed(() => stored.value?.audio.status === "approved");
 const subtitleLocked = computed(() => stored.value?.subtitle.status === "approved");
 
 const mccUrl = computed(() => (detail.value ? audioUrl.mcc(detail.value.level, "spanish", detail.value.spanish.index) : null));
+/** The MCC English takes of the line, which A can play instead of Spain's under "Listen and compare". */
+const mccEnglish = computed(() =>
+  (detail.value?.english ?? []).map((sample) => ({
+    label: englishName(sample),
+    url: audioUrl.mcc(detail.value!.level, "english", sample.index),
+  })),
+);
 
 // The edited replacement is rendered automatically; only a preview of the current recipe is offered.
 const preview = useEditPreview(props.match);
@@ -224,6 +231,7 @@ async function choose(ref: string) {
       <AudioCompare
         :key="detail.slot_id"
         :mcc-url="mccUrl"
+        :mcc-english="mccEnglish"
         :replacement="replacement"
         :can-render="canRender"
         :rendering="preview.rendering.value"

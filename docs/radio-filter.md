@@ -142,12 +142,19 @@ The M4 preview and M6 use the same function, so the "as encoded" preview is stil
 
 The `spain` preset has `clicks` on; `english` has it off.
 
+**Owner presets (2026-10-15)**, tuned by ear in the Studio, both with `clicks` on and no `presence_hz`:
+
+| Preset | Studio label | Low (Hz) | High (Hz) | Slope (dB/oct) | Presence (dB) | Drive (dB) | Hiss (dBFS) |
+|---|---|---|---|---|---|---|---|
+| `soldier` | Soldier radio | 1000 | 5000 | 24 | 0 | 1 | −70 |
+| `pilot` | Pilot radio | 700 | 3300 | 24 | 0 | 0 | −60 |
+
 **Real-data check:** `es:A30_250_pilot#0`, rendered and encoded with the Spain preset. Against that line's own
 Spain original, its first 45 ms correlate 0.88 and its last 200 ms 0.85.
 
 ## 3. In the Studio
 
-The filter is set under **Audio editing → Radio filter**: Off, Spain radio, English radio or Custom, plus the
+The filter is set under **Audio editing → Radio filter**: Off, Spain radio, English radio, the two intercoms, Soldier radio, Pilot radio or Custom, plus the
 six values and **MCC clicks**. Changing a value turns the preset into Custom. Every change is undoable and re-renders the
 automatic preview (B), as the other edits do. "Reset edits" keeps the filter; it has its own Off. The filter
 is part of the audio decision, so an approved line must be marked Needs rework first. The "Needs radio
