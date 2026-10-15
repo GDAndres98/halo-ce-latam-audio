@@ -367,7 +367,14 @@ tr.detail-row:hover {
 
 .build-detail {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.6rem;
+}
+
+/* Paths and file names have no spaces: let them break anywhere rather than widen the panel. */
+.build-detail p,
+.build-detail li {
+  overflow-wrap: anywhere;
 }
 
 .build-detail h4 {
@@ -413,7 +420,261 @@ table.compact td {
 }
 
 .builds-view .level-cell {
+  overflow-wrap: anywhere;
+}
+
+/* ---- Build history (components/build/BuildHistory.vue): a table on the desktop, cards below 1000 px. */
+.build-table table {
+  table-layout: fixed;
+  min-width: 900px;
+}
+
+/* Two narrow fixed columns (date, action); the rest share the width, so the table fits from 1000 px up. */
+.build-table col.c-when { width: 7.6rem; }
+.build-table col.c-name { width: 25%; }
+.build-table col.c-folders { width: 12%; }
+.build-table col.c-result { width: 23%; }
+.build-table col.c-level { width: 18%; }
+.build-table col.c-status { width: 22%; }
+.build-table col.c-action { width: 7rem; }
+
+.build-table tr.open {
+  background: rgba(47, 140, 255, 0.09);
+}
+
+.sort-mark {
+  margin-left: 0.2rem;
+  color: var(--text);
+}
+
+.build-table .when time {
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+}
+
+.build-history .when .date {
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.build-history .when .time {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.build-history .latest {
+  margin-top: 0.3rem;
+}
+
+.build-history .name-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* Build names are identifiers: shown whole and as written (never upper-cased), wrapping when long, with a copy
+   button. */
+.build-history .build-toggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.build-history .build-toggle svg {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.build-history .build-name {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+  min-width: 0;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere; /* the end of a name (often a timestamp) is what tells builds apart: never cut it */
+}
+
+.build-table .files {
+  margin-left: 1.15rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.build-history .copy-button {
+  flex: none;
+}
+
+.build-history .kind {
+  display: inline-flex;
+  margin: 0.15rem 0 0 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.build-history .folder-list {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.build-table .level-cell > * {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.build-history .result svg {
+  vertical-align: -0.12em;
+}
+
+.build-history .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.build-history .stale-reasons {
+  margin: 0.3rem 0 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.build-history td.action {
+  text-align: right;
+}
+
+.build-history td.action .small-button {
+  white-space: nowrap;
+}
+
+.detail-folders {
+  margin: 0 0 0.35rem;
+}
+
+.build-detail code,
+.build-detail .mono {
+  overflow-wrap: anywhere;
+}
+
+/* Cards: phones one column, upright tablets two. */
+.build-cards {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-layout="tablet"] .build-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+/* An open card spans both columns: its details need the width. */
+html[data-layout="tablet"] .build-cards > li:has(.build-detail) {
+  grid-column: 1 / -1;
+}
+
+.build-card {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: var(--frame-width) solid var(--frame-dim);
+  border-radius: var(--radius);
+  background: var(--panel-glass);
+}
+
+.build-card header {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.build-card h3.build-name {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.build-card .when {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  color: var(--muted);
+}
+
+.build-card .when time {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.build-card .badges .kind {
+  margin: 0;
+}
+
+.card-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.card-facts dt {
+  font-weight: 700;
+  color: var(--menu);
+}
+
+.card-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-facts .folder-list {
+  display: inline;
+  white-space: normal;
+  font-size: inherit;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.card-actions button {
+  flex: 1 1 9rem;
+  justify-content: center;
+}
+
+.build-card .build-detail {
+  border-top: 1px solid var(--line);
+  padding-top: 0.55rem;
+  min-width: 0;
+}
+
+.build-card .build-detail table.compact {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .builds-view .level-mode {
@@ -433,6 +694,7 @@ table.compact td {
 .deploy-history li {
   padding: 0.2rem 0;
   border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
 }
 
 /* ---- Data. */

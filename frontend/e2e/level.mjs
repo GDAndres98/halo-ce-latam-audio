@@ -60,7 +60,7 @@ async function main() {
       await row.waitFor({ timeout: 30000 });
       const text = await row.getByTestId("build-level").innerText();
       const lv = manifest.level;
-      check(text.includes(`global gain +${lv.global_gain_db.toFixed(1)} dB`), `level cell: ${text}`);
+      check(text.toLowerCase().includes(`global gain +${lv.global_gain_db.toFixed(1)} dB`), `level cell: ${text}`);
       check(text.includes(`${lv.constrained.length}/${lv.lines} constrained`), `level cell: ${text}`);
       return text.replace(/\s+/g, " ");
     });

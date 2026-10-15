@@ -285,6 +285,16 @@ input[type="radio"]:disabled {
   opacity: 0.45;
 }
 
+/* A fieldset shrinks like any block (browsers give it min-content by default), and a select never grows past
+   its box because of a long option: both let narrow screens keep long choices inside their panels. */
+fieldset {
+  min-width: 0;
+}
+
+select {
+  max-width: 100%;
+}
+
 fieldset:disabled {
   opacity: 0.8;
 }

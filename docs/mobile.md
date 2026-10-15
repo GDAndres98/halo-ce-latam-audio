@@ -132,6 +132,11 @@ their difference are shown below. While a recording loads on a slow connection, 
 - Test: `npm run test:mobile` drives an emulated phone with real touch events (Chrome DevTools Protocol) on
   disposable data, then the same page sideways, as a tablet and as a desktop, and checks for sideways overflow
   at 360, 390, 430, 768 and 1024 px. It needs Microsoft Edge.
+- `npm run test:layout` checks every page at 360–1920 px for text that escapes its box, sideways scroll and
+  small touch targets, with real data ([ui-design-system.md §6](ui-design-system.md#long-values-and-narrow-screens)).
+- Build & Test shows one card per build on phones and upright tablets (two columns on a tablet), newest first.
+  Each card has the date, status badges, folders, results, level, **Details** and **Install to MCC**. Install
+  still works only on the host's own page.
 
 ## 9. Install it as an app
 

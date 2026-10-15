@@ -164,7 +164,12 @@
   gap: 0.3rem;
 }
 
-.edit-grid input {
+.edit-grid label {
+  min-width: 0;
+}
+
+.edit-grid input,
+.edit-grid select {
   width: 100%;
   font-variant-numeric: tabular-nums;
 }
@@ -235,6 +240,8 @@
 /* ---- Insert silence tools and the list of inserted silences (AudioEditor.vue). */
 .silence-tools {
   display: inline-flex;
+  flex-wrap: wrap; /* a narrow editor (upright tablet, narrow panel) puts the buttons under the field */
+  max-width: 100%;
   align-items: center;
   gap: 0.35rem;
 }

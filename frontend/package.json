@@ -29,6 +29,7 @@
     "test:theme": "node e2e/theme.mjs",
     "test:remote": "node e2e/remote.mjs",
     "test:mobile": "node e2e/mobile.mjs",
+    "test:layout": "node e2e/layout.mjs",
     "test:pwa": "node e2e/pwa.mjs",
     "icons": "node scripts/make-icons.mjs",
     "perf": "node e2e/perf.mjs",

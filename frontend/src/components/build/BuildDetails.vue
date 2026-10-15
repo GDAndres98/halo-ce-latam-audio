@@ -8,7 +8,7 @@ import { api } from "../../api/client";
 import type { BuildDetail } from "../../api/types";
 import StatusBadge from "../StatusBadge.vue";
 
-const props = defineProps<{ name: string; hasLog: boolean }>();
+const props = defineProps<{ name: string; hasLog: boolean; levels?: string[] }>();
 
 const detail = ref<BuildDetail | null>(null);
 const error = ref("");
@@ -46,6 +46,9 @@ async function loadLog() {
     <template v-else-if="detail">
       <section>
         <h4><FileCheck2 :size="14" aria-hidden="true" /> Files and validation</h4>
+        <p v-if="levels?.length" class="small detail-folders" data-testid="detail-folders">
+          <span class="muted">Folders ({{ levels.length }}):</span> <span class="mono">{{ levels.join(", ") }}</span>
+        </p>
         <ul class="small plain" data-testid="detail-files">
           <li v-for="f in detail.install_files" :key="f.install_rel">
             <code>{{ f.install_rel }}</code> ← <code>{{ f.candidate }}</code>

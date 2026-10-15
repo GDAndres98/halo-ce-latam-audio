@@ -196,6 +196,13 @@
   letter-spacing: 0.01em;
 }
 
+/* Line IDs (vo_scr_m01_00770_cryoassistant#0) have no spaces: they wrap in a narrow panel instead of running
+   past the card's frame. */
+.tag {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .row-item.selected {
   border-color: var(--frame);
   background: linear-gradient(90deg, rgba(47, 140, 255, 0.24), rgba(47, 140, 255, 0.06));

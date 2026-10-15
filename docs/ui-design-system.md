@@ -107,6 +107,9 @@ All live in `frontend/src/components/`:
   - Keyboard shortcuts pause while it is open.
   - The browser's `window.confirm` is no longer used anywhere.
 - `StatusBadge.vue` shows an icon plus a word. The tone colour only repeats the meaning.
+- `build/BuildHistory.vue` is the Build & Test build list. On the desktop it is a table, and below 1000 px
+  (`data-layout` phone or tablet) it is one card per build. Builds are listed newest first by their real
+  `built_at` time (`src/build/history.ts`), with a copy button on each name and the details opening in place.
 - `AppBackdrop.vue` and `AppEmblem.vue` are original SVG art: a ring around a sphere. They are not the
   Halo logo.
 
@@ -126,6 +129,35 @@ Native controls (buttons, fields, selects, checkboxes, radio buttons, scrollbars
 
 Important actions carry an icon (lucide) and a word. Icon-only buttons (zoom, clear selection) have an
 accessible name and a tooltip.
+
+### Long values and narrow screens
+
+Identifiers (slot IDs, Campaign Evolved line refs, build names, file paths) have no spaces. The rules below
+keep them, and long generated text, inside their boxes. They do not hide overflow:
+
+- `.tag`, build names and the paths in build details wrap anywhere (`overflow-wrap: anywhere`). They are
+  never cut, because the end of an ID (`#0`, a timestamp) is often the part that tells two apart. They are
+  also never upper-cased.
+- A shortened value (`text-overflow: ellipsis`) always has its full text in a `title` and somewhere else on the
+  page, such as the build details.
+- A `fieldset` may shrink (`min-width: 0`), and a `select` never grows past its box because of a long option.
+- Grid and flex children that hold text get `min-width: 0` (`minmax(0, 1fr)` columns).
+- Groups of controls wrap (`flex-wrap: wrap`).
+- On touch screens, controls are at least 40–44 px tall, including text links (`button.link`), section
+  chips and `<summary>` toggles.
+- Bars that run edge to edge on purpose use negative side margins or `position: fixed`.
+
+`npm run test:layout` (`frontend/e2e/layout.mjs`) checks this on the rendered pages. It opens every page at
+360, 390, 430, 768, 1024, 1440 and 1920 px, with the real decisions and builds on a disposable copy. It
+reports:
+
+- sideways page scroll;
+- text drawn outside its box;
+- elements outside the window;
+- touch targets under 40 px.
+
+It also checks the build list's order and layout. With `-- --shots`, it saves screenshots to
+`frontend/e2e/out/layout/`.
 
 ## 7. Interaction and motion
 
@@ -174,4 +206,4 @@ tasks while idle.
 4. Status is always an icon or glyph plus a word.
 5. Run `npm test`, `npm run typecheck` and `npm run test:theme`. The theme test screenshots every screen into
    `frontend/e2e/out/theme-*.png` and checks fonts, contrast, the dialog, keyboard menus, reduced motion,
-   overflow at 390–1440 px and responsiveness.
+   overflow at 390–1440 px and responsiveness. Run `npm run test:layout` for long content at 360–1920 px.

@@ -78,6 +78,32 @@ def _sha_file(path):
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
+def built_at_epoch(value):
+    """A build's `built_at` as seconds since the epoch, or None when missing or not a valid ISO 8601 time.
+
+    m6_build.py writes the host's local time without an offset; a time with an offset (or Z) is honoured, so
+    builds from either form compare on the real instant, never on the text."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        t = dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    try:
+        return t.timestamp()  # a naive time is read as the host's local time, as it was written
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def newest_first(builds):
+    """Builds sorted by creation time, newest first; equal times by name; builds without a valid time last
+    (by name), so the order never depends on folder names or on how a date is displayed."""
+    def key(b):
+        t = built_at_epoch(b.get("built_at"))
+        return (t is None, -(t or 0.0), b.get("name", ""))
+    return sorted(builds, key=key)
+
+
 def _read_json(path):
     if not path.is_file():
         return None
@@ -154,7 +180,7 @@ class BuildBoard:
                                   for f in manifest.get("install_files", [])],
                 "has_log": (self.build_root / f"{folder.name}_build.log").is_file(),
             })
-        return {"builds": builds, "decisions_sha256": current, "kinds": list(BUILD_KINDS),
+        return {"builds": newest_first(builds), "decisions_sha256": current, "kinds": list(BUILD_KINDS),
                 "runtime_note": RUNTIME_NOTE, "missions": self.missions()}
 
     def build_detail(self, name):

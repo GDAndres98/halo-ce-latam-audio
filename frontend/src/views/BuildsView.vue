@@ -8,11 +8,11 @@
 // hash-checked and backed up outside the game; any failure restores every file of the build) and only after
 // you confirm the exact files. Nothing launches MCC.
 
-import { Captions, ChevronDown, ChevronRight, FileAudio, Folder, Hammer, HardDriveDownload, Layers, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
+import { Captions, FileAudio, Folder, Hammer, HardDriveDownload, Layers, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
 import { permissions } from "../auth/session";
-import BuildDetails from "../components/build/BuildDetails.vue";
+import BuildHistory from "../components/build/BuildHistory.vue";
 import DeployHistory from "../components/build/DeployHistory.vue";
 import GainSetting from "../components/build/GainSetting.vue";
 import ScopePreview from "../components/build/ScopePreview.vue";
@@ -37,7 +37,6 @@ const folderInput = ref("");
 const preview = ref<BuildPreview | null>(null);
 const previewError = ref("");
 const previewLoading = ref(false);
-const open = ref<string | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 let previewSeq = 0;
@@ -210,8 +209,6 @@ function poll() {
 const JOB_TEXT = { build: "Building", install: "Installing", restore: "Restoring" } as const;
 const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
 const jobKind = computed(() => (job.value?.detail as { kind?: BuildKind } | undefined)?.kind);
-const isInstalled = (build: string) => Boolean(deploy.value?.active_builds.includes(build));
-const fileName = (rel: string) => rel.split("/").pop();
 const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
 const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null }) =>
   l.mode === "match_spain" ? "match Spain" : `global gain ${db(l.global_gain_db)}`;
@@ -337,86 +334,17 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
     </section>
 
     <section class="panel quiet" aria-labelledby="builds-title">
-      <PanelHeader title="Builds" title-id="builds-title" :icon="Layers" />
-      <div v-if="builds" class="table-frame">
-        <table>
-          <thead>
-            <tr><th>Build</th><th>Contents</th><th>Folders</th><th>Built</th><th>Counts</th><th>Level</th><th>Validation</th><th>Decisions</th><th>Game</th></tr>
-          </thead>
-          <tbody>
-            <template v-for="b in builds.builds" :key="b.name">
-              <tr :data-build="b.name" :data-kind="b.kind">
-                <td class="mono">
-                  <button
-                    type="button"
-                    class="link-button icon-label"
-                    :aria-expanded="open === b.name"
-                    :aria-label="`Details of ${b.name}`"
-                    @click="open = open === b.name ? null : b.name"
-                  >
-                    <ChevronDown v-if="open === b.name" :size="14" aria-hidden="true" />
-                    <ChevronRight v-else :size="14" aria-hidden="true" />{{ b.name }}
-                  </button>
-                </td>
-                <td class="small">
-                  <span class="icon-label kind">
-                    <FileAudio v-if="b.kind !== 'subtitles'" :size="14" aria-hidden="true" />
-                    <Captions v-if="b.kind !== 'audio'" :size="14" aria-hidden="true" />
-                    {{ KIND_TEXT[b.kind] }}
-                  </span>
-                  <div class="muted">{{ b.install_files.map((f) => fileName(f.install_rel)).join(", ") }}</div>
-                </td>
-                <td>{{ b.levels.join(", ") }}</td>
-                <td class="small">{{ b.built_at ?? "—" }}</td>
-                <td class="small">
-                  <template v-if="b.kind !== 'subtitles'">replace {{ b.counts.replace ?? 0 }} · keep {{ b.counts.keep_original ?? 0 }}</template>
-                  <template v-if="b.kind === 'both'"><br /></template>
-                  <template v-if="b.subtitles.enabled && b.subtitles.summary">
-                    subtitles {{ b.subtitles.summary.keys_to_write }}
-                    <span :class="{ warn: b.subtitles.summary.excluded }">· excluded {{ b.subtitles.summary.excluded }}</span>
-                    <span :class="{ error: b.subtitles.conflicts }">· conflicts {{ b.subtitles.conflicts }}</span>
-                  </template>
-                </td>
-                <td class="small level-cell" data-testid="build-level">
-                  <template v-if="b.level">
-                    <strong>{{ levelName(b.level) }}</strong>
-                    <div>applied {{ db(b.level.effective_gain_db?.median) }} <span class="muted">median</span></div>
-                    <div :class="{ warn: b.level.constrained }">{{ b.level.constrained }}/{{ b.level.lines }} constrained</div>
-                    <div v-if="b.level.loudness_vs_spain_db">vs Spain {{ db(b.level.loudness_vs_spain_db.median) }}</div>
-                  </template>
-                  <span v-else class="muted">—</span>
-                </td>
-                <td>
-                  <StatusBadge v-if="b.validation_ok === true" label="passed" tone="ok" />
-                  <StatusBadge v-else-if="b.validation_ok === false" :label="`failed (${b.failed_checks.length})`" tone="bad" />
-                  <StatusBadge v-else label="not validated" tone="muted" />
-                </td>
-                <td>
-                  <StatusBadge v-if="b.stale" :label="`stale: ${b.stale_reasons.join('; ')}`" tone="bad" />
-                  <StatusBadge v-else label="current" tone="ok" />
-                </td>
-                <td>
-                  <StatusBadge v-if="isInstalled(b.name)" label="installed" tone="warn" />
-                  <button
-                    v-else
-                    type="button"
-                    class="icon-label small-button"
-                    :disabled="!canDeploy || b.validation_ok !== true || !b.install_files.length || deploy?.mod_installed"
-                    :title="deploy?.mod_installed ? 'Restore the originals first' : b.validation_ok !== true ? 'Only validated builds can be installed' : 'Install this build into MCC'"
-                    @click="install(b.name)"
-                  >
-                    <HardDriveDownload :size="14" aria-hidden="true" /> Install to MCC
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="open === b.name" class="detail-row">
-                <td colspan="9"><BuildDetails :name="b.name" :has-log="b.has_log" /></td>
-              </tr>
-            </template>
-            <tr v-if="!builds.builds.length"><td colspan="9"><StateMessage kind="empty">No builds yet.</StateMessage></td></tr>
-          </tbody>
-        </table>
-      </div>
+      <PanelHeader title="Builds" title-id="builds-title" :icon="Layers">
+        <span v-if="builds" class="small muted">{{ builds.builds.length }} · newest first</span>
+      </PanelHeader>
+      <BuildHistory
+        v-if="builds"
+        :builds="builds.builds"
+        :installed="deploy?.active_builds ?? []"
+        :can-deploy="canDeploy"
+        :mod-installed="Boolean(deploy?.mod_installed)"
+        @install="install"
+      />
       <StateMessage v-else-if="!error" kind="loading">Loading builds…</StateMessage>
     </section>
   </section>

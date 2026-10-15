@@ -19,11 +19,12 @@ from build_api import BuildBoard  # noqa: E402
 from m4_app import ApiError  # noqa: E402
 
 
-def write_build(root, name, mappings_sha, ok=True, kind=None, local_sha=None, gain=4.0, install_files=()):
+def write_build(root, name, mappings_sha, ok=True, kind=None, local_sha=None, gain=4.0, install_files=(),
+                built_at="2026-10-10T10:00:00"):
     folder = root / "work" / "m6" / name
     folder.mkdir(parents=True)
     manifest = {
-        "schema": "m6-build-manifest/1", "name": name, "levels": [name], "built_at": "2026-10-10T10:00:00",
+        "schema": "m6-build-manifest/1", "name": name, "levels": [name], "built_at": built_at,
         "inputs": {"mappings_sha256": mappings_sha, "local_sha256": local_sha}, "counts": {"audio": 3},
         "subtitles": {"enabled": kind in ("subtitles", "both")},
         "global_gain": {"configured_db": gain},  # 4.0 = the default gain: most tests are about the decisions
@@ -67,6 +68,19 @@ class BuildBoardTests(unittest.TestCase):
         self.assertTrue(builds["a10"]["stale"])
         self.assertFalse(builds["x10"]["stale"])
         self.assertTrue(builds["x10"]["validation_ok"])
+
+    def test_builds_are_listed_newest_first_by_their_real_time(self):
+        # Folder names deliberately sort the other way; one time has an offset, ties fall back to the name, and
+        # builds without a valid time come last.
+        write_build(self.root, "a_old", self.current, built_at="2026-10-08T23:24:55")
+        write_build(self.root, "b_newest", self.current, built_at="2026-10-15T01:52:22")
+        write_build(self.root, "c_mid", self.current, built_at="2026-10-12T02:36:00")
+        write_build(self.root, "d_tie", self.current, built_at="2026-10-12T02:36:00")
+        write_build(self.root, "e_utc", self.current, built_at="2026-10-01T00:00:00Z")
+        write_build(self.root, "f_no_time", self.current, built_at=None)
+        write_build(self.root, "g_bad_time", self.current, built_at="yesterday")
+        names = [b["name"] for b in self.board().list_builds()["builds"]]
+        self.assertEqual(names, ["b_newest", "c_mid", "d_tie", "a_old", "e_utc", "f_no_time", "g_bad_time"])
 
     def test_folders_without_a_manifest_are_not_builds(self):
         (self.root / "work" / "m6" / "a10_build.log").parent.mkdir(parents=True)
