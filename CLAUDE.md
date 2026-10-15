@@ -279,6 +279,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       Installable PWA ("Halo Studio", `vite-plugin-pwa` 1.3.0, owner-requested): app-shell precache only, never
       `/api`, `/audio`, `/classic`; update via a Reload prompt; icons from `npm run icons`. HTTPS (Tailscale) to
       install. Test: `npm run test:pwa` (docs/mobile.md §9).
+    - **Mute / LATAM language / permutations (owner prompt 49, 2026-10-15):** `docs/mute-language-permutations.md`.
+      - Audio source `mute` (+ required `audio.mute_reason`, match must be `no_equivalent`; additive, no migration).
+        M6 action `mute` = `audio_pipeline.silent_stream`: exact original sample count, MCC's own CELT silence
+        packet (retail `x70\cor_19` is already all silence). An empty subtitle (`none`) is written only when every
+        take of the tag agrees. Studio: "Mute in game", filter, badge, `muted` counts. Never mute lines yourself.
+      - A new H1 audio language is not supported (closed `localizations` list in `initial_ps.s3dpak`
+        `sound_config.ps`; fallback is per language). Replacing the Spain bank stays the route.
+      - `.lst.bin` sample ranges are per language (names identical, counts differ). Extra permutations are
+        structurally possible (bank + Spanish `.lst.bin` together; offline proof
+        `scripts/discovery/p49_offline_proofs.py permutations`); selection in game is unverified, and no installer
+        writes the `.lst.bin` yet.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

@@ -22,6 +22,7 @@ import {
   isDirty,
   proposeSubtitle,
   unmatchDraft,
+  muteDraft,
   type Draft,
   type SubtitleProposal,
 } from "../matching/draft";
@@ -134,6 +135,21 @@ export function useMatch() {
     proposal.value = null;
     error.value = "";
     message.value = "Unmatched. Save the draft to keep it (or undo by reloading the line without saving).";
+    return true;
+  }
+
+  /** Mute / No replacement (draft only; Save draft keeps it). Refused while the audio is approved. */
+  function mute(): boolean {
+    if (!detail.value) return false;
+    if (detail.value.mapping?.audio.status === "approved") {
+      error.value = "The audio decision is approved. Mark it Needs rework before muting the line.";
+      return false;
+    }
+    muteDraft(draft, detail.value.mapping?.subtitle.status === "approved");
+    proposedSubtitle.value = null;
+    proposal.value = null;
+    error.value = "";
+    message.value = "Muted in the draft: say why, then save. The subtitle is a separate choice (proposed: none).";
     return true;
   }
 
@@ -283,6 +299,7 @@ export function useMatch() {
     chooseRecording,
     removeMatch,
     unmatch,
+    mute,
   };
 }
 

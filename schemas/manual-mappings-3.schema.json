@@ -81,8 +81,10 @@
           "additionalProperties": false,
           "properties": {
             "status": {"$ref": "#/$defs/decision_status"},
-            "source": {"enum": ["keep_original", "ce", "ce_concat", "user_recording", "composite"],
-                       "description": "keep_original: Spain audio stays. ce: one CE line. ce_concat: >=2 CE lines in order. user_recording: one local recording. composite: >=2 sources of any kind, in order."},
+            "source": {"enum": ["keep_original", "ce", "ce_concat", "user_recording", "composite", "mute"],
+                       "description": "keep_original: Spain audio stays. ce: one CE line. ce_concat: >=2 CE lines in order. user_recording: one local recording. composite: >=2 sources of any kind, in order. mute (owner request 2026-10-15, added without a migration): the line is omitted from gameplay; M6 writes digital silence of the original sample's exact length (docs/mute-language-permutations.md §1)."},
+            "mute_reason": {"type": "string", "minLength": 1, "maxLength": 500,
+                            "description": "Why the owner muted the line. Required when source is 'mute' and only allowed then. Part of the audio decision (immutable once approved)."},
             "sources": {"type": "array", "items": {"oneOf": [{"$ref": "#/$defs/ce_source"}, {"$ref": "#/$defs/user_source"}]}},
             "edit": {
               "type": "object",
@@ -184,7 +186,10 @@
              "then": {"properties": {"sources": {"minItems": 2, "items": {"$ref": "#/$defs/ce_source"}}}}},
             {"if": {"properties": {"source": {"const": "user_recording"}}},
              "then": {"properties": {"sources": {"minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/user_source"}}}}},
-            {"if": {"properties": {"source": {"const": "composite"}}}, "then": {"properties": {"sources": {"minItems": 2}}}}
+            {"if": {"properties": {"source": {"const": "composite"}}}, "then": {"properties": {"sources": {"minItems": 2}}}},
+            {"if": {"properties": {"source": {"const": "mute"}}},
+             "then": {"required": ["mute_reason"], "properties": {"sources": {"maxItems": 0}}},
+             "else": {"not": {"required": ["mute_reason"]}}}
           ]
         },
         "subtitle": {

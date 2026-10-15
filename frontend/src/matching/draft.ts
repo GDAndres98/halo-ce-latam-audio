@@ -28,6 +28,8 @@ export interface Draft {
   /** The CE line used as the replacement. Must be one of ceRefs when audioSource is "ce". */
   audioRef: string | null;
   audioLanguage: CeLanguage;
+  /** Why the line is muted (audioSource "mute"); kept in the draft so switching back and forth keeps it. */
+  muteReason: string;
   edit: AudioEdit;
   subtitleSource: SubtitleSource;
   subtitleRef: string | null;
@@ -87,6 +89,7 @@ export function draftFrom(detail: SlotDetail): Draft {
     audioSource: m?.audio.source ?? "keep_original",
     audioRef: firstSource?.ce_line_ref ?? null,
     audioLanguage: firstSource?.language ?? DEFAULT_LANGUAGE,
+    muteReason: m?.audio.mute_reason ?? "",
     // The server stores only the fields that were set (a new line has just the trims and gap), so the
     // missing ones are filled with the defaults, as the classic page does.
     edit: m ? completeEdit(m.audio.edit) : defaultEdit(),
@@ -170,6 +173,12 @@ export function proposeSubtitle(
 
 /** Problems with the audio choice that would make the server refuse the draft. */
 function audioProblems(draft: Draft): string[] {
+  if (draft.audioSource === "mute") {
+    const problems: string[] = [];
+    if (!draft.muteReason.trim()) problems.push("Say why the line is muted.");
+    if (draft.matchStatus !== "no_equivalent") problems.push("A muted line must be marked No equivalent.");
+    return problems;
+  }
   if (draft.audioSource !== "ce") return [];
   if (!draft.audioRef) return ["Choose the Campaign Evolved recording to use, or keep Spain's audio."];
   if (!draft.ceRefs.includes(draft.audioRef)) return ["The replacement must be one of the matched lines."];
@@ -243,6 +252,26 @@ export function unmatchDraft(draft: Draft): void {
   draft.fits = false;
 }
 
+/**
+ * Mute / No replacement, in the draft only (saving is still the user's action): the line is marked No equivalent,
+ * its Campaign Evolved lines and edits are dropped, the flags that need a CE line are cleared, and an
+ * unapproved subtitle is proposed as "none" (the user can keep MCC's text instead: the subtitle is its own
+ * decision, and a tag's subtitle is only removed when every take of it agrees). The reason is the user's.
+ */
+export function muteDraft(draft: Draft, subtitleApproved: boolean): void {
+  draft.matchStatus = "no_equivalent";
+  draft.ceRefs = [];
+  draft.audioSource = "mute";
+  draft.audioRef = null;
+  draft.edit = defaultEdit(draft.edit.gap_s);
+  draft.radio = false;
+  draft.fits = false;
+  if (!subtitleApproved && (draft.subtitleSource === "keep_original" || draft.subtitleSource === "ce_locres")) {
+    draft.subtitleSource = "none";
+    draft.subtitleRef = null;
+  }
+}
+
 /** Whether the audio or subtitle decision can be approved right now. Approval is always an explicit
  * action on a saved draft: the user must save first, so what is approved is what they saw. */
 export function canApprove(field: ApprovalField, stored: StoredDecision | null, draft: Draft, baseline: Draft): ApprovalCheck {
@@ -307,6 +336,7 @@ function audioSection(draft: Draft, baseline: Draft): NonNullable<SaveBody["audi
   if (usesCe && JSON.stringify(draft.edit) !== JSON.stringify(baseline.edit)) {
     section.edit = draft.edit;
   }
+  if (draft.audioSource === "mute") section.mute_reason = draft.muteReason.trim();
   return section;
 }
 

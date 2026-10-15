@@ -62,7 +62,7 @@ async function loadLog() {
           <dd data-testid="detail-folders"><strong>{{ build.levels.length }}</strong> · <span class="mono">{{ build.levels.join(", ") }}</span></dd>
           <template v-if="build.kind !== 'subtitles'">
             <dt>Audio</dt>
-            <dd>{{ n(build.counts.replace) }} replaced · {{ n(build.counts.keep_original) }} kept original</dd>
+            <dd>{{ n(build.counts.replace) }} replaced · {{ n(build.counts.mute) }} muted · {{ n(build.counts.keep_original) }} kept original</dd>
           </template>
           <template v-if="build.subtitles.enabled && build.subtitles.summary">
             <dt>Subtitles</dt>

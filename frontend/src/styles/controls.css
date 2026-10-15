@@ -368,6 +368,15 @@ kbd {
   padding: 0.05rem 0.25rem;
 }
 
+/* A muted line (Mute / No replacement): icon plus word, so it never relies on colour alone. */
+.muted-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.3rem;
+  color: var(--bad);
+}
+
 .flag-radio { color: var(--radio); }
 .flag-recording { color: var(--warn); }
 .flag-fits { color: var(--menu); }

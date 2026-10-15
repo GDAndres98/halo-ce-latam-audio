@@ -10,6 +10,7 @@ import {
   draftFrom,
   draftProblems,
   isDirty,
+  muteDraft,
   proposeSubtitle,
   subtitleDirty,
   unmatchDraft,
@@ -289,5 +290,38 @@ describe("unmatching a line", () => {
     expect(canUnmatch(approved, matched()).allowed).toBe(false);
     expect(canUnmatch(null, matched()).allowed).toBe(true);
     expect(canUnmatch(null, draftFrom(slot(null))).allowed).toBe(false);
+  });
+});
+
+describe("mute / no replacement", () => {
+  it("marks the line no equivalent, drops CE lines and edits, and proposes no subtitle", () => {
+    const detail = slot(decision({ radio_effect: { needed: true, set_at: null, revision: 1 } }));
+    const d = draftFrom(detail);
+    muteDraft(d, false);
+    expect([d.matchStatus, d.ceRefs, d.audioSource, d.audioRef, d.radio]).toEqual(["no_equivalent", [], "mute", null, false]);
+    expect(d.edit).toEqual(defaultEdit(0));
+    expect(d.subtitleSource).toBe("none");
+    expect(draftProblems(d)).toEqual(["Say why the line is muted."]);
+    d.muteReason = "  no equivalent in Campaign Evolved  ";
+    expect(draftProblems(d)).toEqual([]);
+    const body = buildSaveBody(detail, d, draftFrom(detail));
+    expect(body.audio).toEqual({ source: "mute", sources: [], mute_reason: "no equivalent in Campaign Evolved" });
+    expect(body.match).toEqual({ status: "no_equivalent", ce_line_refs: [] });
+  });
+
+  it("never touches an approved subtitle or a custom one", () => {
+    const custom = draftFrom(slot(decision({ subtitle: { status: "draft", source: "custom", ce_locres: null, custom_ref: "c-000001", approved_at: null, revision: 1 } }), "Hola"));
+    muteDraft(custom, false);
+    expect(custom.subtitleSource).toBe("custom");
+    const approved = draftFrom(slot(decision({ subtitle: { status: "approved", source: "keep_original", ce_locres: null, custom_ref: null, approved_at: "2026-10-15", revision: 1 } })));
+    muteDraft(approved, true);
+    expect(approved.subtitleSource).toBe("keep_original");
+  });
+
+  it("can be undone by unmatching (Spain's audio again)", () => {
+    const d = draftFrom(slot(decision()));
+    muteDraft(d, false);
+    unmatchDraft(d);
+    expect([d.matchStatus, d.audioSource]).toEqual(["unreviewed", "keep_original"]);
   });
 });

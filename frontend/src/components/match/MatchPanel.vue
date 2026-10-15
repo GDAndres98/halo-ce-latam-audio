@@ -192,6 +192,7 @@ async function choose(ref: string) {
               <span v-else-if="preview.rendering.value" class="small muted" data-testid="draft-rendering">rendering the draft…</span>
             </span>
           </template>
+          <span v-else-if="draft.audioSource === 'mute'" class="source-key muted" data-testid="ce-muted">None: the line is muted in game</span>
           <span v-else class="source-key muted">None: Spain's audio stays</span>
         </div>
 
@@ -213,7 +214,7 @@ async function choose(ref: string) {
           </span>
         </div>
 
-        <AudioDecision :draft="draft" :locked="audioLocked" @choose="choose" @remove="match.removeMatch" />
+        <AudioDecision :draft="draft" :locked="audioLocked" @choose="choose" @remove="match.removeMatch" @mute="match.mute" />
         <p class="decision-status"><StatusBadge v-bind="statusOf('audio')" /></p>
       </section>
 

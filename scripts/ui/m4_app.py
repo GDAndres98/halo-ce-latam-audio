@@ -149,7 +149,7 @@ def _next_id(prefix, used):
 
 
 def _audio_sem(a):
-    return (a["source"], a["sources"], a["edit"])
+    return (a["source"], a["sources"], a["edit"], a.get("mute_reason"))
 
 
 def _fits(m):
@@ -335,6 +335,7 @@ class M4App:
                 "subtitle_pending": sub != "approved", "draft": "draft" in (a, sub),
                 "approved": a == "approved" and sub == "approved",
                 "keep_original": bool(m and m["audio"]["source"] == "keep_original"),
+                "muted": bool(m and m["audio"]["source"] == "mute"),
                 "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m), "edited": _edited(m),
                 "recording": _needs_recording(m),
                 "stereo": s["channels"] > 1}.get(status, False)
@@ -701,8 +702,17 @@ class M4App:
     # ------------------------------------------------------------------ save
     def _normalize_audio(self, a, refs):
         source = a.get("source")
-        if source not in ("keep_original", "ce", "ce_concat"):
+        if source not in ("keep_original", "ce", "ce_concat", "mute"):
             raise ApiError(400, f"audio source {source!r} is not supported by the UI")
+        if source == "mute":  # Mute / No replacement: no sources; the reason is part of the decision
+            if a.get("sources"):
+                raise ApiError(400, "a muted line has no audio sources")
+            reason = a.get("mute_reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise ApiError(400, "say why the line is muted (mute_reason)")
+            if len(reason.strip()) > 500:
+                raise ApiError(400, "the mute reason is limited to 500 characters")
+            return source, []
         sources = []
         for x in a.get("sources") or []:
             ref, lang = x.get("ce_line_ref"), x.get("language", "Spanish(Mexico)")
@@ -786,6 +796,9 @@ class M4App:
             source, sources = self._normalize_audio(body["audio"], slot["match"]["ce_line_refs"])
             edit = self._normalize_edit(body["audio"], source, sources, slot["audio"]["edit"])
             want = dict(slot["audio"], source=source, sources=sources, edit=edit)
+            want.pop("mute_reason", None)
+            if source == "mute":
+                want["mute_reason"] = body["audio"]["mute_reason"].strip()
             changed = _audio_sem(want) != _audio_sem(slot["audio"])
             guard("audio", changed)
             if changed:

@@ -100,6 +100,12 @@ Slot filters (left):
    ↑ / ↓ (several lines are concatenated in that order). Or choose *no equivalent* or *deferred*.
 3. **Audio:** *keep Spain*, or *CE line(s) from the match* in es-MX (en and es-ES are allowed
    too). The duration difference against Spain is a plain fact.
+   - **Mute in game (no replacement)** (Studio only, 2026-10-15): the line is omitted; the build
+     writes silence of the same length, so the scene's timing stays. Say why (required). It marks
+     the line *no equivalent* and proposes subtitle *none* (a tag's subtitle is only removed when
+     every take of it has an approved *none*). Undo it with *keep Spain* (after *Needs rework* if
+     approved). Find muted lines with the **Muted in game** filter. See
+     `docs/mute-language-permutations.md` §1.
 4. **Needs radio effect** (the **R** checkbox under Audio): your manual flag for the future v1.1
    radio repair. No effect is applied now.
    - It is saved with **Save** and survives restarts.

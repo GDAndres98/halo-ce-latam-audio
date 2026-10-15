@@ -278,7 +278,7 @@ setting chosen on Build & Test.
 | Subtitle decision | Build action |
 |---|---|
 | Approved CE es-MX / EN text, or approved custom text | **write** it into the entry for the line's key, in SU and in SP |
-| Approved "no subtitle" (`none`) | **write** an empty entry |
+| Approved "no subtitle" (`none`) | **write** an empty entry, only when every Spanish take of the tag has an approved `none`; otherwise a conflict, unchanged (docs/mute-language-permutations.md §1.5) |
 | Approved "keep MCC text" | keep the entry byte for byte |
 | Draft, needs rework | **excluded**: MCC's text stays; listed |
 | Approved, but its fingerprint drifted, its text is missing, or the text can't go into a table (NUL, control characters, over 2,048 bytes) | **excluded** as invalid; listed |

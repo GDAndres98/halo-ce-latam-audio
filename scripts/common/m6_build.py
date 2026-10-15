@@ -12,6 +12,9 @@ Audio eligibility (per mapping in the selected levels):
                   catalog), never an English index. An edited line carries its recipe (`edit`);
                   the CLI renders it with common/audio_edit, exactly as the M4 preview does.
   keep_original   audio approved as "keep Spain" -> sample preserved byte for byte.
+  mute            audio approved as "Mute / No replacement", mono slot, no drift, no recipe -> the sample
+                  becomes digital silence of exactly its original sample count (common/audio_pipeline.
+                  silent_stream: MCC's own CELT silence packet, so the stream keeps its exact byte length).
   not_eligible    draft / needs_rework / unsupported (ce_concat, user_recording, composite, stereo,
                   gap on one line) / invalid (drift, unresolved media, test event, bad recipe) -> sample
                   preserved, reason
@@ -71,6 +74,19 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
             e.update(action="keep_original", reason=f"audio {a['status']} (not approved): Spain audio stays")
         elif a["source"] == "keep_original":
             e.update(action="keep_original", reason="approved: keep Spain audio")
+        elif a["source"] == "mute":
+            if sample["channels"] != 1:
+                e.update(action="not_eligible", reason="unsupported: stereo slot (stereo replacement deferred)")
+            elif m["match"]["status"] != "no_equivalent":
+                e.update(action="not_eligible", reason="invalid: a muted line must be marked 'no equivalent'")
+            elif not audio_edit.is_identity(a["edit"]):
+                e.update(action="not_eligible", reason="invalid: a muted line has no edit recipe")
+            elif a["fingerprint"] != audio_fingerprint(m, ce_idx, mcc_idx, local):
+                e.update(action="not_eligible",
+                         reason="invalid: approved fingerprint no longer matches the catalogs (drift); rework it")
+            else:
+                e.update(action="mute", reason="approved: mute (silence of the original length)",
+                         mute_reason=a.get("mute_reason"))
         elif a["source"] != "ce":
             e.update(action="not_eligible", reason=f"unsupported in this build: audio source {a['source']}")
         elif sample["channels"] != 1:
@@ -125,13 +141,16 @@ def edit_problems(edit, ref, lang):
     return out
 
 
-FOLDER_GROUPS = ("replace", "approved_keep_spain", "not_approved", "unmapped", "unsupported", "invalid")
+FOLDER_GROUPS = ("replace", "muted", "approved_keep_spain", "not_approved", "unmapped", "unsupported", "invalid")
+BUILT_ACTIONS = ("replace", "mute")  # actions that change a bank sample
 
 
 def entry_group(e):
     """Report group of one planned slot (per folder, owner request 2026-10-08)."""
     if e["action"] == "replace":
         return "replace"
+    if e["action"] == "mute":
+        return "muted"
     if e["mapping_id"] is None:
         return "unmapped"
     if e["action"] == "not_eligible":
@@ -150,7 +169,7 @@ def folder_summary(entries):
         f[entry_group(e)] += 1
         f["slots"] += 1
         f["stereo"] += e["channels"] > 1
-        f["stereo_replaced"] += e["channels"] > 1 and e["action"] == "replace"
+        f["stereo_replaced"] += e["channels"] > 1 and e["action"] in BUILT_ACTIONS
     return out
 
 
@@ -168,9 +187,9 @@ def compare_plans(built_entries, current_entries):
     changed, new = [], []
     for e in built_entries:
         c = cur.get(e["slot_id"])
-        if e["action"] == "replace" and (c is None or _built_key(c) != _built_key(e)):
+        if e["action"] in BUILT_ACTIONS and (c is None or _built_key(c) != _built_key(e)):
             changed.append(e["slot_id"])
-        elif e["action"] != "replace" and c is not None and c["action"] == "replace":
+        elif e["action"] not in BUILT_ACTIONS and c is not None and c["action"] in BUILT_ACTIONS:
             new.append(e["slot_id"])
     return {"changed_or_revoked": changed, "newly_eligible": new}
 
@@ -252,11 +271,15 @@ def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, 
       missing_key  the line has no entry in SU or SP
     Several slots (takes) share one key, the tag path. All approved decisions for a key must agree: different
     texts, or a text next to an approved "keep", is a conflict and the key is left unchanged (reported, never
-    guessed). Keys are looked up in each table independently; a key a table lacks is never added.
+    guessed). An empty entry ("none", e.g. for a muted line) hides the subtitle of every take of the tag, so it
+    is written only when EVERY Spanish take of the tag has an approved "none"; otherwise the key is left
+    unchanged and reported (a take that still plays keeps its subtitle). Keys are looked up in each table
+    independently; a key a table lacks is never added.
     Nothing is approved, changed or chosen here."""
     from .mcc_loc_writer import normalize_text, text_problems
     rows, conflicts = [], []
     by_key = defaultdict(list)
+    takes_of = {}  # key -> every Spanish slot (take) of the tag, mapped or not
     for m in sorted(doc["slots"], key=lambda m: m["slot_id"]):
         hit = slot_index.get(m["slot_id"])
         if not hit or hit[0] not in levels:
@@ -264,6 +287,7 @@ def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, 
         s = m["subtitle"]
         tag = hit[1]["mcc_tag"]
         key = loc_key(tag)
+        takes_of.setdefault(key, set()).update(hit[1].get("slot_ids") or [m["slot_id"]])
         row = {"slot_id": m["slot_id"], "mapping_id": m["mapping_id"], "level": hit[0], "mcc_tag": tag,
                "key": key, "key_evidence": "derived:mcc_loc_key_crc32_tag_path", "status": s["status"],
                "source": s["source"], "change": False, "category": "excluded"}
@@ -313,6 +337,17 @@ def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, 
             keys[key] = dict(entry, action="conflict")
             continue
         kind, text = next(iter(outcomes))
+        missing = sorted(takes_of[key] - set(entry["slots"]))
+        if kind == "write" and text == "" and missing:
+            conflicts.append({"code": "empty_subtitle_not_agreed_by_every_take", "key": key,
+                              "key_hex": entry["key_hex"], "mcc_tag": entry["mcc_tag"], "slots": entry["slots"],
+                              "takes_without_approved_none": missing})
+            for r in items:
+                r.update(category="conflict", change=False,
+                         result="conflict: 'no subtitle' hides the line for every take; these takes have no "
+                                "approved 'none': " + ", ".join(missing) + "; unchanged")
+            keys[key] = dict(entry, action="conflict")
+            continue
         if kind == "keep":
             keys[key] = dict(entry, action="keep")
             continue

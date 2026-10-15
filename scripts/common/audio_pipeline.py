@@ -81,6 +81,27 @@ def encode_for_mcc(celt, pcm, channels=1, profile="fmod"):
             "sample_count": frames * FRAME_SAMPLES}
 
 
+def silent_stream(celt, sample_count, channels=1):
+    """Digital silence for a muted line: exactly `sample_count` samples (MCC's dialogue samples are whole
+    512-sample frames), CELT "fmod" profile. -> dict(stream, packets, frames, sample_count, decoded).
+
+    Every packet must be a CELT silence frame and decode to zeros. The encoder's silence packet is
+    byte-identical to the only silence packet in MCC's own banks (33,294 frames in the Spanish bank; one
+    retail sample, x70 cor_19, is made only of it: docs/mute-language-permutations.md §1.3), and the stream
+    has the original's exact byte length (CBR), so the bank's layout does not move."""
+    from .celt_header import frame_flags
+    if sample_count <= 0 or sample_count % FRAME_SAMPLES:
+        raise ValueError(f"sample count {sample_count} is not a whole number of {FRAME_SAMPLES}-sample frames")
+    packets, frames = celt.encode(b"\0" * (sample_count * channels * 2), channels=channels, profile="fmod")
+    if profile_violations(packets) or not all(frame_flags(p)["silence"] for p in packets):
+        raise ValueError("the silence encode produced a non-silence CELT frame")
+    decoded = celt.decode(packets, channels=channels)
+    if decoded.strip(b"\0"):
+        raise ValueError("the silence encode does not decode to digital silence")
+    return {"stream": fmod_frames(packets), "packets": packets, "frames": frames,
+            "sample_count": frames * FRAME_SAMPLES, "decoded": decoded}
+
+
 def snr_db(ref, test, lag=CODEC_DELAY):
     """SNR (dB) of `test` against `ref` (16-bit mono PCM), with `test` delayed by `lag` samples."""
     a = array("h", ref)

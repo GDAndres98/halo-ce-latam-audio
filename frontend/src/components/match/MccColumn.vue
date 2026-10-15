@@ -3,7 +3,7 @@
 // Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
-import { ChevronsDown, ListMusic } from "lucide-vue-next";
+import { ChevronsDown, ListMusic, VolumeX } from "lucide-vue-next";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { onChange, onReconnect } from "../../live/changes";
@@ -37,6 +37,7 @@ const STATUS_OPTIONS: [string, string][] = [
   ["approved", "Approved (both)"],
   ["needs_rework", "Needs rework"],
   ["keep_original", "Keep Spain audio"],
+  ["muted", "Muted in game"],
   ["radio", FLAGS.radio.label],
   ["recording", FLAGS.recording.label],
   ["fits", FLAGS.fits.label],
@@ -201,7 +202,8 @@ function rowLabel(row: SlotRow) {
     <p v-if="data?.progress" class="progress small">
       Decided {{ data.progress.decided }} / {{ data.progress.slots }} ·
       audio approved {{ data.progress.audio_approved }} ·
-      subtitles approved {{ data.progress.subtitle_approved }}
+      subtitles approved {{ data.progress.subtitle_approved }}<template v-if="data.progress.muted"> ·
+      muted {{ data.progress.muted }}</template>
       <StatusBadge v-if="data.progress.ready_for_build" label="ready to build" tone="ok" />
     </p>
     <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
@@ -243,6 +245,13 @@ function rowLabel(row: SlotRow) {
                 :aria-label="`audio: ${markFor(decisionOf(row).audio).word}`">A{{ markFor(decisionOf(row).audio).glyph }}</span>
           <span class="pill" :class="markFor(decisionOf(row).subtitle).tone" :title="`subtitle: ${markFor(decisionOf(row).subtitle).word}`"
                 :aria-label="`subtitle: ${markFor(decisionOf(row).subtitle).word}`">S{{ markFor(decisionOf(row).subtitle).glyph }}</span>
+          <span
+            v-if="row.decision?.audio_source === 'mute'"
+            class="pill muted-pill"
+            title="Muted in game (no replacement)"
+            aria-label="Muted in game"
+            data-testid="muted-pill"
+          ><VolumeX :size="12" aria-hidden="true" /> muted</span>
           <span
             v-for="flag in rowFlags(row)"
             :key="flag.name"

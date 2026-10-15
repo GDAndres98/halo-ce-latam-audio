@@ -206,9 +206,20 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
         if only_mapping_ids is not None and s["mapping_id"] not in only_mapping_ids:
             continue
         radio = s.get("radio_effect") or {}
-        if radio.get("needed") and s["audio"]["source"] == "keep_original":
+        if radio.get("needed") and s["audio"]["source"] in ("keep_original", "mute"):
             out.append(finding("error", "radio_effect_without_selected_audio", file, w + "/radio_effect",
-                               "the 'needs radio effect' flag applies to selected CE audio, not to kept Spain audio"))
+                               "the 'needs radio effect' flag applies to selected CE audio, not to kept Spain "
+                               "audio or a muted line"))
+        if s["audio"]["source"] == "mute":  # owner's explicit "Mute / No replacement" (docs/mute-language-permutations.md)
+            if s["match"]["status"] != "no_equivalent":
+                out.append(finding("error", "mute_requires_no_equivalent", file, w + "/audio",
+                                   f"a muted line must be marked 'no equivalent' (match.status={s['match']['status']})"))
+            if not (s["audio"].get("mute_reason") or "").strip():
+                out.append(finding("error", "mute_without_reason", file, w + "/audio",
+                                   "say why the line is muted"))
+            if s["subtitle"]["source"] in ("ce_locres", "custom"):
+                out.append(finding("info", "muted_line_with_subtitle_text", file, w + "/subtitle",
+                                   "the audio is muted but a subtitle text is chosen; it will still be shown"))
         if (s.get("different_but_fits") or {}).get("marked") and not s["match"]["ce_line_refs"]:
             out.append(finding("error", "different_but_fits_without_match", file, w + "/different_but_fits",
                                "'different dialogue, fits the scene' needs at least one matched CE line"))
@@ -443,7 +454,7 @@ def level_progress(level_slot_ids, mappings_doc):
     by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
            "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0,
-           "different_but_fits": 0, "needs_recording": 0}
+           "different_but_fits": 0, "needs_recording": 0, "muted": 0, "muted_approved": 0}
     for sid in level_slot_ids:
         s = by_slot.get(sid)
         if not s:
@@ -459,6 +470,9 @@ def level_progress(level_slot_ids, mappings_doc):
         out["different_but_fits"] += bool((s.get("different_but_fits") or {}).get("marked"))
         out["needs_recording"] += bool((s.get("needs_recording") or {}).get("marked"))
         out["needs_rework"] += "needs_rework" in (s["audio"]["status"], s["subtitle"]["status"])
+        # Muted lines (a subset of no_equivalent): decided, never counted as matched recordings.
+        out["muted"] += s["audio"]["source"] == "mute"
+        out["muted_approved"] += s["audio"]["source"] == "mute" and s["audio"]["status"] == "approved"
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out
 

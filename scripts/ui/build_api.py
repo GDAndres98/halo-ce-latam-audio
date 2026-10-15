@@ -251,7 +251,7 @@ class BuildBoard:
                     for r in subs["rows"] if r["category"] in ("excluded", "conflict", "missing_key")]
         return {"levels": levels, "scope": label,
                 "audio": {"replace": acts.get("replace", 0), "keep_original": acts.get("keep_original", 0),
-                          "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},
+                          "mute": acts.get("mute", 0), "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},
                 "subtitles": {**subs["summary"], "excluded_rows": excluded, "conflict_list": subs["conflicts"]}}
 
     def missions(self):

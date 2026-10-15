@@ -12,6 +12,9 @@ export interface LevelProgress {
   radio_effect: number;
   different_but_fits: number;
   needs_recording: number;
+  /** Lines muted in game (Mute / No replacement): a subset of no_equivalent, never counted as matched. */
+  muted: number;
+  muted_approved: number;
   ready_for_build: boolean;
 }
 
@@ -97,7 +100,8 @@ export interface ChangeEvent {
 
 export type MatchStatus = "unreviewed" | "matched" | "no_equivalent" | "deferred";
 export type CeLanguage = "Spanish(Mexico)" | "English(US)" | "Spanish(Spain)";
-export type AudioSource = "keep_original" | "ce";
+/** mute: the line is omitted from gameplay (silence of the original length). */
+export type AudioSource = "keep_original" | "ce" | "mute";
 export type SubtitleSource = "keep_original" | "ce_locres" | "custom" | "none";
 export type ApprovalField = "audio" | "subtitle";
 export type ObjectStatus = "draft" | "approved" | "needs_rework";
@@ -211,6 +215,8 @@ export interface StoredDecision {
     source: AudioSource;
     sources: { kind: "ce"; ce_line_ref: string; language: CeLanguage }[];
     edit: AudioEdit;
+    /** Why the owner muted the line (only when source is "mute"). */
+    mute_reason?: string;
     approved_at: string | null;
     revision: number;
   };
@@ -351,6 +357,8 @@ export interface SaveBody {
     sources: { ce_line_ref: string; language: CeLanguage }[];
     /** Sent only when the recipe changed. Omitting it keeps the stored recipe. */
     edit?: AudioEdit;
+    /** Required when source is "mute". */
+    mute_reason?: string;
   };
   subtitle?: {
     source: SubtitleSource;
@@ -494,7 +502,7 @@ export type BuildScope = "mission" | "levels" | "all_mapped";
 export interface BuildPreview {
   levels: string[];
   scope: string;
-  audio: { replace: number; keep_original: number; not_eligible: number; conflicts: number };
+  audio: { replace: number; keep_original: number; mute: number; not_eligible: number; conflicts: number };
   subtitles: SubtitleSummary & { excluded_rows: ExcludedSubtitle[]; conflict_list: SubtitleConflict[] };
 }
 

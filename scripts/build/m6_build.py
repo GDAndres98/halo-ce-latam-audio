@@ -8,7 +8,8 @@ game files. `--kind` chooses what is built for the selected level(s):
              (common/m6_build.plan_audio) through the validated pipeline (common/audio_pipeline: CE WAV ->
              ffmpeg 44.1 kHz -> [owner's edit recipe, the same render the M4 editor previews] -> global gain
              -> pad codec delay -> CELT 0.11 "fmod" profile), assembled into ONE new bank from
-             reference-audio/stage1/. Untouched samples stay byte-identical; .lst.bin is never written.
+             reference-audio/stage1/. Approved muted lines become digital silence of their original length.
+             Untouched samples stay byte-identical; .lst.bin is never written.
   subtitles  SU_Halo1.bin and SP_Halo1.bin from the approved subtitle decisions (common/m6_build.subtitle_plan:
              CE es-MX/EN text, custom text, or an approved empty entry; drafts, needs-rework, drift, conflicts
              and lines without a key are excluded and reported), written by common/mcc_loc_writer (variable
@@ -50,11 +51,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
 from common import audio_edit, interference, radio_clicks, radio_static  # noqa: E402
-from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
+from common.audio_pipeline import (  # noqa: E402
+    derive, derive_processed, needs_processing, sha256_file, silent_stream, snr_db)
 from common.export_config import LEVEL_MODES, ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
+from common.fsb5_writer import decompose  # noqa: E402
 from common.m6_build import (  # noqa: E402
     BUILD_KINDS, FOLDER_GROUPS, SUBTITLE_COPY, SUBTITLE_INSTALL, SUBTITLE_PINS, SUBTITLE_TABLES, assemble, build_tables,
     compare_plans, compare_subtitle_plans, entry_group, folder_summary, mission_folders, multi_structural_checks,
@@ -176,7 +179,23 @@ def level_summary(cfg, slots):
             "loudness_vs_spain_db": dist([round(v, 2) for v in vs])}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None, static=None):
+def mute_checks(exe, cand_path, e, res):
+    """vgmstream decode of one muted sample: digital silence, the original's length, Custom CELT."""
+    wav = decode_pcm(exe, cand_path, e["spanish_index"] + 1)
+    if wav is None:
+        return {"vgm_target_decodes": False}
+    pcm = wav[wav.index(b"data") + 8:]
+    m = meta(exe, cand_path, e["spanish_index"] + 1)
+    return {"vgm_target_decodes": True, "vgm_equals_own_decode": pcm == res["decoded"][:len(pcm)],
+            "decodes_to_digital_silence": not pcm.strip(b"\0"),
+            "sample_count_equals_original": res["sample_count"] == e["original_sample_count"],
+            "vgm_sample_count": (meta_value(m, "stream total samples") or "").split(" ")[0] == str(res["sample_count"]),
+            "vgm_encoding_custom_celt": meta_value(m, "encoding") == "Custom CELT",
+            "stream_length_equals_original": res["stream_bytes"] == res["original_stream_bytes"]}
+
+
+def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None, static=None, mutes=(),
+               model=None):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
     cfg: the export config (level mode and global gain, the same for every replacement); refs: Spain
     loudness per slot (the match target, or reported only); clicks: MCC's radio clicks
@@ -201,6 +220,11 @@ def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks
             res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
                          source_meta=meta)
         res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
+        results[e["spanish_index"]] = res
+    for e in mutes:  # Mute / No replacement: silence of exactly the original sample count
+        res = silent_stream(celt, e["original_sample_count"])
+        res["stream_bytes"] = len(res["stream"])
+        res["original_stream_bytes"] = len(model["samples"][e["spanish_index"]]["stream"])
         results[e["spanish_index"]] = res
     cand = assemble(original, {k: (r["stream"], r["sample_count"]) for k, r in results.items()})
     return cand, results
@@ -276,7 +300,8 @@ def test_report(name, manifest, report, app):
     audio = kind in ("audio", "both")
     ents = manifest["slots"]
     rep = [e for e in ents if e["action"] == "replace"]
-    keep = [e for e in ents if e["action"] != "replace"]
+    muted = [e for e in ents if e["action"] == "mute"]
+    keep = [e for e in ents if e["action"] not in ("replace", "mute")]
     su = lambda e: (app._mcc_text(e["mcc_tag"])["SU"]["text"] or "")[:70]  # noqa: E731
     L = [f"# M6 test build `{name}` — {'PASS' if report['ok'] else 'FAILED'}", "",
          f"Built {manifest['built_at']} from `manual_mappings.json` sha256 `{manifest['inputs']['mappings_sha256'][:16]}…` "
@@ -296,10 +321,17 @@ def test_report(name, manifest, report, app):
                                                                          ("≈", e["different_but_fits"]),
                                                                          ("E", bool(e.get("edit")))) if on)),
                             ("MCC LATAM subtitle (SU) before", su)])
+        if muted:
+            L += ["", f"### Muted lines ({len(muted)}): digital silence of the original length", "",
+                  "Listen for: nothing plays where the line was, the scene's timing is unchanged, and no click or "
+                  "noise. Check the subtitle separately (a muted line's subtitle is its own decision).", ""]
+            L += md_table(muted, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Spain s", lambda e: e["original_seconds"]),
+                                  ("Why muted", lambda e: e.get("mute_reason") or ""),
+                                  ("MCC LATAM subtitle (SU) before", su)])
         L += ["", "## Per folder", ""]
         L += md_table([{"f": f, **v} for f, v in manifest["folders"].items()],
                       [("Folder", lambda r: f"`{r['f']}`"), ("Slots", lambda r: r["slots"]),
-                       ("LATAM (approved CE)", lambda r: r["replace"]),
+                       ("LATAM (approved CE)", lambda r: r["replace"]), ("Muted", lambda r: r["muted"]),
                        ("Approved keep Spain", lambda r: r["approved_keep_spain"]),
                        ("Not approved", lambda r: r["not_approved"]), ("Unmapped", lambda r: r["unmapped"]),
                        ("Unsupported", lambda r: r["unsupported"]), ("Invalid", lambda r: r["invalid"]),
@@ -439,7 +471,7 @@ def read_local(path):
     return json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
 
 
-def build_audio(out, targets, original, args, cfg, pins, app):
+def build_audio(out, targets, original, args, cfg, pins, app, mutes=()):
     """The audio stage: encode, assemble, validate the bank. -> (checks, results, per_target, report extras)."""
     checks = {"bank_copy_matches_pin": hashlib.sha256(original).hexdigest() == pins["spanish.fsb"]["sha256"],
               "lst_copy_matches_pin": sha256_file(LST) == pins["spanish.lst"]["sha256"]}
@@ -467,10 +499,12 @@ def build_audio(out, targets, original, args, cfg, pins, app):
         checks["radio_static_matches_pin"] = static["sha256"] == radio_static.PINNED
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
-    print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
+    model = decompose(original) if mutes else None
+    print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes, {len(mutes)} muted (pass 1)...")
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static, mutes, model)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static, mutes, model)
+    del model
     celt.close()
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
@@ -492,6 +526,10 @@ def build_audio(out, targets, original, args, cfg, pins, app):
         k = e["spanish_index"]
         c, extra = content_checks(exe, cand_path, k, results[k])
         per_target[e["slot_id"]] = {"checks": c, **extra}
+        all_target_ok &= all(c.values())
+    for e in mutes:
+        c = mute_checks(exe, cand_path, e, results[e["spanish_index"]])
+        per_target[e["slot_id"]] = {"checks": c, "muted": True}
         all_target_ok &= all(c.values())
     checks["every_target_content_ok"] = all_target_ok
     checks["lst_not_written"] = sha256_file(LST) == pins["spanish.lst"]["sha256"]
@@ -622,11 +660,12 @@ def main():
     if want_audio and plan["conflicts"]:
         raise SystemExit(f"conflicts: {plan['conflicts']}")
     targets = [e for e in plan["entries"] if e["action"] == "replace"]
-    if want_audio and not targets:
-        raise SystemExit("nothing eligible to build: no approved Campaign Evolved audio in this scope")
+    mutes = [e for e in plan["entries"] if e["action"] == "mute"]
+    if want_audio and not targets and not mutes:
+        raise SystemExit("nothing eligible to build: no approved Campaign Evolved audio or muted line in this scope")
     if want_subs and not ss["keys_to_write"]:
         raise SystemExit("nothing eligible to build: no approved subtitle text in this scope")
-    if want_audio and not args.ffmpeg:
+    if want_audio and targets and not args.ffmpeg:
         raise SystemExit("ffmpeg not found")
     try:
         cfg = load_export_config(REPO_ROOT)
@@ -651,7 +690,7 @@ def main():
     if want_audio:
         original = BANK.read_bytes()
         a_checks, results, per_target, audio_extra, bank_file = build_audio(out, targets, original, args, cfg, pins,
-                                                                            app)
+                                                                            app, mutes)
         checks.update(a_checks)
         install_files.append(bank_file)
     sub_tables, sub_warnings = {}, []
@@ -688,6 +727,10 @@ def main():
             e["global_gain_applied_db"] = st["global_gain_applied_db"] if st else 0.0
             e["total_gain_db"] = st["total_gain_db"] if st else 0.0
             e["warnings"] = st["warnings"] if st else []
+        elif want_audio and e["action"] == "mute":
+            r = results[e["spanish_index"]]
+            e.update(new_sample_count=r["sample_count"], new_seconds=round(r["sample_count"] / 44100, 3),
+                     stream_sha256=hashlib.sha256(r["stream"]).hexdigest())
     slots = plan["entries"] if want_audio else []
     counts = dict(acts) if want_audio else {}
     if want_subs:
@@ -706,7 +749,8 @@ def main():
                    "subtitle_writer": WRITER if want_subs else None,
                    "libcelt_sha256": sha256_file(DEFAULT_DLL) if want_audio else None,
                    "vgmstream_sha256": sha256_file(args.vgmstream_cli) if want_audio else None,
-                   "ffmpeg": next(iter(results.values()))["recipe"]["steps"][0]["version"] if want_audio else None,
+                   "ffmpeg": next((r["recipe"]["steps"][0]["version"] for r in results.values() if "recipe" in r),
+                                  None) if want_audio else None,
                    "celt_profile": "fmod (prediction 0, complexity 0: all intra, no transients)" if want_audio else None},
         "install_files": install_files,
         "not_written": [p for p in ("halo1/sound/pc/lst/sounds_dialogs_spanish.lst.bin", INSTALL_BANK,
@@ -716,6 +760,7 @@ def main():
         "counts": counts,
         "radio_effect_slots": [e["slot_id"] for e in slots if e["radio_effect"]],
         "edited_slots": [e["slot_id"] for e in slots if e["action"] == "replace" and e.get("edit")],
+        "muted_slots": [e["slot_id"] for e in slots if e["action"] == "mute"],
         "audio_edit_engine": audio_edit.ENGINE, "render_engine": audio_edit.RENDER_ENGINE,
         "level": level_summary(cfg, slots) if want_audio else None,
         "global_gain": {"configured_db": cfg["global_gain_db"], "source": cfg["source"],
@@ -746,7 +791,7 @@ def main():
     bad_targets = {s: [k for k, v in t["checks"].items() if not v] for s, t in per_target.items()
                    if not all(t["checks"].values())}
     print(f"{'PASS' if ok else 'FAILED'}: {len(checks) - len(failed)}/{len(checks)} checks; "
-          f"{len(results)} sample(s) replaced; {ss['keys_to_write'] if want_subs else 0} subtitle entr(ies) written; "
+          f"{len(targets) if want_audio else 0} sample(s) replaced, {len(mutes) if want_audio else 0} muted; {ss['keys_to_write'] if want_subs else 0} subtitle entr(ies) written; "
           f"{report['seconds']} s")
     for f in install_files:
         print(f"  {f['install_rel']}: candidate {f['candidate_sha256'][:16]}… ({f['growth_bytes']:+,} B)")
