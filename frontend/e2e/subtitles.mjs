@@ -179,8 +179,9 @@ async function main() {
       const row = page.locator(`tr[data-build="${SUBS}"]`);
       await row.waitFor({ timeout: 15000 });
       const text = await row.innerText();
-      check(text.includes("passed") && text.includes("Subtitles") && text.includes("SU_Halo1.bin") && text.includes("SP_Halo1.bin"),
-        `row: ${text.replace(/\s+/g, " ").slice(0, 200)}`);
+      const files = (await row.getAttribute("data-files")) ?? "";
+      check(text.includes("passed") && text.includes("Subtitles") && files.includes("SU_Halo1.bin") && files.includes("SP_Halo1.bin"),
+        `row: ${text.replace(/\s+/g, " ").slice(0, 200)} files: ${files}`);
       const m = await manifest(SUBS);
       check(m.kind === "subtitles" && m.install_files.length === 2, "manifest is not a two-table subtitle build");
       check(m.install_files.every((f) => f.install_rel !== BANK_REL), "a subtitle build lists the bank");

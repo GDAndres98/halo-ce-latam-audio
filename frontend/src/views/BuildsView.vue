@@ -334,9 +334,7 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
     </section>
 
     <section class="panel quiet" aria-labelledby="builds-title">
-      <PanelHeader title="Builds" title-id="builds-title" :icon="Layers">
-        <span v-if="builds" class="small muted">{{ builds.builds.length }} · newest first</span>
-      </PanelHeader>
+      <PanelHeader title="Builds" title-id="builds-title" :icon="Layers" />
       <BuildHistory
         v-if="builds"
         :builds="builds.builds"

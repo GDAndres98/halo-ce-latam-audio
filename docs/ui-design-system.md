@@ -107,9 +107,15 @@ All live in `frontend/src/components/`:
   - Keyboard shortcuts pause while it is open.
   - The browser's `window.confirm` is no longer used anywhere.
 - `StatusBadge.vue` shows an icon plus a word. The tone colour only repeats the meaning.
-- `build/BuildHistory.vue` is the Build & Test build list. On the desktop it is a table, and below 1000 px
-  (`data-layout` phone or tablet) it is one card per build. Builds are listed newest first by their real
-  `built_at` time (`src/build/history.ts`), with a copy button on each name and the details opening in place.
+- `build/BuildHistory.vue` is the Build & Test build list:
+  - newest first by the real `built_at` time (`src/build/history.ts`), grouped by day ("Today", "Yesterday",
+    "Sun 11 Oct 2026");
+  - a search (name or folder), a type filter and a status filter;
+  - without a filter, the 8 newest builds, then **Show N older builds**;
+  - short rows on the desktop and compact cards below 1000 px.
+
+  Clicking a row opens its details (`build/BuildDetails.vue`): the overview (level, why the build is stale,
+  folders, line counts), files and validation, subtitles and the log.
 - `AppBackdrop.vue` and `AppEmblem.vue` are original SVG art: a ring around a sphere. They are not the
   Halo logo.
 

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-// One build in detail: the files it would install, the validation checks, and for a subtitle build what each
-// table gets (entries written, before and after), what was excluded and why, and conflicts. Read-only.
+// One build in detail: an overview (when, type, folders, lines, level, why it is stale), the files it would
+// install and the validation checks, and for a subtitle build what each table gets (entries written, before and
+// after), what was excluded and why, and conflicts. Read-only.
 
-import { Captions, FileCheck2, ScrollText, TriangleAlert } from "lucide-vue-next";
+import { Captions, FileCheck2, Info, ScrollText, TriangleAlert } from "lucide-vue-next";
 import { computed, onMounted, ref } from "vue";
 import { api } from "../../api/client";
-import type { BuildDetail } from "../../api/types";
+import type { BuildDetail, BuildLevel, BuildSummary } from "../../api/types";
+import { builtAtParts } from "../../build/history";
 import StatusBadge from "../StatusBadge.vue";
 
-const props = defineProps<{ name: string; hasLog: boolean; levels?: string[] }>();
+const props = defineProps<{ name: string; hasLog: boolean; build?: BuildSummary }>();
 
 const detail = ref<BuildDetail | null>(null);
 const error = ref("");
@@ -21,6 +23,11 @@ const failed = computed(() => Object.entries(detail.value?.checks ?? {}).filter(
 const passed = computed(() => Object.values(detail.value?.checks ?? {}).filter(Boolean).length);
 const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 const size = (n: number) => (n > 4 * 1048576 ? `${(n / 1048576).toFixed(1)} MB` : kb(n));
+const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
+const when = computed(() => builtAtParts(props.build?.built_at));
+const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
+const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
+const levelName = (l: BuildLevel) => (l.mode === "match_spain" ? "Match Spain" : `Global gain ${db(l.global_gain_db)}`);
 const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "no subtitle entry" } as const;
 
 onMounted(async () => {
@@ -44,11 +51,47 @@ async function loadLog() {
   <div class="build-detail" data-testid="build-detail" :data-build="name">
     <p v-if="error" class="small error">{{ error }}</p>
     <template v-else-if="detail">
+      <section v-if="build" class="detail-overview">
+        <h4><Info :size="14" aria-hidden="true" /> Overview</h4>
+        <dl class="detail-facts small">
+          <dt>Built</dt>
+          <dd>{{ when ? `${when.date} · ${when.time}` : "no date" }}</dd>
+          <dt>Type</dt>
+          <dd>{{ KIND_TEXT[build.kind] }}</dd>
+          <dt>Folders</dt>
+          <dd data-testid="detail-folders"><strong>{{ build.levels.length }}</strong> · <span class="mono">{{ build.levels.join(", ") }}</span></dd>
+          <template v-if="build.kind !== 'subtitles'">
+            <dt>Audio</dt>
+            <dd>{{ n(build.counts.replace) }} replaced · {{ n(build.counts.keep_original) }} kept original</dd>
+          </template>
+          <template v-if="build.subtitles.enabled && build.subtitles.summary">
+            <dt>Subtitles</dt>
+            <dd>
+              {{ n(build.subtitles.summary.keys_to_write) }} written ·
+              <span :class="{ warn: build.subtitles.summary.excluded }">{{ n(build.subtitles.summary.excluded) }} excluded</span> ·
+              <span :class="{ error: build.subtitles.conflicts }">{{ build.subtitles.conflicts }} conflicts</span>
+            </dd>
+          </template>
+          <template v-if="build.level">
+            <dt>Level</dt>
+            <dd data-testid="build-level">
+              <strong>{{ levelName(build.level) }}</strong> · {{ db(build.level.effective_gain_db?.median) }} applied (median) ·
+              <span :class="{ warn: build.level.constrained }">{{ build.level.constrained }}/{{ build.level.lines }} constrained</span>
+              <template v-if="build.level.loudness_vs_spain_db"> · {{ db(build.level.loudness_vs_spain_db.median) }} vs Spain</template>
+            </dd>
+          </template>
+          <dt>Decisions</dt>
+          <dd>
+            <StatusBadge :label="build.stale ? 'stale' : 'current'" :tone="build.stale ? 'warn' : 'ok'" />
+            <ul v-if="build.stale" class="plain stale-reasons" data-testid="stale-reasons">
+              <li v-for="r in build.stale_reasons" :key="r">{{ r }}</li>
+            </ul>
+          </dd>
+        </dl>
+      </section>
+
       <section>
         <h4><FileCheck2 :size="14" aria-hidden="true" /> Files and validation</h4>
-        <p v-if="levels?.length" class="small detail-folders" data-testid="detail-folders">
-          <span class="muted">Folders ({{ levels.length }}):</span> <span class="mono">{{ levels.join(", ") }}</span>
-        </p>
         <ul class="small plain" data-testid="detail-files">
           <li v-for="f in detail.install_files" :key="f.install_rel">
             <code>{{ f.install_rel }}</code> ← <code>{{ f.candidate }}</code>

@@ -160,17 +160,48 @@ async function main() {
         await page.goto(`http://localhost:${WEB_PORT}/#/builds`);
         const list = page.getByTestId("build-list");
         await list.waitFor({ timeout: 15000 });
-        const rows = await page.evaluate(() =>
-          [...document.querySelectorAll('[data-testid="build-list"] [data-build]')]
-            .filter((el) => el.getBoundingClientRect().height > 0)
-            .map((el) => ({ name: el.dataset.build, at: el.dataset.builtAt })),
-        );
+        const listed = () =>
+          page.evaluate(() =>
+            [...document.querySelectorAll('[data-testid="build-list"] [data-build]')]
+              .filter((el) => el.getBoundingClientRect().height > 0)
+              .map((el) => ({ name: el.dataset.build, at: el.dataset.builtAt })),
+          );
+        // By default only the newest few, under day headings, with the rest one click away.
+        const first = await listed();
+        const days = await page.locator(".day-row, .day-heading").count();
+        const older = page.getByTestId("show-older");
+        const hasOlder = (await older.count()) > 0;
+        record(`builds: newest ${first.length} shown under ${days} day headings @ ${width}px`, first.length > 0 && first.length <= 8 && days > 0,
+          hasOlder ? await older.innerText() : "no older builds");
+        if (SHOTS) await page.locator('section[aria-labelledby="builds-title"]').screenshot({ path: join(OUT, `builds-panel-${width}.png`) });
         if (SHOTS && width < 1000) await page.locator(".build-cards > li").nth(0).screenshot({ path: join(OUT, `builds-card-${width}.png`) });
+        if (hasOlder) await older.click();
+        const rows = await listed();
         const times = rows.map((r) => (r.at ? Date.parse(r.at) : NaN));
         const sorted = times.every((t, i) => i === 0 || Number.isNaN(t) || Number.isNaN(times[i - 1]) || times[i - 1] >= t);
         const undatedLast = times.findIndex((t) => Number.isNaN(t)) === -1 || times.slice(times.findIndex((t) => Number.isNaN(t))).every((t) => Number.isNaN(t));
-        record(`builds newest first @ ${width}px`, rows.length > 0 && sorted && undatedLast, rows.slice(0, 3).map((r) => `${r.name} ${r.at}`).join(", "));
-        if (SHOTS) await page.locator('section[aria-labelledby="builds-title"]').screenshot({ path: join(OUT, `builds-panel-${width}.png`) });
+        record(`builds newest first, all ${rows.length} @ ${width}px`, rows.length >= first.length && sorted && undatedLast && rows[0]?.name === first[0]?.name,
+          rows.slice(0, 3).map((r) => `${r.name} ${r.at}`).join(", "));
+        // Search and the type filter narrow the list; Clear brings it back.
+        // The longest name: a short one (a10) is also a folder name, which every build may contain.
+        const sample = rows.map((r) => r.name).sort((x, y) => y.length - x.length)[0];
+        await page.getByRole("searchbox", { name: /Search builds/ }).fill(sample);
+        const found = await listed();
+        record(`builds search finds "${sample}" @ ${width}px`, found.some((r) => r.name === sample) && found.length < rows.length, found.map((r) => r.name).join(", "));
+        await page.getByRole("button", { name: "Clear" }).click();
+        await page.getByRole("group", { name: "Type" }).getByRole("button", { name: "Audio", exact: true }).click();
+        const kinds = await page.evaluate(() => [...document.querySelectorAll('[data-testid="build-list"] [data-build]')].map((el) => el.dataset.kind));
+        record(`builds type filter @ ${width}px`, kinds.length > 0 && kinds.every((k) => k === "audio"), `${kinds.length} audio builds`);
+        await page.getByRole("button", { name: "Clear" }).click();
+        record(`builds filters clear @ ${width}px`, (await listed()).length === rows.length);
+        if (width >= 1000) {
+          // A click anywhere on a row (not on its buttons) opens it.
+          await page.locator("tr.build-row td.folders").first().click();
+          const opened = await page.locator("tr.build-row").first().locator("[aria-expanded]").getAttribute("aria-expanded");
+          record(`builds row click opens the details @ ${width}px`, opened === "true");
+          await page.locator("tr.build-row td.folders").first().click();
+        }
+
         const shown = await page.evaluate(() => ({
           table: Boolean(document.querySelector(".build-table")?.getBoundingClientRect().height),
           cards: Boolean(document.querySelector(".build-cards")?.getBoundingClientRect().height),

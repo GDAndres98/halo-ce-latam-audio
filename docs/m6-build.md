@@ -15,8 +15,10 @@
   manifest's `built_at` (`build_api.newest_first`), not by folder name. Times without an offset are the host's
   local time. Equal times are ordered by name. Builds with a missing or invalid time come last. The page sorts
   again with the same rules (`frontend/src/build/history.ts`), so a new build appears at the top after each
-  refresh. Build & Test shows a table on the desktop and cards on phones and tablets
-  (`BuildHistory.vue`).
+  refresh. Build & Test (`BuildHistory.vue`) groups builds by day and shows the 8 newest first, with
+  **Show N older builds** below. A search (name or folder) and filters (type; current, stale, failed or
+  installed) narrow the list. Rows show the time, name, type, folders, lines, status and Install. Clicking a
+  row opens the details, with the level, why the build is stale, the files, validation and subtitles.
 - **Audio edit recipes (2026-10-09):** approved lines with an M4 edit (trims, cuts, silences,
   fades) are built from their recipe (§2.1). Loudness matching and its limiter were removed on 2026-10-11.
 - **Global export gain (2026-10-09):** +4 dB by default on every CE replacement (+3 dB until 2026-10-10) (§2.2). Speed and
@@ -240,7 +242,7 @@ setting chosen on Build & Test.
   - the constrained lines and the fallbacks;
   - the limiter reduction;
   - loudness vs Spain (distribution), measured in both modes.
-- Build & Test shows each build's level (the Level column, or the Level line on a card), and for the installed build its settings next to
+- Build & Test shows each build's level in its details (Overview → Level), and for the installed build its settings next to
   the Studio's current ones, with a warning when they differ.
 - A build made in another mode is stale. The global gain only makes `global_gain` builds stale.
 - `m6_build.py --level-mode … --global-gain …` overrides the saved setting for one build (recorded as the

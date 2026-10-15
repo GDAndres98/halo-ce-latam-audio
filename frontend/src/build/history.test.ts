@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builtAtMs, builtAtParts, newestFirst } from "./history";
+import { builtAtMs, builtAtParts, dayLabel, groupByDay, matchesFilter, newestFirst } from "./history";
 
 const b = (name: string, built_at: string | null) => ({ name, built_at });
 
@@ -43,5 +43,52 @@ describe("built times", () => {
   it("formats a date and a time for the list", () => {
     expect(builtAtParts("2026-10-15T01:52:22")).toMatchObject({ date: "15 Oct 2026", time: "01:52" });
     expect(builtAtParts("nope")).toBeNull();
+  });
+});
+
+describe("day groups", () => {
+  const now = new Date(2026, 9, 15, 12, 0, 0).getTime();
+
+  it("labels today, yesterday and older days", () => {
+    expect(dayLabel(new Date(2026, 9, 15, 1, 52).getTime(), now)).toBe("Today");
+    expect(dayLabel(new Date(2026, 9, 14, 22, 28).getTime(), now)).toBe("Yesterday");
+    expect(dayLabel(new Date(2026, 9, 11, 3, 53).getTime(), now)).toBe("Sun 11 Oct 2026");
+  });
+
+  it("groups consecutive builds of a day and keeps undated ones last", () => {
+    const list = newestFirst([
+      b("a", "2026-10-11T03:53:13"),
+      b("b", "2026-10-15T01:52:22"),
+      b("c", "2026-10-11T21:21:42"),
+      b("d", null),
+    ]);
+    const groups = groupByDay(list, now);
+    expect(groups.map((g) => [g.label, g.builds.map((x) => x.name).join()])).toEqual([
+      ["Today", "b"],
+      ["Sun 11 Oct 2026", "c,a"],
+      ["No date", "d"],
+    ]);
+  });
+});
+
+describe("matchesFilter", () => {
+  const build = { name: "all_mapped_both_20261015013840", kind: "both", levels: ["a10", "x10"], stale: true, validation_ok: true };
+  const all = { text: "", kind: "all" as const, status: "all" as const };
+
+  it("matches the name or a folder, ignoring case", () => {
+    expect(matchesFilter(build, { ...all, text: "MAPPED_both" })).toBe(true);
+    expect(matchesFilter(build, { ...all, text: "x10" })).toBe(true);
+    expect(matchesFilter(build, { ...all, text: "c40" })).toBe(false);
+  });
+
+  it("filters by kind and status", () => {
+    expect(matchesFilter(build, { ...all, kind: "both" })).toBe(true);
+    expect(matchesFilter(build, { ...all, kind: "audio" })).toBe(false);
+    expect(matchesFilter(build, { ...all, status: "stale" })).toBe(true);
+    expect(matchesFilter(build, { ...all, status: "current" })).toBe(false);
+    expect(matchesFilter(build, { ...all, status: "failed" })).toBe(false);
+    expect(matchesFilter({ ...build, validation_ok: null }, { ...all, status: "failed" })).toBe(true);
+    expect(matchesFilter(build, { ...all, status: "installed" }, [build.name])).toBe(true);
+    expect(matchesFilter(build, { ...all, status: "installed" }, [])).toBe(false);
   });
 });

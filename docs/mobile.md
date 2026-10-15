@@ -134,9 +134,12 @@ their difference are shown below. While a recording loads on a slow connection, 
   at 360, 390, 430, 768 and 1024 px. It needs Microsoft Edge.
 - `npm run test:layout` checks every page at 360–1920 px for text that escapes its box, sideways scroll and
   small touch targets, with real data ([ui-design-system.md §6](ui-design-system.md#long-values-and-narrow-screens)).
-- Build & Test shows one card per build on phones and upright tablets (two columns on a tablet), newest first.
-  Each card has the date, status badges, folders, results, level, **Details** and **Install to MCC**. Install
-  still works only on the host's own page.
+- Build & Test shows compact cards on phones and upright tablets (two columns on a tablet), newest first and
+  grouped by day, with the same search and filters as the desktop. Each card has:
+  - the time, type, folders and lines;
+  - the status badges;
+  - **Details** (level, files, validation, subtitles);
+  - **Install to MCC**, which still works only on the host's own page.
 
 ## 9. Install it as an app
 

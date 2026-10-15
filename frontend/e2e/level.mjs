@@ -56,9 +56,11 @@ async function main() {
     await page.goto(`http://localhost:${WEB_PORT}/#/builds`);
     const row = page.locator(`tr[data-build="${BUILD}"]`);
 
-    await step("each build's Level column reports its mode, applied gain and constrained lines", async () => {
+    await step("each build's details report its level mode, applied gain and constrained lines", async () => {
       await row.waitFor({ timeout: 30000 });
-      const text = await row.getByTestId("build-level").innerText();
+      // The level is in the build's details (the row stays short).
+      await page.getByRole("button", { name: `Details of ${BUILD}` }).click();
+      const text = await page.locator(`[data-testid="build-detail"][data-build="${BUILD}"]`).getByTestId("build-level").innerText({ timeout: 15000 });
       const lv = manifest.level;
       check(text.toLowerCase().includes(`global gain +${lv.global_gain_db.toFixed(1)} dB`), `level cell: ${text}`);
       check(text.includes(`${lv.constrained.length}/${lv.lines} constrained`), `level cell: ${text}`);
