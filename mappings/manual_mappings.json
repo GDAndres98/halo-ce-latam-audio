@@ -48372,7 +48372,7 @@
         "revision": 1
       },
       "audio": {
-        "status": "needs_rework",
+        "status": "approved",
         "source": "ce",
         "sources": [
           {
@@ -48391,23 +48391,47 @@
             "language": "Spanish(Mexico)"
           },
           "cuts": [],
-          "silences": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.2
+            }
+          ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
           "crossfade_ms": 20,
           "radio": {
-            "preset": "spain",
+            "preset": "pilot",
             "low_hz": 700,
             "high_hz": 3300,
-            "slope_db_oct": 36,
+            "slope_db_oct": 24,
             "presence_db": 0,
             "drive_db": 0,
-            "noise_dbfs": null,
+            "noise_dbfs": -60,
             "clicks": true
           }
         },
-        "fingerprint": null,
-        "approved_at": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_350_pilot%202#0",
+            "index": 419,
+            "data_sha256": "fa02b0aa8cfe787fc23d4184c597008b7d435975d7cb2477595ae74d051f920d"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00960_bravo22#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 139493419,
+                  "wem_sha256": "e8afa828b6ac302c391758c01ef2dd84adac7566f8bd7539aa8bfa482c5db06b"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
         "revision": 2
       },
       "subtitle": {
@@ -48492,13 +48516,13 @@
           "fade_out_ms": 0,
           "crossfade_ms": 20,
           "radio": {
-            "preset": "custom",
-            "low_hz": 700,
-            "high_hz": 3300,
-            "slope_db_oct": 36,
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
             "presence_db": 0,
-            "drive_db": 0,
-            "noise_dbfs": null,
+            "drive_db": 1,
+            "noise_dbfs": -70,
             "clicks": true
           }
         },
@@ -48522,8 +48546,8 @@
             }
           ]
         },
-        "approved_at": "2026-10-13",
-        "revision": 2
+        "approved_at": "2026-10-15",
+        "revision": 3
       },
       "subtitle": {
         "status": "approved",
@@ -96259,6 +96283,2917 @@
             "data_sha256": "5fa538f1a9eba978800ff877284d28914be4551b06de638f5cd5efd4595a3224"
           },
           "source": "keep_original"
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001097",
+      "slot_id": "es:B30_020_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_020_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00360_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00360_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_020_cortana#0",
+            "index": 378,
+            "data_sha256": "9ec3916327f386ddb33a32e27ed47e6d348147b0107d92676b1acddb1abd522a"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00360_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 330202393,
+                  "wem_sha256": "85d35c7a4f45c71b0f3dab4964cd0086af8d81b0ea92271477fa0aab2b380c14"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00360_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_020_cortana#0",
+            "index": 378,
+            "data_sha256": "9ec3916327f386ddb33a32e27ed47e6d348147b0107d92676b1acddb1abd522a"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00360_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00360_Cortana",
+            "source_hash": 722192860
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001098",
+      "slot_id": "es:B30_030_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_030_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00370_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00370_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 1.013,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00370_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 1.02,
+              "dur_s": 0.3
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_030_pilot#0",
+            "index": 379,
+            "data_sha256": "a7393bb76b8fccc02c3bcaf0ffd4f08804a06b3035189fb95e2c8b39cb8ca927"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00370_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 23738006,
+                  "wem_sha256": "8978b231baaa9ea75bb4244aa0df1a7907e6ee12734f92cd15def3abaeb4d20b"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "custom",
+        "ce_locres": null,
+        "custom_ref": "c-000052",
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_030_pilot#0",
+            "index": 379,
+            "data_sha256": "a7393bb76b8fccc02c3bcaf0ffd4f08804a06b3035189fb95e2c8b39cb8ca927"
+          },
+          "source": "custom",
+          "custom": {
+            "custom_ref": "c-000052",
+            "text_sha256": "c699a92d7ae7f42d27bdff6fdb8fe9341c534de730be1e6276d125185812b05b"
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001099",
+      "slot_id": "es:B30_031_sarge2#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_031_sarge2",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00380_stacker#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00380_stacker#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00380_stacker#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.3
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_031_sarge2#0",
+            "index": 381,
+            "data_sha256": "996d3ca8cfd0257f2ec8f27cd2f2bca4728b29f86c1864e1b21294dde6a1dd09"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00380_stacker#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 80675226,
+                  "wem_sha256": "98e58c32a17502e83a1721480db684bb05c5dd6794369332f44b040d6630086c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00380_stacker#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_031_sarge2#0",
+            "index": 381,
+            "data_sha256": "996d3ca8cfd0257f2ec8f27cd2f2bca4728b29f86c1864e1b21294dde6a1dd09"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00380_stacker#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00380_Stacker",
+            "source_hash": 3338224143
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001100",
+      "slot_id": "es:B30_032_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_032_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00400_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00400_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00400_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.3
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_032_pilot#0",
+            "index": 382,
+            "data_sha256": "fac2503252dadbff78adc6562ac7316f155470234efe87f0a59be82777c2830f"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00400_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 360696186,
+                  "wem_sha256": "181fa2acacba9de7393ac3082cd0ad841f6908d2c5e6e87e8ab33facbd2b2b25"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00400_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_032_pilot#0",
+            "index": 382,
+            "data_sha256": "fac2503252dadbff78adc6562ac7316f155470234efe87f0a59be82777c2830f"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00400_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00400_Echo419",
+            "source_hash": 43605613
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001101",
+      "slot_id": "es:B30_040_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_040_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00410_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00410_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_040_cortana#0",
+            "index": 383,
+            "data_sha256": "78da415032172f19e0c734b5e6823efe0c4a5e1ce26317ed7dc0e62c3b974505"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00410_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 774011176,
+                  "wem_sha256": "4f36ef3e03485740856be8c39656cdb5d3b16af613478ae26f0683e27d23adc1"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00410_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_040_cortana#0",
+            "index": 383,
+            "data_sha256": "78da415032172f19e0c734b5e6823efe0c4a5e1ce26317ed7dc0e62c3b974505"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00410_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00410_Cortana",
+            "source_hash": 3033070875
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001102",
+      "slot_id": "es:B30_090_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_090_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00450_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00450_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_090_cortana#0",
+            "index": 389,
+            "data_sha256": "e2f6b2243ef1fdd29115550c18ce075fe64a9f4d7bd192c7ce00bcf6ccae5eb3"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00450_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 360404771,
+                  "wem_sha256": "3fbf1a8b0031b49f1bca3dad3962459caf23f3cbdcbfb189d103c0f9849c107c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00450_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_090_cortana#0",
+            "index": 389,
+            "data_sha256": "e2f6b2243ef1fdd29115550c18ce075fe64a9f4d7bd192c7ce00bcf6ccae5eb3"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00450_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00450_Cortana",
+            "source_hash": 112439972
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001103",
+      "slot_id": "es:B30_100_mendoza#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_100_mendoza",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00460_mendoza#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00460_mendoza#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_100_mendoza#0",
+            "index": 392,
+            "data_sha256": "ad95682e208f92b076210a62ef60af3a311a6421899340d164b06b92e4cd7c2a"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00460_mendoza#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 299602146,
+                  "wem_sha256": "5bd3fd44047a080c820c667a8d35159844e5bb5a4c828f9043777329fa6983ba"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00460_mendoza#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_100_mendoza#0",
+            "index": 392,
+            "data_sha256": "ad95682e208f92b076210a62ef60af3a311a6421899340d164b06b92e4cd7c2a"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00460_mendoza#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00460_Mendoza",
+            "source_hash": 2434384547
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001104",
+      "slot_id": "es:B30_100_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_100_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00470_bisenti#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00470_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_100_bisenti#0",
+            "index": 390,
+            "data_sha256": "dec9623b46afd617a57b069152323389a3361245b1113189f61fe7b313b0be15"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00470_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 943459079,
+                  "wem_sha256": "e41177a6c75b1fb950bce837a1dfc9e8dcf57cc2de31ce34d5814684e1499a79"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00470_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_100_bisenti#0",
+            "index": 390,
+            "data_sha256": "dec9623b46afd617a57b069152323389a3361245b1113189f61fe7b313b0be15"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00470_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00470_Bisenti",
+            "source_hash": 2774796714
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001105",
+      "slot_id": "es:B30_110_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_110_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00480_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00480_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_110_cortana#0",
+            "index": 393,
+            "data_sha256": "8c000b5d4f1256077bef351091268596bd61bbbacedca4d5be96417f65800a67"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00480_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 849847337,
+                  "wem_sha256": "f62ff6c1167dc99bac36dc3ef7a3c3c3bcbea98f26e2e1c26a8e068ace1c678e"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00480_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_110_cortana#0",
+            "index": 393,
+            "data_sha256": "8c000b5d4f1256077bef351091268596bd61bbbacedca4d5be96417f65800a67"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00480_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00480_Cortana",
+            "source_hash": 3355256011
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001106",
+      "slot_id": "es:B30_120_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_120_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00510_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00510_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_120_cortana#0",
+            "index": 394,
+            "data_sha256": "b3126b79e8551749c03b6e7f0151b0a3532004cece1e0e6dea08cb637d18bcbf"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00510_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 622414605,
+                  "wem_sha256": "1e0096ddac707578ba3e460268be117ae43fb819b684d978597a07bf36cbbe03"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00510_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_120_cortana#0",
+            "index": 394,
+            "data_sha256": "b3126b79e8551749c03b6e7f0151b0a3532004cece1e0e6dea08cb637d18bcbf"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00510_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00510_Cortana",
+            "source_hash": 2484678004
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001107",
+      "slot_id": "es:B30_130_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_130_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00520_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00520_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_130_cortana#0",
+            "index": 395,
+            "data_sha256": "7071892df51ed340db9b77e64047a31512b969283d1bb87012b3c62cbcc44d04"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00520_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 365564644,
+                  "wem_sha256": "b676fd7298fbdcaae12abd901fc3c8890ed97de0ea3eb52f5b74e82db72af93e"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00520_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_130_cortana#0",
+            "index": 395,
+            "data_sha256": "7071892df51ed340db9b77e64047a31512b969283d1bb87012b3c62cbcc44d04"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00520_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00520_Cortana",
+            "source_hash": 2378103616
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001108",
+      "slot_id": "es:B30_140_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_140_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00530_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00530_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_140_cortana#0",
+            "index": 396,
+            "data_sha256": "3aea8992daeedcbc895fac0705912b620a881cddbc4a5c18e178d252a0b43a47"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00530_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 430297450,
+                  "wem_sha256": "b679cd3bc0b3257b5ba6c4aaea0e8cb7fb6f1a38fb891030a94f62934f06e29c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00530_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_140_cortana#0",
+            "index": 396,
+            "data_sha256": "3aea8992daeedcbc895fac0705912b620a881cddbc4a5c18e178d252a0b43a47"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00530_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00530_Cortana",
+            "source_hash": 1153557665
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001109",
+      "slot_id": "es:B30_150_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_150_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00540_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00540_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_150_cortana#0",
+            "index": 397,
+            "data_sha256": "feba764b8c7abb85d5dd59fa71179a20496b5cb6b0db2aa05474614fd1606ecf"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00540_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 27232650,
+                  "wem_sha256": "b7a6cc065908720370632b4bfa48f71557c5bb2453fa018fc02876d45427960d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00540_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_150_cortana#0",
+            "index": 397,
+            "data_sha256": "feba764b8c7abb85d5dd59fa71179a20496b5cb6b0db2aa05474614fd1606ecf"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00540_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00540_Cortana",
+            "source_hash": 622041751
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001110",
+      "slot_id": "es:B30_160_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_160_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00550_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00550_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_160_cortana#0",
+            "index": 398,
+            "data_sha256": "d0a8b527970c2114b4d55b551d9fb888fb3cc38d1a6d81ebaf2e9ab6e7854e21"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00550_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 926180322,
+                  "wem_sha256": "3f7c9622dcc454acf8425f6ea746044f921367149ea6fc6bdf103054f6795d03"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00550_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_160_cortana#0",
+            "index": 398,
+            "data_sha256": "d0a8b527970c2114b4d55b551d9fb888fb3cc38d1a6d81ebaf2e9ab6e7854e21"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00550_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00550_Cortana",
+            "source_hash": 2947104589
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001111",
+      "slot_id": "es:B30_190_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_190_captkeyes",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00590_keyes#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00590_keyes#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00590_keyes#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.3
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": null,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_190_captkeyes#0",
+            "index": 401,
+            "data_sha256": "20f9a69fb384f59e6904ecd94472d1d51ecf1cf336be31e2df9eea0b37594756"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00590_keyes#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 654639288,
+                  "wem_sha256": "6b93fc6164fa53dc162655787ae41d15d98466c8cbf3faa4c29411eadf7ea26c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00590_keyes#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_190_captkeyes#0",
+            "index": 401,
+            "data_sha256": "20f9a69fb384f59e6904ecd94472d1d51ecf1cf336be31e2df9eea0b37594756"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00590_keyes#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00590_Keyes",
+            "source_hash": 2814897377
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001112",
+      "slot_id": "es:B30_210_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_210_captkeyes",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00610_keyes#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00610_keyes#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00610_keyes#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [
+            {
+              "start_s": 0.709,
+              "end_s": 0.836
+            },
+            {
+              "start_s": 2.744,
+              "end_s": 2.933
+            }
+          ],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": null,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_210_captkeyes#0",
+            "index": 403,
+            "data_sha256": "f977492bc78e0427f48935809753e3df5dd1e2fd19153a582807fb74cdf9e80c"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00610_keyes#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 80047535,
+                  "wem_sha256": "8d95d5bd910f620d75afec20a21f604a525adbc04780e3c0bafa9ce41fe2520c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 2
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00610_keyes#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_210_captkeyes#0",
+            "index": 403,
+            "data_sha256": "f977492bc78e0427f48935809753e3df5dd1e2fd19153a582807fb74cdf9e80c"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00610_keyes#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00610_Keyes",
+            "source_hash": 1403148045
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001113",
+      "slot_id": "es:B30_200_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_200_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00600_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00600_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_200_cortana#0",
+            "index": 402,
+            "data_sha256": "061e351dc19301d28b0ae72ad9e7e2aed94ea893eb10303ce4d137ca43686540"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00600_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 882505648,
+                  "wem_sha256": "05d79dcb4d2b0854dbb55098b4dd4cedc6a0f03d21bd309c8db6bf68f680737d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00600_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_200_cortana#0",
+            "index": 402,
+            "data_sha256": "061e351dc19301d28b0ae72ad9e7e2aed94ea893eb10303ce4d137ca43686540"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00600_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00600_Cortana",
+            "source_hash": 3323015090
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001114",
+      "slot_id": "es:B30_180_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_180_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00580_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00580_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_180_cortana#0",
+            "index": 400,
+            "data_sha256": "754fe27aa388ca29ef1373bdc93fb77fd936a2f7f484428a08d38ba57cc111df"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00580_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 109607638,
+                  "wem_sha256": "e93a1f9b0ff08d4c695fcebfe14e04d91288ad947ecd8ccf2b0ae00e43dd01af"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00580_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_180_cortana#0",
+            "index": 400,
+            "data_sha256": "754fe27aa388ca29ef1373bdc93fb77fd936a2f7f484428a08d38ba57cc111df"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00580_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00580_Cortana",
+            "source_hash": 1204514229
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001115",
+      "slot_id": "es:B30_220_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_220_captkeyes",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00620_keyes#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00620_keyes#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.132,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00620_keyes#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": null,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_220_captkeyes#0",
+            "index": 404,
+            "data_sha256": "8cd04c8c83c3e744d1aa8a1aafad3a407c5ea4c141f4329528afafa483cf4bd8"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00620_keyes#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 780937786,
+                  "wem_sha256": "c2818bd5c6da0f8750863c28f5b9620ebfe5f7ea5f05c3fea05f09248559a9bc"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 2
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00620_keyes#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_220_captkeyes#0",
+            "index": 404,
+            "data_sha256": "8cd04c8c83c3e744d1aa8a1aafad3a407c5ea4c141f4329528afafa483cf4bd8"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00620_keyes#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00620_Keyes",
+            "source_hash": 491785304
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 2
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001116",
+      "slot_id": "es:B30_270_captkeyes#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_270_captkeyes",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_00640_keyes#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.3
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": null,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_270_captkeyes#0",
+            "index": 412,
+            "data_sha256": "afb5ccd73e9005b4d9f7781123ca09a8e1d25a2a9e4c929a4cef9ddb41dfd2f0"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_00640_keyes#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 261784342,
+                  "wem_sha256": "504766284053dd7d98e176278540946537719f7d8eef77bf3ea04c163b9cfbbb"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_00640_keyes#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_270_captkeyes#0",
+            "index": 412,
+            "data_sha256": "afb5ccd73e9005b4d9f7781123ca09a8e1d25a2a9e4c929a4cef9ddb41dfd2f0"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_00640_Keyes",
+            "source_hash": 933567447
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001117",
+      "slot_id": "es:B30_390_cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_390_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_01000_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_01000_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_390_cortana#0",
+            "index": 420,
+            "data_sha256": "5986543061c28509d6377a1816e31bdf1d63e21cf0d6192764127776fa021c30"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_01000_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 776291372,
+                  "wem_sha256": "c7a0e0acb7609c320ade45b3738fa25af67ee0ab481091ffce95ce44f66f3471"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_01000_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_390_cortana#0",
+            "index": 420,
+            "data_sha256": "5986543061c28509d6377a1816e31bdf1d63e21cf0d6192764127776fa021c30"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_01000_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M04CARTOGRAPHER",
+            "key": "VO_SCR_M04_01000_Cortana",
+            "source_hash": 3517333085
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001118",
+      "slot_id": "es:B30_insert_040_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_insert_040_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m04_01040_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m04_01040_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.177,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m04_01040_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.2
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_insert_040_pilot#0",
+            "index": 452,
+            "data_sha256": "e3c419b31a16cf7cdc1d6b7c9c4b143a06c0172fac710e5556f7b7a529ddd18e"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m04_01040_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 217616795,
+                  "wem_sha256": "d5bf7bd3c5c749a2909d4ac224cbfa178e756a67eee9148ba2676186ab1b2550"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m04_01040_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_insert_040_pilot#0",
+            "index": 452,
+            "data_sha256": "e3c419b31a16cf7cdc1d6b7c9c4b143a06c0172fac710e5556f7b7a529ddd18e"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m04_01040_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin01_intro_00330_Echo419",
+            "source_hash": 1346694140
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001119",
+      "slot_id": "es:B30_insert_030_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_insert_030_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin01_intro_00320_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin01_intro_00320_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.41,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_cin_m04_cin01_intro_00320_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.15
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_insert_030_pilot#0",
+            "index": 451,
+            "data_sha256": "194df27d641fb7a254f0b7761417f4c7510ef48b0e37c32f0b3672c0a9b90467"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin01_intro_00320_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 433695911,
+                  "wem_sha256": "be5e86f86e46718e1abb603312da728ad76d3169f2680753e51256cc182a90eb"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin01_intro_00320_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_insert_030_pilot#0",
+            "index": 451,
+            "data_sha256": "194df27d641fb7a254f0b7761417f4c7510ef48b0e37c32f0b3672c0a9b90467"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin01_intro_00320_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin01_intro_00320_Echo419",
+            "source_hash": 2484918571
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001120",
+      "slot_id": "es:B30_extract_070_Cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_extract_070_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin05_outro_00950_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00950_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_070_Cortana#0",
+            "index": 448,
+            "data_sha256": "1134f0b7ec0c76f2be06442290128f37da59b72aee07bf2bcfaa329a5bf5ccb4"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin05_outro_00950_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 662125343,
+                  "wem_sha256": "d3972db5acee5a83c7ad5384b25dd19aefb6ba682627e0e6926feb3e114d24ff"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin05_outro_00950_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_070_Cortana#0",
+            "index": 448,
+            "data_sha256": "1134f0b7ec0c76f2be06442290128f37da59b72aee07bf2bcfaa329a5bf5ccb4"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00950_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin05_outro_00950_Cortana",
+            "source_hash": 1644636484
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001121",
+      "slot_id": "es:B30_extract_060_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_extract_060_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin05_outro_00940_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00940_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00940_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.2
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_060_pilot#0",
+            "index": 447,
+            "data_sha256": "4a14b6c4d9bc6446d7978e05c9f5a3a7d543dd4a20e347f4afa2f710f4b0cfc7"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin05_outro_00940_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 628270837,
+                  "wem_sha256": "4b0a79469f2ef3b445924670521212c25f8521209e661cf95f7dd18dce790c0d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin05_outro_00940_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_060_pilot#0",
+            "index": 447,
+            "data_sha256": "4a14b6c4d9bc6446d7978e05c9f5a3a7d543dd4a20e347f4afa2f710f4b0cfc7"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00940_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin05_outro_00940_Echo419",
+            "source_hash": 1027316763
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-15",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001122",
+      "slot_id": "es:B30_extract_050_Cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_extract_050_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin05_outro_00930_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00930_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00930_cortana#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [
+            {
+              "start_s": 2.206,
+              "end_s": 2.412
+            },
+            {
+              "start_s": 5.957,
+              "end_s": 6.653
+            }
+          ],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_050_Cortana#0",
+            "index": 446,
+            "data_sha256": "664556ddb075f68a78e07b537a96e5764d6445fc14e421c87120aab65027645b"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin05_outro_00930_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 152755793,
+                  "wem_sha256": "d5cba74980715efbb68e5401903ba3af009b2c9006ee017710cabae5db118249"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "custom",
+        "ce_locres": null,
+        "custom_ref": "c-000053",
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_050_Cortana#0",
+            "index": 446,
+            "data_sha256": "664556ddb075f68a78e07b537a96e5764d6445fc14e421c87120aab65027645b"
+          },
+          "source": "custom",
+          "custom": {
+            "custom_ref": "c-000053",
+            "text_sha256": "7aa65694303fea3aa7f2c05adca03f85663be05d6c79aa1e49a06273771a88fe"
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001123",
+      "slot_id": "es:B30_extract_020_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_extract_020_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin05_outro_00920_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00920_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.253,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00920_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_020_pilot#0",
+            "index": 445,
+            "data_sha256": "90ad825845fdb1fca06f81bbcb0632307d9a9ce66b2017695140d881169b9535"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin05_outro_00920_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 536200961,
+                  "wem_sha256": "7368d2079622cf8aaeda17e48f203ef029f54700746bccd4ca0a8ea990eda5b9"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin05_outro_00920_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_020_pilot#0",
+            "index": 445,
+            "data_sha256": "90ad825845fdb1fca06f81bbcb0632307d9a9ce66b2017695140d881169b9535"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00920_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin05_outro_00920_Echo419",
+            "source_hash": 2140634298
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001124",
+      "slot_id": "es:B30_extract_010_Cortana#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_extract_010_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin05_outro_00910_cortana#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00910_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_010_Cortana#0",
+            "index": 444,
+            "data_sha256": "170abe78372eeed750cf81ae4084e03d1ebfb0f0457c22cc8f71993dccc41090"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin05_outro_00910_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 852397214,
+                  "wem_sha256": "01e43d81cc63c743d47bccba69fbd52e188a76279062962227b032e1c0a71d9a"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin05_outro_00910_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_extract_010_Cortana#0",
+            "index": 444,
+            "data_sha256": "170abe78372eeed750cf81ae4084e03d1ebfb0f0457c22cc8f71993dccc41090"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin05_outro_00910_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin05_outro_00910_Cortana",
+            "source_hash": 2511914405
+          }
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001125",
+      "slot_id": "es:B30_630_pilot#0",
+      "mcc_tag": "sound\\dialog\\b30\\b30_630_pilot",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_cin_m04_cin04_map_00880_echo419#0"
+        ],
+        "decided_at": "2026-10-15",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_cin_m04_cin04_map_00880_echo419#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.449,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_cin_m04_cin04_map_00880_echo419#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.2
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "pilot",
+            "low_hz": 700,
+            "high_hz": 3300,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 0,
+            "noise_dbfs": -60,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_630_pilot#0",
+            "index": 439,
+            "data_sha256": "b2404faee2e68098a75e07f540744eb059d493c800ea9cf92fcc7152fcf4455e"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_cin_m04_cin04_map_00880_echo419#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 951327680,
+                  "wem_sha256": "b1df7c63a318309952ee1df39e91803ecf8d9a2c6fdd38b0cd13e762023f88fa"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-15",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_cin_m04_cin04_map_00880_echo419#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_630_pilot#0",
+            "index": 439,
+            "data_sha256": "b2404faee2e68098a75e07f540744eb059d493c800ea9cf92fcc7152fcf4455e"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_cin_m04_cin04_map_00880_echo419#0",
+            "culture": "es-MX",
+            "namespace": "VO_CIN_M04CARTOGRAPHER",
+            "key": "VO_CIN_M04_cin04_map_00880_Echo419",
+            "source_hash": 1953637915
+          }
         },
         "approved_at": "2026-10-15",
         "revision": 1
