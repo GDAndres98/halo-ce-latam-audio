@@ -36,6 +36,25 @@ originals, snapshot unchanged). A failure after the first file restores **both**
 the bank now refuses to install while the index is not the original (`m6_install.companion_check`), so a normal
 LATAM build can never sit on top of the experiment's index.
 
+## 1b. Johnson variant (owner, 2026-10-16): `exp_grunt_death_violent_johnson`
+
+`python scripts/discovery/perm_experiment.py --preset johnson`: all four `death_violent` takes are Sergeant
+Johnson lines (Spain bank, `sargeant`), chosen because Halo (a30) never triggers them itself (Flood, Sentinels,
+a betrayal). So **any Johnson voice when a Grunt dies comes from the experiment**, and each line tells which take
+the game picked:
+
+| Take | Johnson line | Seconds | Place | What hearing it means |
+|---|---|---|---|---|
+| 1 | `killedenemyfloodcombatcm 03` (`es:killedenemyfloodcombatcm%2003#5`) | 2.98 | Spain's take 1 | `death_violent` played (original range) |
+| 2 | `killedenemysentinel 02` (`es:killedenemysentinel%2002#5`) | 1.46 | Spain's take 2 | `death_violent` played (original range) |
+| 3 | `alliancebroken 02` (`es:alliancebroken%2002#5`) | 2.43 | **added** | the game picks from the index (the tag says skip take 3) |
+| 4 | `killedenemyfloodcarriercm 02` (`es:killedenemyfloodcarriercm%2002#5`) | 1.29 | **added** | **added takes are selected** |
+
+18/18 offline checks; bank `b6c3e881…` (+202,784 B), index `c1b3c702…` (the same index as the English variant:
+only the count matters there). Listening files: `work/m6/exp_grunt_death_violent_johnson/listen/take1_…` to
+`take4_EXTRA_…`. The procedure in §3 is the same; tally takes 1–4 instead of Spain/English. Spain's own
+`death_violent` takes are not in this build, so every Grunt `death_violent` sound is a Johnson line.
+
 ## 2. When does the game play `death_violent`? (what is known)
 
 - **VERIFIED** (HEK `grunt.dialogue`, its 166 sound references in c20's field order [^c20]): the Grunt's
