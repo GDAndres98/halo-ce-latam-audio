@@ -31,6 +31,8 @@ export const visitor = computed(() => Boolean(state.info?.visitor));
 export const readOnly = computed(() => !permissions.value.edit);
 /** Recordings, waveforms and editor previews may be played (never for a visitor). */
 export const canListen = computed(() => permissions.value.audio ?? permissions.value.edit);
+/** The public view plays the published edited previews of approved lines (never originals, never drafts). */
+export const canPlayPreviews = computed(() => Boolean(permissions.value.previews));
 /** Recordings may be saved as files (never for a visitor). */
 export const canDownload = computed(() => permissions.value.download ?? permissions.value.edit);
 

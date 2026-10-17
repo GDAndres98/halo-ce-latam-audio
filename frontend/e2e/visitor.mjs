@@ -10,7 +10,7 @@
 // direct writes, audio and downloads from the page are refused (401). The owner's address keeps the full editor.
 // It never installs anything, and the real mapping decisions are checked unchanged at the end.
 
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, devices } from "playwright-core";
@@ -22,8 +22,10 @@ const LOCAL_PORT = 8798;
 const PUBLIC_PORT = 8797;
 const SLOT = "es:A10_010_cryotech#0";
 const SIGN_IN = "https://admin.example.com/";
-// E2E_PUBLIC_AUDIO=1: the owner's "public": {"audio": true} (visitors play the originals; still no downloads).
-const AUDIO = process.env.E2E_PUBLIC_AUDIO === "1";
+// E2E_PUBLIC_PREVIEWS=1: the owner's "public": {"previews": true}: one approved line of the disposable copy is
+// published (scripts/build/publish_previews.py --slot) and the visitor plays and seeks it; originals stay private.
+const PREVIEWS = process.env.E2E_PUBLIC_PREVIEWS === "1";
+let previewSlot = null;
 
 const results = [];
 const pageErrors = [];
@@ -68,7 +70,7 @@ async function openVisitor(browser, options, label) {
 }
 
 const forbidden = (requests) =>
-  requests.filter((r) => (r.path.startsWith("/audio/") && !(AUDIO && /^\/audio\/(mcc|ce|peaks)$/.test(r.path))) ||
+  requests.filter((r) => (r.path.startsWith("/audio/") && !(PREVIEWS && r.path === "/audio/public")) ||
     r.method !== "GET" || r.path === "/api/events");
 
 async function openLine(page, base) {
@@ -84,7 +86,7 @@ async function main() {
   const fixture = await runFixture(join(tmp, "root"));
   const root = fixture.root;
   const config = join(tmp, "studio_server.json");
-  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN, audio: AUDIO } }));
+  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN, previews: PREVIEWS } }));
   let server;
   let browser;
   const pages = [];
@@ -95,6 +97,18 @@ async function main() {
       check(code === 0, out.slice(-400));
       return "frontend/dist";
     });
+
+    if (PREVIEWS) {
+      await step("publish the edited preview of one approved line (disposable copy)", async () => {
+        const doc = JSON.parse(await readFile(join(root, "mappings", "manual_mappings.json"), "utf-8"));
+        const m = doc.slots.find((x) => x.audio.status === "approved" && x.audio.source === "ce" && x.audio.sources.length === 1 && x.slot_id.startsWith("es:A10_"));
+        check(m, "no approved a10 line in the copy");
+        previewSlot = m.slot_id;
+        const { code, out } = await run("python", ["scripts/build/publish_previews.py", "--root", root, "--slot", previewSlot]);
+        check(code === 0 && /published 1 preview/.test(out), out.slice(-300));
+        return previewSlot;
+      });
+    }
 
     await step("start the server with the public read-only listener", async () => {
       server = start("api", "python", ["scripts/ui/m4_server.py", "--root", root, "--config", config, "--port", String(LOCAL_PORT),
@@ -109,8 +123,11 @@ async function main() {
       for (const p of ok) check((await fetch(base + p)).status === 200, `${p} not 200`);
       const audio = ["audio/mcc?level=a10&lang=spanish&index=0", "audio/ce?ref=vo_scr_m01_00460_cryotech%230&lang=Spanish(Mexico)",
         "audio/peaks?src=%2Faudio%2Fmcc%3Flevel%3Da10%26lang%3Dspanish%26index%3D0"];
-      if (AUDIO) for (const p of audio) check((await fetch(base + p)).status === 200, `${p} not 200 with public audio on`);
-      const refused = [...(AUDIO ? ["audio/preview?key=abc&kind=edited"] : audio), "api/events", "api/network", "api/settings/export",
+      if (PREVIEWS) {
+        const res = await fetch(`${base}audio/public?slot=${encodeURIComponent(previewSlot)}`, { headers: { Range: "bytes=0-99" } });
+        check(res.status === 206 && res.headers.get("content-type") === "audio/wav", `published preview answered ${res.status}`);
+      }
+      const refused = [...audio, "audio/preview?key=abc&kind=edited", "api/events", "api/network", "api/settings/export",
         "api/data/status", "api/deploy/status", "api/builds/log?name=a10"];
       const codes = [];
       for (const p of refused) codes.push((await fetch(base + p)).status);
@@ -155,14 +172,7 @@ async function main() {
       check(Object.values(counts).every((n) => n === 0), JSON.stringify(counts));
       const players = await desk.page.locator("button.play").count();
       const compare = await desk.page.locator('[data-section="compare"]').count();
-      check(AUDIO ? players > 0 && compare === 1 : players === 0 && compare === 0, `players ${players}, compare ${compare}`);
-      if (AUDIO) {
-        const spain = desk.page.locator("li.row-item.selected button.play").first();
-        await spain.click();
-        await desk.page.locator("li.row-item.selected button.play.active").first().waitFor({ timeout: 20000 });
-        await spain.click();
-        check(desk.requests.some((r) => r.path === "/audio/mcc"), "no MCC audio was requested");
-      }
+      check(players === 0 && compare === 0, `players ${players}, compare ${compare}`);
       const subtitle = await desk.page.getByTestId("subtitle-preview-text").innerText().catch(() => "");
       check(subtitle.length > 0, "no subtitle shown");
       await desk.page.screenshot({ path: join(OUT, "visitor-match.png") });
@@ -171,13 +181,41 @@ async function main() {
 
     await step("desktop: shortcuts and clicks change nothing and play nothing", async () => {
       await desk.page.locator("li.row-item").nth(1).click();
-      const keys = AUDIO ? ["s", "Control+s", "Control+Enter"] : ["s", "Control+s", "Control+Enter", " ", "m", "e", "n", "1"];
-      for (const key of keys) await desk.page.keyboard.press(key);
+      for (const key of ["s", "Control+s", "Control+Enter", " ", "m", "e", "n", "1"]) await desk.page.keyboard.press(key);
       await desk.page.waitForTimeout(800);
       const bad = forbidden(desk.requests);
       check(bad.length === 0, `requests: ${JSON.stringify(bad.slice(0, 5))}`);
       return `${desk.requests.length} requests, all GET and none for audio`;
     });
+
+    if (PREVIEWS) {
+      await step("desktop: the approved line's edited preview plays and seeks; others say it is unavailable", async () => {
+        const detail = await (await fetch(`${base}api/slot?id=${encodeURIComponent(previewSlot)}`)).json();
+        await desk.page.goto(`${base}#/match?level=${detail.level}&slot=${encodeURIComponent(previewSlot)}`);
+        const player = desk.page.getByTestId("public-preview-player");
+        await player.waitFor({ timeout: 30000 });
+        check((await player.getAttribute("controlslist"))?.includes("nodownload"), "the player offers a download");
+        const played = await player.evaluate(async (a) => {
+          a.muted = true;
+          await a.play();
+          await new Promise((done) => setTimeout(done, 700));
+          const t = a.currentTime;
+          a.currentTime = Math.min(0.2, a.duration / 4);
+          await new Promise((done) => a.addEventListener("seeked", done, { once: true }));
+          a.pause();
+          return { t, duration: a.duration, after: a.currentTime };
+        });
+        check(played.t > 0.2 && played.duration > 0.5, `did not play: ${JSON.stringify(played)}`);
+        await desk.page.screenshot({ path: join(OUT, "visitor-preview.png") });
+        const rows = (await (await fetch(`${base}api/slots?level=a10`)).json()).slots;
+        const other = rows.find((r) => r.slot_id !== previewSlot && r.decision?.audio !== "approved");
+        await desk.page.goto(`${base}#/match?level=a10&slot=${encodeURIComponent(other.slot_id)}`);
+        await desk.page.getByTestId("public-preview-unavailable").waitFor({ timeout: 30000 });
+        const status = (await fetch(`${base}audio/public?slot=${encodeURIComponent(other.slot_id)}`)).status;
+        check(status === 404, `an unapproved line's preview answered ${status}`);
+        return `${previewSlot}: played ${played.t.toFixed(2)} s of ${played.duration.toFixed(2)} s, seeked; ${other.slot_id}: unavailable (404)`;
+      });
+    }
 
     await step("desktop: owner pages redirect; Build & Test shows builds read-only", async () => {
       await desk.page.goto(`${base}#/data`);

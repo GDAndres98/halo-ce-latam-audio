@@ -9,11 +9,13 @@ closed: an endpoint added to the server later is refused here until it is listed
   see: local file system paths, the game folder, build file locations and logs, notes, and anything that looks
   like an absolute path in free text.
 
-Refused (401, "sign in to edit"): every write (any method but GET/HEAD), audio (streams, waveform peaks, editor
-previews, the interference reference) unless the owner turns on "public": {"audio": true}, which opens only
-PUBLIC_AUDIO (the original recordings and their peaks; never previews or downloads), the change
+Refused (401, "sign in to edit"): every write (any method but GET/HEAD), all of the Studio's own audio (original
+recordings, waveform peaks, editor previews, the interference reference), the change
 feed (it names who saved), configuration, data status, network details, jobs, the game folder status and
 install plans, and build logs.
+
+With "public": {"previews": true}, PUBLIC_PREVIEW serves the published edited previews of approved lines
+(public_previews.py): pre-rendered files only, never rendered on a visitor's request, never the originals.
 
 Anonymous traffic is also bounded (PublicLimiter): requests per address per minute and API requests at once,
 so visitors cannot starve the owner's own listeners.
@@ -29,9 +31,9 @@ PUBLIC_GETS = frozenset({
     "/api/builds", "/api/builds/detail", "/api/deploy/history",
 })
 
-# Audio a visitor may play when the owner turns on "public": {"audio": true}: the original recordings and their
-# waveform peaks. Never editor previews (rendering them is a write) and never downloads (no download links).
-PUBLIC_AUDIO = frozenset({"/audio/mcc", "/audio/ce", "/audio/peaks"})
+# The published edited preview of an approved line (GET /audio/public?slot=<slot_id>), with "public":
+# {"previews": true}. Pre-rendered by the owner (scripts/build/publish_previews.py); nothing else is audio here.
+PUBLIC_PREVIEW = "/audio/public"
 
 # Keys removed wherever they appear in a public answer: file system locations, the game folder, logs, notes.
 DENY_KEYS = frozenset({

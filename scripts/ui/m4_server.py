@@ -90,7 +90,8 @@ from common.export_config import ConfigError, load_export_config, save_global_ga
 from live_feed import LiveFeed  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 from cf_access import HEADER as ACCESS_HEADER, AccessError, AccessVerifier  # noqa: E402
-from public_view import (PUBLIC_AUDIO, PUBLIC_GETS as PUBLIC_LISTENER_GETS, Limited, PublicLimiter,  # noqa: E402
+from public_previews import PreviewStore  # noqa: E402
+from public_view import (PUBLIC_GETS as PUBLIC_LISTENER_GETS, PUBLIC_PREVIEW, Limited, PublicLimiter,  # noqa: E402
                          sanitize)
 from studio_auth import AuthError, Authenticator, SessionStore, UserStore, csrf_ok  # noqa: E402
 from studio_net import ConfigError as NetConfigError, HostPolicy, connection_info, load_server_config  # noqa: E402
@@ -154,9 +155,9 @@ class Listener:
         return self.kind == "public"
 
     @property
-    def public_audio(self):
-        """The owner let visitors play the original recordings ("public": {"audio": true})."""
-        return self.public and self.cfg["public"].get("audio") is True
+    def public_previews(self):
+        """The owner let visitors play the published edited previews of approved lines ("previews": true)."""
+        return self.public and self.cfg["public"].get("previews") is True
 
     @property
     def sign_in_url(self):
@@ -194,6 +195,7 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         listener = Listener("local", cfg, cfg["local"]["port"])
     shared = shared or Shared(app.root, listener.cfg)
     static_dir = listener.cfg.get("static_path")
+    previews = PreviewStore(app.root)  # published previews of approved lines (public view only)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "Studio/2"
@@ -361,8 +363,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             local = not listener.remote
             # audio: stream recordings, waveforms and editor previews; download: save them as files.
             return {"edit": bool(s), "admin": bool(s) and (local or s["role"] == "admin"),
-                    "install": local, "settings_mcc": local, "audio": bool(s) or listener.public_audio,
-                    "download": bool(s)}
+                    "install": local, "settings_mcc": local, "audio": bool(s), "download": bool(s),
+                    "previews": listener.public_previews}  # published previews of approved lines (public view)
 
         def _session_info(self, s):
             if listener.public:
@@ -433,8 +435,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         # ------------------------------------------------------------ audio
         def _audio_path(self, path, q):
             """The file behind one of the audio URLs. Only catalog entries and preview keys: never a path."""
-            if listener.public and not (listener.public_audio and path in ("/audio/mcc", "/audio/ce")):
-                raise self._visitor_refused("Recordings need the owner's sign-in")  # previews: never public
+            if listener.public:  # defence in depth: the public route never gets here
+                raise self._visitor_refused("Recordings need the owner's sign-in")
             if path == "/audio/mcc":
                 return app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)), False
             if path == "/audio/ce":
@@ -532,6 +534,12 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             raise ApiError(405, "method not allowed")
 
         # ------------------------------------------------------------ the public read-only listener
+        def _stored_mapping(self, slot_id):
+            """The line's saved decision (None if it has none); unknown slots are 404."""
+            if slot_id not in app.slot_index:
+                raise ApiError(404, "unknown line")
+            return next((m for m in app._mappings()[0]["slots"] if m["slot_id"] == slot_id), None)
+
         def _visitor_refused(self, what="This public view is read-only"):
             url = listener.sign_in_url
             return ApiError(401, f"{what}. Sign in to edit" + (f" at {url}." if url else "."))
@@ -541,17 +549,19 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             built page. Everything else is refused before any work is done (fail closed)."""
             if self.command not in ("GET", "HEAD"):
                 raise self._visitor_refused()
-            if listener.public_audio and path in PUBLIC_AUDIO:
+            if path == PUBLIC_PREVIEW:
+                if not listener.public_previews:
+                    raise self._visitor_refused("Previews are not published in this view")
                 try:
                     listener.limiter.admit(self._peer())
-                    if path == "/audio/peaks":
-                        with listener.limiter.slot():
-                            return self._peaks(q)
-                    with listener.limiter.slot():  # decoding on demand; the transfer itself holds no slot
-                        wav, immutable = self._audio_path(path, q)
+                    with listener.limiter.slot():  # a lookup only: nothing is ever rendered for a visitor
+                        sid = q.get("slot", "")
+                        wav, why = previews.lookup(sid, self._stored_mapping(sid))
                 except Limited as e:
                     return self._json(e.status, {"error": e.message}, {"Retry-After": str(e.retry_after or 5)})
-                return self._wav(wav, immutable)
+                if wav is None:
+                    raise ApiError(404, f"No public preview: {why}.")
+                return self._wav(wav)
             if path.startswith(("/api/", "/audio/")):
                 if path not in PUBLIC_LISTENER_GETS:
                     raise self._visitor_refused("Recordings and downloads need the owner's sign-in"
@@ -579,7 +589,10 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             if path == "/api/slots":
                 return app.slots(q.get("level", ""), q.get("status") or None, q.get("q"))
             if path == "/api/slot":
-                return app.slot(q.get("id", ""), with_interference=False)  # no on-demand audio decoding
+                d = app.slot(q.get("id", ""), with_interference=False)  # no on-demand audio decoding
+                if listener.public_previews:
+                    d["public_preview"] = previews.status(d["slot_id"], d["mapping"])
+                return d
             if path == "/api/ce":
                 return app.ce(q.get("mission", "all"), q.get("q"), q.get("offset", 0), q.get("limit", 100),
                               q.get("level"), q.get("subs") or None, q.get("hide_used") == "1",

@@ -11,7 +11,7 @@
 import { FileAudio, ListChecks, Unlink } from "lucide-vue-next";
 import { computed } from "vue";
 import { audioUrl } from "../../api/client";
-import { canListen, readOnly } from "../../auth/session";
+import { canListen, canPlayPreviews, readOnly } from "../../auth/session";
 import AudioButton from "../AudioButton.vue";
 import type { CeLine } from "../../api/types";
 import { useEditPreview } from "../../composables/useEditPreview";
@@ -26,6 +26,7 @@ import AudioEditor from "./AudioEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
 import { FLAGS, FLAG_ORDER } from "./flags";
 import { canUnmatch } from "../../matching/draft";
+import PublicPreview from "./PublicPreview.vue";
 import ReadOnlyNotice from "./ReadOnlyNotice.vue";
 import RecipeSummary from "./RecipeSummary.vue";
 import SaveBar from "./SaveBar.vue";
@@ -227,6 +228,9 @@ async function choose(ref: string) {
 
       <!-- 2. Flags & notes -->
       <FlagsNotes :draft="draft" :read-only="readOnly" />
+
+      <!-- Public view: the published edited preview of an approved line (never originals or drafts) -->
+      <PublicPreview v-if="readOnly && canPlayPreviews" :key="detail.slot_id" :preview="detail.public_preview ?? null" />
 
       <!-- 3. Audio editing (a read-only summary in the public view, or where recordings cannot be played) -->
       <RecipeSummary v-if="readOnly || !canListen" :detail="detail" :draft="draft" />

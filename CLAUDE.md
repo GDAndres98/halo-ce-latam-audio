@@ -274,9 +274,11 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     - **Public read-only view (owner prompt 50, 2026-10-17):** `docs/public-access.md`. A third listener, `public`
       (`127.0.0.1:8081`, `"public"` block in `config/studio_server.json`, `--public`): anonymous, no identity read
       at all, allowlist `scripts/ui/public_view.py` `PUBLIC_GETS` with sanitised answers (no paths, notes, logs or
-      game folder). No writes, downloads, settings or live feed (401). Audio only with `public.audio: true`: **the owner
-      turned it on for studio.andresgustavo.com on 2026-10-17, accepting the redistribution risk** (originals + peaks;
-      never previews). The UI shows Read-only + Sign in to edit.
+      game folder). No writes, downloads, settings, live feed or original audio (401). With `public.previews: true`
+      (owner request 2026-10-17; ships off, copyright assessment in §2.2) visitors play `GET /audio/public?slot=`: the
+      edited previews of APPROVED lines, pre-rendered by the owner with `scripts/build/publish_previews.py`
+      (`scripts/ui/public_previews.py`), served only while the line is unchanged; anonymous requests never render.
+      The UI shows Read-only + Sign in to edit.
       Plan: `studio.andresgustavo.com` → 8081 public, `admin.andresgustavo.com` → 8080 with Access (same Access
       app, same AUD). The dashboard steps (§6) are the owner's. Tests: `tests/test_public_access.py`,
       `npm run test:visitor`. Never add an endpoint to `PUBLIC_GETS` that streams audio or reveals paths.

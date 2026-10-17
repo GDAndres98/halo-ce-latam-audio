@@ -74,7 +74,9 @@ export interface SessionInfo {
   logout_url?: string | null;
   /** audio: play recordings, waveforms and editor previews; download: save them as files. Older servers send
    * neither (then edit stands for both). */
-  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean; audio?: boolean; download?: boolean };
+  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean; audio?: boolean; download?: boolean;
+    /** The public view plays the published edited previews of approved lines (docs/public-access.md §2.1). */
+    previews?: boolean };
 }
 
 export interface NetworkInfo {
@@ -300,7 +302,15 @@ export interface MccSubtitle {
   table_loaded: boolean;
 }
 
+/** The public view only: whether this line's published edited preview can be played, and why not. */
+export interface PublicPreview {
+  available: boolean;
+  url: string | null;
+  reason: string | null;
+}
+
 export interface SlotDetail {
+  public_preview?: PublicPreview;
   slot_id: string;
   level: string;
   mcc_tag: string;
