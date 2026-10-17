@@ -1,7 +1,14 @@
 # Permutation experiment: can MCC play more takes than Spain's bank provides? (owner, 2026-10-16)
 
-**For:** the owner, before and after the in-game test. **Status:** prepared and validated offline; **not
-installed**. Nothing here is made from `mappings/`; the general "add another take" feature is not built.
+**For:** the owner, before and after the in-game test.
+
+> **RESULT (2026-10-17, owner, `v-000020`): PASS.** With `exp_grunt_death_violent_johnson` installed, the owner
+> heard **all four** Johnson takes at Grunt deaths, including the two added after Spain's original two. MCC
+> selects added takes through the per-language sound index. Take 3 sits on the map tag's permutation with skip
+> fraction 1.0, so hearing it indicates the game picks within the index range and does not apply the tag's skip
+> flag there. Not reported: counts, level, graphics mode. Still untested: more takes than the tag defines (5+).
+
+**Status before the result:** prepared and validated offline. Nothing here is made from `mappings/`; the general "add another take" feature is not built.
 
 ## 1. What the test build contains
 

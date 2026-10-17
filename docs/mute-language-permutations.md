@@ -192,7 +192,9 @@ step (bank + index together).
 ### 3.3 Answer
 
 *Can we make MCC randomly play more variations than currently defined in the Spain Spanish resources?*
-**Likely, at least up to the tag's own permutation count (4 for `death_violent`); unverified beyond it.** The
+**Yes, up to the tag's own permutation count: confirmed in game on 2026-10-17 (`v-000020`, all 4 takes of
+`death_violent` heard, 2 of them added; docs/permutation-experiment.md). Beyond the tag's count is still untested.**
+Original assessment: likely, at least up to the tag's own permutation count (4 for `death_violent`). The
 data says the per-language index, not the tag, defines Spain's set (Spain already ships 200 tags with more
 samples than the tag defines, and 329 with fewer, without problems). Whether extra samples are actually
 **selected** can only be shown in game.
