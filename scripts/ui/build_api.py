@@ -371,15 +371,27 @@ class BuildBoard:
                 entry = files.setdefault(f["install_rel"], {"install_rel": f["install_rel"],
                                                             "original_sha256": f["original_sha256"], "builds": []})
                 entry["builds"].append((name, f["candidate_sha256"]))
-        active = set()
+        matched = {}  # build -> how many of its files are installed as its candidates
         for rel, entry in sorted(files.items()):
             installed = folder / rel
             sha = self._hash(installed) if installed.is_file() else None
             matches = [name for name, cand in entry["builds"] if cand == sha]
             state = "original" if sha == entry["original_sha256"] else "build" if matches else "unknown"
-            active.update(matches)
+            for name in matches:
+                matched[name] = matched.get(name, 0) + 1
             out["files"].append({"install_rel": rel, "sha256": sha, "state": state, "builds": matches})
-        out["active_builds"] = sorted(active)
+        # A build is installed when ALL its files are its candidates. Two builds can share a candidate (the
+        # permutation experiments share one index), so one matching file alone does not make a build installed.
+        # A build with only some of its files in place (an interrupted install) is "partial": still restored.
+        full = {n for n, k in matched.items() if k == len(manifests[n]["install_files"])}
+        covered = {f["install_rel"] for n in full for f in manifests[n]["install_files"]}
+        partial = {n for n in set(matched) - full
+                   if any(f["install_rel"] not in covered for f in manifests[n]["install_files"]
+                          if any(n in x["builds"] for x in out["files"] if x["install_rel"] == f["install_rel"]))}
+        for f in out["files"]:
+            f["builds"] = [n for n in f["builds"] if n in full or n in partial]
+        out["active_builds"] = sorted(full)
+        out["partial_builds"] = sorted(partial)
         out["mod_installed"] = any(f["state"] != "original" for f in out["files"])
         # The level settings inside the installed audio, against what the Studio is set to now.
         cfg = load_export_config(self.root)
@@ -484,7 +496,7 @@ class BuildBoard:
         if body.get("confirm") is not True:
             raise ApiError(400, "restoring changes game files; it needs confirm: true")
         status = self.deploy_status()
-        names = [body["build"]] if body.get("build") else status["active_builds"]
+        names = [body["build"]] if body.get("build") else status["active_builds"] + status["partial_builds"]
         if not names:
             if not status["mod_installed"]:
                 raise ApiError(409, "the game files are already the originals")

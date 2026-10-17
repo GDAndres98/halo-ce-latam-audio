@@ -547,6 +547,8 @@ export interface DeployStatus {
   game_running: string[];
   files: { install_rel: string; sha256: string | null; state: "original" | "build" | "unknown"; builds: string[] }[];
   active_builds: string[];
+  /** Builds with only some of their files installed (an interrupted install); Restore covers them too. */
+  partial_builds?: string[];
   mod_installed: boolean;
   /** What the Studio is set to now, and the level settings inside the installed audio build(s). */
   current_level?: { mode: LevelMode; global_gain_db: number };

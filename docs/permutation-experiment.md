@@ -62,6 +62,20 @@ only the count matters there). Listening files: `work/m6/exp_grunt_death_violent
 `take4_EXTRA_…`. The procedure in §3 is the same; tally takes 1–4 instead of Spain/English. Spain's own
 `death_violent` takes are not in this build, so every Grunt `death_violent` sound is a Johnson line.
 
+## 1c. Six takes, beyond the tag's 4 (owner, 2026-10-17): `exp_grunt_death_violent_johnson6`
+
+`python scripts/discovery/perm_experiment.py --preset johnson6`: the four Johnson takes of §1b, plus
+
+| Take | Johnson line | Seconds | Place |
+|---|---|---|---|
+| 5 | `killedenemysentinel 03` (`es:killedenemysentinel%2003#5`) | 1.14 | **added, beyond the tag's 4** |
+| 6 | `killedenemyfloodcarrier 03` (`es:killedenemyfloodcarrier%2003#5`) | 1.47 | **added, beyond the tag's 4** |
+
+18/18 offline checks; bank `8d4304e2…` (+287,968 B), index `7dc530d5…` (count 2 → 6, later ranges + 4).
+Hearing take 5 or 6 means the count comes from the index, not the map tag: a sound can then carry as many
+Campaign Evolved takes as we add. Hearing only takes 1–4 after ~20 `death_violent` sounds (chance of missing both
+5 and 6 by luck: about 0.03 % if all six are equally likely) means the tag's 4 is the limit.
+
 ## 2. When does the game play `death_violent`? (what is known)
 
 - **VERIFIED** (HEK `grunt.dialogue`, its 166 sound references in c20's field order [^c20]): the Grunt's

@@ -9,7 +9,8 @@ written as one unit. Take sources:
   en:K          the English bank's take K of this sound
   slot:<id>     any recording of the Spanish bank by slot ID, as the Studio shows it (slot:es:alliancebroken%2002#5)
 
-Presets: `--preset english` (default; exp_grunt_death_violent_4: Spain 1-2 + English 3-4) and `--preset johnson`
+Presets: `--preset english` (default; exp_grunt_death_violent_4: Spain 1-2 + English 3-4), `--preset johnson6` (the
+Johnson four plus two more: 6 takes, beyond the tag's 4) and `--preset johnson`
 (exp_grunt_death_violent_johnson: four Johnson lines Halo/a30 never plays, so any Johnson voice at a Grunt's
 death comes from the experiment; takes 1-2 in Spain's places, 3-4 added).
 
@@ -50,6 +51,13 @@ PRESETS = {
                                                     "slot:es:killedenemysentinel%2002#5",
                                                     "slot:es:alliancebroken%2002#5",
                                                     "slot:es:killedenemyfloodcarriercm%2002#5"]),
+    # The same four plus two more (takes 5-6 go beyond the map tag's 4 permutations): does the index count win?
+    "johnson6": ("exp_grunt_death_violent_johnson6", ["slot:es:killedenemyfloodcombatcm%2003#5",
+                                                      "slot:es:killedenemysentinel%2002#5",
+                                                      "slot:es:alliancebroken%2002#5",
+                                                      "slot:es:killedenemyfloodcarriercm%2002#5",
+                                                      "slot:es:killedenemysentinel%2003#5",
+                                                      "slot:es:killedenemyfloodcarrier%2003#5"]),
 }
 REFERENCES = ("death_quiet", "death_instant", "death_flying")  # other Grunt deaths, to tell them apart by ear
 INSTALL = {"bank": "halo1/sound/pc/sounds_dialogs_spanish.fsb",
