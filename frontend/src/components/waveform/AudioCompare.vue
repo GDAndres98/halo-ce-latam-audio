@@ -8,6 +8,8 @@
 // On touch screens two more buttons play A or B from the start, so the comparison works with one thumb.
 //
 // While the edited recording is being rendered, B has no URL: an outdated preview is never offered.
+// In the public read-only view B's edited recording is the owner's published preview of the approved line
+// (canRender = it exists); nothing is rendered and there is no "encoded" option.
 import { readOnly } from "../../auth/session";
 
 import { computed, ref, watch } from "vue";
@@ -32,6 +34,8 @@ const props = defineProps<{
   errors: string[];
   /** Render statistics of the current preview (global gain report). */
   stats: Record<string, number> | null;
+  /** Public view: why this line has no published edited preview. */
+  noEditedReason?: string | null;
 }>();
 
 const original = ref<InstanceType<typeof WaveformView> | null>(null);
@@ -61,7 +65,9 @@ const KIND_LABEL: Record<ReplacementKind, string> = {
 };
 
 const otherUrl = computed(() => props.replacement[kind.value]);
-const otherLabel = computed(() => KIND_LABEL[kind.value]);
+const otherLabel = computed(() =>
+  readOnly.value && kind.value === "edited" ? "Campaign Evolved LATAM (approved edited preview)" : KIND_LABEL[kind.value],
+);
 const otherEmptyText = computed(() =>
   !props.replacement.unedited
     ? "No Campaign Evolved recording chosen."
@@ -211,14 +217,18 @@ useShortcuts({ a: switchAB, b: playSequence });
     <div class="compare-source">
       <label class="inline small">B plays
         <select v-model="kind" aria-label="Which replacement B plays">
-          <option value="edited" :disabled="!canRender">Edited recording (latest edits)</option>
+          <option value="edited" :disabled="!canRender">{{ readOnly ? "Edited recording (approved, published preview)" : "Edited recording (latest edits)" }}</option>
           <option value="unedited">Unedited recording</option>
-          <option value="encoded" :disabled="!canRender">Encoded for the game (CELT)</option>
+          <option value="encoded" :disabled="!canRender || readOnly">Encoded for the game (CELT)</option>
         </select>
       </label>
       <span class="preview-status small" role="status" data-testid="preview-status" :data-state="previewState">
         <span v-if="!replacement.unedited" class="muted">No Campaign Evolved recording chosen.</span>
-        <span v-else-if="!canRender" class="muted">{{ readOnly ? "Read-only view: B plays the unedited recording (the edits are listed under Audio editing)." : "Previews are unavailable on this server: B plays the unedited recording." }}</span>
+        <template v-else-if="readOnly">
+          <span v-if="replacement.edited" class="muted">The edited recording is the owner's published preview of the approved line.</span>
+          <span v-else class="muted" data-testid="no-edited-preview">No edited preview: {{ noEditedReason ?? "none is published for this line" }}.</span>
+        </template>
+        <span v-else-if="!canRender" class="muted">Previews are unavailable on this server: B plays the unedited recording.</span>
         <template v-else-if="rendering">
           <LoaderCircle :size="14" class="spin" aria-hidden="true" />
           <span class="muted">Rendering the latest edits…</span>

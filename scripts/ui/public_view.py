@@ -34,6 +34,10 @@ PUBLIC_GETS = frozenset({
 # The published edited preview of an approved line (GET /audio/public?slot=<slot_id>), with "public":
 # {"previews": true}. Pre-rendered by the owner (scripts/build/publish_previews.py); nothing else is audio here.
 PUBLIC_PREVIEW = "/audio/public"
+# With "public": {"originals": true}: the original recordings (decoded on demand, as for the owner).
+PUBLIC_ORIGINALS = frozenset({"/audio/mcc", "/audio/ce"})
+# Waveform peaks of any audio the visitor may play (the src is checked against the same rules).
+PUBLIC_PEAKS = "/audio/peaks"
 
 # Keys removed wherever they appear in a public answer: file system locations, the game folder, logs, notes.
 DENY_KEYS = frozenset({

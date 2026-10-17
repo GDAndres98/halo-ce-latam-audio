@@ -9,6 +9,10 @@
 // play or download controls; keyboard shortcuts do nothing; the page requests no audio and sends no write at all;
 // direct writes, audio and downloads from the page are refused (401). The owner's address keeps the full editor.
 // It never installs anything, and the real mapping decisions are checked unchanged at the end.
+//
+//   E2E_PUBLIC_ORIGINALS=1 npm run test:visitor   the owner's "public": {"originals": true} (implies previews): the
+//   visitor plays the originals from the lists, and Listen & compare loads A (MCC) and B (unedited CE or the
+//   published edited preview) with waveforms; still no downloads, editor previews or writes.
 
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,7 +28,10 @@ const SLOT = "es:A10_010_cryotech#0";
 const SIGN_IN = "https://admin.example.com/";
 // E2E_PUBLIC_PREVIEWS=1: the owner's "public": {"previews": true}: one approved line of the disposable copy is
 // published (scripts/build/publish_previews.py --slot) and the visitor plays and seeks it; originals stay private.
-const PREVIEWS = process.env.E2E_PUBLIC_PREVIEWS === "1";
+const ORIGINALS = process.env.E2E_PUBLIC_ORIGINALS === "1";
+const PREVIEWS = process.env.E2E_PUBLIC_PREVIEWS === "1" || ORIGINALS;
+// Audio a visitor's page may ask for: published previews, and with the originals also MCC / CE and waveforms.
+const VISITOR_AUDIO = new Set([...(PREVIEWS ? ["/audio/public"] : []), ...(ORIGINALS ? ["/audio/mcc", "/audio/ce", "/audio/peaks"] : [])]);
 let previewSlot = null;
 
 const results = [];
@@ -70,7 +77,7 @@ async function openVisitor(browser, options, label) {
 }
 
 const forbidden = (requests) =>
-  requests.filter((r) => (r.path.startsWith("/audio/") && !(PREVIEWS && r.path === "/audio/public")) ||
+  requests.filter((r) => (r.path.startsWith("/audio/") && !VISITOR_AUDIO.has(r.path)) ||
     r.method !== "GET" || r.path === "/api/events");
 
 async function openLine(page, base) {
@@ -86,7 +93,7 @@ async function main() {
   const fixture = await runFixture(join(tmp, "root"));
   const root = fixture.root;
   const config = join(tmp, "studio_server.json");
-  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN, previews: PREVIEWS } }));
+  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN, previews: PREVIEWS, originals: ORIGINALS } }));
   let server;
   let browser;
   const pages = [];
@@ -105,7 +112,7 @@ async function main() {
         check(m, "no approved a10 line in the copy");
         previewSlot = m.slot_id;
         const { code, out } = await run("python", ["scripts/build/publish_previews.py", "--root", root, "--slot", previewSlot]);
-        check(code === 0 && /published 1 preview/.test(out), out.slice(-300));
+        check(code === 0 && /published \d+ preview/.test(out), out.slice(-300));
         return previewSlot;
       });
     }
@@ -127,7 +134,14 @@ async function main() {
         const res = await fetch(`${base}audio/public?slot=${encodeURIComponent(previewSlot)}`, { headers: { Range: "bytes=0-99" } });
         check(res.status === 206 && res.headers.get("content-type") === "audio/wav", `published preview answered ${res.status}`);
       }
-      const refused = [...audio, "audio/preview?key=abc&kind=edited", "api/events", "api/network", "api/settings/export",
+      if (ORIGINALS) {
+        for (const p of audio) {
+          const res = await fetch(base + p);
+          const type = res.headers.get("content-type") ?? "";
+          check(res.status === 200 && (p.startsWith("audio/peaks") ? type.startsWith("application/json") : type === "audio/wav"), `${p} answered ${res.status} ${type}`);
+        }
+      }
+      const refused = [...(ORIGINALS ? ["audio/peaks?src=%2Faudio%2Fpreview%3Fkey%3Dabc"] : audio), "audio/preview?key=abc&kind=edited", "api/events", "api/network", "api/settings/export",
         "api/data/status", "api/deploy/status", "api/builds/log?name=a10"];
       const codes = [];
       for (const p of refused) codes.push((await fetch(base + p)).status);
@@ -172,7 +186,8 @@ async function main() {
       check(Object.values(counts).every((n) => n === 0), JSON.stringify(counts));
       const players = await desk.page.locator("button.play").count();
       const compare = await desk.page.locator('[data-section="compare"]').count();
-      check(players === 0 && compare === 0, `players ${players}, compare ${compare}`);
+      if (ORIGINALS) check(players > 0 && compare === 1, `players ${players}, compare ${compare}`);
+      else check(players === 0 && compare === 0, `players ${players}, compare ${compare}`);
       const subtitle = await desk.page.getByTestId("subtitle-preview-text").innerText().catch(() => "");
       check(subtitle.length > 0, "no subtitle shown");
       await desk.page.screenshot({ path: join(OUT, "visitor-match.png") });
@@ -188,7 +203,44 @@ async function main() {
       return `${desk.requests.length} requests, all GET and none for audio`;
     });
 
-    if (PREVIEWS) {
+    if (ORIGINALS) {
+      await step("desktop: list buttons play the originals; A / B load with waveforms; no downloads", async () => {
+        const detail = await (await fetch(`${base}api/slot?id=${encodeURIComponent(previewSlot)}`)).json();
+        await desk.page.goto(`${base}#/match?level=${detail.level}&slot=${encodeURIComponent(previewSlot)}`);
+        const compare = desk.page.locator('[data-section="compare"]');
+        await compare.waitFor({ timeout: 30000 });
+        check((await desk.page.getByTestId("public-preview-player").count()) === 0, "the separate preview block is shown beside the compare player");
+        const options = await compare.locator('select[aria-label="Which replacement B plays"] option').evaluateAll((os) => os.map((o) => ({ v: o.value, d: o.disabled, t: o.textContent })));
+        check(options.find((o) => o.v === "encoded")?.d === true, `encoded offered: ${JSON.stringify(options)}`);
+        check(options.find((o) => o.v === "edited")?.d === false, `published preview not offered: ${JSON.stringify(options)}`);
+        const loaded = async () => {
+          await desk.page.waitForFunction(() => ["duration-a", "duration-b"].every((id) => /\d\.\d{3} s/.test(document.querySelector(`[data-testid="${id}"]`)?.textContent ?? "")), null, { timeout: 30000 });
+          return Promise.all(["duration-a", "duration-b"].map((id) => desk.page.getByTestId(id).innerText()));
+        };
+        const edited = await loaded();
+        await compare.locator('select[aria-label="Which replacement B plays"]').selectOption("unedited");
+        const unedited = await loaded();
+        const before = desk.requests.length;
+        await desk.page.locator("li.row-item button.play:visible, [data-section] button.play:visible").first().click();
+        await desk.page.waitForTimeout(1200);
+        const asked = desk.requests.slice(before).filter((r) => r.path === "/audio/mcc" || r.path === "/audio/ce");
+        await desk.page.keyboard.press("Escape");
+        const downloads = await desk.page.locator("a.download-link, a[download]").count();
+        check(downloads === 0, `${downloads} download links`);
+        check(desk.requests.some((r) => r.path === "/audio/peaks"), "no waveform was requested");
+        check(!desk.requests.some((r) => r.path === "/audio/preview" || r.method !== "GET"), "the page asked for an editor preview or sent a write");
+        await desk.page.screenshot({ path: join(OUT, "visitor-originals.png") });
+        const rows = (await (await fetch(`${base}api/slots?level=a10`)).json()).slots;
+        const other = rows.find((r) => r.slot_id !== previewSlot && r.decision?.audio_source === "ce" && r.decision?.audio !== "approved");
+        if (other) {
+          await desk.page.goto(`${base}#/match?level=a10&slot=${encodeURIComponent(other.slot_id)}`);
+          await desk.page.getByTestId("no-edited-preview").waitFor({ timeout: 30000 });
+        }
+        return `A/B edited ${edited.join(" / ")}, unedited ${unedited.join(" / ")}; list button asked ${asked.length} recording(s)${other ? `; ${other.slot_id}: no edited preview` : ""}`;
+      });
+    }
+
+    if (PREVIEWS && !ORIGINALS) {
       await step("desktop: the approved line's edited preview plays and seeks; others say it is unavailable", async () => {
         const detail = await (await fetch(`${base}api/slot?id=${encodeURIComponent(previewSlot)}`)).json();
         await desk.page.goto(`${base}#/match?level=${detail.level}&slot=${encodeURIComponent(previewSlot)}`);
@@ -243,6 +295,7 @@ async function main() {
       const wide = await phone.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
       check(!wide, "horizontal scroll on the phone");
       check(forbidden(phone.requests).length === 0, "the phone page asked for audio or sent a write");
+      check((await phone.page.locator("a.download-link, a[download]").count()) === 0, "download links on the phone");
       return "Read-only badge visible; no horizontal scroll";
     });
 

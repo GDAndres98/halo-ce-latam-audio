@@ -45,9 +45,10 @@ Two host names instead of one host with mixed rules, because:
 | Visitor can | Visitor cannot |
 |---|---|
 | Open the Studio without signing in (desktop, phone, installed app) | Save, approve, reject, mark needs rework, unmatch, mute |
-| **Only with `public.previews` on:** play (and seek, replay) the **published edited LATAM preview of an approved line** (§2.1) | Play original recordings: MCC Spain / English, unprocessed Campaign Evolved; hear drafts, reworked lines or the owner's editor previews; trigger any rendering |
+| **Only with `public.previews` on:** play (and seek, replay) the **published edited LATAM preview of an approved line** (§2.1) | Hear drafts, reworked lines or the owner's editor previews (`/audio/preview`); trigger any rendering (`POST /api/edit/preview`) |
+| **Only with `public.originals` on:** play the **original recordings** (MCC Spain and English takes, unedited Campaign Evolved) from the line lists, and see **waveforms** of anything they may hear in **Listen and compare** (§2.1) | Without `public.originals`: play original recordings or see waveforms |
 | Browse levels, MCC lines, Campaign Evolved lines, search and filters | Choose recordings ("Use this recording" is hidden), edit flags, notes, subtitles or recipes |
-| See each decision: match, audio source, approvals, flags, subtitle text (SU / SP / EN / CE / custom), the edit recipe as text | Use download buttons or exports (none are shown or served); see waveforms or the editor |
+| See each decision: match, audio source, approvals, flags, subtitle text (SU / SP / EN / CE / custom), the edit recipe as text | Use download buttons or exports (none are shown or served); use the waveform editor or the interference reference |
 | See progress and statistics | Start builds, change the level setting, install or restore, change the MCC folder |
 | See the build list and the history of test installs (sanitised) | Open Data or Network, read build logs, the game folder or file locations |
 | | Receive the live change feed (it names who saved) |
@@ -78,9 +79,21 @@ installed app). Lines without one say why: "Preview unavailable: the audio is no
 
 **Guarantees.** Anonymous requests never render, decode or write anything: they read the index and stream a
 pre-rendered file. Visitors address previews by slot id only (already public); file names, preview keys and paths
-never leave the server. Originals (`/audio/mcc`, `/audio/ce`), waveforms, editor previews (`/audio/preview`) and
-the interference reference stay 401. Responses are `Cache-Control: private` (Cloudflare does not cache them) and
+never leave the server. Editor previews (`/audio/preview`) and the interference reference stay 401; originals
+(`/audio/mcc`, `/audio/ce`) and waveforms too, unless `public.originals` is on (below). Responses are `Cache-Control: private` (Cloudflare does not cache them) and
 rate limited like the API (240 a minute per address, 8 at once).
+
+**With `public.originals` (owner request, 2026-10-17).** Visitors also play the original recordings (`GET
+/audio/mcc`, `/audio/ce`, decoded on demand exactly as for the owner) from the MCC and Campaign Evolved lists, and a
+line shows the same **Listen and compare** player as the editor, with waveforms (`GET /audio/peaks`, only for a
+`src` that is itself allowed: MCC, CE or a published preview). A plays the MCC original (Spain or an English take);
+B plays the unedited Campaign Evolved recording or, for an approved line, the published edited preview. There is no
+"encoded" option, and a line without a published preview says "No edited preview: <reason>". The separate **Edited
+LATAM preview** block is shown only while originals are off. Still refused (401): editor previews
+(`/audio/preview`, and peaks of one), rendering (`POST /api/edit/preview`), the interference reference, downloads
+(`permissions.download` stays false; no download links are shown), every write, settings and the live feed. A
+visitor's request never renders anything; it decodes at most one original recording. The rate limit applies to
+every audio and peaks request.
 
 **Limitation: hiding download buttons is not protection.** Anything a browser can play can be saved, with the
 browser's developer tools, a screen or audio recorder, or a script that requests `/audio/public?slot=…` for every
@@ -110,8 +123,18 @@ Assessment:
 - **What it does not change:** the Workshop release (roadmap M8) is still gated on the M8.1 rights memo. Public
   previews are not a release, and they don't make one permitted.
 
-**Decision:** the owner asked for public playback on 2026-10-17. The code ships with `previews: false`; the owner
-turns it on after reading this assessment.
+With `public.originals` the published material grows: the **unedited** Campaign Evolved es-MX recordings and
+**MCC's own** Spain and English recordings (Microsoft / 343 Industries; MCC's Spanish dub cast) become playable by
+anyone, a few thousand clips with no editing or transformation. That sits further from the "derivative works"
+allowance than edited previews, makes the site a source for ripping the game's dialogue in bulk, and raises the
+takedown risk accordingly. Setting `originals` to `false` and restarting stops it at once.
+
+**Decision:** the owner asked for public playback of the edited previews on 2026-10-17. The code ships with
+`previews: false`; the owner turns it on after reading this assessment.
+
+**Decision (originals):** on 2026-10-17 the owner asked for the original recordings and waveforms to be public as
+well, and **explicitly accepted the copyright and redistribution risk** described above. The code ships with
+`originals: false`; the owner turned it on in `config/studio_server.json`.
 
 ## 3. Endpoint classification
 
@@ -121,12 +144,14 @@ refused on the public listener, including endpoints added later.
 | Endpoint | Cat. | Public listener | Admin (Access) listener |
 |---|---|---|---|
 | static files of `frontend/dist` | 1 | yes | Access token |
-| `GET /api/session` | 1 | visitor info, all permissions false | token |
+| `GET /api/session` | 1 | visitor info; all permissions false except `previews` / `audio` (= `public.previews` / `public.originals`) | token |
 | `GET /api/state`, `/api/slots`, `/api/ce`, `/api/ce_line` | 1 | yes; validation findings reduced to counts | token |
 | `GET /api/slot` | 1 | yes; notes removed, no interference lane (it decodes audio), no audio decoding | token |
 | `GET /api/builds`, `/api/builds/detail` | 1 | yes; no file locations, no log | token |
 | `GET /api/deploy/history` | 1 | yes; game folder, backups and paths removed | token |
-| `GET /audio/mcc`, `/audio/ce`, `/audio/preview`, `/audio/peaks`, `/api/interference/reference` | 2 | **401** | token |
+| `GET /audio/mcc`, `/audio/ce` (original recordings) | 2* | with `public.originals`: 200 / 206 `audio/wav`, rate limited; otherwise **401** | token |
+| `GET /audio/peaks?src=` (waveform) | 2* | with `public.originals`, when `src` is `/audio/mcc`, `/audio/ce` or (with `public.previews`) `/audio/public`: 200, rate limited; otherwise **401** | token |
+| `GET /audio/preview`, `/api/interference/reference` | 2 | **401** | token |
 | `GET /audio/public?slot=` (published edited preview of an approved line) | 1* | with `public.previews`: 200 / 206 (approved and unchanged) or 404 with the reason; otherwise 401 | – |
 | `GET /api/events` (live feed, names authors) | 2 | **401** | token |
 | `POST /api/save`, `/api/progress`, `/api/validate`, `/api/edit/preview`, `/api/builds/preview` | 3 | **401** | token + CSRF + Origin |
@@ -146,7 +171,7 @@ GETs only read.
 |---|---|
 | Anonymous writes | Every method other than GET/HEAD is refused (401) before the body is read. `_post`, `_events` and `_audio_path` also refuse the public listener themselves (defence in depth). Nothing is written, not even the audit log. |
 | Forged identity | The public listener ignores `Cf-Access-Jwt-Assertion` (even a valid one), cookies, `Cf-Access-Authenticated-User-Email`, `Authorization` and the rest. Its session is always the visitor. |
-| Proprietary audio | Originals, waveforms, editor previews and downloads are never sent to a visitor; the page does not request them and the server refuses them. With `public.previews`, only pre-rendered previews of approved, unchanged lines are streamed (§2.1). Anyone can capture what plays. |
+| Proprietary audio | Editor previews and downloads are never sent to a visitor. Originals and waveforms only with `public.originals` (otherwise refused). With `public.previews`, only pre-rendered previews of approved, unchanged lines are streamed (§2.1). Anyone can capture what plays. |
 | Paths and private data | Answers go through `public_view.sanitize`: keys such as `mcc_root`, `path`, `backup*`, `candidate`, `log`, `notes` are removed everywhere, and any absolute path in text becomes `[path hidden]`. Static files come only from `frontend/dist` after path normalisation; `config/`, `mappings/`, databases, backups, logs and keys are never served. |
 | Host / origin | The public listener answers only `Host: studio.andresgustavo.com` (and localhost). The admin listener does not answer the public host name. No CORS headers on either. |
 | Binding | All listeners are on 127.0.0.1. The settings refuse a public listener on any other address, on a port already in use by another listener, or with the admin host name. |
@@ -179,6 +204,7 @@ Tests: `python -m unittest tests.test_public_access` (handler-level, synthetic d
 | `public.url` | The public https address. It is the only host name the listener answers. It must differ from `public_url`. |
 | `public.sign_in_url` | Where **Sign in to edit** goes. Defaults to `public_url`. |
 | `public.previews` | `false` (default): visitors hear nothing. `true`: visitors may play the published edited previews of approved lines (§2.1); publish them with `scripts/build/publish_previews.py`. Originals are never public. Read §2.2 first. (`public.audio`, which played the originals for a few hours on 2026-10-17, was removed; the server refuses it.) |
+| `public.originals` | `false` (default). `true`: visitors may also play the original recordings (MCC Spain / English, unedited Campaign Evolved) and see waveforms in Listen and compare (§2.1). Downloads, editor previews and rendering stay refused. Turned on by the owner on 2026-10-17, who explicitly accepted the risk in §2.2. |
 
 `public_url` stays the **editing** address (the Access protected one). The template is in
 `config/studio_server.cloudflare.example.json`.
@@ -237,13 +263,15 @@ cd frontend; npm run test:visitor
 
 After step 5, from any computer: `curl -s -o NUL -w "%{http_code}" https://studio.andresgustavo.com/api/state`
 gives 200, `…/api/save -X POST -H "Content-Type: application/json" -d "{}"` gives 401,
-`…/audio/mcc?level=a10&lang=spanish&index=0` gives 401, and https://admin.andresgustavo.com/ without signing in
-gives 302 to Cloudflare Access.
+`…/audio/mcc?level=a10&lang=spanish&index=0` gives 401 (200 `audio/wav` with `public.originals`),
+`…/audio/preview?key=x&kind=edited` gives 401, and https://admin.andresgustavo.com/ without signing in gives 302 to
+Cloudflare Access. Browser test with originals: `$env:E2E_PUBLIC_ORIGINALS = "1"; npm run test:visitor`.
 
 ## 8. Limitations
 
 - Public answers include line metadata and subtitle text from both games (the point of the view). With
-  `public.previews` on, edited Campaign Evolved audio is public too: see §2.2. Set it to `false` and restart to stop.
+  `public.previews` on, edited Campaign Evolved audio is public too, and with `public.originals` the unedited
+  Campaign Evolved and MCC recordings as well: see §2.2. Set them to `false` and restart to stop.
 - Published previews are as fresh as the last publish: newly approved lines need `publish_previews.py` again.
   Changed lines stop playing on their own, and a changed export gain is picked up by the next publish.
 - Visitors do not get live updates; they see changes on reload.

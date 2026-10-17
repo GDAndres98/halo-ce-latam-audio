@@ -64,11 +64,16 @@ const mccEnglish = computed(() =>
 // The edited replacement is rendered automatically; only a preview of the current recipe is offered (never
 // where recordings cannot be played).
 const preview = useEditPreview(props.match);
-// Visitors never render previews (that is a write on the server): B plays the unedited recording.
-const canRender = computed(() => detail.value?.edit?.available !== false && !readOnly.value);
+// Visitors never render previews (that is a write on the server): B plays the unedited recording or, for an
+// approved line, the owner's published edited preview (never an encoded one).
+const publicPreviewUrl = computed(() => detail.value?.public_preview?.url ?? null);
+const canRender = computed(() =>
+  readOnly.value ? Boolean(publicPreviewUrl.value) : detail.value?.edit?.available !== false,
+);
 const replacement = computed(() => {
   const d = draft.value;
   const unedited = d.audioSource === "ce" && d.audioRef ? audioUrl.ce(d.audioRef, d.audioLanguage) : null;
+  if (readOnly.value) return { unedited, edited: publicPreviewUrl.value, encoded: null };
   const current = unedited ? preview.current.value : null;
   return { unedited, edited: current?.edited ?? null, encoded: current?.encoded ?? null };
 });
@@ -229,8 +234,9 @@ async function choose(ref: string) {
       <!-- 2. Flags & notes -->
       <FlagsNotes :draft="draft" :read-only="readOnly" />
 
-      <!-- Public view: the published edited preview of an approved line (never originals or drafts) -->
-      <PublicPreview v-if="readOnly && canPlayPreviews" :key="detail.slot_id" :preview="detail.public_preview ?? null" />
+      <!-- Public view without the originals: the published edited preview of an approved line on its own (with the
+           originals, it is B in Listen & compare) -->
+      <PublicPreview v-if="readOnly && canPlayPreviews && !canListen" :key="detail.slot_id" :preview="detail.public_preview ?? null" />
 
       <!-- 3. Audio editing (a read-only summary in the public view, or where recordings cannot be played) -->
       <RecipeSummary v-if="readOnly || !canListen" :detail="detail" :draft="draft" />
@@ -252,6 +258,7 @@ async function choose(ref: string) {
         :rendering="preview.rendering.value"
         :errors="preview.errors.value"
         :stats="preview.current.value?.stats ?? null"
+        :no-edited-reason="detail.public_preview?.reason ?? null"
       />
 
       <!-- 5. Subtitles -->

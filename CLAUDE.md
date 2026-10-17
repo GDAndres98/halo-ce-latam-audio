@@ -278,10 +278,16 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       (owner request 2026-10-17; ships off, copyright assessment in §2.2) visitors play `GET /audio/public?slot=`: the
       edited previews of APPROVED lines, pre-rendered by the owner with `scripts/build/publish_previews.py`
       (`scripts/ui/public_previews.py`), served only while the line is unchanged; anonymous requests never render.
+      With `public.originals: true` (owner request 2026-10-17, ships off; the owner explicitly accepted the copyright
+      risk, §2.2) visitors also play `/audio/mcc` and `/audio/ce` and see `/audio/peaks` (only for an allowed `src`)
+      in Listen and compare (B = unedited CE or the published preview; no "encoded"); still refused: downloads,
+      `/audio/preview`, `POST /api/edit/preview`, the interference reference, writes. Browser test:
+      `E2E_PUBLIC_ORIGINALS=1 npm run test:visitor`.
       The UI shows Read-only + Sign in to edit.
       Plan: `studio.andresgustavo.com` → 8081 public, `admin.andresgustavo.com` → 8080 with Access (same Access
       app, same AUD). The dashboard steps (§6) are the owner's. Tests: `tests/test_public_access.py`,
-      `npm run test:visitor`. Never add an endpoint to `PUBLIC_GETS` that streams audio or reveals paths.
+      `npm run test:visitor`. Never add an endpoint to `PUBLIC_GETS` that streams audio or reveals paths
+      (public audio goes only through `Listener.public_audio_ok`).
     - **Mobile layout (owner prompt 46, 2026-10-13):** `docs/mobile.md`. Same Vue app and server, no
       backend change: `<html data-layout="phone|tablet|desktop">` from `frontend/src/layout/useLayoutMode.ts`
       (media queries, not innerWidth), styles in `frontend/src/styles/mobile.css`. Phones get one pane at a time

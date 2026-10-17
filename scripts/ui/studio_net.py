@@ -34,8 +34,10 @@ DEFAULTS = {
     # previews: visitors may play the published edited previews of APPROVED lines (public_previews.py; published by
     # scripts/build/publish_previews.py). Never the original recordings. Off by default: anything a browser plays
     # can be saved (docs/public-access.md §2.1).
+    # originals: visitors may also play the original recordings (MCC Spain / English, unedited Campaign Evolved) and
+    # see waveforms (owner request 2026-10-17). Off by default.
     "public": {"enabled": False, "host": "127.0.0.1", "port": 8081, "url": None, "sign_in_url": None,
-               "previews": False},
+               "previews": False, "originals": False},
     # Extra host names the remote listener answers to (e.g. "studio-pc.tail1234.ts.net"). The machine's own
     # names and addresses are always accepted.
     "allowed_hosts": [],
@@ -128,8 +130,9 @@ def load_server_config(root, path=None, overrides=None):
                               "read-only listener")
         if pub["port"] == cfg["local"]["port"] or (cfg["remote"]["enabled"] and pub["port"] == cfg["remote"]["port"]):
             raise ConfigError("the public listener needs its own port")
-        if not isinstance(pub["previews"], bool):
-            raise ConfigError("public.previews must be true or false")
+        for key in ("previews", "originals"):
+            if not isinstance(pub[key], bool):
+                raise ConfigError(f"public.{key} must be true or false")
         for key in ("url", "sign_in_url"):
             if pub[key] is not None and not (str(pub[key]).startswith("https://") and urlparse(pub[key]).hostname):
                 raise ConfigError(f"public.{key} must be an https:// address")

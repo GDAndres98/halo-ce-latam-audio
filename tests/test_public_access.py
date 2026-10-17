@@ -145,8 +145,9 @@ class PublicListenerTests(unittest.TestCase):
                          ("public", True, False, None, None))
         self.assertEqual(info["sign_in_url"], f"https://{ADMIN_HOST}")
         previews = self.cfg["public"]["previews"]  # off by default; PublicPreviewTests turns it on
+        originals = self.cfg["public"]["originals"]  # off by default; PublicOriginalsTests turns it on
         self.assertEqual(info["permissions"], {"edit": False, "admin": False, "install": False, "settings_mcc": False,
-                                               "audio": False, "download": False, "previews": previews})
+                                               "audio": originals, "download": False, "previews": previews})
         state = self.get("/api/state")
         self.assertEqual([lv["level"] for lv in state["levels"]], ["z10"])
         rows = self.get("/api/slots?level=z10")["slots"]
@@ -198,8 +199,10 @@ class PublicListenerTests(unittest.TestCase):
         self.assertEqual(self.data_hashes(), before)
         self.assertFalse((self.root / "work/studio/audit.jsonl").exists(), "an anonymous request wrote the audit log")
 
+    REFUSED = REFUSED_GETS  # PublicOriginalsTests narrows it
+
     def test_no_audio_downloads_settings_or_feed(self):
-        for path in REFUSED_GETS:
+        for path in self.REFUSED:
             for method in ("GET", "HEAD"):
                 st, _, _ = self.req("public", path, method=method)
                 self.assertEqual(st, 401, (method, path))
@@ -214,8 +217,8 @@ class PublicListenerTests(unittest.TestCase):
         self.assertEqual((info["visitor"], info["user"], info["permissions"]["edit"]), (True, None, False))
         self.assertEqual(self.req("public", "/api/save", {"slot_id": SLOT, "notes": "x"}, token=valid,
                                   headers=forged)[0], 401)
-        self.assertEqual(self.req("public", "/audio/mcc?level=z10&lang=spanish&index=0", token=valid,
-                                  headers=forged)[0], 401)
+        self.assertEqual(self.req("public", "/audio/preview?key=abc&kind=edited", token=valid,
+                                  headers=forged)[0], 401)  # editor previews: refused even with originals on
         self.assertEqual(self.req("public", "/api/state?role=admin&edit=1", headers=forged)[0], 200)
 
     def test_host_traversal_and_classic(self):
@@ -317,7 +320,8 @@ class PublicPreviewTests(PublicListenerTests):
 
     def test_approved_line_plays_after_publishing(self):
         info = self.get("/api/session")
-        self.assertEqual((info["permissions"]["previews"], info["permissions"]["audio"]), (True, False))
+        self.assertEqual((info["permissions"]["previews"], info["permissions"]["audio"]),
+                         (True, self.cfg["public"]["originals"]))
         self.assertEqual(self.req("public", self.URL)[0], 404)  # nothing decided yet
         self.assertIn("no decision", self.preview_info()["reason"])
         self.approve()
@@ -397,6 +401,73 @@ class PublicPreviewTests(PublicListenerTests):
         self.assertEqual([self.req("limited", self.URL, host=PUBLIC_HOST)[0] for _ in range(2)], [200, 429])
 
 
+class PublicOriginalsTests(PublicPreviewTests):
+    """The owner also turned on "public": {"originals": true} (2026-10-17): visitors play the original recordings
+    (MCC Spain / English, unedited Campaign Evolved) and see waveforms of whatever they may hear. Downloads, editor
+    previews, rendering, the interference reference, writes, settings and the live feed stay refused, and nothing
+    is rendered for a visitor. Re-runs every PublicPreviewTests check (the private-originals one is replaced)."""
+
+    MCC = ("/audio/mcc?level=z10&lang=spanish&index=0", "/audio/mcc?level=z10&lang=english&index=0")
+    CE = "/audio/ce?ref=line_a%230&lang=Spanish(Mexico)"
+    STILL_REFUSED = ("/audio/preview?key=abc&kind=edited", "/audio/peaks?src=%2Faudio%2Fpreview%3Fkey%3Dabc",
+                     "/audio/peaks?src=https%3A%2F%2Fevil.example%2Faudio%2Fmcc", "/audio/peaks?src=",
+                     "/audio/anything", "/api/events", "/api/network", "/api/settings/export", "/api/data/status",
+                     "/api/job?id=1", "/api/deploy/status", "/api/deploy/plan?build=b1", "/api/builds/log?name=b1",
+                     "/api/interference/reference?slot=x&lang=spanish", "/api/unknown")
+    REFUSED = STILL_REFUSED
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["public"]["originals"] = True
+
+    @staticmethod
+    def peaks(url):
+        return "/audio/peaks?src=" + urllib.request.quote(url, safe="")
+
+    def test_originals_and_waveforms_play(self):
+        info = self.get("/api/session")
+        self.assertEqual((info["permissions"]["audio"], info["permissions"]["download"]), (True, False))
+        for path in (*self.MCC, self.CE):
+            st, body, headers = self.req("public", path)
+            self.assertEqual((st, headers["Content-Type"]), (200, "audio/wav"), path)
+            self.assertIn("private", headers["Cache-Control"])
+            st, body, headers = self.req("public", path, headers={"Range": "bytes=0-9"})
+            self.assertEqual((st, len(body)), (206, 10), path)
+        self.assertEqual(len(self.decoded), 6)  # decoded on demand, as for the owner
+        self.approve()
+        self.publish()
+        for src in (*self.MCC, self.CE, self.URL):
+            st, body, _ = self.req("public", self.peaks(src))
+            self.assertEqual(st, 200, (src, body[:200]))
+            self.assertIsInstance(json.loads(body), dict)
+
+    def test_originals_and_editor_previews_stay_private(self):  # replaces the previews-only check
+        self.approve()
+        self.publish()
+        for path in self.STILL_REFUSED:
+            self.assertEqual(self.req("public", path)[0], 401, path)
+        for path in POSTS:
+            self.assertEqual(self.req("public", path, {"slot_id": SLOT})[0], 401, path)
+        for path in (*self.MCC, self.CE):
+            self.assertEqual(self.req("public", path, method="POST")[0], 401, path)
+        self.assertEqual(self.renders[1:], [], "a visitor request rendered audio")  # [0] is the owner's publish
+
+    def test_originals_off_means_none(self):
+        self.cfg["public"]["originals"] = False
+        for path in (*self.MCC, self.CE, self.peaks(self.MCC[0]), self.peaks(self.CE)):
+            self.assertEqual(self.req("public", path)[0], 401, path)
+        self.assertFalse(self.get("/api/session")["permissions"]["audio"])
+        self.assertEqual(self.decoded, [])
+
+    def test_original_requests_are_rate_limited(self):
+        lst = m4_server.Listener("public", self.cfg, 0, limiter=public_view.PublicLimiter(per_minute=2))
+        s2 = m4_server.StudioHTTPServer(("127.0.0.1", 0), m4_server.make_handler(self.app, quiet=True, listener=lst))
+        threading.Thread(target=s2.serve_forever, daemon=True).start()
+        self.servers["limited"] = s2
+        self.assertEqual([self.req("limited", p, host=PUBLIC_HOST)[0]
+                          for p in (self.MCC[0], self.peaks(self.CE), self.CE)], [200, 200, 429])
+
+
 class PublicConfigTests(unittest.TestCase):
     def cfg(self, tmp, **public):
         return load_server_config(tmp, overrides={
@@ -409,10 +480,12 @@ class PublicConfigTests(unittest.TestCase):
             self.assertFalse(load_server_config(tmp)["public"]["enabled"])  # off unless asked for
             self.assertEqual(self.cfg(tmp)["public"]["port"], 8081)
             self.assertFalse(self.cfg(tmp)["public"]["previews"])  # silent unless the owner turns it on
+            self.assertFalse(self.cfg(tmp)["public"]["originals"])
+            self.assertTrue(self.cfg(tmp, originals=True)["public"]["originals"])
             for bad in ({"host": "0.0.0.0"}, {"host": "192.168.1.5"}, {"port": 8080}, {"port": 8765},
                         {"url": "http://studio.example.com"}, {"url": f"https://{ADMIN_HOST}"},
                         {"sign_in_url": "javascript:alert(1)"}, {"surprise": 1}, {"previews": "yes"},
-                        {"audio": True}):  # the earlier "originals" setting no longer exists
+                        {"originals": "yes"}, {"originals": 1}, {"audio": True}):
                 with self.assertRaises(ConfigError, msg=bad):
                     self.cfg(tmp, **bad)
 
