@@ -1,6 +1,14 @@
 # Added takes: design for review (owner, 2026-10-17)
 
-**For:** the owner, to approve or change before anything is built. **Status:** proposal only; no code yet.
+**For:** the owner. **Status:** approved by the owner on 2026-10-17 with the recommendations in §3 (unsubtitled
+sounds only; independent of Spain's places; no hard limit, warning above 12). **Steps 1–4 built** (commits
+`be4582b`, `abf21a1`, `e55f389`); step 5, the in-game check of a real build, is the owner's.
+
+**Built, and how to use it:** Matching → open a line of a sound without subtitles (e.g. a Grunt bark) → focus a
+Campaign Evolved recording on the right → **Takes of this sound** → *Add as extra take* → *Approve*. Build audio
+as usual: a build with approved added takes writes the bank **and** the Spanish `.lst.bin`, and Build & Test
+installs and restores both together. **Not in the page yet:** the audio editor for an added take (trims, radio,
+echo). The data, the validator and the build already support a recipe; for now added takes play unedited.
 
 ## 1. Goal
 

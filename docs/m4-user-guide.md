@@ -100,6 +100,10 @@ Slot filters (left):
    ↑ / ↓ (several lines are concatenated in that order). Or choose *no equivalent* or *deferred*.
 3. **Audio:** *keep Spain*, or *CE line(s) from the match* in es-MX (en and es-ES are allowed
    too). The duration difference against Spain is a plain fact.
+   - **Takes of this sound** (2026-10-17, docs/added-takes-design.md): for a sound **without** a subtitle
+     entry (AI chatter such as Grunt deaths), add extra Campaign Evolved recordings: focus one on the right, then
+     *Add as extra take*. Each added take is approved, reworked, reordered or removed on its own; the game picks
+     among all the sound's takes. Lines whose sound has added takes show **+N**; filter *Has added takes*.
    - **Mute in game (no replacement)** (Studio only, 2026-10-15): the line is omitted; the build
      writes silence of the same length, so the scene's timing stays. Say why (required). It marks
      the line *no equivalent* and proposes subtitle *none* (a tag's subtitle is only removed when

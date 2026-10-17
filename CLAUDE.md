@@ -314,7 +314,13 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         The map tag has 4 permutations, #3 skip fraction 1.0. Johnson variant (`--preset johnson`): **in-game PASS
         (owner, 2026-10-17, `v-000020`): all 4 takes heard**, so MCC selects added takes via the Spanish index.
         6 takes (`--preset johnson6`, beyond the tag's 4): **PASS, all 6 heard (`v-000021`)**: the take count comes
-        from the Spanish index, not the map tag. General "add another take" feature not built yet.
+        from the Spanish index, not the map tag.
+      - **Added takes built (owner, 2026-10-17):** `docs/added-takes-design.md`. `manual_mappings.json` optional
+        `added_takes` (take_id `t-NNNNNN`, never reused; database v5); sounds without a SU/SP entry, mono; warning
+        above 12. Studio "Takes of this sound" (`AddedTakes.vue`, `/api/takes/save|move|remove`, `npm run
+        test:takes`). M6 `plan_inserts` / `insert_takes`: bank + Spanish `.lst.bin`, installed together. The editor
+        for added takes is not in the page yet. In-game check of a real build pending. Never add or approve takes
+        yourself.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

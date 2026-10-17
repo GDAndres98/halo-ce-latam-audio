@@ -269,6 +269,20 @@ setting chosen on Build & Test.
 - **Stability:** `.lst` not written. Edits made in M4 during the build are reported; the install
   tool guards against stale builds (§1).
 
+## 3b. Added takes (2026-10-17, docs/added-takes-design.md)
+
+- `plan_inserts`: approved added takes of the selected folders → **insert** (drafts and needs-rework are left out
+  and listed; invalid ones are reported: drift, a subtitled or stereo sound, unresolved media, a bad recipe).
+- Stage 1 is the usual bank (replacements, mutes) with its usual checks. Stage 2 (`insert_takes`) inserts each
+  sound's approved takes after its Spain takes, in position order, named `LATAM t000001`, and rewrites the Spanish
+  `.lst.bin` (counts, shifted starts).
+- Extra checks (`insert:*`): every existing sample byte-identical at its new place, inserted streams and counts,
+  LOOP 0, n−2, the index rules, every sound resolving to its old samples first; all subsongs decode, and every
+  original one identically; per-take content checks like a replacement; deterministic.
+- A build with added takes has **two** install files (bank + index), installed and restored together; without
+  them nothing changes (the x30 build was compared byte for byte with the previous builder). The installer's
+  stale check covers inserted takes; a bank-only build refuses a non-original index.
+
 ## 4. Subtitles (`--kind subtitles` or `both`)
 
 **Status (2026-10-11):** works offline; the runtime check in MCC is pending (subtitle-research.md B.13).
