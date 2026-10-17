@@ -399,7 +399,9 @@ export interface ExportSettings {
 }
 
 /** What a build contains: the Spanish dialogue bank, the SU/SP subtitle tables, or all three. */
-export type BuildKind = "audio" | "subtitles" | "both";
+/** "experiment": a prepared test (e.g. the permutation experiment), installed and restored like a build but never
+ * started from the page and not made from the mappings. */
+export type BuildKind = "audio" | "subtitles" | "both" | "experiment";
 
 /** Counts of a subtitle plan (common/m6_build.subtitle_plan "summary"). */
 export interface SubtitleSummary {

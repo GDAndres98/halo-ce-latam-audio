@@ -207,7 +207,7 @@ function poll() {
 }
 
 const JOB_TEXT = { build: "Building", install: "Installing", restore: "Restoring" } as const;
-const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
+const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles", experiment: "Experiment" } as const;
 const jobKind = computed(() => (job.value?.detail as { kind?: BuildKind } | undefined)?.kind);
 const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
 const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null }) =>

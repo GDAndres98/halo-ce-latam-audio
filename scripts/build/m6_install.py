@@ -51,6 +51,11 @@ from common.m6_build import (  # noqa: E402
     SUBTITLE_TABLES, compare_plans, compare_subtitle_plans, plan_audio, subtitle_plan)
 
 STEAM_BUILD = "19905945"
+# The Spanish bank and its sound index (.lst.bin) must always match each other: a build that replaces only the
+# bank was made for the original index (experiments that change the index install both, as one unit).
+BANK_REL = "halo1/sound/pc/sounds_dialogs_spanish.fsb"
+LST_REL = "halo1/sound/pc/lst/sounds_dialogs_spanish.lst.bin"
+LST_PIN = "d5324861186f079c8d436f598b0adcafba259259eaa56be57d987df68cdaffc3"  # work/mcc/build.json spanish.lst
 
 
 def stop(msg):
@@ -119,9 +124,22 @@ def require_closed():
         stop(f"MCC/EAC appears to be running: {procs}. Close it completely first.")
 
 
+def companion_check(b):
+    """A build that replaces the Spanish bank but not its index needs the ORIGINAL index installed (an experiment
+    that changed it must be restored first), or the bank's samples would be read through the wrong ranges."""
+    rels = {f["install_rel"] for f in b.files}
+    lst = b.root / LST_REL
+    if BANK_REL in rels and LST_REL not in rels and lst.is_file() and sha256_file(lst) != LST_PIN:
+        stop(f"installed {LST_REL} is not the original (a permutation experiment is installed?); restore it first")
+
+
 def stale_check(b):
     """Re-plan the build's folders from the CURRENT mappings: refuse if a replaced line (or a written subtitle)
-    is no longer the approved decision; warn if newer approvals are simply not in this build."""
+    is no longer the approved decision; warn if newer approvals are simply not in this build. Experiments
+    (kind "experiment", e.g. the permutation test) are not made from the mappings: nothing to compare."""
+    if b.kind == "experiment":
+        print("experiment build: not made from the mappings (no staleness check)")
+        return {"changed_or_revoked": [], "newly_eligible": []}
     sys.path.insert(0, str(REPO_ROOT / "scripts" / "ui"))
     from m4_app import M4App
     app = M4App(REPO_ROOT, run_validator=False)
@@ -152,6 +170,7 @@ def check(b, quiet=False):
     if not b.report.get("ok"):
         stop("the build's validation report is not ok; rebuild")
     stale_check(b)
+    companion_check(b)
     build, flags = steam_build(b.root)
     if build != STEAM_BUILD:
         stop(f"Steam build {build} != {STEAM_BUILD}: the pins and the build are for another game version")
@@ -204,6 +223,7 @@ def restore_all(b):
 def install(b):
     require_closed()
     stale_check(b)
+    companion_check(b)
     pre = b.read_state("preflight")
     if not pre:
         stop("run preflight first")

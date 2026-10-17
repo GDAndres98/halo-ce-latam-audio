@@ -197,7 +197,7 @@ data says the per-language index, not the tag, defines Spain's set (Spain alread
 samples than the tag defines, and 329 with fewer, without problems). Whether extra samples are actually
 **selected** can only be shown in game.
 
-Minimal in-game test (needs your approval, not prepared as an install): install the `perm_` bank + index
+**Prepared (2026-10-16): docs/permutation-experiment.md.** Original sketch: install the `perm_` bank + index
 together, then kill Grunts violently (grenades, explosions) ~20 times with Spanish audio. English #3/#4 are
 longer (2.6 s / 2.4 s vs Spain's 1.2 s / 0.8 s) and audibly different. Any English death ⇒ the extra samples are
 selected. A stronger second case puts **5 or 6** samples on `death_violent` (above the tag's 4): if those play

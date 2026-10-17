@@ -418,8 +418,12 @@ class BuildBoard:
                 "subtitles": (f"SU and SP rewritten: {sub.get('keys_to_write', 0)} entr(ies) each at most; "
                               f"{sub.get('excluded', 0)} excluded, {sub.get('conflicts', 0)} conflict(s). "
                               + RUNTIME_NOTE) if kind in ("subtitles", "both")
-                else "not changed (audio-only build)",
-                "audio": "Spanish dialogue bank replaced" if kind in ("audio", "both") else "not changed (subtitle-only build)"}
+                else "not changed (audio-only build)" if kind != "experiment" else "not changed",
+                "audio": ("EXPERIMENT (not made from your decisions): the Spanish dialogue bank AND its sound index "
+                          "(.lst.bin) are replaced together, and restored together; "
+                          + ((m.get("experiment") or {}).get("question") or ""))
+                if kind == "experiment"
+                else "Spanish dialogue bank replaced" if kind in ("audio", "both") else "not changed (subtitle-only build)"}
 
     def _install_args(self, name):
         folder, _ = self.mcc_folder()

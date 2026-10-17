@@ -290,6 +290,11 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         structurally possible (bank + Spanish `.lst.bin` together; offline proof
         `scripts/discovery/p49_offline_proofs.py permutations`); selection in game is unverified, and no installer
         writes the `.lst.bin` yet.
+      - **Permutation experiment prepared (owner, 2026-10-16):** `docs/permutation-experiment.md`.
+        `python scripts/discovery/perm_experiment.py` → build `exp_grunt_death_violent_4` (kind `experiment`, bank +
+        Spanish `.lst.bin` as one unit, 19/19 offline). Installed/restored only by the owner from Build & Test
+        (`m6_install.py` handles both files; bank-only builds refuse a non-original index: `companion_check`).
+        The map tag has 4 permutations, #3 skip fraction 1.0. Not installed; in-game result pending.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**
