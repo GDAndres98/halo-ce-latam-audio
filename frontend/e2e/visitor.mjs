@@ -22,6 +22,8 @@ const LOCAL_PORT = 8798;
 const PUBLIC_PORT = 8797;
 const SLOT = "es:A10_010_cryotech#0";
 const SIGN_IN = "https://admin.example.com/";
+// E2E_PUBLIC_AUDIO=1: the owner's "public": {"audio": true} (visitors play the originals; still no downloads).
+const AUDIO = process.env.E2E_PUBLIC_AUDIO === "1";
 
 const results = [];
 const pageErrors = [];
@@ -66,7 +68,8 @@ async function openVisitor(browser, options, label) {
 }
 
 const forbidden = (requests) =>
-  requests.filter((r) => r.path.startsWith("/audio/") || r.method !== "GET" || r.path === "/api/events");
+  requests.filter((r) => (r.path.startsWith("/audio/") && !(AUDIO && /^\/audio\/(mcc|ce|peaks)$/.test(r.path))) ||
+    r.method !== "GET" || r.path === "/api/events");
 
 async function openLine(page, base) {
   await page.goto(`${base}#/match?level=a10&slot=${encodeURIComponent(SLOT)}`);
@@ -81,7 +84,7 @@ async function main() {
   const fixture = await runFixture(join(tmp, "root"));
   const root = fixture.root;
   const config = join(tmp, "studio_server.json");
-  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN } }));
+  await writeFile(config, JSON.stringify({ schema: "studio-server/1", public: { enabled: true, port: PUBLIC_PORT, sign_in_url: SIGN_IN, audio: AUDIO } }));
   let server;
   let browser;
   const pages = [];
@@ -104,8 +107,10 @@ async function main() {
     await step("direct requests: browsing allowed, writes / audio / downloads / settings refused", async () => {
       const ok = ["api/session", "api/state", "api/slots?level=a10", `api/slot?id=${encodeURIComponent(SLOT)}`, "api/ce?mission=M01", "api/builds", "api/deploy/history"];
       for (const p of ok) check((await fetch(base + p)).status === 200, `${p} not 200`);
-      const refused = ["audio/mcc?level=a10&lang=spanish&index=0", "audio/ce?ref=vo_scr_m01_00460_cryotech%230&lang=Spanish(Mexico)",
-        "audio/peaks?src=%2Faudio%2Fmcc%3Flevel%3Da10%26lang%3Dspanish%26index%3D0", "api/events", "api/network", "api/settings/export",
+      const audio = ["audio/mcc?level=a10&lang=spanish&index=0", "audio/ce?ref=vo_scr_m01_00460_cryotech%230&lang=Spanish(Mexico)",
+        "audio/peaks?src=%2Faudio%2Fmcc%3Flevel%3Da10%26lang%3Dspanish%26index%3D0"];
+      if (AUDIO) for (const p of audio) check((await fetch(base + p)).status === 200, `${p} not 200 with public audio on`);
+      const refused = [...(AUDIO ? ["audio/preview?key=abc&kind=edited"] : audio), "api/events", "api/network", "api/settings/export",
         "api/data/status", "api/deploy/status", "api/builds/log?name=a10"];
       const codes = [];
       for (const p of refused) codes.push((await fetch(base + p)).status);
@@ -143,13 +148,21 @@ async function main() {
         save: document.querySelectorAll('[data-testid="save-draft"], [data-testid="approve-both"], .save-bar').length,
         unmatch: document.querySelectorAll('[data-testid="unmatch"]').length,
         use: [...document.querySelectorAll("button")].filter((b) => /Use this recording|Needs rework|Approve/.test(b.textContent ?? "")).length,
-        play: document.querySelectorAll("button.play").length,
         download: document.querySelectorAll("a.download-link, a[download]").length,
-        compare: document.querySelectorAll('[data-section="compare"], .wave-view').length,
         notes: document.querySelectorAll('[data-section="flags"] textarea').length,
-        enabledInputs: [...document.querySelectorAll("#pane-match input, #pane-match textarea, #pane-match select")].filter((el) => !el.disabled && !el.closest("fieldset:disabled")).length,
+        enabledInputs: [...document.querySelectorAll("#pane-match input, #pane-match textarea, #pane-match select")].filter((el) => !el.disabled && !el.closest("fieldset:disabled") && !el.closest('[data-section="compare"]')).length,
       }));
       check(Object.values(counts).every((n) => n === 0), JSON.stringify(counts));
+      const players = await desk.page.locator("button.play").count();
+      const compare = await desk.page.locator('[data-section="compare"]').count();
+      check(AUDIO ? players > 0 && compare === 1 : players === 0 && compare === 0, `players ${players}, compare ${compare}`);
+      if (AUDIO) {
+        const spain = desk.page.locator("li.row-item.selected button.play").first();
+        await spain.click();
+        await desk.page.locator("li.row-item.selected button.play.active").first().waitFor({ timeout: 20000 });
+        await spain.click();
+        check(desk.requests.some((r) => r.path === "/audio/mcc"), "no MCC audio was requested");
+      }
       const subtitle = await desk.page.getByTestId("subtitle-preview-text").innerText().catch(() => "");
       check(subtitle.length > 0, "no subtitle shown");
       await desk.page.screenshot({ path: join(OUT, "visitor-match.png") });
@@ -158,7 +171,8 @@ async function main() {
 
     await step("desktop: shortcuts and clicks change nothing and play nothing", async () => {
       await desk.page.locator("li.row-item").nth(1).click();
-      for (const key of ["s", "Control+s", "Control+Enter", " ", "m", "e", "n", "1"]) await desk.page.keyboard.press(key);
+      const keys = AUDIO ? ["s", "Control+s", "Control+Enter"] : ["s", "Control+s", "Control+Enter", " ", "m", "e", "n", "1"];
+      for (const key of keys) await desk.page.keyboard.press(key);
       await desk.page.waitForTimeout(800);
       const bad = forbidden(desk.requests);
       check(bad.length === 0, `requests: ${JSON.stringify(bad.slice(0, 5))}`);

@@ -90,7 +90,8 @@ from common.export_config import ConfigError, load_export_config, save_global_ga
 from live_feed import LiveFeed  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 from cf_access import HEADER as ACCESS_HEADER, AccessError, AccessVerifier  # noqa: E402
-from public_view import PUBLIC_GETS as PUBLIC_LISTENER_GETS, Limited, PublicLimiter, sanitize  # noqa: E402
+from public_view import (PUBLIC_AUDIO, PUBLIC_GETS as PUBLIC_LISTENER_GETS, Limited, PublicLimiter,  # noqa: E402
+                         sanitize)
 from studio_auth import AuthError, Authenticator, SessionStore, UserStore, csrf_ok  # noqa: E402
 from studio_net import ConfigError as NetConfigError, HostPolicy, connection_info, load_server_config  # noqa: E402
 
@@ -151,6 +152,11 @@ class Listener:
     @property
     def public(self):
         return self.kind == "public"
+
+    @property
+    def public_audio(self):
+        """The owner let visitors play the original recordings ("public": {"audio": true})."""
+        return self.public and self.cfg["public"].get("audio") is True
 
     @property
     def sign_in_url(self):
@@ -355,7 +361,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             local = not listener.remote
             # audio: stream recordings, waveforms and editor previews; download: save them as files.
             return {"edit": bool(s), "admin": bool(s) and (local or s["role"] == "admin"),
-                    "install": local, "settings_mcc": local, "audio": bool(s), "download": bool(s)}
+                    "install": local, "settings_mcc": local, "audio": bool(s) or listener.public_audio,
+                    "download": bool(s)}
 
         def _session_info(self, s):
             if listener.public:
@@ -426,8 +433,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         # ------------------------------------------------------------ audio
         def _audio_path(self, path, q):
             """The file behind one of the audio URLs. Only catalog entries and preview keys: never a path."""
-            if listener.public:  # defence in depth: the public route never gets here
-                raise self._visitor_refused("Recordings need the owner's sign-in")
+            if listener.public and not (listener.public_audio and path in ("/audio/mcc", "/audio/ce")):
+                raise self._visitor_refused("Recordings need the owner's sign-in")  # previews: never public
             if path == "/audio/mcc":
                 return app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)), False
             if path == "/audio/ce":
@@ -534,6 +541,17 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             built page. Everything else is refused before any work is done (fail closed)."""
             if self.command not in ("GET", "HEAD"):
                 raise self._visitor_refused()
+            if listener.public_audio and path in PUBLIC_AUDIO:
+                try:
+                    listener.limiter.admit(self._peer())
+                    if path == "/audio/peaks":
+                        with listener.limiter.slot():
+                            return self._peaks(q)
+                    with listener.limiter.slot():  # decoding on demand; the transfer itself holds no slot
+                        wav, immutable = self._audio_path(path, q)
+                except Limited as e:
+                    return self._json(e.status, {"error": e.message}, {"Retry-After": str(e.retry_after or 5)})
+                return self._wav(wav, immutable)
             if path.startswith(("/api/", "/audio/")):
                 if path not in PUBLIC_LISTENER_GETS:
                     raise self._visitor_refused("Recordings and downloads need the owner's sign-in"

@@ -63,7 +63,8 @@ const mccEnglish = computed(() =>
 // The edited replacement is rendered automatically; only a preview of the current recipe is offered (never
 // where recordings cannot be played).
 const preview = useEditPreview(props.match);
-const canRender = computed(() => detail.value?.edit?.available !== false);
+// Visitors never render previews (that is a write on the server): B plays the unedited recording.
+const canRender = computed(() => detail.value?.edit?.available !== false && !readOnly.value);
 const replacement = computed(() => {
   const d = draft.value;
   const unedited = d.audioSource === "ce" && d.audioRef ? audioUrl.ce(d.audioRef, d.audioLanguage) : null;
@@ -227,8 +228,8 @@ async function choose(ref: string) {
       <!-- 2. Flags & notes -->
       <FlagsNotes :draft="draft" :read-only="readOnly" />
 
-      <!-- 3. Audio editing (a read-only summary where recordings cannot be played) -->
-      <RecipeSummary v-if="!canListen" :detail="detail" :draft="draft" />
+      <!-- 3. Audio editing (a read-only summary in the public view, or where recordings cannot be played) -->
+      <RecipeSummary v-if="readOnly || !canListen" :detail="detail" :draft="draft" />
       <AudioEditor
         v-else
         :key="detail.slot_id" :draft="draft" :locked="audioLocked"

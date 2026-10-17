@@ -8,6 +8,7 @@
 // On touch screens two more buttons play A or B from the start, so the comparison works with one thumb.
 //
 // While the edited recording is being rendered, B has no URL: an outdated preview is never offered.
+import { readOnly } from "../../auth/session";
 
 import { computed, ref, watch } from "vue";
 import { ArrowRightLeft, Headphones, ListVideo, LoaderCircle, Play, Square, TriangleAlert } from "lucide-vue-next";
@@ -217,7 +218,7 @@ useShortcuts({ a: switchAB, b: playSequence });
       </label>
       <span class="preview-status small" role="status" data-testid="preview-status" :data-state="previewState">
         <span v-if="!replacement.unedited" class="muted">No Campaign Evolved recording chosen.</span>
-        <span v-else-if="!canRender" class="muted">Previews are unavailable on this server: B plays the unedited recording.</span>
+        <span v-else-if="!canRender" class="muted">{{ readOnly ? "Read-only view: B plays the unedited recording (the edits are listed under Audio editing)." : "Previews are unavailable on this server: B plays the unedited recording." }}</span>
         <template v-else-if="rendering">
           <LoaderCircle :size="14" class="spin" aria-hidden="true" />
           <span class="muted">Rendering the latest edits…</span>

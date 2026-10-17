@@ -10,7 +10,7 @@
 
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { api, ApiError } from "../api/client";
-import { canListen } from "../auth/session";
+import { canListen, readOnly } from "../auth/session";
 import type { AudioEdit, CeLanguage } from "../api/types";
 import type { MatchState } from "./useMatch";
 
@@ -44,7 +44,8 @@ export function useEditPreview(match: MatchState, delayMs = PREVIEW_DELAY_MS) {
   const request = computed<PreviewRequest | null>(() => {
     const detail = match.detail.value;
     const draft = match.draft;
-    if (!detail || detail.edit?.available === false || !canListen.value) return null; // no previews for visitors
+    // Rendering a preview is a write on the server: never in the read-only view, never without audio.
+    if (!detail || detail.edit?.available === false || !canListen.value || readOnly.value) return null;
     if (draft.audioSource !== "ce" || !draft.audioRef) return null;
     return { slot_id: detail.slot_id, ce_line_ref: draft.audioRef, language: draft.audioLanguage, edit: draft.edit };
   });

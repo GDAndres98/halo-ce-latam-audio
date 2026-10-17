@@ -45,8 +45,9 @@ Two host names instead of one host with mixed rules, because:
 | Visitor can | Visitor cannot |
 |---|---|
 | Open the Studio without signing in (desktop, phone, installed app) | Save, approve, reject, mark needs rework, unmatch, mute |
+| **Only with `public.audio` on:** play the original recordings (MCC Spain / English, Campaign Evolved es-MX / EN / es-ES), their waveforms, and A/B compare with the unedited replacement | Hear editor previews (rendering one is a write), download any file |
 | Browse levels, MCC lines, Campaign Evolved lines, search and filters | Choose recordings ("Use this recording" is hidden), edit flags, notes, subtitles or recipes |
-| See each decision: match, audio source, approvals, flags, subtitle text (SU / SP / EN / CE / custom), the edit recipe as text | Play, stream or download any recording, waveform or editor preview |
+| See each decision: match, audio source, approvals, flags, subtitle text (SU / SP / EN / CE / custom), the edit recipe as text | Play any recording or waveform (unless `public.audio` is on); download anything; hear editor previews |
 | See progress and statistics | Start builds, change the level setting, install or restore, change the MCC folder |
 | See the build list and the history of test installs (sanitised) | Open Data or Network, read build logs, the game folder or file locations |
 | | Receive the live change feed (it names who saved) |
@@ -120,6 +121,7 @@ Tests: `python -m unittest tests.test_public_access` (handler-level, synthetic d
 | `public.port` | 8081 by default; must differ from the other listeners. |
 | `public.url` | The public https address. It is the only host name the listener answers. It must differ from `public_url`. |
 | `public.sign_in_url` | Where **Sign in to edit** goes. Defaults to `public_url`. |
+| `public.audio` | `false` (default): visitors hear nothing. `true`: visitors may play `/audio/mcc`, `/audio/ce` and `/audio/peaks` (rate limited; previews and downloads stay refused). **Turned on by the owner on 2026-10-17, accepting that anything a browser plays can be saved and that this publishes MCC and Campaign Evolved audio.** |
 
 `public_url` stays the **editing** address (the Access protected one). The template is in
 `config/studio_server.cloudflare.example.json`.
@@ -183,9 +185,12 @@ gives 302 to Cloudflare Access.
 
 ## 8. Limitations
 
-- Public answers include line metadata and subtitle text from both games (the point of the view). Audio is
-  never served publicly. The asset question in CLAUDE.md (343 MCC modding FAQ) still applies to anything
-  published.
+- Public answers include line metadata and subtitle text from both games (the point of the view). With
+  `public.audio` on (owner decision, 2026-10-17) the original recordings of both games are also playable by anyone,
+  so they can be saved: the asset question in CLAUDE.md (343 MCC modding FAQ, M8.1) applies. Set it to `false` and
+  restart to stop.
+- Visitors hear the unedited Campaign Evolved recording as B, not the edited result (previews are rendered on
+  request, which is a write).
 - Visitors do not get live updates; they see changes on reload.
 - The owner's notes are not public. To publish them, remove `"notes"` from `public_view.DENY_KEYS`.
 - An installed phone app keeps its origin: the app installed from `studio` becomes the read-only view after

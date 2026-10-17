@@ -17,6 +17,6 @@ defineProps<{ detail: SlotDetail; draft: Draft }>();
       Recipe: <strong data-testid="recipe-summary-text">{{ detail.edit?.summary || "no edits" }}</strong>
     </p>
     <p v-else class="muted">No Campaign Evolved recording replaces this line, so there is no editing recipe.</p>
-    <p class="small muted">Listening, waveforms and the editor are available to the project owner only.</p>
+    <p class="small muted">The waveform editor is available to the project owner only.</p>
   </section>
 </template>

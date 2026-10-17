@@ -143,7 +143,9 @@ class PublicListenerTests(unittest.TestCase):
         self.assertEqual((info["listener"], info["visitor"], info["authenticated"], info["user"], info["csrf"]),
                          ("public", True, False, None, None))
         self.assertEqual(info["sign_in_url"], f"https://{ADMIN_HOST}")
-        self.assertFalse(any(info["permissions"].values()), info["permissions"])
+        audio = self.cfg["public"]["audio"]  # off by default; PublicAudioTests turns it on
+        self.assertEqual(info["permissions"], {"edit": False, "admin": False, "install": False, "settings_mcc": False,
+                                               "audio": audio, "download": False})
         state = self.get("/api/state")
         self.assertEqual([lv["level"] for lv in state["levels"]], ["z10"])
         rows = self.get("/api/slots?level=z10")["slots"]
@@ -275,6 +277,52 @@ class PublicListenerTests(unittest.TestCase):
         self.assertEqual(self.req("remote", "/api/state", token=tok, host=PUBLIC_HOST)[0], 403)
 
 
+class PublicAudioTests(PublicListenerTests):
+    """The owner turned on "public": {"audio": true} (2026-10-17): visitors play the original recordings and their
+    waveforms; still no editor previews, no downloads, no writes. Re-runs every PublicListenerTests check that
+    does not concern audio."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg["public"]["audio"] = True  # the listeners read it per request
+
+    def test_no_audio_downloads_settings_or_feed(self):
+        for path in REFUSED_GETS:
+            if path.startswith(("/audio/mcc", "/audio/ce", "/audio/peaks")) or path == "/audio/anything":
+                continue
+            self.assertEqual(self.req("public", path)[0], 401, path)
+
+    def test_forged_identity_grants_nothing(self):
+        info = json.loads(self.req("public", "/api/session", token=sign(claims()))[1])
+        self.assertEqual((info["visitor"], info["permissions"]["edit"]), (True, False))
+        self.assertEqual(self.req("public", "/api/save", {"slot_id": SLOT}, token=sign(claims()))[0], 401)
+
+    def test_visitors_hear_the_originals(self):
+        info = self.get("/api/session")
+        self.assertEqual({k: info["permissions"][k] for k in ("edit", "audio", "download", "admin")},
+                         {"edit": False, "audio": True, "download": False, "admin": False})
+        st, body, headers = self.req("public", "/audio/mcc?level=z10&lang=spanish&index=0", headers={"Range": "bytes=0-9"})
+        self.assertEqual((st, len(body), headers["Content-Type"]), (206, 10, "audio/wav"))
+        self.assertEqual(self.req("public", "/audio/mcc?level=z10&lang=english&index=0")[0], 200)
+        self.assertEqual(self.req("public", "/audio/ce?ref=line_a%230&lang=Spanish(Mexico)")[0], 200)
+        self.assertEqual(self.req("public", f"/audio/peaks?src={AUDIO_SRC}")[0], 200)
+        self.assertGreater(len(self.decoded), 0)
+        # never previews (rendering one is a write), directly or through the peaks endpoint; never other paths
+        self.assertEqual(self.req("public", "/audio/preview?key=abc&kind=edited")[0], 401)
+        self.assertEqual(self.req("public", "/audio/peaks?src=%2Faudio%2Fpreview%3Fkey%3Dabc%26kind%3Dedited")[0], 401)
+        self.assertEqual(self.req("public", "/api/edit/preview", {"slot_id": SLOT})[0], 401)
+        self.assertEqual(self.req("public", "/api/interference/reference?slot=x&lang=spanish")[0], 401)
+        self.assertEqual(self.req("public", "/audio/mcc?level=..%2F..&lang=spanish&index=0")[0], 404)
+
+    def test_audio_is_rate_limited(self):
+        lst = m4_server.Listener("public", self.cfg, 0, limiter=public_view.PublicLimiter(per_minute=1))
+        s2 = m4_server.StudioHTTPServer(("127.0.0.1", 0), m4_server.make_handler(self.app, quiet=True, listener=lst))
+        threading.Thread(target=s2.serve_forever, daemon=True).start()
+        self.servers["limited"] = s2
+        codes = [self.req("limited", "/audio/mcc?level=z10&lang=spanish&index=0", host=PUBLIC_HOST)[0] for _ in range(2)]
+        self.assertEqual(codes, [200, 429])
+
+
 class PublicConfigTests(unittest.TestCase):
     def cfg(self, tmp, **public):
         return load_server_config(tmp, overrides={
@@ -286,9 +334,10 @@ class PublicConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertFalse(load_server_config(tmp)["public"]["enabled"])  # off unless asked for
             self.assertEqual(self.cfg(tmp)["public"]["port"], 8081)
+            self.assertFalse(self.cfg(tmp)["public"]["audio"])  # silent unless the owner turns it on
             for bad in ({"host": "0.0.0.0"}, {"host": "192.168.1.5"}, {"port": 8080}, {"port": 8765},
                         {"url": "http://studio.example.com"}, {"url": f"https://{ADMIN_HOST}"},
-                        {"sign_in_url": "javascript:alert(1)"}, {"surprise": 1}):
+                        {"sign_in_url": "javascript:alert(1)"}, {"surprise": 1}, {"audio": "yes"}):
                 with self.assertRaises(ConfigError, msg=bad):
                     self.cfg(tmp, **bad)
 

@@ -9,8 +9,9 @@ closed: an endpoint added to the server later is refused here until it is listed
   see: local file system paths, the game folder, build file locations and logs, notes, and anything that looks
   like an absolute path in free text.
 
-Refused (401, "sign in to edit"): every write (any method but GET/HEAD), all audio (streams, waveform peaks,
-editor previews, the interference reference: proprietary recordings are never sent to a visitor), the change
+Refused (401, "sign in to edit"): every write (any method but GET/HEAD), audio (streams, waveform peaks, editor
+previews, the interference reference) unless the owner turns on "public": {"audio": true}, which opens only
+PUBLIC_AUDIO (the original recordings and their peaks; never previews or downloads), the change
 feed (it names who saved), configuration, data status, network details, jobs, the game folder status and
 install plans, and build logs.
 
@@ -27,6 +28,10 @@ PUBLIC_GETS = frozenset({
     "/api/session", "/api/state", "/api/slots", "/api/slot", "/api/ce", "/api/ce_line",
     "/api/builds", "/api/builds/detail", "/api/deploy/history",
 })
+
+# Audio a visitor may play when the owner turns on "public": {"audio": true}: the original recordings and their
+# waveform peaks. Never editor previews (rendering them is a write) and never downloads (no download links).
+PUBLIC_AUDIO = frozenset({"/audio/mcc", "/audio/ce", "/audio/peaks"})
 
 # Keys removed wherever they appear in a public answer: file system locations, the game folder, logs, notes.
 DENY_KEYS = frozenset({
