@@ -18,6 +18,7 @@
     "test:ux": "node e2e/ux.mjs",
     "test:editor": "node e2e/editor.mjs",
     "test:radio": "node e2e/radio.mjs",
+    "test:mute": "node e2e/mute.mjs",
     "test:interference": "node e2e/interference.mjs",
     "test:downloads": "node e2e/downloads.mjs",
     "test:workflow": "node e2e/workflow.mjs",

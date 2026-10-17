@@ -5,11 +5,21 @@
 // Approved audio is shown read-only. Durations are compared under "Listen and compare".
 
 import { X } from "lucide-vue-next";
+import { nextTick, ref, watch } from "vue";
 import type { CeLanguage } from "../../api/types";
 import type { Draft } from "../../matching/draft";
 
-defineProps<{ draft: Draft; locked: boolean }>();
+const props = defineProps<{ draft: Draft; locked: boolean }>();
 const emit = defineEmits<{ choose: [ref: string]; remove: [ref: string]; mute: [] }>();
+
+// Choosing Mute puts the cursor in the reason box: Save stays disabled until the reason is written.
+const reasonBox = ref<HTMLTextAreaElement | null>(null);
+watch(
+  () => props.draft.audioSource,
+  (now, before) => {
+    if (now === "mute" && before !== "mute" && !props.locked) void nextTick(() => reasonBox.value?.focus());
+  },
+);
 
 const LANGUAGES: { value: CeLanguage; label: string }[] = [
   { value: "Spanish(Mexico)", label: "LATAM Spanish (es-MX)" },
@@ -49,7 +59,17 @@ const LANGUAGES: { value: CeLanguage; label: string }[] = [
       </p>
       <label class="block-label">
         Why is it muted? (required)
-        <textarea v-model="draft.muteReason" rows="2" maxlength="500" :disabled="locked" data-testid="mute-reason"></textarea>
+        <textarea
+          ref="reasonBox"
+          v-model="draft.muteReason"
+          rows="2"
+          maxlength="500"
+          required
+          :aria-invalid="!draft.muteReason.trim()"
+          placeholder="Required: Save stays disabled until you say why"
+          :disabled="locked"
+          data-testid="mute-reason"
+        ></textarea>
       </label>
     </div>
 
