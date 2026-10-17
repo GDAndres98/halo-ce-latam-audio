@@ -48,7 +48,7 @@ from common.env import REPO_ROOT, load_env, require_path  # noqa: E402
 from b2_bank_install import running_game_processes, sha256_file, steam_build  # noqa: E402
 from common import mapping_store  # noqa: E402
 from common.m6_build import (  # noqa: E402
-    SUBTITLE_TABLES, compare_plans, compare_subtitle_plans, plan_audio, subtitle_plan)
+    SUBTITLE_TABLES, compare_inserts, compare_plans, compare_subtitle_plans, plan_audio, plan_inserts, subtitle_plan)
 
 STEAM_BUILD = "19905945"
 # The Spanish bank and its sound index (.lst.bin) must always match each other: a build that replaces only the
@@ -151,6 +151,11 @@ def stale_check(b):
     if b.kind in ("audio", "both"):
         cur = plan_audio(doc, b.manifest["levels"], local=local, **idx)
         diff = compare_plans(b.manifest["slots"], cur["entries"])
+        # added takes (docs/added-takes-design.md): a take inserted by the build must still be approved as built
+        di = compare_inserts(b.manifest.get("inserts") or [],
+                             plan_inserts(doc, b.manifest["levels"], local=local, subtitle_keys=app._subtitle_keys(),
+                                          **idx))
+        diff = {k: diff[k] + di[k] for k in diff}
     if b.kind in ("subtitles", "both"):
         cur_s = subtitle_plan(doc, set(b.manifest["levels"]), local=local,
                               tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)

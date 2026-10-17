@@ -183,5 +183,72 @@ class AddedTakeTests(unittest.TestCase):
             conn.close()
 
 
+class InsertBuildTests(unittest.TestCase):
+    """M6 side: insert_takes / insert_checks on a synthetic bank + index, compare_inserts."""
+
+    def bank_and_index(self):
+        from common.mcc_lst import build_lst
+        from test_m6_build import five_sample_bank
+        # sounds: a = samples 0-1, b = sample 2, c = samples 3-4
+        return five_sample_bank(), build_lst(1, [("sound\\dialog\\x\\a", 0, 2), ("sound\\dialog\\x\\b", 1 + 1, 1),
+                                                  ("sound\\dialog\\x\\c", 3, 2)])
+
+    def test_inserted_takes_follow_their_sound_and_everything_else_shifts(self):
+        from common.m6_build import insert_checks, insert_takes
+        from common.mcc_lst import parse_lst
+        from test_fsb5_writer import celt_stream
+        bank, lst = self.bank_and_index()
+        items = [{"take_id": "t-000001", "mcc_tag": "sound\\dialog\\x\\a", "stream": celt_stream(2, 370, 80),
+                  "sample_count": 1024},
+                 {"take_id": "t-000002", "mcc_tag": "sound\\dialog\\x\\a", "stream": celt_stream(1, 370, 81),
+                  "sample_count": 512},
+                 {"take_id": "t-000003", "mcc_tag": "sound\\dialog\\x\\c", "stream": celt_stream(3, 370, 82),
+                  "sample_count": 1536}]
+        cand, new_lst, index_map, new_index = insert_takes(bank, lst, items)
+        self.assertEqual(index_map, [0, 1, 4, 5, 6])
+        self.assertEqual(new_index, {"t-000001": 2, "t-000002": 3, "t-000003": 7})
+        self.assertEqual([r[1:] for r in parse_lst(new_lst)["records"]], [(0, 4), (4, 1), (5, 3)])
+        checks = insert_checks(bank, cand, lst, new_lst, index_map, new_index, items)
+        self.assertTrue(all(checks.values()), {k: v for k, v in checks.items() if not v})
+        self.assertEqual(insert_takes(bank, lst, items)[0], cand)  # deterministic
+        bad = insert_checks(bank, cand, lst, new_lst, index_map, {**new_index, "t-000003": 6}, items)
+        self.assertFalse(bad["insert:inserted_streams_and_counts"])
+
+    def test_compare_inserts(self):
+        from common.m6_build import compare_inserts
+        built = [{"take_id": "t-1", "action": "insert", "ce_line_ref": "x#0", "language": "L", "media": {"wem_sha256": "h"}}]
+        self.assertEqual(compare_inserts(built, built), {"changed_or_revoked": [], "newly_eligible": []})
+        self.assertEqual(compare_inserts(built, [dict(built[0], action="skip")])["changed_or_revoked"], ["t-1"])
+        self.assertEqual(compare_inserts([], built)["newly_eligible"], ["t-1"])
+
+
+class InsertPlanTests(AddedTakeTests):
+    """plan_inserts on the Studio fixture (inherits its setUp; the AddedTakeTests tests are not repeated)."""
+
+    def plan(self):
+        from common.m6_build import plan_inserts
+        return plan_inserts(self.doc(), ["z10"], slot_index=self.app.slot_index, ce_lines=self.app.ce_lines,
+                            ce_idx=self.app.ce_idx, mcc_idx=self.app.mcc_idx, subtitle_keys=self.app._subtitle_keys())
+
+    def test_only_approved_drift_free_takes_are_inserted(self):
+        self.add("line_a#0")
+        self.add("line_b#0")
+        self.act("t-000001", "approve")
+        by = {e["take_id"]: e for e in self.plan()}
+        self.assertEqual((by["t-000001"]["action"], by["t-000001"]["ce_line_ref"], by["t-000001"]["ref_slot_id"]),
+                         ("insert", "line_a#0", "es:Z10_030_death#0"))
+        self.assertEqual(by["t-000002"]["action"], "skip")
+        doc = self.doc()
+        doc["added_takes"][0]["audio"]["fingerprint"]["mcc"]["spanish"][0]["data_sha256"] = "0" * 64
+        from common.m6_build import plan_inserts
+        e = plan_inserts(doc, ["z10"], slot_index=self.app.slot_index, ce_lines=self.app.ce_lines,
+                         ce_idx=self.app.ce_idx, mcc_idx=self.app.mcc_idx)[0]
+        self.assertIn("drift", e["reason"])
+
+
+for _name in [n for n in dir(AddedTakeTests) if n.startswith("test_")]:
+    setattr(InsertPlanTests, _name, None)  # run the inherited fixture only, not the tests twice
+
+
 if __name__ == "__main__":
     unittest.main()

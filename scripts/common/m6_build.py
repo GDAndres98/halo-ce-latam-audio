@@ -29,7 +29,7 @@ from . import audio_edit
 from .fsb5_lib import parse_header
 from .fsb5_writer import ALIGN, build, decompose, replace_sample, sample_spans
 from .mcc_loc import loc_key, parse_mcc_loc
-from .project_validation import audio_fingerprint, subtitle_fingerprint
+from .project_validation import added_take_fingerprint, audio_fingerprint, subtitle_fingerprint
 
 PLAN_SCHEMA = "m6-build-plan/1"
 
@@ -128,6 +128,146 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
                     e.update(action="not_eligible", reason="conflict: several replacements for one bank sample")
     entries.sort(key=lambda e: e["spanish_index"])
     return {"schema": PLAN_SCHEMA, "levels": sorted(levels), "entries": entries, "conflicts": conflicts}
+
+
+def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None, subtitle_keys=None):
+    """Approved added takes of the sounds in `levels` -> one entry each (docs/added-takes-design.md):
+      insert        approved, its sound mono and without a subtitle entry, one resolved CE line, no drift, a valid
+                    recipe made for that line -> inserted after the sound's Spain takes, in position order
+      skip          draft / needs_rework: left out (reported)
+      not_eligible  invalid (reason reported). Nothing is approved or changed here."""
+    levels = set(levels)
+    tags = {}
+    for _sid, (lv, rec, _smp) in slot_index.items():
+        tags.setdefault(rec["mcc_tag"], (lv, rec))
+    out = []
+    for t in sorted(doc.get("added_takes", []), key=lambda t: (t["mcc_tag"], t["position"])):
+        hit = tags.get(t["mcc_tag"])
+        if not hit or hit[0] not in levels:
+            continue
+        lv, rec = hit
+        sp = rec["samples"]["spanish"]
+        a = t["audio"]
+        e = {"take_id": t["take_id"], "mcc_tag": t["mcc_tag"], "level": lv, "position": t["position"],
+             "spain_takes": len(sp), "ref_slot_id": sp[0]["slot_id"], "audio_status": a["status"],
+             "radio_effect": bool(t["radio_effect"]["needed"]), "action": "not_eligible", "reason": "", "edit": None}
+        src = (a["sources"] or [{}])[0]
+        ref, lang = src.get("ce_line_ref"), src.get("language")
+        line = ce_lines.get(ref)
+        media = ((line[2]["media"].get(lang) or {}) if line else {})
+        if a["status"] != "approved":
+            e.update(action="skip", reason=f"audio {a['status']} (not approved): not inserted")
+        elif any(x["channels"] != 1 for x in sp):
+            e.update(reason="unsupported: stereo sound (stereo replacement deferred)")
+        elif subtitle_keys is not None and loc_key(t["mcc_tag"]) in subtitle_keys:
+            e.update(reason="invalid: the sound has a subtitle entry (added takes are for sounds without one)")
+        elif len(a["sources"]) != 1 or src.get("kind") != "ce":
+            e.update(reason="invalid: an added take needs exactly one CE line")
+        elif not line:
+            e.update(reason=f"invalid: unknown CE line {ref}")
+        elif "test_event" in line[1]["flags"]:
+            e.update(reason=f"invalid: {ref} is a test event")
+        elif media.get("evidence") != "explicit" or len(media.get("media", [])) != 1:
+            e.update(reason=f"invalid: {ref} has no single resolved {lang} media")
+        elif a["fingerprint"] != added_take_fingerprint(t, ce_idx, mcc_idx, local):
+            e.update(reason="invalid: approved fingerprint no longer matches the catalogs (drift); rework it")
+        elif edit_problems(a["edit"], ref, lang):
+            e.update(reason="invalid: edit recipe: " + "; ".join(edit_problems(a["edit"], ref, lang)))
+        else:
+            edited = not audio_edit.is_identity(a["edit"])
+            e.update(action="insert", reason="approved added take" + (" (edited)" if edited else ""),
+                     ce_line_ref=ref, language=lang, ce_mission=line[0], media=media["media"][0],
+                     edit=a["edit"] if edited else None,
+                     edit_summary=audio_edit.summary(a["edit"]) if edited else None)
+        out.append(e)
+    return out
+
+
+def insert_takes(bank, lst_bytes, inserts):
+    """bank (FSB5 bytes, any replacements already applied), the Spanish index (.lst.bin bytes) and
+    inserts [{"take_id", "mcc_tag", "stream", "sample_count"}] in position order -> (bank bytes, lst bytes,
+    index_map [original index -> new index], {take_id: new index}).
+
+    Each sound's added takes go right after its own samples; the index gets the new counts and shifted
+    starts. A new sample copies the head bits of its sound's first sample (frequency, mono) and gets a LOOP
+    chunk 0, n-2 like every MCC dialogue sample, and a unique name (`LATAM t000001`)."""
+    from .fsb5_writer import loop_chunk
+    from .mcc_lst import build_lst, check_ranges, parse_lst
+    model = decompose(bank)
+    lst = parse_lst(lst_bytes)
+    if not check_ranges(lst["records"], len(model["samples"]))["contiguous_from_zero"]:
+        raise ValueError("the sound index is not contiguous; refusing to insert")
+    by_tag = defaultdict(list)
+    for x in inserts:
+        by_tag[x["mcc_tag"]].append(x)
+    unknown = set(by_tag) - {t for t, _, _ in lst["records"]}
+    if unknown:
+        raise ValueError(f"sounds not in the index: {sorted(unknown)}")
+    samples, names, records, index_map, new_index = [], [], [], [], {}
+    for tag, first, count in lst["records"]:
+        start = len(samples)
+        for i in range(first, first + count):
+            index_map.append(len(samples))
+            samples.append(model["samples"][i])
+            names.append(model["names"][i])
+        template = model["samples"][first]
+        for x in by_tag.get(tag, []):
+            name = f"LATAM {x['take_id'].replace('-', '')}".encode()
+            if name in model["names"] or name in names:
+                raise ValueError(f"{name!r} is already in the bank")
+            new_index[x["take_id"]] = len(samples)
+            samples.append({"head_bits": template["head_bits"], "sample_count": x["sample_count"],
+                            "channels": template["channels"], "stream": x["stream"],
+                            "chunks": [loop_chunk(x["sample_count"]) if ct == 3 else (ct, pl)
+                                       for ct, pl in template["chunks"]]})
+            names.append(name)
+        records.append((tag, start, len(samples) - start))
+    new = dict(model, samples=samples, names=names)
+    return build(new), build_lst(lst["version"], records), index_map, new_index
+
+
+def insert_checks(base, cand, lst_old, lst_new, index_map, new_index, inserts):
+    """Independent checks of insert_takes: `cand` == `base` with the inserts added, and the index consistent."""
+    from .mcc_lst import build_lst, check_ranges, parse_lst
+    mb, mc = decompose(base), decompose(cand)
+    lo, ln = parse_lst(lst_old), parse_lst(lst_new)
+    by_tag = defaultdict(int)
+    for x in inserts:
+        by_tag[x["mcc_tag"]] += 1
+    rng = check_ranges(ln["records"], len(mc["samples"]))
+    return {
+        "insert:round_trip": build(mc) == cand,
+        "insert:sample_count": len(mc["samples"]) == len(mb["samples"]) + len(inserts),
+        "insert:header_tail_unchanged": mc["header_tail"] == mb["header_tail"] and mc["mode"] == mb["mode"],
+        "insert:every_existing_sample_byte_identical_at_its_new_place": all(
+            mc["samples"][index_map[i]] == s and mc["names"][index_map[i]] == mb["names"][i]
+            for i, s in enumerate(mb["samples"])),
+        "insert:inserted_streams_and_counts": all(
+            mc["samples"][new_index[x["take_id"]]]["stream"] == x["stream"]
+            and mc["samples"][new_index[x["take_id"]]]["sample_count"] == x["sample_count"] for x in inserts),
+        "insert:inserted_loop_0_n_minus_2": all(
+            all(pl == (0).to_bytes(4, "little") + (x["sample_count"] - 2).to_bytes(4, "little")
+                for ct, pl in mc["samples"][new_index[x["take_id"]]]["chunks"] if ct == 3) for x in inserts),
+        "insert:lst_writer_reproduces_the_original_index": build_lst(lo["version"], lo["records"]) == lst_old,
+        "insert:lst_same_tags_same_order": [r[0] for r in ln["records"]] == [r[0] for r in lo["records"]],
+        "insert:lst_contiguous_and_covers_the_bank": rng["contiguous_from_zero"] and rng["total_matches_bank"],
+        "insert:lst_counts": all(n[2] == o[2] + by_tag.get(o[0], 0) for o, n in zip(lo["records"], ln["records"])),
+        "insert:every_sound_resolves_to_its_old_samples_first": all(
+            [mc["samples"][j] for j in range(n[1], n[1] + o[2])] == [mb["samples"][i] for i in range(o[1], o[1] + o[2])]
+            for o, n in zip(lo["records"], ln["records"])),
+    }
+
+
+def compare_inserts(built, current):
+    """Added takes a build inserted vs the current plan: changed_or_revoked (do not install; rebuild) and
+    newly_eligible (only missing)."""
+    def key(e):
+        return (e.get("ce_line_ref"), e.get("language"), (e.get("media") or {}).get("wem_sha256"),
+                json.dumps(e.get("edit"), sort_keys=True))
+    cur = {e["take_id"]: e for e in current if e["action"] == "insert"}
+    was = {e["take_id"]: e for e in built if e["action"] == "insert"}
+    return {"changed_or_revoked": sorted(t for t, e in was.items() if t not in cur or key(cur[t]) != key(e)),
+            "newly_eligible": sorted(t for t in cur if t not in was)}
 
 
 def edit_problems(edit, ref, lang):
