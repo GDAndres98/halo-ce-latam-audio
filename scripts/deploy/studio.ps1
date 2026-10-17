@@ -123,7 +123,7 @@ function Show-Status {
     $url = $doc.public_url
     if ($url) { Write-Host ("Editing {0}  -> {1} without signing in (302 to Cloudflare Access expected)" -f $url, (Test-Url $url)) }
     if ($doc.public -and $doc.public.enabled -and $doc.public.url) {
-      $rec = if ($doc.public.audio -eq $true) { "200: public.audio is on" } else { "401: public.audio is off" }
+      $rec = "401: originals are never public"
       Write-Host ("Public view {0}  -> page {1} (200 expected), recording {2} ({3} expected)" -f $doc.public.url,
         (Test-Url $doc.public.url), (Test-Url "$($doc.public.url.TrimEnd('/'))/audio/mcc?level=a10&lang=spanish&index=0"), $rec)
     }
