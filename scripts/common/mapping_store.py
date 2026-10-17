@@ -216,6 +216,20 @@ def _write_document(path, data, now):
     return mapping_db.sha256(data)
 
 
+def used_take_ids(path):
+    """Every take_id the decisions have ever held (current and removed, from the database history), so a new
+    take never gets the ID of a removed one."""
+    db = mapping_db.db_path_for(path)
+    if not mapping_db.is_imported(db):
+        return set()
+    conn = mapping_db.open_existing(db)
+    try:
+        return {tid for (tid,) in conn.execute("SELECT take_id FROM added_take_history")} | \
+               {tid for (tid,) in conn.execute("SELECT take_id FROM added_takes")}
+    finally:
+        conn.close()
+
+
 def changed_mapping_ids(old_doc, new_doc):
     """mapping_ids whose slot is new or differs from old_doc (dict comparison, no serialisation)."""
     old = {s["mapping_id"]: s for s in old_doc.get("slots", [])}
@@ -273,6 +287,31 @@ def check_transition(old_doc, new_doc, user_actions=()):
             oflag, nflag = old.get(mid, {}).get(flag), ns.get(flag)
             if oflag and nflag and oflag != nflag and nflag["revision"] != oflag["revision"] + 1:
                 problems.append(f"{mid}/{flag}: a change must bump its revision by exactly 1")
+    # Added takes (docs/added-takes-design.md): the same rules for their one approved object, `audio`. A user
+    # action names the take by its take_id in UserAction.mapping_id.
+    old_t = {t["take_id"]: t for t in old_doc.get("added_takes", [])}
+    new_t = {t["take_id"]: t for t in new_doc.get("added_takes", [])}
+    for tid, ot in old_t.items():
+        if ot["audio"]["status"] != "approved":
+            continue
+        nt = new_t.get(tid)
+        if nt is None:
+            problems.append(f"{tid}: cannot remove an added take with an approved decision")
+            continue
+        if nt["mcc_tag"] != ot["mcc_tag"]:
+            problems.append(f"{tid}: cannot move an approved take to another sound")
+        if nt["audio"] != ot["audio"] and not (
+                allowed.get((tid, "audio")) == "needs_rework" and nt["audio"]["status"] == "needs_rework"
+                and nt["audio"]["revision"] == ot["audio"]["revision"] + 1):
+            problems.append(f"{tid}/audio: approved decisions are immutable (only a user 'needs_rework' "
+                            "action with revision + 1 may change them)")
+    for tid, nt in new_t.items():
+        was = old_t.get(tid, {}).get("audio", {}).get("status")
+        if nt["audio"]["status"] == "approved" and was != "approved" and allowed.get((tid, "audio")) != "approve":
+            problems.append(f"{tid}/audio: only an explicit user 'approve' action can approve")
+        ofl, nfl = old_t.get(tid, {}).get("radio_effect"), nt["radio_effect"]
+        if ofl and ofl != nfl and nfl["revision"] != ofl["revision"] + 1:
+            problems.append(f"{tid}/radio_effect: a change must bump its revision by exactly 1")
     unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework")]
     if unused:
         problems.append(f"unknown user actions {unused}")
@@ -527,6 +566,9 @@ def _read_import_candidate(path):
     mids = [x["mapping_id"] for x in doc["slots"]]
     if len(set(ids)) != len(ids) or len(set(mids)) != len(mids):
         raise StoreError(f"{path.name} repeats a slot_id or mapping_id")
+    tids = [t["take_id"] for t in doc.get("added_takes", [])]
+    if len(set(tids)) != len(tids):
+        raise StoreError(f"{path.name} repeats a take_id")
     return raw, data, doc
 
 
@@ -554,8 +596,23 @@ def preview_import(path):
                                          if (a or {}).get(k) != (b or {}).get(k)),
                         "database": _slot_summary(a) if a else None, "file": _slot_summary(b) if b else None})
 
+    old_t = {t["take_id"]: t for t in current.get("added_takes", [])}
+    new_t = {t["take_id"]: t for t in doc.get("added_takes", [])}
+    for tid in sorted(old_t.keys() | new_t.keys()):
+        a, b = old_t.get(tid), new_t.get(tid)
+        if a != b:
+            summary = lambda t: {"mcc_tag": t["mcc_tag"], "position": t["position"], "audio": t["audio"]["status"],  # noqa: E731
+                                 "audio_revision": t["audio"]["revision"],
+                                 "ce_line_refs": [x.get("ce_line_ref") for x in t["audio"]["sources"]]}
+            changes.append({"take_id": tid, "mapping_id": tid,
+                            "slot_id": "added take of " + (b or a)["mcc_tag"].rsplit(chr(92), 1)[-1], "kind": "added" if a is None else "removed" if b is None else "changed",
+                            "fields": sorted(k for k in (a or {}).keys() | (b or {}).keys()
+                                             if (a or {}).get(k) != (b or {}).get(k)),
+                            "database": summary(a) if a else None, "file": summary(b) if b else None})
+
     def approvals(d):
-        return {(x["mapping_id"], f) for x in d["slots"] for f in ("audio", "subtitle") if x[f]["status"] == "approved"}
+        return ({(x["mapping_id"], f) for x in d["slots"] for f in ("audio", "subtitle") if x[f]["status"] == "approved"}
+                | {(t["take_id"], "audio") for t in d.get("added_takes", []) if t["audio"]["status"] == "approved"})
 
     return {"file_sha256": mapping_db.sha256(raw), "db_export_sha256": db_sha,
             "line_endings": "CRLF" if b"\r\n" in raw else "LF",

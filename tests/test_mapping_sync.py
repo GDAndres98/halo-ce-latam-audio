@@ -149,7 +149,7 @@ class SyncTests(unittest.TestCase):
         mapping_store.export_json(self.path, None, history_dir=self.hist)
         self.assertEqual(mapping_store.sync_status(self.path)["state"], "in_sync")
 
-    def test_a_v3_database_upgrades_to_v4_keeping_its_history(self):
+    def test_a_v3_database_upgrades_to_the_current_version_keeping_its_history(self):
         doc = copy.deepcopy(self.doc)
         doc["slots"][0]["notes"] = "antes de v4"
         self.sha = mapping_store.save(self.path, doc, self.sha, history_dir=self.hist)
@@ -159,8 +159,10 @@ class SyncTests(unittest.TestCase):
         raw.close()
         conn = mapping_db.open_existing(self.db)
         try:
-            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 4)
+            self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], mapping_db.DB_SCHEMA_VERSION)  # v4, v5
             self.assertEqual(conn.execute("SELECT COUNT(*), MAX(reason) FROM slot_history").fetchone(), (1, None))
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM added_takes").fetchone()[0], 0)  # v5: additive table
+            self.assertEqual(mapping_db.export_bytes(conn), self.path.read_bytes())  # same export as before
         finally:
             conn.close()
 

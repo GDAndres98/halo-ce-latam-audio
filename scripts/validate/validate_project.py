@@ -174,7 +174,7 @@ def run(root, use_git=True, catalog_cache=None):
         schema_name = "manual-mappings-2" if version == "manual-mappings/2" else "manual-mappings-3"
         f, d = validate_mappings(docs["mappings"], load_schema(schema_name), ce=ce, mcc=mcc, local=local,
                                  verifications=docs["verifications"], current_pins=current_pins(root),
-                                 file=USER_FILES["mappings"])
+                                 file=USER_FILES["mappings"], subtitle_keys=subtitle_keys(root))
         out += f
         drift += d
         out += check_approved_protected(heads.get("mappings"), docs["mappings"], USER_FILES["mappings"])
@@ -203,6 +203,18 @@ def run(root, use_git=True, catalog_cache=None):
     out.sort(key=lambda x: ({"error": 0, "warning": 1, "info": 2}[x["severity"]], x["file"], x["code"], x["where"]))
     return {"schema": "validation-report/1", "summary": summary, "findings": out}, \
         {"schema": "drift-report/1", "drift": drift}
+
+
+def subtitle_keys(root):
+    """Keys of the pinned SU/SP copies (added takes are only for sounds without one); None when not present."""
+    from common.mcc_loc import parse_mcc_loc
+    keys, found = set(), False
+    for t in ("SU", "SP"):
+        path = root / "work" / "mcc" / "loc" / "copies" / f"{t}_Halo1.bin"
+        if path.is_file():
+            found = True
+            keys |= set(parse_mcc_loc(path.read_bytes())["entries"])
+    return keys if found else None
 
 
 def main():

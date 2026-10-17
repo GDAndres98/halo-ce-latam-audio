@@ -52,7 +52,9 @@ def build_mcc_index(records):
     slots, tags = {}, {}
     for r in records:
         tags[r["mcc_tag"]] = {"level": r["level"], "english": [
-            {"index": s["index"], "data_sha256": s["data_sha256"]} for s in r["samples"]["english"]]}
+            {"index": s["index"], "data_sha256": s["data_sha256"]} for s in r["samples"]["english"]],
+            "spanish": [s["slot_id"] for s in r["samples"]["spanish"]],
+            "spanish_channels": sorted({s["channels"] for s in r["samples"]["spanish"]})}
         for s in r["samples"]["spanish"]:
             slots[s["slot_id"]] = {"mcc_tag": r["mcc_tag"], "level": r["level"], "index": s["index"],
                                    "name_in_bank": s["name_in_bank"], "data_sha256": s["data_sha256"],
@@ -62,7 +64,7 @@ def build_mcc_index(records):
 
 # --------------------------------------------------------------------------- fingerprints
 def mcc_fingerprint(slot_id, mcc):
-    s = mcc["slots"].get(slot_id)
+    s = mcc["slots"].get(slot_id) if slot_id else None
     return None if not s else {"slot_id": slot_id, "index": s["index"], "data_sha256": s["data_sha256"]}
 
 
@@ -77,6 +79,15 @@ def audio_fingerprint(slot, ce, mcc, local=None):
         else:
             rec = ((local or {}).get("user_recordings") or {}).get(src["ref"]) or {}
             out["sources"].append({"kind": "user_recording", "ref": src["ref"], "sha256": rec.get("sha256")})
+    return out
+
+
+def added_take_fingerprint(take, ce, mcc, local=None):
+    """What an added take's approval pins: its CE recording(s) and the sound's Spain takes (their identity and
+    data), so a changed bank or catalog shows up as drift."""
+    tag = (mcc.get("tags") or {}).get(take["mcc_tag"]) or {}
+    out = audio_fingerprint({"slot_id": None, "audio": take["audio"]}, ce, mcc, local)
+    out["mcc"] = {"mcc_tag": take["mcc_tag"], "spanish": [mcc_fingerprint(sid, mcc) for sid in tag.get("spanish", [])]}
     return out
 
 
@@ -172,7 +183,7 @@ def compare_slot_identity(old_records, new_records):
 
 # --------------------------------------------------------------------------- mappings
 def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pins, file="manual_mappings.json",
-                      only_mapping_ids=None):
+                      only_mapping_ids=None, subtitle_keys=None):
     """-> (findings, drift). ce/mcc are indexes; local may be None; current_pins may hold None values.
     only_mapping_ids: check just these slots in depth (a save checks the slot it changes; the others are
     unchanged and were checked when they were saved). Duplicate ids are still looked for across all slots."""
@@ -317,6 +328,16 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
                 drift.append({"kind": "approved_mapping", "mapping_id": s["mapping_id"], "field": field,
                               "slot_id": s["slot_id"], "approved": obj["fingerprint"], "current": cur})
 
+    out += added_take_findings(doc, ce=ce, mcc=mcc, local=local, file=file, subtitle_keys=subtitle_keys)
+    for t in doc.get("added_takes", []):
+        if t["audio"]["status"] == "approved" and have_mcc and have_ce:
+            cur = added_take_fingerprint(t, ce, mcc, local)
+            if t["audio"]["fingerprint"] != cur:
+                out.append(finding("warning", "approved_fingerprint_drift", file, f"/added_takes ({t['take_id']})/audio",
+                                   "approved added take no longer matches current catalogs; see drift report"))
+                drift.append({"kind": "approved_added_take", "take_id": t["take_id"], "field": "audio",
+                              "mcc_tag": t["mcc_tag"], "approved": t["audio"]["fingerprint"], "current": cur})
+
     if local is not None:
         used_c = {s["subtitle"]["custom_ref"] for s in doc["slots"] if s["subtitle"]["custom_ref"]}
         used_r = {x["ref"] for s in doc["slots"] for x in s["audio"]["sources"] if x["kind"] == "user_recording"}
@@ -325,6 +346,74 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
         for r in sorted(set(local["user_recordings"]) - used_r):
             out.append(finding("info", "unused_user_recording", "manual_mappings.local.json", r, "not referenced"))
     return out, drift
+
+
+TAKE_WARN_COUNT = 12  # owner, 2026-10-17: no hard limit; a warning above 12 takes per sound
+
+
+def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", subtitle_keys=None):
+    """Rules for added takes (docs/added-takes-design.md). subtitle_keys: the SU/SP keys (set) when the tables
+    are loaded; added takes are allowed only on sounds without a subtitle entry (owner, 2026-10-17)."""
+    from .mcc_loc import loc_key
+    out, seen, positions = [], set(), {}
+    have_ce, have_mcc = bool(ce), bool(mcc["slots"])
+    tags = mcc.get("tags") or {}
+    for t in doc.get("added_takes", []):
+        w = f"/added_takes ({t['take_id']})"
+        if t["take_id"] in seen:
+            out.append(finding("error", "duplicate_take_id", file, w, t["take_id"]))
+        seen.add(t["take_id"])
+        key = (t["mcc_tag"], t["position"])
+        if key in positions:
+            out.append(finding("error", "duplicate_take_position", file, w,
+                               f"position {t['position']} is also used by {positions[key]}"))
+        positions.setdefault(key, t["take_id"])
+        tag = tags.get(t["mcc_tag"])
+        if not tag:
+            out.append(finding("error" if have_mcc else "warning", "unknown_mcc_tag", file, w, t["mcc_tag"]))
+        elif tag.get("spanish_channels") and tag["spanish_channels"] != [1]:
+            out.append(finding("error", "added_take_stereo_sound", file, w,
+                               "added takes are for mono sounds only (stereo replacement is deferred)"))
+        if subtitle_keys is not None and loc_key(t["mcc_tag"]) in subtitle_keys:
+            out.append(finding("error", "added_take_on_subtitled_sound", file, w,
+                               "added takes are only for sounds without a subtitle entry (the subtitle is shared by "
+                               "every take)"))
+        a = t["audio"]
+        if len(a["sources"]) != 1:
+            out.append(finding("error", "added_take_source", file, w + "/audio", "an added take has exactly one CE line"))
+        for x in a["sources"]:
+            info = ce.get(x.get("ce_line_ref"))
+            if x["kind"] != "ce":
+                out.append(finding("error", "added_take_source", file, w + "/audio", "added takes use one CE line"))
+            elif not info:
+                out.append(finding("error" if have_ce else "warning", "unknown_ce_line_ref", file, w + "/audio",
+                                   x["ce_line_ref"]))
+            else:
+                if TEST_EVENT_FLAG in info["flags"]:
+                    out.append(finding("error", "test_event_audio_source", file, w + "/audio",
+                                       f"{x['ce_line_ref']} plays a test event with no dialogue media"))
+                if info["media"].get(x["language"], {}).get("evidence") != "explicit":
+                    out.append(finding("error" if a["status"] == "approved" else "warning", "audio_source_unresolved",
+                                       file, w + "/audio", f"{x['ce_line_ref']} has no resolved {x['language']} media"))
+        if not audio_edit.is_identity(a["edit"]):
+            for prob in audio_edit.problems({k: v for k, v in a["edit"].items() if k not in audio_edit.REMOVED_FIELDS}):
+                out.append(finding("error", "invalid_audio_edit", file, w + "/audio/edit", prob))
+            want = {k: a["sources"][0].get(k) for k in ("ce_line_ref", "language")} if a["sources"] else None
+            if want != a["edit"].get("for_source"):
+                out.append(finding("error" if a["status"] == "approved" else "warning", "audio_edit_source_mismatch",
+                                   file, w + "/audio/edit", "the edit was made for another CE line or language"))
+        if ABS_PATH.search(t["notes"]):
+            out.append(finding("error", "local_path_in_committed_file", file, w + "/notes",
+                               "absolute paths belong in manual_mappings.local.json"))
+    per_tag = {}
+    for t in doc.get("added_takes", []):
+        per_tag[t["mcc_tag"]] = per_tag.get(t["mcc_tag"], 0) + 1
+    for tag_path, n in per_tag.items():
+        total = n + len((tags.get(tag_path) or {}).get("spanish", []))
+        if total > TAKE_WARN_COUNT:
+            out.append(finding("warning", "many_takes", file, f"/added_takes ({tag_path})",
+                               f"{total} takes for one sound (above {TAKE_WARN_COUNT})"))
+    return out
 
 
 def _only_level_settings_reset(head_audio, audio):
@@ -374,6 +463,22 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
             if s[f]["status"] in ("needs_rework", "approved") and s[f]["revision"] > hs[f]["revision"]:
                 continue
             out.append(finding("error", "approved_object_modified", file, f"{hs['mapping_id']}/{f}",
+                               "approved decisions are immutable; only a user move to needs_rework "
+                               "(revision + 1) is allowed"))
+    cur_t = {t["take_id"]: t for t in doc.get("added_takes", [])}
+    for ht in head_doc.get("added_takes", []):  # added takes: the same rule for their audio
+        if ht["audio"]["status"] != "approved":
+            continue
+        t = cur_t.get(ht["take_id"])
+        if t is None:
+            out.append(finding("error", "approved_mapping_removed", file, ht["take_id"],
+                               "an added take with an approved decision was deleted"))
+        elif t["mcc_tag"] != ht["mcc_tag"]:
+            out.append(finding("error", "approved_mapping_retargeted", file, ht["take_id"],
+                               f"mcc_tag changed {ht['mcc_tag']} -> {t['mcc_tag']}"))
+        elif t["audio"] != ht["audio"] and not (t["audio"]["status"] in ("needs_rework", "approved")
+                                                and t["audio"]["revision"] > ht["audio"]["revision"]):
+            out.append(finding("error", "approved_object_modified", file, f"{ht['take_id']}/audio",
                                "approved decisions are immutable; only a user move to needs_rework "
                                "(revision + 1) is allowed"))
     return out
@@ -449,8 +554,9 @@ def validate_mission_map(doc, schema, *, ce_missions, mcc_levels, file="mission_
 READY_STATUSES = ("ready_for_build", "in_game_tested", "reviewed")
 
 
-def level_progress(level_slot_ids, mappings_doc):
-    """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure."""
+def level_progress(level_slot_ids, mappings_doc, level_tags=()):
+    """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure. level_tags: the level's
+    sound tags, to count its added takes (never counted as lines or matches)."""
     by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
            "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0,
@@ -473,6 +579,10 @@ def level_progress(level_slot_ids, mappings_doc):
         # Muted lines (a subset of no_equivalent): decided, never counted as matched recordings.
         out["muted"] += s["audio"]["source"] == "mute"
         out["muted_approved"] += s["audio"]["source"] == "mute" and s["audio"]["status"] == "approved"
+    tags = set(level_tags)
+    takes = [t for t in (mappings_doc or {}).get("added_takes", []) if t["mcc_tag"] in tags]
+    out["added_takes"] = len(takes)
+    out["added_takes_approved"] = sum(1 for t in takes if t["audio"]["status"] == "approved")
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out
 

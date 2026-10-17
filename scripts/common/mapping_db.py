@@ -32,7 +32,7 @@ from pathlib import Path
 
 from .jsonschema_lite import load_schema, validate
 
-DB_SCHEMA_VERSION = 4
+DB_SCHEMA_VERSION = 5
 SOURCE_SCHEMA = "manual-mappings/3"
 
 DDL = """
@@ -65,6 +65,23 @@ CREATE TABLE slot_history (
     reason      TEXT                                -- NULL: Studio save; "import:<sha256>": JSON import
 );
 CREATE INDEX slot_history_mapping ON slot_history (mapping_id);
+CREATE TABLE added_takes (
+    position     INTEGER PRIMARY KEY,               -- order in the file's added_takes list
+    take_id      TEXT NOT NULL UNIQUE,
+    mcc_tag      TEXT NOT NULL,
+    audio_status TEXT NOT NULL,
+    body         TEXT NOT NULL                      -- exact take JSON as stored in the file
+);
+CREATE INDEX added_takes_mcc_tag ON added_takes (mcc_tag);
+CREATE TABLE added_take_history (
+    id          INTEGER PRIMARY KEY,
+    changed_at  TEXT NOT NULL,
+    take_id     TEXT NOT NULL,
+    before_body TEXT,                               -- NULL when the take was added
+    after_body  TEXT,                               -- NULL when the take was removed
+    reason      TEXT
+);
+CREATE INDEX added_take_history_take ON added_take_history (take_id);
 CREATE TABLE documents (
     name               TEXT PRIMARY KEY,            -- e.g. manual_mappings.local.json
     body               TEXT NOT NULL,               -- exact file text (canonical JSON): the source of truth
@@ -82,6 +99,7 @@ CREATE TABLE document_history (
 
 # Version 2 -> 3 only adds the two document tables. Nothing existing is touched.
 DDL_V3_DOCUMENTS = DDL[DDL.index("CREATE TABLE documents"):]
+DDL_V5_TAKES = DDL[DDL.index("CREATE TABLE added_takes"):DDL.index("CREATE TABLE documents")]
 
 
 class MappingDbError(Exception):
@@ -111,17 +129,31 @@ def body_of(slot):
     return json.dumps(slot, ensure_ascii=False, indent=2)
 
 
-def serialize_from_bodies(schema, pins, bodies):
-    """serialize({"schema", "pins", "slots"}) built from the stored slot bodies instead of encoding every slot
-    again. Byte-identical: json.dumps(indent=2) writes a slot at depth 2 exactly as body_of() writes it at
-    depth 0, with every line indented four more spaces (tests/test_mapping_sync.py checks it on the live
-    file). Python's indenting encoder is pure Python; encoding 536 slots took ~70 ms per save."""
-    head = json.dumps({"schema": schema, "pins": pins, "slots": []}, indent=2, ensure_ascii=False)
+def _list_block(bodies):
+    """A top-level list as json.dumps(indent=2) writes it, from bodies encoded at depth 0."""
     if not bodies:
-        return (head + "\n").encode("utf-8")
+        return "[]"
+    return "[\n" + ",\n".join("    " + b.replace("\n", "\n    ") for b in bodies) + "\n  ]"
+
+
+def serialize_from_bodies(schema, pins, bodies, take_bodies=()):
+    """serialize({"schema", "pins", "slots"[, "added_takes"]}) built from the stored bodies instead of encoding
+    every slot again. Byte-identical: json.dumps(indent=2) writes a slot at depth 2 exactly as body_of() writes
+    it at depth 0, with every line indented four more spaces (tests/test_mapping_sync.py checks it on the live
+    file). Python's indenting encoder is pure Python; encoding 536 slots took ~70 ms per save. added_takes is
+    written only when there is at least one (an empty list is never stored), so files without added takes are
+    byte-identical to before."""
+    head = json.dumps({"schema": schema, "pins": pins, "slots": []}, indent=2, ensure_ascii=False)
     assert head.endswith('"slots": []\n}')
-    slots = ",\n".join("    " + b.replace("\n", "\n    ") for b in bodies)
-    return (head[:-len("[]\n}")] + "[\n" + slots + "\n  ]\n}\n").encode("utf-8")
+    text = head[:-len("[]\n}")] + _list_block(bodies)
+    if take_bodies:
+        text += ',\n  "added_takes": ' + _list_block(take_bodies)
+    return (text + "\n}\n").encode("utf-8")
+
+
+def take_columns(take):
+    """Indexed columns of one added take."""
+    return take["take_id"], take["mcc_tag"], take["audio"]["status"]
 
 
 def slot_columns(slot):
@@ -159,6 +191,9 @@ def open_existing(path):
     if version == 3:
         upgrade_v3_to_v4(conn)
         version = 4
+    if version == 4:
+        upgrade_v4_to_v5(conn)
+        version = 5
     if version != DB_SCHEMA_VERSION:
         conn.close()
         raise MappingDbError(f"{path}: database schema {version}, this build expects {DB_SCHEMA_VERSION}")
@@ -179,6 +214,14 @@ def upgrade_v3_to_v4(conn):
     if "reason" not in columns:
         conn.execute("ALTER TABLE slot_history ADD COLUMN reason TEXT")
     conn.execute("PRAGMA user_version = 4")
+    conn.commit()
+
+
+def upgrade_v4_to_v5(conn):
+    """Adds the added_takes tables (docs/added-takes-design.md). Additive only: no existing row changes."""
+    conn.executescript(DDL_V5_TAKES.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ")
+                       .replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS "))
+    conn.execute("PRAGMA user_version = 5")
     conn.commit()
 
 
@@ -226,6 +269,9 @@ def import_document(conn, doc, json_sha256):
         "subtitle_status, radio_needed, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [(position, *slot_columns(slot), body_of(slot)) for position, slot in enumerate(doc["slots"])],
     )
+    conn.executemany(
+        "INSERT INTO added_takes (position, take_id, mcc_tag, audio_status, body) VALUES (?, ?, ?, ?, ?)",
+        [(position, *take_columns(t), body_of(t)) for position, t in enumerate(doc.get("added_takes", []))])
     conn.commit()
 
 
@@ -262,8 +308,16 @@ def store_document(conn, doc, changed_at, *, reason=None, data=None, changed_ids
             upserts.append((position, *slot_columns(slot), body))
     removed = [mid for mid in old if mid not in new_ids]
     history += [(changed_at, mid, old[mid][1], None, reason) for mid in removed]
+    # Added takes: a small list, rewritten as a whole; history for each take that changed.
+    old_takes = {tid: body for tid, body in conn.execute("SELECT take_id, body FROM added_takes")}
+    new_takes = [(position, t, body_of(t)) for position, t in enumerate(doc.get("added_takes", []))]
+    take_history = [(changed_at, t["take_id"], old_takes.get(t["take_id"]), b, reason)
+                    for _, t, b in new_takes if old_takes.get(t["take_id"]) != b]
+    kept = {t["take_id"] for _, t, _ in new_takes}
+    take_history += [(changed_at, tid, b, None, reason) for tid, b in old_takes.items() if tid not in kept]
     if data is None:
-        data = serialize_from_bodies(doc["schema"], doc["pins"], [b for _, _, b in new])
+        data = serialize_from_bodies(doc["schema"], doc["pins"], [b for _, _, b in new],
+                                     [b for _, _, b in new_takes])
     export_sha = sha256(data)
     try:
         conn.execute("BEGIN")
@@ -281,6 +335,13 @@ def store_document(conn, doc, changed_at, *, reason=None, data=None, changed_ids
             upserts)
         conn.executemany("INSERT INTO slot_history (changed_at, mapping_id, before_body, after_body, reason) "
                          "VALUES (?, ?, ?, ?, ?)", history)
+        stored = [(tid, body) for tid, body in conn.execute("SELECT take_id, body FROM added_takes ORDER BY position")]
+        if stored != [(t["take_id"], b) for _, t, b in new_takes]:  # any change, removal or new order
+            conn.execute("DELETE FROM added_takes")
+            conn.executemany("INSERT INTO added_takes (position, take_id, mcc_tag, audio_status, body) "
+                             "VALUES (?, ?, ?, ?, ?)", [(p, *take_columns(t), b) for p, t, b in new_takes])
+            conn.executemany("INSERT INTO added_take_history (changed_at, take_id, before_body, after_body, reason) "
+                             "VALUES (?, ?, ?, ?, ?)", take_history)
         _write_meta(conn, [
             ("source_schema", doc["schema"]),
             ("pins", json.dumps(doc["pins"], ensure_ascii=False)),
@@ -305,7 +366,11 @@ def export_document(conn):
     if pins is None or schema is None:
         raise MappingDbError("database has no pins or schema")
     slots = [json.loads(body) for (body,) in conn.execute("SELECT body FROM slots ORDER BY position")]
-    return {"schema": schema, "pins": json.loads(pins), "slots": slots}
+    doc = {"schema": schema, "pins": json.loads(pins), "slots": slots}
+    takes = [json.loads(body) for (body,) in conn.execute("SELECT body FROM added_takes ORDER BY position")]
+    if takes:
+        doc["added_takes"] = takes
+    return doc
 
 
 def export_bytes(conn):

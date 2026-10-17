@@ -47,6 +47,7 @@ API (all JSON unless noted):
     POST /api/edit/preview                        {slot_id, ce_line_ref, language, edit} -> render as M6
                                                   would; writes only work/m4/preview/, never mappings
     POST /api/save                                see M4App.save; 409 = stale or protected
+    POST /api/takes/save | remove | move          added takes of a sound (M4App.take_save / take_remove / take_move)
     POST /api/progress                            {level, status, note, verification, confirm, loaded_sha256}
     POST /api/validate                            run the read-only validator
     GET  /api/data/status                         manual_mappings.json vs the database
@@ -544,6 +545,9 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                                  "from": self._peer(), "path": path, "status": status}
                         if path == "/api/save":
                             entry.update(slot_id=body.get("slot_id"), actions=body.get("actions") or [])
+                        if path.startswith("/api/takes/"):
+                            entry.update(mcc_tag=body.get("mcc_tag"), take_id=body.get("take_id"),
+                                         actions=body.get("actions") or [])
                         if path == "/api/login":
                             entry["user"] = str(body.get("username") or "")[:40]
                         shared.audit(entry)
@@ -751,6 +755,9 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 if shared.feed and result.get("saved"):
                     shared.feed.note_author(body.get("slot_id"), s["username"])
                 return 200, result, None
+            if path in ("/api/takes/save", "/api/takes/remove", "/api/takes/move"):  # added takes (editor role)
+                op = {"save": app.take_save, "remove": app.take_remove, "move": app.take_move}[path.rsplit("/", 1)[1]]
+                return 200, op(body), None
             if path == "/api/edit/preview":
                 return 200, app.edit_preview(body), None
             if path == "/api/progress":

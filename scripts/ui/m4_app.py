@@ -44,8 +44,8 @@ from common.mapping_store import (  # noqa: E402
 from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
-    READY_STATUSES, audio_fingerprint, build_ce_index, build_mcc_index, level_progress, subtitle_fingerprint,
-    validate_mappings)
+    READY_STATUSES, added_take_fingerprint, audio_fingerprint, build_ce_index, build_mcc_index, level_progress,
+    subtitle_fingerprint, validate_mappings)
 
 MAPPINGS = "mappings/manual_mappings.json"
 LOCAL = "mappings/manual_mappings.local.json"
@@ -296,7 +296,8 @@ class M4App:
         for lv, recs in self.levels.items():
             sids = [sid for r in recs for sid in r["slot_ids"]]
             levels.append({"level": lv, "group": ["campaign", "cutscene", "generic"][level_sort_key(lv)[0]],
-                           "tags": len(recs), "slots": len(sids), "progress": level_progress(sids, mappings),
+                           "tags": len(recs), "slots": len(sids),
+                           "progress": level_progress(sids, mappings, [r["mcc_tag"] for r in recs]),
                            "status": status.get(lv), "ce_missions": self._mission_scope(lv)})
         missions = []
         for m, recs in self.missions.items():
@@ -325,7 +326,9 @@ class M4App:
                       "table_loaded": tbl is not None, "evidence": SUBTITLE_KEY_EVIDENCE}
         return out
 
-    def _slot_filter(self, status, m, s):
+    def _slot_filter(self, status, m, s, take_counts=None):
+        if status == "takes":  # the sound has added takes (counted once per request, not per line)
+            return (take_counts or {}).get(self.slot_index[s["slot_id"]][1]["mcc_tag"], 0) > 0
         st = m["match"]["status"] if m else "unreviewed"
         a = m["audio"]["status"] if m else "draft"
         sub = m["subtitle"]["status"] if m else "draft"
@@ -354,29 +357,31 @@ class M4App:
             raise ApiError(404, f"unknown level {level}")
         mappings, msha = self._mappings()
         by_slot = {s["slot_id"]: s for s in mappings["slots"]}
+        take_counts = self._take_counts(mappings)
         terms = parse_query(q)
         out, total = [], 0
         for lv in (self.levels if level == "all" else [level]):
             for r in self.levels[lv]:
                 for s in r["samples"]["spanish"]:
                     m = by_slot.get(s["slot_id"])
-                    if not self._slot_filter(status, m, s):
+                    if not self._slot_filter(status, m, s, take_counts):
                         continue
                     if terms and not matches(terms, self._mcc_hay[s["slot_id"]]):
                         continue
                     total += 1
                     if len(out) >= limit:
                         continue
-                    out.append(self._slot_row(lv, r, s, m))
+                    out.append(self._slot_row(lv, r, s, m, take_counts))
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
         if level != "all":
-            prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings)
+            prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings,
+                                  [r["mcc_tag"] for r in self.levels[level]])
         return {"level": level, "slots": out, "total": total, "truncated": total > len(out),
                 "progress": prog, "sha256": msha, "terms": terms}
 
-    def _slot_row(self, lv, r, s, m):
+    def _slot_row(self, lv, r, s, m, take_counts=None):
         """One line of the MCC list (also returned by a save, so the page updates that row in place)."""
         en = r["samples"]["english"]
         k = s["ordinal_in_tag"]
@@ -390,6 +395,8 @@ class M4App:
                 "decision": self._decision_summary(m),
                 "radio_effect": bool(m and m["radio_effect"]["needed"]),
                 "different_but_fits": _fits(m), "needs_recording": _needs_recording(m), "edited": _edited(m),
+                "added_takes": (take_counts if take_counts is not None
+                                else self._take_counts(self._mappings()[0])).get(r["mcc_tag"], 0),
                 "preview": self._subtitle_preview(r["mcc_tag"]),
                 "english_preview": self._subtitle_preview(r["mcc_tag"], "EN"),
                 "spanish_index": s["index"]}
@@ -511,6 +518,7 @@ class M4App:
                 "interference": {ref: d for ref in refs if with_interference
                                  and (d := self.interference_defaults(ref, slot_id))},
                 "ce_missions": self._mission_scope(level),
+                "sound": self.sound(r["mcc_tag"], mappings, local),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 
     # ------------------------------------------------------------------ audio
@@ -918,10 +926,211 @@ class M4App:
                 # The list row and the level's progress as the server now holds them: the page replaces that
                 # row and the counters instead of reloading the list.
                 "row": self._slot_row(level, rec, _s, detail["mapping"]),
-                "progress": level_progress(level_slots, {"slots": new_doc["slots"]}),
+                "progress": level_progress(level_slots, new_doc, [x["mcc_tag"] for x in self.levels[level]]),
                 # The project-wide report is refreshed in the background (validate_soon); this is the last
                 # complete one. The decision itself was checked above, before anything was written.
                 "validation": self.last_validation, "validation_pending": self.run_validator}
+
+    # ------------------------------------------------------------------ added takes (docs/added-takes-design.md)
+    @staticmethod
+    def _take_counts(doc):
+        out = {}
+        for t in doc.get("added_takes", []):
+            out[t["mcc_tag"]] = out.get(t["mcc_tag"], 0) + 1
+        return out
+
+    def _tag_record(self, mcc_tag):
+        for lv, recs in self.levels.items():
+            for r in recs:
+                if r["mcc_tag"] == mcc_tag:
+                    return lv, r
+        raise ApiError(404, f"unknown sound {mcc_tag}")
+
+    def take_rule(self, mcc_tag):
+        """-> (allowed, reason). Owner rule 2026-10-17: only sounds without a SU/SP subtitle entry, mono."""
+        _lv, r = self._tag_record(mcc_tag)
+        key = loc_key(mcc_tag)
+        if any(tbl is not None and key in tbl for t, tbl in self.loc.items() if t in ("SU", "SP")):
+            return False, ("this sound has a subtitle entry; added takes are only for sounds without one "
+                           "(every take would show the same text)")
+        if any(s["channels"] != 1 for s in r["samples"]["spanish"]):
+            return False, "stereo sound (stereo replacement is deferred)"
+        return True, ""
+
+    @staticmethod
+    def takes_version(doc, mcc_tag):
+        """The stored version of one sound's added takes: a take save names the version it was made from."""
+        takes = [t for t in doc.get("added_takes", []) if t["mcc_tag"] == mcc_tag]
+        return _sha(json.dumps(takes, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+    def sound(self, mcc_tag, mappings=None, local=None):
+        """One sound: its Spain takes (with their decisions) and its added takes, for the Studio's section."""
+        if mappings is None:
+            mappings, _ = self._mappings()
+        if local is None:
+            local, _ = self._local()
+        lv, r = self._tag_record(mcc_tag)
+        by_slot = {x["slot_id"]: x for x in mappings["slots"]}
+        allowed, reason = self.take_rule(mcc_tag)
+        takes = []
+        for t in sorted((t for t in mappings.get("added_takes", []) if t["mcc_tag"] == mcc_tag),
+                        key=lambda t: t["position"]):
+            drift = (t["audio"]["status"] == "approved"
+                     and t["audio"]["fingerprint"] != added_take_fingerprint(t, self.ce_idx, self.mcc_idx, local))
+            src = (t["audio"]["sources"] or [{}])[0]
+            takes.append({**t, "drift": drift, "edit_summary": audio_edit.summary(t["audio"]["edit"]),
+                          "edited": not audio_edit.is_identity(t["audio"]["edit"]),
+                          "line": self.ce_line(src["ce_line_ref"]) if src.get("ce_line_ref") in self.ce_lines else None})
+        spain = []
+        for s in r["samples"]["spanish"]:
+            m = by_slot.get(s["slot_id"])
+            spain.append({"slot_id": s["slot_id"], "ordinal": s["ordinal_in_tag"], "duration_s": s["duration_s"],
+                          "spanish_index": s["index"], "decision": self._decision_summary(m),
+                          "audio_ref": ((m or {}).get("audio", {}).get("sources") or [{}])[0].get("ce_line_ref")})
+        return {"mcc_tag": mcc_tag, "level": lv, "tag_name": r["tag_name"], "allowed": allowed, "reason": reason,
+                "spain_takes": spain, "added_takes": takes, "total_takes": len(spain) + len(takes),
+                "warn_above": 12, "version": self.takes_version(mappings, mcc_tag)}
+
+    def _take_edit(self, raw_edit, src, current):
+        """The recipe to store for an added take (the same rules as a line's: _normalize_edit)."""
+        a = {} if raw_edit is None else {"edit": raw_edit}
+        return self._normalize_edit(a, "ce", [src], current)
+
+    def take_save(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, take_id? (absent = a new take), audio?: {ce_line_ref, language, edit?},
+        radio_effect?: {needed}, notes?, actions?: [{action: approve|needs_rework, field: "audio"}]}."""
+        with self._save_lock:
+            return self._take_write(body, "save")
+
+    def take_remove(self, body):
+        """body: {mcc_tag, take_id, loaded_takes_sha256}. Not while approved (Needs rework first)."""
+        with self._save_lock:
+            return self._take_write(body, "remove")
+
+    def take_move(self, body):
+        """body: {mcc_tag, take_id, direction: -1 | 1, loaded_takes_sha256}: swaps it with its neighbour."""
+        with self._save_lock:
+            return self._take_write(body, "move")
+
+    def _take_write(self, body, op):
+        tag = body.get("mcc_tag")
+        self._tag_record(tag)  # 404 for an unknown sound
+        doc, sha = self._mappings()
+        local, _lsha = self._local()
+        if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+            raise ApiError(409, "This sound's added takes changed elsewhere since this page loaded them; reload")
+        new_doc = copy.deepcopy(doc)
+        takes = new_doc.setdefault("added_takes", [])
+        mine = sorted((t for t in takes if t["mcc_tag"] == tag), key=lambda t: t["position"])
+        tid = body.get("take_id")
+        take = next((t for t in mine if t["take_id"] == tid), None) if tid else None
+        if tid and take is None:
+            raise ApiError(404, f"unknown added take {tid} for this sound")
+        user_actions, today = [], self.today()
+        if op == "remove":
+            if take["audio"]["status"] == "approved":
+                raise ApiError(409, "the take is approved; mark it Needs rework before removing it")
+            takes.remove(take)
+            for k, t in enumerate(x for x in mine if x is not take):
+                t["position"] = k + 1
+        elif op == "move":
+            d = body.get("direction")
+            if d not in (-1, 1):
+                raise ApiError(400, "direction must be -1 or 1")
+            i = mine.index(take)
+            j = i + d
+            if not 0 <= j < len(mine):
+                raise ApiError(400, "the take is already at that end")
+            mine[i]["position"], mine[j]["position"] = mine[j]["position"], mine[i]["position"]
+        else:
+            if take is None:  # a new take: allowed sounds only
+                allowed, reason = self.take_rule(tag)
+                if not allowed:
+                    raise ApiError(409, f"added takes are not allowed here: {reason}")
+                used = [t["take_id"] for t in takes] + sorted(mapping_store.used_take_ids(self.root / MAPPINGS))
+                take = {"take_id": _next_id("t", used), "mcc_tag": tag, "position": len(mine) + 1,
+                        "audio": {"status": "draft", "source": "ce", "sources": [],
+                                  "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0},
+                                  "fingerprint": None, "approved_at": None, "revision": 1},
+                        "radio_effect": {"needed": False, "set_at": None, "revision": 1}, "notes": ""}
+                takes.append(take)
+                if not body.get("audio"):
+                    raise ApiError(400, "a new take needs its Campaign Evolved recording (audio.ce_line_ref)")
+            actions = body.get("actions") or []
+            for a in actions:
+                if a.get("action") not in ("approve", "needs_rework") or a.get("field") != "audio":
+                    raise ApiError(400, f"unknown action {a}")
+                user_actions.append(UserAction(a["action"], take["take_id"], "audio"))
+            if any(a.action == "needs_rework" for a in user_actions):
+                if take["audio"]["status"] != "approved":
+                    raise ApiError(400, "the take is not approved; nothing to rework")
+                take["audio"].update(status="needs_rework", revision=take["audio"]["revision"] + 1,
+                                     approved_at=None, fingerprint=None)
+            if body.get("audio"):
+                ab = body["audio"]
+                ref, lang = ab.get("ce_line_ref"), ab.get("language", "Spanish(Mexico)")
+                if ref not in self.ce_lines:
+                    raise ApiError(400, f"unknown CE line {ref}")
+                if lang not in CE_LANGS:
+                    raise ApiError(400, f"unknown language {lang}")
+                src = {"kind": "ce", "ce_line_ref": ref, "language": lang}
+                edit = self._take_edit(ab.get("edit"), src, take["audio"]["edit"])
+                want = dict(take["audio"], sources=[src], edit=edit)
+                if _audio_sem(want) != _audio_sem(take["audio"]):
+                    if take["audio"]["status"] == "approved":
+                        raise ApiError(409, "the take is approved and read-only; choose 'needs rework' first")
+                    take["audio"] = want
+            if "radio_effect" in body:
+                needed = (body["radio_effect"] or {}).get("needed")
+                if not isinstance(needed, bool):
+                    raise ApiError(400, "radio_effect.needed must be true or false")
+                cur = take["radio_effect"]
+                if needed != cur["needed"]:
+                    take["radio_effect"] = {"needed": needed, "set_at": today,
+                                            "revision": cur["revision"] + (1 if tid else 0)}
+            if "notes" in body:
+                notes = body["notes"] or ""
+                if len(notes) > 2000:
+                    raise ApiError(400, "notes are limited to 2000 characters")
+                take["notes"] = notes
+            if any(a.action == "approve" for a in user_actions):
+                if take["audio"]["status"] == "approved":
+                    raise ApiError(400, "the take is already approved")
+                take["audio"].update(status="approved", approved_at=today,
+                                     fingerprint=added_take_fingerprint(take, self.ce_idx, self.mcc_idx, local))
+        if not takes:
+            new_doc.pop("added_takes")  # never stored empty (schema: minItems 1)
+        if new_doc == doc:
+            return {"saved": False, "message": "nothing changed", "sound": self.sound(tag, doc, local)}
+        try:
+            check_transition(doc, new_doc, user_actions)
+        except ProtectedError as e:
+            raise ApiError(409, str(e))
+        findings, _ = validate_mappings(new_doc, load_schema(SCHEMA_NAME), ce=self.ce_idx, mcc=self.mcc_idx,
+                                        local=local, verifications=self._verifications(),
+                                        current_pins=self._current_pins(), file=MAPPINGS, only_mapping_ids=set(),
+                                        subtitle_keys=self._subtitle_keys())
+        mine_ids = {t["take_id"] for t in new_doc.get("added_takes", []) if t["mcc_tag"] == tag}
+        errors = [f for f in findings if f["severity"] == "error"
+                  and (f["code"] == "schema" or any(f"({t})" in f["where"] for t in mine_ids))]
+        if errors:
+            raise ApiError(422, "the take is not valid yet", [f"{f['code']}: {f['message']}" for f in errors])
+        try:
+            new_sha = save_mappings(self.root / MAPPINGS, new_doc, sha, user_actions=user_actions)
+        except (StaleError, ProtectedError) as e:
+            raise ApiError(409, str(e))
+        except StoreError as e:
+            raise ApiError(422, str(e))
+        self.validate_soon()
+        return {"saved": True, "sha256": new_sha, "sound": self.sound(tag),
+                "take_id": None if op == "remove" else take["take_id"]}
+
+    def _subtitle_keys(self):
+        keys = set()
+        for t in ("SU", "SP"):
+            if self.loc.get(t) is not None:
+                keys |= set(self.loc[t])
+        return keys
 
     # ------------------------------------------------------------------ level status
     def set_progress(self, body):
