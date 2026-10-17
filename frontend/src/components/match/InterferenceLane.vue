@@ -18,6 +18,7 @@ import { Pause, Pencil, Play, RotateCcw, Spline, Trash2, ZoomIn, ZoomOut } from 
 import { api, audioUrl } from "../../api/client";
 import type { AudioEdit, CurvePoint, InterferenceDefaults, InterferenceReference } from "../../api/types";
 import { loadPeaks, type Peaks } from "../../audio/peaks";
+import { attachVolume } from "../../audio/volume";
 import { CURVE, curveAt, curveMin, editedTime, sourceTime, speechDb } from "../../matching/editRecipe";
 
 const props = defineProps<{
@@ -423,7 +424,11 @@ function stop() {
   playhead.value = null;
 }
 player.addEventListener("ended", stop);
-onBeforeUnmount(stop);
+const detachVolume = attachVolume(player);
+onBeforeUnmount(() => {
+  stop();
+  detachVolume();
+});
 
 const sources = [
   { id: "processed", label: "CE processed" },

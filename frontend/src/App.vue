@@ -2,7 +2,7 @@
 import { AudioLines, Database, ExternalLink, Eye, Hammer, LayoutDashboard, LogIn, LogOut, Menu, Network, UserRound, X } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
-import { loadSession, session, signedIn, signOut, visitor } from "./auth/session";
+import { canListen, loadSession, session, signedIn, signOut, visitor } from "./auth/session";
 import { startLiveUpdates, stopLiveUpdates } from "./live/changes";
 import AppBackdrop from "./components/AppBackdrop.vue";
 import AppEmblem from "./components/AppEmblem.vue";
@@ -11,6 +11,7 @@ import HostUnreachable from "./components/HostUnreachable.vue";
 import InstallApp from "./components/InstallApp.vue";
 import PwaBanner from "./components/PwaBanner.vue";
 import StateMessage from "./components/ui/StateMessage.vue";
+import VolumeControl from "./components/VolumeControl.vue";
 import LoginView from "./views/LoginView.vue";
 
 const route = useRoute();
@@ -71,6 +72,8 @@ watch(
       <InstallApp compact />
       <a v-if="session.info?.local_admin" class="classic" :href="classicUrl" target="_blank" rel="noopener">Classic page <ExternalLink :size="13" aria-hidden="true" /></a>
     </nav>
+    <!-- The listening volume for every player in the Studio; hidden where nothing can be heard. In the menu on phones. -->
+    <VolumeControl v-if="signedIn && canListen" :class="{ open: navOpen }" />
     <!-- Public view: always visible (also on a phone, where the account area folds into the menu). -->
     <div v-if="visitor" class="visitor-chip" data-testid="visitor-mode">
       <span class="badge info" title="Anyone can browse this Studio. Editing, listening and downloads need the owner's sign-in.">

@@ -4,10 +4,12 @@
 import { reactive, readonly } from "vue";
 import { canListen } from "../auth/session";
 import { endPlayback, startPlayback, type Playback } from "./transport";
+import { attachVolume } from "./volume";
 
 // `loading`: asked to play, waiting for the first audio (a slow connection, a recording decoded on demand).
 const state = reactive({ url: null as string | null, playing: false, loading: false, error: "" });
 let audio: HTMLAudioElement | null = null;
+let detachVolume: (() => void) | null = null;
 
 export const playerState = readonly(state);
 
@@ -24,6 +26,7 @@ export function togglePlay(url: string): void {
   }
   stop();
   audio = new Audio(url);
+  detachVolume = attachVolume(audio);
   audio.onended = () => {
     state.playing = false;
     endPlayback(clipPlayer);
@@ -63,6 +66,8 @@ export function stop(): void {
     audio.pause();
     audio.src = "";
   }
+  detachVolume?.();
+  detachVolume = null;
   audio = null;
   state.url = null;
   state.playing = false;

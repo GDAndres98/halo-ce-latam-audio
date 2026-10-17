@@ -147,6 +147,72 @@ main.wide {
   }
 }
 
+/* ---- The listening volume (VolumeControl.vue): at the right of the top band, before the account. */
+.top .volume {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.top .volume ~ .who,
+.top .volume ~ .visitor-chip {
+  margin-left: 0;
+}
+
+.top .volume .volume-mute {
+  padding: 0.3rem 0.45rem;
+}
+
+.top .volume input[type="range"] {
+  width: 90px;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.top .volume input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--frame) var(--fill), var(--line) var(--fill));
+}
+
+.top .volume input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--frame) var(--fill), var(--line) var(--fill));
+}
+
+.top .volume input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--menu);
+  border: 2px solid var(--frame);
+  box-shadow: 0 0 8px var(--frame-glow);
+}
+
+.top .volume input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--menu);
+  border: 2px solid var(--frame);
+  box-shadow: 0 0 8px var(--frame-glow);
+}
+
+.top .volume input[type="range"]:focus-visible {
+  outline: 2px solid var(--frame);
+  outline-offset: 3px;
+}
+
 /* ---- The signed-in account (remote address only), at the right of the top band. */
 .top .who {
   margin-left: auto;
