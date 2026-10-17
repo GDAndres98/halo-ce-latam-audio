@@ -15,6 +15,9 @@ export interface LevelProgress {
   /** Lines muted in game (Mute / No replacement): a subset of no_equivalent, never counted as matched. */
   muted: number;
   muted_approved: number;
+  /** Added takes of the level's sounds (docs/added-takes-design.md); never counted as lines or matches. */
+  added_takes?: number;
+  added_takes_approved?: number;
   ready_for_build: boolean;
 }
 
@@ -244,6 +247,8 @@ export interface StoredDecision {
 }
 
 export interface SlotRow {
+  /** Added takes of this line's sound (all its takes share them). */
+  added_takes?: number;
   slot_id: string;
   level: string;
   mcc_tag: string;
@@ -329,7 +334,49 @@ export interface SlotDetail {
   /** Lines with the one-off interference treatment, by CE line ref (only Victor 933's). */
   interference?: Record<string, InterferenceDefaults>;
   ce_missions: string[];
+  /** The line's sound: its Spain takes and its added takes. */
+  sound?: SoundTakes;
   sha256: Hashes;
+}
+
+/** One added take of a sound (manual_mappings.json added_takes). */
+export interface AddedTake {
+  take_id: string;
+  mcc_tag: string;
+  position: number;
+  audio: StoredDecision["audio"];
+  radio_effect: { needed: boolean; set_at: string | null; revision: number };
+  notes?: string;
+  /** Approved, but the recording or the sound's Spain takes changed since. */
+  drift: boolean;
+  edit_summary: string;
+  edited: boolean;
+  line: CeLine | null;
+}
+
+/** A sound (tag) as the takes section shows it (GET /api/slot -> sound, and every takes request). */
+export interface SoundTakes {
+  mcc_tag: string;
+  level: string;
+  tag_name: string;
+  /** Owner rule 2026-10-17: only mono sounds without a subtitle entry may get added takes. */
+  allowed: boolean;
+  reason: string;
+  spain_takes: { slot_id: string; ordinal: number; duration_s: number; spanish_index: number;
+                 decision: { match: string; audio: string; subtitle: string; audio_source: string | null } | null;
+                 audio_ref: string | null }[];
+  added_takes: AddedTake[];
+  total_takes: number;
+  warn_above: number;
+  /** The version the next takes request must name (loaded_takes_sha256). */
+  version: string;
+}
+
+export interface TakeResponse {
+  saved: boolean;
+  message?: string;
+  sound: SoundTakes;
+  take_id?: string | null;
 }
 
 export interface CeLine {
@@ -520,7 +567,8 @@ export type BuildScope = "mission" | "levels" | "all_mapped";
 export interface BuildPreview {
   levels: string[];
   scope: string;
-  audio: { replace: number; keep_original: number; mute: number; not_eligible: number; conflicts: number };
+  audio: { replace: number; keep_original: number; mute: number; insert?: number; insert_not_eligible?: number;
+           not_eligible: number; conflicts: number };
   subtitles: SubtitleSummary & { excluded_rows: ExcludedSubtitle[]; conflict_list: SubtitleConflict[] };
 }
 

@@ -24,7 +24,7 @@ const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "
         <dt><FileAudio :size="14" aria-hidden="true" /> Audio</dt>
         <dd data-testid="preview-audio">
           {{ preview.audio.replace }} approved replacement(s)
-          <span class="muted">· {{ preview.audio.mute ?? 0 }} muted · {{ preview.audio.keep_original }} keep Spain · {{ preview.audio.not_eligible }} not eligible</span>
+          <span class="muted">· {{ preview.audio.mute ?? 0 }} muted · {{ preview.audio.insert ?? 0 }} added takes · {{ preview.audio.keep_original }} keep Spain · {{ preview.audio.not_eligible }} not eligible</span>
         </dd>
         <dt><Captions :size="14" aria-hidden="true" /> Subtitles</dt>
         <dd data-testid="preview-subtitles">

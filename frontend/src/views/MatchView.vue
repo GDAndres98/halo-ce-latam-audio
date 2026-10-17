@@ -316,6 +316,7 @@ onMounted(async () => {
         :class="{ 'pane-active': pane === 'match' }"
         :match="match"
         :slot-id="selectedSlot"
+        :focused-ref="focusedRef"
         @save-next="saveAndNext"
         @browse="setPane('mcc')"
       />

@@ -377,6 +377,14 @@ kbd {
   color: var(--bad);
 }
 
+/* A sound with added takes (docs/added-takes-design.md). */
+.takes-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.3rem;
+}
+
 .flag-radio { color: var(--radio); }
 .flag-recording { color: var(--warn); }
 .flag-fits { color: var(--menu); }

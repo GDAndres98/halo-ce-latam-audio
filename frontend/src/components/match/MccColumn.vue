@@ -3,7 +3,7 @@
 // Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
-import { ChevronsDown, ListMusic, VolumeX } from "lucide-vue-next";
+import { ChevronsDown, Layers, ListMusic, VolumeX } from "lucide-vue-next";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { onChange, onReconnect } from "../../live/changes";
@@ -38,6 +38,7 @@ const STATUS_OPTIONS: [string, string][] = [
   ["needs_rework", "Needs rework"],
   ["keep_original", "Keep Spain audio"],
   ["muted", "Muted in game"],
+  ["takes", "Has added takes"],
   ["radio", FLAGS.radio.label],
   ["recording", FLAGS.recording.label],
   ["fits", FLAGS.fits.label],
@@ -252,6 +253,13 @@ function rowLabel(row: SlotRow) {
             aria-label="Muted in game"
             data-testid="muted-pill"
           ><VolumeX :size="12" aria-hidden="true" /> muted</span>
+          <span
+            v-if="row.added_takes"
+            class="pill takes-pill"
+            :title="`${row.added_takes} added take(s) for this sound`"
+            :aria-label="`${row.added_takes} added takes`"
+            data-testid="takes-pill"
+          ><Layers :size="12" aria-hidden="true" /> +{{ row.added_takes }}</span>
           <span
             v-for="flag in rowFlags(row)"
             :key="flag.name"

@@ -1,4 +1,4 @@
-import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference } from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -140,6 +140,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Added takes of one sound: add / change / approve / rework (save), reorder (move), remove. Each request names
+   * the sound's version it was made from (409 when another computer changed the sound's takes). */
+  takeSave: (body: TakeSaveBody) => request<TakeResponse>("/api/takes/save", postJson(body)),
+  takeMove: (body: { mcc_tag: string; take_id: string; direction: -1 | 1; loaded_takes_sha256: string }) =>
+    request<TakeResponse>("/api/takes/move", postJson(body)),
+  takeRemove: (body: { mcc_tag: string; take_id: string; loaded_takes_sha256: string }) =>
+    request<TakeResponse>("/api/takes/remove", postJson(body)),
+
   exportSettings: () => request<ExportSettings>("/api/settings/export"),
 
   /** Saves the global gain and/or the level mode (null keeps the saved value). `loadedSha256` must be the hash
@@ -192,6 +200,14 @@ export const api = {
 };
 
 /** Audio is streamed by the API; these are the URLs the players use (same ones as the classic page). */
+export interface TakeSaveBody {
+  mcc_tag: string;
+  loaded_takes_sha256: string;
+  take_id?: string;
+  audio?: { ce_line_ref: string; language: string };
+  actions?: { action: "approve" | "needs_rework"; field: "audio" }[];
+}
+
 export const audioUrl = {
   mcc: (level: string, lang: "spanish" | "english", index: number) =>
     `/audio/mcc${query({ level, lang, index })}`,

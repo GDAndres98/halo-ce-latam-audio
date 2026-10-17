@@ -21,6 +21,7 @@ import CopyButton from "../ui/CopyButton.vue";
 import DownloadLink from "../ui/DownloadLink.vue";
 import StateMessage from "../ui/StateMessage.vue";
 import AudioCompare from "../waveform/AudioCompare.vue";
+import AddedTakes from "./AddedTakes.vue";
 import AudioDecision from "./AudioDecision.vue";
 import AudioEditor from "./AudioEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
@@ -36,6 +37,8 @@ const props = defineProps<{
   match: MatchState;
   /** The MCC line selected in the list (from the URL): shown at once, even while its decision loads. */
   slotId: string | null;
+  /** The Campaign Evolved recording focused in the right-hand column ("Add as extra take" uses it). */
+  focusedRef?: string | null;
 }>();
 const emit = defineEmits<{ saveNext: []; browse: [] }>();
 
@@ -230,6 +233,16 @@ async function choose(ref: string) {
         <AudioDecision :draft="draft" :locked="audioLocked" :read-only="readOnly" @choose="choose" @remove="match.removeMatch" @mute="match.mute" />
         <p class="decision-status"><StatusBadge v-bind="statusOf('audio')" /></p>
       </section>
+
+      <!-- Takes of this sound: its Spain takes and its added takes (docs/added-takes-design.md) -->
+      <AddedTakes
+        :key="`takes-${detail.slot_id}`"
+        :sound="detail.sound ?? null"
+        :focused-ref="props.focusedRef ?? null"
+        :read-only="readOnly"
+        :can-listen="canListen"
+        @changed="(s) => { if (match.detail.value) match.detail.value.sound = s; }"
+      />
 
       <!-- 2. Flags & notes -->
       <FlagsNotes :draft="draft" :read-only="readOnly" />
