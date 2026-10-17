@@ -9,6 +9,7 @@ import { computed } from "vue";
 import type { MatchState } from "../../composables/useMatch";
 import type { Pane } from "../../layout/layoutMode";
 import { draftProblems } from "../../matching/draft";
+import { readOnly } from "../../auth/session";
 
 const props = defineProps<{ match: MatchState; pane: Pane; saveBarVisible: boolean }>();
 const emit = defineEmits<{ saveNext: []; review: [] }>();
@@ -20,7 +21,7 @@ const blocked = computed(
 );
 const note = computed(() => props.match.error.value || props.match.message.value);
 const shown = computed(
-  () => !(props.pane === "match" && props.saveBarVisible) && (dirty.value || props.match.saving.value || Boolean(note.value)),
+  () => !readOnly.value && !(props.pane === "match" && props.saveBarVisible) && (dirty.value || props.match.saving.value || Boolean(note.value)),
 );
 
 function dismiss() {

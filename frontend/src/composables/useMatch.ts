@@ -11,6 +11,7 @@
 
 import { reactive, ref, watch } from "vue";
 import { api, ApiError } from "../api/client";
+import { readOnly } from "../auth/session";
 import type { ApprovalField, CeLine, SaveAction, SaveResponse, SlotDetail } from "../api/types";
 import {
   buildReworkBody,
@@ -55,7 +56,7 @@ export function useMatch() {
     baseline.value = fresh;
     next.matched_lines.forEach((line) => lines.set(line.ce_line_ref, line));
     if (!keepTyping) {
-      const restored = restoreSession(next);
+      const restored = readOnly.value ? null : restoreSession(next); // a visitor always sees what is stored
       Object.assign(draft, restored ? completeDraft(restored, fresh) : fresh);
       // What is shown now is saved (or the user's own restored draft): nothing is a proposal any more.
       proposedSubtitle.value = null;
@@ -88,6 +89,7 @@ export function useMatch() {
    * the subtitle (see proposeSubtitle). Returns false when the audio is approved and cannot change.
    */
   async function chooseRecording(ref: string): Promise<boolean> {
+    if (readOnly.value) return false; // the public read-only view (the server refuses saves there anyway)
     if (!detail.value || !baseline.value || loading.value) return false; // the line is still loading
     if (detail.value.mapping?.audio.status === "approved") {
       error.value = "The audio decision is approved. Mark it Needs rework before choosing another recording.";
@@ -110,6 +112,7 @@ export function useMatch() {
 
   /** Removes a CE line from the match. A replacement or subtitle that used it goes back to the default. */
   function removeMatch(ref: string) {
+    if (readOnly.value) return;
     draft.ceRefs = draft.ceRefs.filter((r) => r !== ref);
     if (draft.audioRef === ref) {
       draft.audioRef = null;
@@ -124,7 +127,7 @@ export function useMatch() {
 
   /** Unmatch the line (draft only; Save draft keeps it). Refused while an approval protects what it changes. */
   function unmatch(): boolean {
-    if (!detail.value) return false;
+    if (!detail.value || readOnly.value) return false;
     const check = canUnmatch(detail.value.mapping, draft);
     if (!check.allowed) {
       error.value = check.reason;
@@ -140,7 +143,7 @@ export function useMatch() {
 
   /** Mute / No replacement (draft only; Save draft keeps it). Refused while the audio is approved. */
   function mute(): boolean {
-    if (!detail.value) return false;
+    if (!detail.value || readOnly.value) return false;
     if (detail.value.mapping?.audio.status === "approved") {
       error.value = "The audio decision is approved. Mark it Needs rework before muting the line.";
       return false;
@@ -180,7 +183,7 @@ export function useMatch() {
   /** Saves the draft and any approval actions in one request. On failure nothing is lost: the draft
    * stays exactly as the user left it. */
   async function save(actions: SaveAction[] = []): Promise<boolean> {
-    if (!detail.value || !baseline.value) return false;
+    if (!detail.value || !baseline.value || readOnly.value) return false;
     const slotId = detail.value.slot_id;
     const sentKey = draftKey(draft);
     saving.value = true;
@@ -203,7 +206,7 @@ export function useMatch() {
 
   /** Sends an approved decision back to rework. Only that field is touched; the draft is kept. */
   async function rework(field: ApprovalField): Promise<boolean> {
-    if (!detail.value) return false;
+    if (!detail.value || readOnly.value) return false;
     saving.value = true;
     error.value = "";
     try {

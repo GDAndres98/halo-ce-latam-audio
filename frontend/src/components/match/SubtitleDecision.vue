@@ -17,6 +17,8 @@ const props = defineProps<{
   /** What is saved, to tell an unsaved choice apart. */
   baseline: Draft | null;
   locked: boolean;
+  /** The public read-only view: shown as stored, with no editing advice. */
+  readOnly?: boolean;
   detail: SlotDetail;
   /** The Campaign Evolved lines of the draft's match, saved or not (in match order). */
   lines: CeLine[];
@@ -97,7 +99,7 @@ const preview = computed<{ text: string | null; note: string }>(() => {
 <template>
   <section class="block" aria-label="Subtitles" data-section="subtitles">
     <h3><Captions :size="15" aria-hidden="true" /> Subtitles</h3>
-    <p v-if="locked" class="note">Approved. Mark it Needs rework to change the subtitle.</p>
+    <p v-if="locked && !readOnly" class="note">Approved. Mark it Needs rework to change the subtitle.</p>
 
     <dl class="texts">
       <dt>MCC LATAM (SU)</dt>
@@ -146,7 +148,7 @@ const preview = computed<{ text: string | null; note: string }>(() => {
           </label>
         </li>
       </ul>
-      <p v-else class="small muted">Use a recording from the right-hand list; its subtitle can then be chosen here.</p>
+      <p v-else-if="!readOnly" class="small muted">Use a recording from the right-hand list; its subtitle can then be chosen here.</p>
     </div>
 
     <div v-if="draft.subtitleSource === 'custom'" class="custom-subtitle">

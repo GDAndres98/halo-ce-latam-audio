@@ -11,7 +11,7 @@
 import { Captions, FileAudio, Folder, Hammer, HardDriveDownload, Layers, RefreshCw, TriangleAlert, Undo2 } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api } from "../api/client";
-import { permissions } from "../auth/session";
+import { permissions, visitor } from "../auth/session";
 import BuildHistory from "../components/build/BuildHistory.vue";
 import DeployHistory from "../components/build/DeployHistory.vue";
 import GainSetting from "../components/build/GainSetting.vue";
@@ -73,6 +73,14 @@ const blockedReason = (kind: BuildKind) =>
       : "";
 
 async function refresh() {
+  // The public read-only view sees the builds and the install history only (docs/public-access.md): the game
+  // folder, the level setting and the scope preview are the owner's.
+  if (visitor.value) {
+    const [b, h] = await Promise.all([api.builds(), api.deployHistory()]);
+    builds.value = b;
+    history.value = h.events;
+    return;
+  }
   const [b, d, h] = await Promise.all([api.builds(), api.deployStatus(), api.deployHistory()]);
   builds.value = b;
   deploy.value = d;
@@ -81,7 +89,7 @@ async function refresh() {
 }
 
 async function loadPreview() {
-  if (!scopeReady.value) {
+  if (!scopeReady.value || visitor.value) {
     preview.value = null;
     return;
   }
@@ -219,11 +227,18 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
     <PageHeader
       title="Build & Test"
       :icon="Hammer"
-      lead="Build the Spanish dialogue bank and the LATAM subtitle tables from approved decisions, install them to try them in MCC, then restore the originals."
+      :lead="visitor
+        ? 'The builds made from approved decisions and the history of test installs. Read-only: building, installing and downloads are limited to the project owner.'
+        : 'Build the Spanish dialogue bank and the LATAM subtitle tables from approved decisions, install them to try them in MCC, then restore the originals.'"
     />
     <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
 
-    <div class="builds-grid">
+    <section v-if="visitor" class="panel" aria-labelledby="installs-title" data-testid="public-install-history">
+      <PanelHeader title="Test installs" title-id="installs-title" :icon="HardDriveDownload" />
+      <DeployHistory :events="history" />
+    </section>
+
+    <div v-if="!visitor" class="builds-grid">
       <GainSetting @saved="refresh" />
 
       <section class="panel build-panel" aria-labelledby="build-title">
@@ -277,7 +292,7 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
       </section>
     </div>
 
-    <section class="panel" aria-labelledby="install-title">
+    <section v-if="!visitor" class="panel" aria-labelledby="install-title">
       <PanelHeader title="Install to MCC" title-id="install-title" :icon="HardDriveDownload">
         <button type="button" class="icon-label small-button" :disabled="running" @click="refresh">
           <RefreshCw :size="14" aria-hidden="true" /> Check again
@@ -341,6 +356,7 @@ const levelName = (l: BuildLevel | { mode: string; global_gain_db: number | null
         :installed="deploy?.active_builds ?? []"
         :can-deploy="canDeploy"
         :mod-installed="Boolean(deploy?.mod_installed)"
+        :read-only="visitor"
         @install="install"
       />
       <StateMessage v-else-if="!error" kind="loading">Loading builds…</StateMessage>

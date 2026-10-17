@@ -156,3 +156,18 @@ main.wide {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+/* ---- The public read-only view (docs/public-access.md): a quiet badge and the way to the editing address.
+   Shown on every layout (the account area folds into the menu on phones; this does not). */
+.top .visitor-chip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+html[data-layout="phone"] .top .visitor-chip .button span,
+html[data-layout="phone"] .top .visitor-chip .button {
+  font-size: 0.72rem;
+}

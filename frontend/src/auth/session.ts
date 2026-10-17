@@ -25,6 +25,15 @@ export const permissions = computed(
   () => state.info?.permissions ?? { edit: false, admin: false, install: false, settings_mcc: false },
 );
 
+/** The public read-only view (docs/public-access.md): anyone may browse; nothing can be changed. */
+export const visitor = computed(() => Boolean(state.info?.visitor));
+/** Nothing on this page may be changed: no saving, approving, choosing recordings or editing. */
+export const readOnly = computed(() => !permissions.value.edit);
+/** Recordings, waveforms and editor previews may be played (never for a visitor). */
+export const canListen = computed(() => permissions.value.audio ?? permissions.value.edit);
+/** Recordings may be saved as files (never for a visitor). */
+export const canDownload = computed(() => permissions.value.download ?? permissions.value.edit);
+
 function adopt(info: SessionInfo) {
   state.info = info;
   setCsrfToken(info.csrf);

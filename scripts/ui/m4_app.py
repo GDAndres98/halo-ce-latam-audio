@@ -475,7 +475,8 @@ class M4App:
                 "terms": terms, "hidden_used": n_hidden,
                 "order": "catalog order (mission, catalog file, entry index); filter only, never ranked"}
 
-    def slot(self, slot_id):
+    def slot(self, slot_id, with_interference=True):
+        """with_interference=False (the public view) skips the Victor 933 lane defaults, which decode audio."""
         if slot_id not in self.slot_index:
             raise ApiError(404, f"unknown slot {slot_id}")
         level, r, s = self.slot_index[slot_id]
@@ -507,7 +508,8 @@ class M4App:
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
                 "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
                          "available": self.editor is not None, "engine": audio_edit.ENGINE},
-                "interference": {ref: d for ref in refs if (d := self.interference_defaults(ref, slot_id))},
+                "interference": {ref: d for ref in refs if with_interference
+                                 and (d := self.interference_defaults(ref, slot_id))},
                 "ce_missions": self._mission_scope(level),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 

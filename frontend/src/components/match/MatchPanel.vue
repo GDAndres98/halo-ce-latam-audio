@@ -11,6 +11,7 @@
 import { FileAudio, ListChecks, Unlink } from "lucide-vue-next";
 import { computed } from "vue";
 import { audioUrl } from "../../api/client";
+import { canListen, readOnly } from "../../auth/session";
 import AudioButton from "../AudioButton.vue";
 import type { CeLine } from "../../api/types";
 import { useEditPreview } from "../../composables/useEditPreview";
@@ -25,6 +26,8 @@ import AudioEditor from "./AudioEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
 import { FLAGS, FLAG_ORDER } from "./flags";
 import { canUnmatch } from "../../matching/draft";
+import ReadOnlyNotice from "./ReadOnlyNotice.vue";
+import RecipeSummary from "./RecipeSummary.vue";
 import SaveBar from "./SaveBar.vue";
 import SubtitleDecision from "./SubtitleDecision.vue";
 
@@ -44,8 +47,9 @@ const switching = computed(
 );
 const draft = computed(() => props.match.draft);
 const stored = computed(() => detail.value?.mapping ?? null);
-const audioLocked = computed(() => stored.value?.audio.status === "approved");
-const subtitleLocked = computed(() => stored.value?.subtitle.status === "approved");
+// The public read-only view (docs/public-access.md) shows every decision as it is stored, never editable.
+const audioLocked = computed(() => readOnly.value || stored.value?.audio.status === "approved");
+const subtitleLocked = computed(() => readOnly.value || stored.value?.subtitle.status === "approved");
 
 const mccUrl = computed(() => (detail.value ? audioUrl.mcc(detail.value.level, "spanish", detail.value.spanish.index) : null));
 /** The MCC English takes of the line, which A can play instead of Spain's under "Listen and compare". */
@@ -56,7 +60,8 @@ const mccEnglish = computed(() =>
   })),
 );
 
-// The edited replacement is rendered automatically; only a preview of the current recipe is offered.
+// The edited replacement is rendered automatically; only a preview of the current recipe is offered (never
+// where recordings cannot be played).
 const preview = useEditPreview(props.match);
 const canRender = computed(() => detail.value?.edit?.available !== false);
 const replacement = computed(() => {
@@ -200,6 +205,7 @@ async function choose(ref: string) {
           <StatusBadge :label="`match: ${draft.matchStatus}`" :tone="matchTone" />
           <StatusBadge v-if="match.dirty()" label="unsaved changes" tone="warn" />
           <button
+            v-if="!readOnly"
             type="button"
             class="icon-label small-button"
             :disabled="!unmatchable.allowed || switching"
@@ -214,15 +220,17 @@ async function choose(ref: string) {
           </span>
         </div>
 
-        <AudioDecision :draft="draft" :locked="audioLocked" @choose="choose" @remove="match.removeMatch" @mute="match.mute" />
+        <AudioDecision :draft="draft" :locked="audioLocked" :read-only="readOnly" @choose="choose" @remove="match.removeMatch" @mute="match.mute" />
         <p class="decision-status"><StatusBadge v-bind="statusOf('audio')" /></p>
       </section>
 
       <!-- 2. Flags & notes -->
-      <FlagsNotes :draft="draft" />
+      <FlagsNotes :draft="draft" :read-only="readOnly" />
 
-      <!-- 3. Audio editing -->
+      <!-- 3. Audio editing (a read-only summary where recordings cannot be played) -->
+      <RecipeSummary v-if="!canListen" :detail="detail" :draft="draft" />
       <AudioEditor
+        v-else
         :key="detail.slot_id" :draft="draft" :locked="audioLocked"
         :interference="detail.interference?.[draft.audioRef ?? ''] ?? null" :slot-id="detail.slot_id"
         :original-url="mccUrl" :preview-url="replacement.edited"
@@ -230,6 +238,7 @@ async function choose(ref: string) {
 
       <!-- 4. Listen & compare -->
       <AudioCompare
+        v-if="canListen"
         :key="detail.slot_id"
         :mcc-url="mccUrl"
         :mcc-english="mccEnglish"
@@ -245,6 +254,7 @@ async function choose(ref: string) {
         :draft="draft"
         :baseline="match.baseline.value"
         :locked="subtitleLocked"
+        :read-only="readOnly"
         :detail="detail"
         :lines="draftLines"
         :proposed-ref="match.proposedSubtitle.value"
@@ -252,16 +262,17 @@ async function choose(ref: string) {
         <p class="decision-status"><StatusBadge v-bind="statusOf('subtitle')" /></p>
       </SubtitleDecision>
 
-      <SaveBar :match="match" @save-next="emit('saveNext')" />
+      <ReadOnlyNotice v-if="readOnly" />
+      <SaveBar v-else :match="match" @save-next="emit('saveNext')" />
     </template>
 
     <StateMessage v-else-if="match.loading.value" kind="loading">Loading line…</StateMessage>
     <StateMessage v-else-if="match.error.value" kind="error">{{ match.error.value }}</StateMessage>
     <div v-else class="center-empty">
       <ListChecks :size="56" aria-hidden="true" />
-      <p class="pointer-only">Choose an MCC line on the left to start matching.</p>
+      <p class="pointer-only">Choose an MCC line on the left to {{ readOnly ? "see its decision" : "start matching" }}.</p>
       <p class="small pointer-only"><kbd>J</kbd> / <kbd>K</kbd> step through the lines · <kbd>U</kbd> next unmatched</p>
-      <p class="touch-only">Choose an MCC line to start matching.</p>
+      <p class="touch-only">Choose an MCC line to {{ readOnly ? "see its decision" : "start matching" }}.</p>
       <button type="button" class="primary icon-label touch-only" data-testid="browse-mcc" @click="emit('browse')">Browse MCC lines</button>
     </div>
   </section>

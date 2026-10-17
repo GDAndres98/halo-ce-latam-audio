@@ -2,6 +2,7 @@
 // so starting a clip anywhere stops the previous one, and every button shows the same state.
 
 import { reactive, readonly } from "vue";
+import { canListen } from "../auth/session";
 import { endPlayback, startPlayback, type Playback } from "./transport";
 
 // `loading`: asked to play, waiting for the first audio (a slow connection, a recording decoded on demand).
@@ -15,6 +16,7 @@ const clipPlayer: Playback = { pause: () => pause() };
 
 /** Starts the clip at `url`, or pauses it if it is the one playing. */
 export function togglePlay(url: string): void {
+  if (!canListen.value) return; // the public read-only view never streams recordings (the server refuses them)
   if (audio && state.url === url) {
     if (audio.paused) void play(audio);
     else pause();

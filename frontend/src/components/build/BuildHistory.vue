@@ -22,6 +22,8 @@ const props = defineProps<{
   canDeploy: boolean;
   /** A build is installed now: restore first. */
   modInstalled: boolean;
+  /** The public read-only view (docs/public-access.md): no Install action at all. */
+  readOnly?: boolean;
 }>();
 const emit = defineEmits<{ install: [name: string] }>();
 
@@ -181,7 +183,7 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
               </td>
               <td class="action">
                 <button
-                  v-if="!isInstalled(b.name)"
+                  v-if="!readOnly && !isInstalled(b.name)"
                   type="button"
                   class="icon-label small-button"
                   aria-label="Install to MCC"
@@ -236,7 +238,7 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
                   <ChevronDown v-if="open === b.name" :size="15" aria-hidden="true" />
                   <ChevronRight v-else :size="15" aria-hidden="true" /> Details
                 </button>
-                <button v-if="!isInstalled(b.name)" type="button" class="icon-label" :disabled="installBlocked(b)" :title="installTitle(b)" @click="emit('install', b.name)">
+                <button v-if="!readOnly && !isInstalled(b.name)" type="button" class="icon-label" :disabled="installBlocked(b)" :title="installTitle(b)" @click="emit('install', b.name)">
                   <HardDriveDownload :size="15" aria-hidden="true" /> Install to MCC
                 </button>
               </div>

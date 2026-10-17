@@ -5,6 +5,11 @@ phone app ([mobile.md](mobile.md)). Cloudflare Access signs people in, a Cloudfl
 to this computer, and the Studio checks Cloudflare's signed token on every request. Nothing listens on a public
 network interface, and no router port is open.
 
+> **Public read-only view (2026-10-17):** the plan is for `studio.andresgustavo.com` to become an anonymous,
+> read-only view (port 8081) and editing to move to `admin.andresgustavo.com` (this page's setup, unchanged).
+> See [public-access.md](public-access.md) for the design and the dashboard steps. Until those steps are done,
+> everything below is still what runs.
+
 - [1. How it fits together](#1-how-it-fits-together)
 - [2. Start, stop, status](#2-start-stop-status)
 - [3. Start after a reboot](#3-start-after-a-reboot)

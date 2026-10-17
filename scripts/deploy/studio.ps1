@@ -7,6 +7,7 @@
   One server process (scripts/ui/m4_server.py, Python standard library) serves the built Studio and its API:
     - http://127.0.0.1:8765/  the host's own address (no sign-in; the only place game installs are possible)
     - http://127.0.0.1:8080/  the Cloudflare Tunnel's address (Cloudflare Access verified on every request)
+    - http://127.0.0.1:8081/  optional public read-only view for anonymous visitors (docs/public-access.md)
   Both listen on 127.0.0.1 only. Settings: config/studio_server.json (git-ignored).
 
   .\scripts\deploy\studio.ps1 start [-Build]   start in the background (log: work\studio\server.log)
@@ -82,6 +83,7 @@ function Start-Studio {
       Write-Host "Studio started. This computer: http://127.0.0.1:8765/   Log: $LogFile"
       $info = (Get-StudioProcess).Info
       if ($info.public_url) { Write-Host "Through Cloudflare: $($info.public_url) (tunnel -> $($info.remote))" }
+      if ($info.public) { Write-Host "Public read-only view: $($info.public_view_url) (tunnel -> $($info.public))" }
       return
     }
   }
@@ -103,6 +105,11 @@ function Show-Status {
     Write-Host "Studio: running (pid $($i.pid), since $($i.started_at))"
     Write-Host ("  local   {0}  -> {1}" -f $i.local, (Test-Url "$($i.local)api/session"))
     if ($i.remote) { Write-Host ("  tunnel  {0}  -> {1} without an Access token (401 expected)" -f $i.remote, (Test-Url "$($i.remote)api/session" ([uri]$i.public_url).Host)) }
+    if ($i.public) {
+      $pubHost = if ($i.public_view_url) { ([uri]$i.public_view_url).Host } else { $null }
+      Write-Host ("  public  {0}  -> {1} anonymous session (200 expected); a save -> {2} (401 expected)" -f $i.public,
+        (Test-Url "$($i.public)api/session" $pubHost), (Test-Url "$($i.public)api/save" $pubHost))
+    }
   } else { Write-Host "Studio: not running" }
   $svc = Get-Service Cloudflared -ErrorAction SilentlyContinue
   Write-Host "Cloudflare Tunnel connector (service Cloudflared): $(if ($svc) { $svc.Status } else { 'not installed' })"
@@ -112,8 +119,13 @@ function Show-Status {
   } catch { Write-Host "  (cloudflared metrics not reachable on 127.0.0.1:20241)" }
   $cfgFile = Join-Path $Root "config\studio_server.json"
   if (Test-Path $cfgFile) {
-    $url = (Get-Content $cfgFile -Raw | ConvertFrom-Json).public_url
-    if ($url) { Write-Host ("Public {0}  -> {1} without signing in (302 to Cloudflare Access expected)" -f $url, (Test-Url $url)) }
+    $doc = Get-Content $cfgFile -Raw | ConvertFrom-Json
+    $url = $doc.public_url
+    if ($url) { Write-Host ("Editing {0}  -> {1} without signing in (302 to Cloudflare Access expected)" -f $url, (Test-Url $url)) }
+    if ($doc.public -and $doc.public.enabled -and $doc.public.url) {
+      Write-Host ("Public view {0}  -> page {1} (200 expected), recording {2} (401 expected)" -f $doc.public.url,
+        (Test-Url $doc.public.url), (Test-Url "$($doc.public.url.TrimEnd('/'))/audio/mcc?level=a10&lang=spanish&index=0"))
+    }
   }
 }
 

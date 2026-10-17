@@ -32,6 +32,7 @@
     "test:mobile": "node e2e/mobile.mjs",
     "test:layout": "node e2e/layout.mjs",
     "test:pwa": "node e2e/pwa.mjs",
+    "test:visitor": "node e2e/visitor.mjs",
     "icons": "node scripts/make-icons.mjs",
     "perf": "node e2e/perf.mjs",
     "docs:screenshots": "node e2e/screenshots.mjs"

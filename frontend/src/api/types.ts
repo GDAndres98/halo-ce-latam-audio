@@ -55,7 +55,11 @@ export interface Hashes {
 
 /** GET /api/session: the address this page came from and who is signed in (docs/remote-access.md). */
 export interface SessionInfo {
-  listener: "local" | "remote";
+  listener: "local" | "remote" | "public";
+  /** The public read-only view (docs/public-access.md): anonymous, no edits, no audio, no downloads. */
+  visitor?: boolean;
+  /** Where a visitor signs in to edit (the owner's Cloudflare Access protected address). */
+  sign_in_url?: string | null;
   auth_required: boolean;
   authenticated: boolean;
   user: string | null;
@@ -68,7 +72,9 @@ export interface SessionInfo {
   sso?: "cloudflare_access" | null;
   /** Where signing out goes in that mode (Cloudflare's own logout page). */
   logout_url?: string | null;
-  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean };
+  /** audio: play recordings, waveforms and editor previews; download: save them as files. Older servers send
+   * neither (then edit stands for both). */
+  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean; audio?: boolean; download?: boolean };
 }
 
 export interface NetworkInfo {

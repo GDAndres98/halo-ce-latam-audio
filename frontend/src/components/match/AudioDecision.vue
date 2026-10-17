@@ -9,7 +9,8 @@ import { nextTick, ref, watch } from "vue";
 import type { CeLanguage } from "../../api/types";
 import type { Draft } from "../../matching/draft";
 
-const props = defineProps<{ draft: Draft; locked: boolean }>();
+// readOnly: the public read-only view (docs/public-access.md): shown as stored, with no editing advice.
+const props = defineProps<{ draft: Draft; locked: boolean; readOnly?: boolean }>();
 const emit = defineEmits<{ choose: [ref: string]; remove: [ref: string]; mute: [] }>();
 
 // Choosing Mute puts the cursor in the reason box: Save stays disabled until the reason is written.
@@ -30,7 +31,7 @@ const LANGUAGES: { value: CeLanguage; label: string }[] = [
 
 <template>
   <div class="audio-decision">
-    <p v-if="locked" class="note">Approved. Mark it Needs rework to change the audio.</p>
+    <p v-if="locked && !readOnly" class="note">Approved. Mark it Needs rework to change the audio.</p>
 
     <fieldset :disabled="locked" class="choice">
       <label class="opt">
@@ -74,7 +75,7 @@ const LANGUAGES: { value: CeLanguage; label: string }[] = [
     </div>
 
     <div v-if="draft.ceRefs.length && draft.audioSource !== 'mute'" class="matched">
-      <p class="small muted">Matched recordings (choose one to use as the replacement):</p>
+      <p class="small muted">{{ readOnly ? "Matched recordings:" : "Matched recordings (choose one to use as the replacement):" }}</p>
       <ul>
         <li v-for="ref in draft.ceRefs" :key="ref">
           <label class="opt">
@@ -87,13 +88,13 @@ const LANGUAGES: { value: CeLanguage; label: string }[] = [
             />
             <span class="mono small">{{ ref }}</span>
           </label>
-          <button type="button" class="link icon-label" :disabled="locked" @click="emit('remove', ref)">
+          <button v-if="!readOnly" type="button" class="link icon-label" :disabled="locked" @click="emit('remove', ref)">
             <X :size="13" aria-hidden="true" /> remove
           </button>
         </li>
       </ul>
     </div>
-    <p v-else-if="draft.audioSource !== 'mute'" class="small muted">No Campaign Evolved recording is matched to this line yet. Use one from the right-hand list.</p>
+    <p v-else-if="draft.audioSource !== 'mute'" class="small muted">No Campaign Evolved recording is matched to this line yet.<template v-if="!readOnly"> Use one from the right-hand list.</template></p>
 
     <label class="inline">
       Language of the replacement

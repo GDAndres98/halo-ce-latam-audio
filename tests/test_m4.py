@@ -422,10 +422,11 @@ class HttpTests(unittest.TestCase):
         import ast
         # b2_bank_install: the project's MCC process and Steam checks (stdlib only), shared with m6_install.
         # studio_auth / studio_net / live_feed: remote access (docs/remote-access.md), also stdlib only.
+        # public_view: the public read-only listener (docs/public-access.md).
         allowed = set(sys.stdlib_module_names) | {"common", "m4_app", "build_api", "b2_bank_install", "studio_auth",
-                                                  "studio_net", "live_feed", "cf_access"}
+                                                  "studio_net", "live_feed", "cf_access", "public_view"}
         for name in ("m4_server.py", "m4_app.py", "build_api.py", "studio_auth.py", "studio_net.py", "live_feed.py",
-                     "studio_users.py", "cf_access.py"):
+                     "studio_users.py", "cf_access.py", "public_view.py"):
             tree = ast.parse((ROOT / "scripts/ui" / name).read_text(encoding="utf-8"))
             mods = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
             mods |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
