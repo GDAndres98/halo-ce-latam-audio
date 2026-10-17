@@ -296,7 +296,8 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         (`m6_install.py` handles both files; bank-only builds refuse a non-original index: `companion_check`).
         The map tag has 4 permutations, #3 skip fraction 1.0. Johnson variant (`--preset johnson`): **in-game PASS
         (owner, 2026-10-17, `v-000020`): all 4 takes heard**, so MCC selects added takes via the Spanish index.
-        More takes than the tag defines (5+) untested. General "add another take" feature not built yet.
+        6 takes (`--preset johnson6`, beyond the tag's 4): **PASS, all 6 heard (`v-000021`)**: the take count comes
+        from the Spanish index, not the map tag. General "add another take" feature not built yet.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**

@@ -819,6 +819,57 @@
       "by": "user",
       "at": "2026-10-17",
       "note": "Permutation experiment PASSED (owner report: 'I heard the 4 variations'). With the Spanish bank and its .lst.bin replaced together, Grunt death_violent played all four takes, including the two added after Spain's original two. MCC selects added takes through the per-language sound index. Take 3 is the map tag's permutation with skip fraction 1.0, so hearing it indicates the game picks within the index range rather than honouring the tag's skip flag. Only these observations were reported (no counts, level or mode)."
+    },
+    {
+      "id": "v-000021",
+      "subject": "mcc:es:deathviolent%2001#1",
+      "mcc_tag": "sound\\dialog\\grunt\\conditional\\combat2\\involuntary\\death_violent",
+      "checks": [
+        "permutation_selection",
+        "permutation_count_beyond_tag"
+      ],
+      "languages": [
+        "spanish"
+      ],
+      "fingerprint": {
+        "steam_buildid": "19905945",
+        "fsb_sha256": {
+          "spanish": "ed0ff3ec240546611a62d2a23d6ce66b5cd7af17527bf1b12834a77fa91faef6"
+        },
+        "lst_sha256": {
+          "spanish": "d5324861186f079c8d436f598b0adcafba259259eaa56be57d987df68cdaffc3"
+        },
+        "samples": {
+          "spanish": {
+            "index": 1351,
+            "name_in_bank": "deathviolent 01",
+            "data_sha256": "e62c7cd7c0a5c597f4cff2fd9946039ee945bd8e3f5d4d96753dd54ccd3e8e84"
+          }
+        },
+        "experiment": {
+          "id": "P49-PERM-JOHNSON6",
+          "build": "exp_grunt_death_violent_johnson6",
+          "candidate_bank_sha256": "8d4304e23d2478a3ac283dd97a1fb33b4addaead95ea2eef19b16ce993daa1a7",
+          "candidate_lst_sha256": "7dc530d5b5c31975c17d1fb072fc97ebf3f71b8333b154f2351804b1bd27b996",
+          "takes": [
+            "es:killedenemyfloodcombatcm 03#5 (in Spain's place)",
+            "es:killedenemysentinel 02#5 (in Spain's place)",
+            "es:alliancebroken 02#5 (added)",
+            "es:killedenemyfloodcarriercm 02#5 (added)",
+            "es:killedenemysentinel 03#5 (added)",
+            "es:killedenemyfloodcarrier 03#5 (added)"
+          ],
+          "lst_change": "death_violent count 2 -> 6, every later range + 4",
+          "map_tag": "a30.map death_violent: 4 permutations, permutation 3 skip fraction 1.0"
+        },
+        "graphics_modes": "not reported",
+        "language_settings": "not reported",
+        "launch": "MCC anti-cheat disabled"
+      },
+      "result": "pass",
+      "by": "user",
+      "at": "2026-10-17",
+      "note": "6-take permutation experiment PASSED (owner report: 'I heard all 6 lines'). With the Spanish bank and its .lst.bin replaced together, Grunt death_violent played all six Johnson takes, including takes 5 and 6 beyond the map tag's 4 permutations. The number of takes MCC chooses from comes from the per-language sound index, not from the map tag. Only these observations were reported."
     }
   ]
 }

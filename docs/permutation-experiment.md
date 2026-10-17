@@ -6,7 +6,10 @@
 > heard **all four** Johnson takes at Grunt deaths, including the two added after Spain's original two. MCC
 > selects added takes through the per-language sound index. Take 3 sits on the map tag's permutation with skip
 > fraction 1.0, so hearing it indicates the game picks within the index range and does not apply the tag's skip
-> flag there. Not reported: counts, level, graphics mode. Still untested: more takes than the tag defines (5+).
+>
+> **RESULT 2 (2026-10-17, owner, `v-000021`): PASS with 6 takes.** With `exp_grunt_death_violent_johnson6`, the
+> owner heard **all six**, including takes 5 and 6 beyond the map tag's 4 permutations. **The number of takes MCC
+> chooses from comes from the per-language sound index (.lst.bin), not from the map tag.**
 
 **Status before the result:** prepared and validated offline. Nothing here is made from `mappings/`; the general "add another take" feature is not built.
 
