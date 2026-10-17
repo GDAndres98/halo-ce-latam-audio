@@ -11067,8 +11067,8 @@
             }
           ]
         },
-        "approved_at": "2026-10-08",
-        "revision": 1
+        "approved_at": "2026-10-16",
+        "revision": 2
       },
       "subtitle": {
         "status": "approved",
@@ -11095,8 +11095,8 @@
             "source_hash": 4102411552
           }
         },
-        "approved_at": "2026-10-08",
-        "revision": 1
+        "approved_at": "2026-10-16",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -12066,23 +12066,15 @@
       "slot_id": "es:cor01#0",
       "mcc_tag": "sound\\dialog\\x10\\cor01",
       "match": {
-        "status": "matched",
-        "ce_line_refs": [
-          "vo_cin_m01_cin01_sc02_bridge_00020_cortana#0"
-        ],
-        "decided_at": "2026-10-08",
-        "revision": 1
+        "status": "no_equivalent",
+        "ce_line_refs": [],
+        "decided_at": "2026-10-16",
+        "revision": 2
       },
       "audio": {
         "status": "approved",
-        "source": "ce",
-        "sources": [
-          {
-            "kind": "ce",
-            "ce_line_ref": "vo_cin_m01_cin01_sc02_bridge_00020_cortana#0",
-            "language": "Spanish(Mexico)"
-          }
-        ],
+        "source": "mute",
+        "sources": [],
         "edit": {
           "trim_start_s": 0,
           "trim_end_s": 0,
@@ -12094,30 +12086,16 @@
             "index": 5527,
             "data_sha256": "312b8bbfd86cdfd5e70065671c73c64b1a1cdcfd8a520f69ff9237d046e6d483"
           },
-          "sources": [
-            {
-              "kind": "ce",
-              "ce_line_ref": "vo_cin_m01_cin01_sc02_bridge_00020_cortana#0",
-              "language": "Spanish(Mexico)",
-              "media": [
-                {
-                  "media_id": 238102734,
-                  "wem_sha256": "c85426406f8ebb44efea4e00ef17bd6090c2916f6911ccdaa8b105ed20774422"
-                }
-              ]
-            }
-          ]
+          "sources": []
         },
-        "approved_at": "2026-10-08",
-        "revision": 1
+        "approved_at": "2026-10-16",
+        "revision": 2,
+        "mute_reason": "Test"
       },
       "subtitle": {
         "status": "approved",
-        "source": "ce_locres",
-        "ce_locres": {
-          "ce_line_ref": "vo_cin_m01_cin01_sc02_bridge_00020_cortana#0",
-          "culture": "es-MX"
-        },
+        "source": "none",
+        "ce_locres": null,
         "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
@@ -12127,17 +12105,10 @@
             "index": 5527,
             "data_sha256": "312b8bbfd86cdfd5e70065671c73c64b1a1cdcfd8a520f69ff9237d046e6d483"
           },
-          "source": "ce_locres",
-          "ce_locres": {
-            "ce_line_ref": "vo_cin_m01_cin01_sc02_bridge_00020_cortana#0",
-            "culture": "es-MX",
-            "namespace": "VO_CIN_M01PILLAROFAUTUMN",
-            "key": "VO_CIN_M01_cin01_sc02_bridge_00020_Cortana",
-            "source_hash": 2645594135
-          }
+          "source": "none"
         },
-        "approved_at": "2026-10-08",
-        "revision": 1
+        "approved_at": "2026-10-16",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -71489,18 +71460,20 @@
       "match": {
         "status": "matched",
         "ce_line_refs": [
-          "vo_sys_default_11involuntary_dth_mjr_grunt#0"
+          "vo_sys_default_11involuntary_dth_mjr_grunt#0",
+          "vo_sys_default_11involuntary_dth_mjr_grunt#2",
+          "vo_sys_default_11involuntary_dth_mjr_grunt#4"
         ],
-        "decided_at": "2026-10-12",
-        "revision": 1
+        "decided_at": "2026-10-17",
+        "revision": 2
       },
       "audio": {
-        "status": "approved",
+        "status": "needs_rework",
         "source": "ce",
         "sources": [
           {
             "kind": "ce",
-            "ce_line_ref": "vo_sys_default_11involuntary_dth_mjr_grunt#0",
+            "ce_line_ref": "vo_sys_default_11involuntary_dth_mjr_grunt#4",
             "language": "Spanish(Mexico)"
           }
         ],
@@ -71509,46 +71482,20 @@
           "trim_end_s": 0,
           "gap_s": 0
         },
-        "fingerprint": {
-          "mcc": {
-            "slot_id": "es:deathviolent%2001#1",
-            "index": 1351,
-            "data_sha256": "e62c7cd7c0a5c597f4cff2fd9946039ee945bd8e3f5d4d96753dd54ccd3e8e84"
-          },
-          "sources": [
-            {
-              "kind": "ce",
-              "ce_line_ref": "vo_sys_default_11involuntary_dth_mjr_grunt#0",
-              "language": "Spanish(Mexico)",
-              "media": [
-                {
-                  "media_id": 1016751840,
-                  "wem_sha256": "c853d0aee7436c39971738191f7a6960318d1e43941dcf311a96e14c1b821ed0"
-                }
-              ]
-            }
-          ]
-        },
-        "approved_at": "2026-10-12",
-        "revision": 1
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 2
       },
       "subtitle": {
-        "status": "approved",
+        "status": "needs_rework",
         "source": "keep_original",
         "ce_locres": null,
         "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
-        "fingerprint": {
-          "mcc": {
-            "slot_id": "es:deathviolent%2001#1",
-            "index": 1351,
-            "data_sha256": "e62c7cd7c0a5c597f4cff2fd9946039ee945bd8e3f5d4d96753dd54ccd3e8e84"
-          },
-          "source": "keep_original"
-        },
-        "approved_at": "2026-10-12",
-        "revision": 1
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -71575,7 +71522,7 @@
         "revision": 2
       },
       "audio": {
-        "status": "approved",
+        "status": "needs_rework",
         "source": "ce",
         "sources": [
           {
@@ -71589,46 +71536,20 @@
           "trim_end_s": 0,
           "gap_s": 0
         },
-        "fingerprint": {
-          "mcc": {
-            "slot_id": "es:deathviolent%2002#1",
-            "index": 1352,
-            "data_sha256": "6cd7fde6a32187c9338e5ab5390f1ce940d62b2387e3e70b836d4d74169488d1"
-          },
-          "sources": [
-            {
-              "kind": "ce",
-              "ce_line_ref": "vo_sys_default_11involuntary_dth_mjr_grunt#3",
-              "language": "Spanish(Mexico)",
-              "media": [
-                {
-                  "media_id": 1006852373,
-                  "wem_sha256": "e4f1322cc77cb9a137acf83e8b04dfe357f65b8371c7169d83574b327bfb4ff1"
-                }
-              ]
-            }
-          ]
-        },
-        "approved_at": "2026-10-15",
-        "revision": 2
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 3
       },
       "subtitle": {
-        "status": "approved",
+        "status": "needs_rework",
         "source": "keep_original",
         "ce_locres": null,
         "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
-        "fingerprint": {
-          "mcc": {
-            "slot_id": "es:deathviolent%2002#1",
-            "index": 1352,
-            "data_sha256": "6cd7fde6a32187c9338e5ab5390f1ce940d62b2387e3e70b836d4d74169488d1"
-          },
-          "source": "keep_original"
-        },
-        "approved_at": "2026-10-12",
-        "revision": 1
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
