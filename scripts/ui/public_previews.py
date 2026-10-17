@@ -106,6 +106,14 @@ class PreviewStore:
                 "url": f"/audio/public?slot={quote(slot_id, safe='')}" if path else None}
 
 
+def _write_index(store, entries):
+    store.mkdir(parents=True, exist_ok=True)
+    doc = {"schema": SCHEMA, "published_at": dt.datetime.now().isoformat(timespec="seconds"), "entries": entries}
+    tmp = store / "index.json.tmp"
+    tmp.write_text(json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    os.replace(tmp, store / "index.json")
+
+
 def publish(app, root, dry_run=False, log=print, only=None):
     """Render and publish every eligible approved line; remove what is no longer eligible. -> summary dict.
     `app` is an M4App with its audio editor (scripts/ui/m4_server.make_app). `only`: a set of slot ids to
@@ -162,15 +170,13 @@ def publish(app, root, dry_run=False, log=print, only=None):
                         "rendered_at": dt.datetime.now().isoformat(timespec="seconds")}
         rendered += 1
         log(f"  published {sid}")
+        if rendered % 25 == 0:  # lines become playable while a long publish runs (stale ones are never served)
+            _write_index(store, {**old, **entries})
     summary = {"published": len(entries), "rendered": rendered, "reused": reused, "skipped_approved": skipped,
                "removed": sorted(set(old) - set(entries)), "dry_run": dry_run}
     if dry_run:
         return summary
-    store.mkdir(parents=True, exist_ok=True)
-    doc = {"schema": SCHEMA, "published_at": dt.datetime.now().isoformat(timespec="seconds"), "entries": entries}
-    tmp = store / "index.json.tmp"
-    tmp.write_text(json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
-    os.replace(tmp, store / "index.json")
+    _write_index(store, entries)
     keep = {e["file"] for e in entries.values()}
     for f in store.glob("*.wav"):
         if f.name not in keep:
