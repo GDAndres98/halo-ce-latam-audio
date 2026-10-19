@@ -113,5 +113,90 @@ class InstallTests(unittest.TestCase):
             m6_install.check(self.build())
 
 
+class ExperimentTests(unittest.TestCase):
+    """The permutation experiment (scripts/discovery/perm_experiment.py): the Spanish bank and its sound index
+    (.lst.bin) are one unit; a bank-only build refuses to go on top of a changed index."""
+    BANK, LST = m6_install.BANK_REL, m6_install.LST_REL
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        base = Path(self._tmp.name)
+        self.repo = base / "repo"
+        self.game = base / "steam" / "steamapps" / "common" / "Halo The Master Chief Collection"
+        self.orig = {self.BANK: b"original bank", self.LST: b"original index"}
+        self.cand = {self.BANK: b"bank with 2 more takes", self.LST: b"index, count 2 -> 4"}
+        for rel, data in self.orig.items():
+            (self.game / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.game / rel).write_bytes(data)
+        for t in ("SU", "SP"):
+            (self.game / f"Data/ui/localization/{t}_Halo1.bin").parent.mkdir(parents=True, exist_ok=True)
+            (self.game / f"Data/ui/localization/{t}_Halo1.bin").write_bytes(t.encode())
+        (base / "steam/steamapps/appmanifest_976730.acf").write_text(
+            '"AppState"\n{\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"Halo The Master Chief Collection"\n'
+            '\t"buildid"\t\t"19905945"\n}\n')
+        self.make_build("exp", "experiment", [self.BANK, self.LST])
+        self.make_build("audio", "audio", [self.BANK])
+        real_stale = m6_install.stale_check
+        patches = [mock.patch.object(m6_install, "REPO_ROOT", self.repo),
+                   mock.patch.object(m6_install, "LST_PIN", sha(self.orig[self.LST])),
+                   mock.patch.object(m6_install, "running_game_processes", lambda: []),
+                   # the experiment's own check runs for real; an audio build's needs catalogs (test_m6_subtitles)
+                   mock.patch.object(m6_install, "stale_check",
+                                     lambda b: real_stale(b) if b.kind == "experiment" else None)]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.base = base
+
+    def make_build(self, name, kind, rels):
+        d = self.repo / f"work/m6/{name}"
+        d.mkdir(parents=True)
+        files = []
+        for rel in rels:
+            (d / Path(rel).name).write_bytes(self.cand[rel] + name.encode())
+            files.append({"install_rel": rel, "original_sha256": sha(self.orig[rel]),
+                          "candidate": f"work/m6/{name}/{Path(rel).name}",
+                          "candidate_sha256": sha(self.cand[rel] + name.encode())})
+        (d / "build_manifest.json").write_text(json.dumps({"kind": kind, "levels": ["grunt"], "install_files": files,
+                                                           "slots": []}))
+        (d / "validation_report.json").write_text(json.dumps({"ok": True}))
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def build(self, name, fail_after=None):
+        b = m6_install.Build(name, self.game, self.base / "backup", self.base / f"state_{name}", self.base / "h.jsonl")
+        b.fail_after = fail_after
+        return b
+
+    def installed(self):
+        return {rel: (self.game / rel).read_bytes() for rel in self.orig}
+
+    def test_bank_and_index_install_and_restore_together(self):
+        m6_install.preflight(self.build("exp"))
+        m6_install.install(self.build("exp"))
+        self.assertEqual(self.installed(), {r: self.cand[r] + b"exp" for r in self.orig})
+        m6_install.rollback(self.build("exp"))
+        self.assertEqual(self.installed(), self.orig)
+
+    def test_a_failure_after_the_bank_restores_the_bank_too(self):
+        m6_install.preflight(self.build("exp"))
+        with self.assertRaises(SystemExit) as cm:
+            m6_install.install(self.build("exp", fail_after=1))
+        self.assertIn("originals restored and verified", str(cm.exception))
+        self.assertEqual(self.installed(), self.orig)
+
+    def test_a_bank_only_build_refuses_a_changed_index(self):
+        m6_install.preflight(self.build("exp"))
+        m6_install.install(self.build("exp"))
+        (self.game / self.BANK).write_bytes(self.orig[self.BANK])  # only the bank put back (e.g. by hand)
+        with self.assertRaises(SystemExit) as cm:
+            m6_install.check(self.build("audio"))
+        self.assertIn("is not the original", str(cm.exception))
+        m6_install.rollback(self.build("exp"))  # restoring the experiment puts both back
+        self.assertEqual(self.installed(), self.orig)
+        m6_install.check(self.build("audio"))  # now allowed
+
+
 if __name__ == "__main__":
     unittest.main()

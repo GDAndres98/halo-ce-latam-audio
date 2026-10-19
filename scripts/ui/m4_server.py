@@ -15,6 +15,9 @@ Two listeners share one application and one decisions database (docs/remote-acce
   With "remote": {"auth": "cloudflare_access"} the remote listener sits behind a Cloudflare Tunnel: every
   request, the page's own files included, must carry a Cloudflare Access token that this server verifies
   (cf_access.py; docs/deploy-cloudflare.md). There is no password sign-in on it then.
+- **public** (off by default; `--public`, or "public": {"enabled": true}): a read-only view for anonymous
+  visitors through a tunnel on this computer (docs/public-access.md). No identity is read at all; only the
+  allowlisted, sanitised metadata of public_view.py is served. No writes, no audio, no downloads.
 
 Stop a running server cleanly: python scripts/ui/m4_server.py --stop (or scripts/deploy/studio.ps1 stop).
 
@@ -43,7 +46,18 @@ API (all JSON unless noted):
     GET  /audio/peaks?src=<one of the audio URLs above>    waveform peaks (JSON)
     POST /api/edit/preview                        {slot_id, ce_line_ref, language, edit} -> render as M6
                                                   would; writes only work/m4/preview/, never mappings
+    POST /api/edit/preview_combined               {slot_id, source: ce_concat|ce_mix, sources, edit}: the same for a
+                                                  join or an overlay of two recordings (docs/combine-recordings.md)
     POST /api/save                                see M4App.save; 409 = stale or protected
+    POST /api/takes/save | remove | move          added takes of a sound (M4App.take_save / take_remove / take_move)
+    POST /api/takes/add_many                      several recordings as new draft takes, one save (M4App.take_add_many)
+    POST /api/takes/own_set_on | own_set_off      own take set of a sound (M4App.own_set_on / own_set_off)
+    GET  /api/takes/convert/preview?mcc_tag=      read-only: converting a sound's per-take decisions into a
+                                                  replacement set (docs/replacement-set-conversion.md)
+    GET  /api/takes/convert/inventory?level=all|<level>    read-only: every multi-take sound, previewed
+    GET  /api/takes/convert/approvable?mcc_tag=   read-only: the staged takes "approve unchanged" would approve
+    GET  /api/takes/convert/revert_preview?mcc_tag=&rework_drifted=1    read-only: an undo's plan and conflicts
+    POST /api/takes/convert/stage | activate | cancel | revert | approve_unchanged    owner actions (M4App.convert_*)
     POST /api/progress                            {level, status, note, verification, confirm, loaded_sha256}
     POST /api/validate                            run the read-only validator
     GET  /api/data/status                         manual_mappings.json vs the database
@@ -87,6 +101,9 @@ from common.export_config import ConfigError, load_export_config, save_global_ga
 from live_feed import LiveFeed  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 from cf_access import HEADER as ACCESS_HEADER, AccessError, AccessVerifier  # noqa: E402
+from public_previews import PreviewStore  # noqa: E402
+from public_view import (PUBLIC_GETS as PUBLIC_LISTENER_GETS, PUBLIC_ORIGINALS, PUBLIC_PEAKS,  # noqa: E402
+                         PUBLIC_PREVIEW, Limited, PublicLimiter, sanitize)
 from studio_auth import AuthError, Authenticator, SessionStore, UserStore, csrf_ok  # noqa: E402
 from studio_net import ConfigError as NetConfigError, HostPolicy, connection_info, load_server_config  # noqa: E402
 
@@ -118,7 +135,7 @@ COMPRESSIBLE = ("application/json", "text/", "image/svg+xml")
 STUDIO_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
               "media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; "
               "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'")
-AUDIO_PATHS = ("/audio/mcc", "/audio/ce", "/audio/preview")
+AUDIO_PATHS = ("/audio/mcc", "/audio/ce", "/audio/preview", "/audio/public")
 ACCESS_LOGOUT = "/cdn-cgi/access/logout"  # Cloudflare Access ends its own session at this path of the app's host
 # Headers a proxy adds. The trusted local listener refuses requests that carry any of them.
 PROXY_HEADERS = ("X-Forwarded-For", "Forwarded", "X-Forwarded-Host", "Tailscale-User-Login", "Cf-Connecting-Ip",
@@ -127,16 +144,46 @@ STOP_FILE = "server.stop"  # in the state folder (work/studio/): its appearance 
 
 
 class Listener:
-    """What one listening address allows. kind "local": the host's own trusted address; "remote": sign-in."""
+    """What one listening address allows. kind "local": the host's own trusted address; "remote": sign-in;
+    "public": anonymous, read-only (public_view.py)."""
 
-    def __init__(self, kind, cfg, port, auth=None, secure_tls=False, access=None, csrf_key=None):
+    def __init__(self, kind, cfg, port, auth=None, secure_tls=False, access=None, csrf_key=None, limiter=None):
+        if kind not in ("local", "remote", "public"):
+            raise ValueError(f"unknown listener kind {kind!r}")
         self.kind, self.cfg, self.port, self.auth, self.tls = kind, cfg, port, auth, secure_tls
         self.access, self.csrf_key = access, csrf_key  # Cloudflare Access mode: the verifier and the CSRF key
+        self.limiter = limiter or (PublicLimiter() if kind == "public" else None)
         self.policy = HostPolicy(cfg, kind, port)
 
     @property
     def remote(self):
-        return self.kind == "remote"
+        """Not the host's own trusted address. The public listener counts as remote too, so it can never get the
+        local listener's trust by accident."""
+        return self.kind != "local"
+
+    @property
+    def public(self):
+        return self.kind == "public"
+
+    @property
+    def public_previews(self):
+        """The owner let visitors play the published edited previews of approved lines ("previews": true)."""
+        return self.public and self.cfg["public"].get("previews") is True
+
+    @property
+    def public_originals(self):
+        """The owner let visitors play the original recordings ("originals": true)."""
+        return self.public and self.cfg["public"].get("originals") is True
+
+    def public_audio_ok(self, path):
+        """May a visitor hear this audio URL path? (Published previews and, if allowed, the originals.)"""
+        return ((path == "/audio/public" and self.public_previews)
+                or (path in ("/audio/mcc", "/audio/ce") and self.public_originals))
+
+    @property
+    def sign_in_url(self):
+        """Where a visitor signs in to edit (the Cloudflare Access protected address)."""
+        return self.cfg["public"].get("sign_in_url") or self.cfg.get("public_url")
 
 
 class Shared:
@@ -169,6 +216,7 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         listener = Listener("local", cfg, cfg["local"]["port"])
     shared = shared or Shared(app.root, listener.cfg)
     static_dir = listener.cfg.get("static_path")
+    previews = PreviewStore(app.root)  # published previews of approved lines (public view only)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "Studio/2"
@@ -294,7 +342,7 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         def _peer(self):
             ip = self.client_address[0]
             cf = self.headers.get("Cf-Connecting-Ip")
-            if listener.access and cf and ip in ("127.0.0.1", "::1"):  # cloudflared on this computer
+            if (listener.access or listener.public) and cf and ip in ("127.0.0.1", "::1"):  # cloudflared, here
                 return cf.strip()[:64]
             fwd = self.headers.get("X-Forwarded-For")
             if fwd and ip in ("127.0.0.1", "::1"):  # a proxy on this computer (tailscale serve) names the client
@@ -315,6 +363,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             return None
 
         def _session(self):
+            if listener.public:
+                return None  # anonymous by construction: no cookie, token or header is ever read here
             if not listener.remote:
                 return {"username": "host", "role": "admin", "csrf": None, "local": True}
             if listener.access:  # verified in _guard on every request
@@ -332,11 +382,19 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
 
         def _permissions(self, s):
             local = not listener.remote
+            # audio: stream recordings, waveforms and editor previews; download: save them as files.
             return {"edit": bool(s), "admin": bool(s) and (local or s["role"] == "admin"),
-                    "install": local, "settings_mcc": local}
+                    "install": local, "settings_mcc": local, "audio": bool(s) or listener.public_originals,
+                    "download": bool(s),
+                    "previews": listener.public_previews}  # published previews of approved lines (public view)
 
         def _session_info(self, s):
-            return {"listener": listener.kind, "auth_required": listener.remote, "authenticated": bool(s),
+            if listener.public:
+                return {"listener": "public", "auth_required": False, "authenticated": False, "visitor": True,
+                        "user": None, "role": None, "csrf": None, "local_admin": False, "https": self._https(),
+                        "sso": None, "logout_url": None, "sign_in_url": listener.sign_in_url,
+                        "permissions": self._permissions(None)}
+            return {"listener": listener.kind, "visitor": False, "auth_required": listener.remote, "authenticated": bool(s),
                     "user": s and s["username"], "role": s and s["role"], "csrf": s and s.get("csrf"),
                     "local_admin": not listener.remote, "https": self._https(),
                     "sso": "cloudflare_access" if listener.access else None,
@@ -399,6 +457,14 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
         # ------------------------------------------------------------ audio
         def _audio_path(self, path, q):
             """The file behind one of the audio URLs. Only catalog entries and preview keys: never a path."""
+            if listener.public and not listener.public_audio_ok(path):  # defence in depth
+                raise self._visitor_refused("Recordings need the owner's sign-in")
+            if path == "/audio/public":  # a published preview: looked up, never rendered
+                sid = q.get("slot", "")
+                wav, why = previews.lookup(sid, self._stored_mapping(sid))
+                if wav is None:
+                    raise ApiError(404, f"No public preview: {why}.")
+                return wav, False
             if path == "/audio/mcc":
                 return app.mcc_wav(q.get("level", ""), q.get("lang", ""), q.get("index", -1)), False
             if path == "/audio/ce":
@@ -425,6 +491,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
 
         # ------------------------------------------------------------ events
         def _events(self, s):
+            if listener.public or not s:  # the feed names who saved: never anonymous
+                raise self._visitor_refused("Live updates need the owner's sign-in")
             if not shared.feed:
                 raise ApiError(503, "change notifications are not running")
             self.close_connection = True
@@ -466,6 +534,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
             path = u.path
             self._guard(path)
             q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            if listener.public:
+                return self._public_route(path, q)
             s = self._session()
             self._authorize(path, s)
             if self.command in ("GET", "HEAD"):
@@ -480,16 +550,106 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                     status = e.status
                     raise
                 finally:
-                    if path not in ("/api/edit/preview", "/api/builds/preview", "/api/data/import/preview"):
+                    if path not in ("/api/edit/preview", "/api/edit/preview_combined", "/api/builds/preview",
+                                    "/api/data/import/preview"):
                         entry = {"listener": listener.kind, "user": (s or {}).get("username"),
                                  "from": self._peer(), "path": path, "status": status}
                         if path == "/api/save":
                             entry.update(slot_id=body.get("slot_id"), actions=body.get("actions") or [])
+                        if path.startswith("/api/takes/"):
+                            entry.update(mcc_tag=body.get("mcc_tag"), take_id=body.get("take_id"),
+                                         actions=body.get("actions") or [])
+                            if isinstance(body.get("clear_mapping_ids"), list):
+                                entry["cleared"] = body["clear_mapping_ids"][:50]
+                            if isinstance(body.get("audio_list"), list):
+                                entry["count"] = len(body["audio_list"])
+                            if isinstance(body.get("take_ids"), list):  # approve unchanged: each target
+                                entry["take_ids"] = [str(t) for t in body["take_ids"][:50]]
+                            if isinstance(body.get("items"), list):  # conversions: the sounds named
+                                entry["items"] = [i.get("mcc_tag") for i in body["items"][:50] if isinstance(i, dict)]
                         if path == "/api/login":
                             entry["user"] = str(body.get("username") or "")[:40]
                         shared.audit(entry)
                 return
             raise ApiError(405, "method not allowed")
+
+        # ------------------------------------------------------------ the public read-only listener
+        def _stored_mapping(self, slot_id):
+            """The line's saved decision (None if it has none); unknown slots are 404."""
+            if slot_id not in app.slot_index:
+                raise ApiError(404, "unknown line")
+            return next((m for m in app._mappings()[0]["slots"] if m["slot_id"] == slot_id), None)
+
+        def _visitor_refused(self, what="This public view is read-only"):
+            url = listener.sign_in_url
+            return ApiError(401, f"{what}. Sign in to edit" + (f" at {url}." if url else "."))
+
+        def _public_route(self, path, q):
+            """Anonymous visitors: an allowlist of GETs (public_view.PUBLIC_GETS), each answer sanitised, and the
+            built page. Everything else is refused before any work is done (fail closed)."""
+            if self.command not in ("GET", "HEAD"):
+                raise self._visitor_refused()
+            if path in (PUBLIC_PREVIEW, PUBLIC_PEAKS) or path in PUBLIC_ORIGINALS:
+                if path == PUBLIC_PEAKS:
+                    src = urlparse(q.get("src", ""))
+                    allowed = not (src.scheme or src.netloc) and listener.public_audio_ok(src.path)
+                else:
+                    allowed = listener.public_audio_ok(path)
+                if not allowed:
+                    raise self._visitor_refused("Recordings need the owner's sign-in")
+                try:
+                    listener.limiter.admit(self._peer())
+                    with listener.limiter.slot():  # previews: a lookup only; originals: decoded on demand
+                        if path == PUBLIC_PEAKS:
+                            return self._peaks(q)
+                        wav, immutable = self._audio_path(path, q)
+                except Limited as e:
+                    return self._json(e.status, {"error": e.message}, {"Retry-After": str(e.retry_after or 5)})
+                return self._wav(wav, immutable)
+            if path.startswith(("/api/", "/audio/")):
+                if path not in PUBLIC_LISTENER_GETS:
+                    raise self._visitor_refused("Recordings and downloads need the owner's sign-in"
+                                                if path.startswith("/audio/") else "Not available in the public view")
+                try:
+                    listener.limiter.admit(self._peer())
+                    with listener.limiter.slot():
+                        obj = self._public_get(path, q)
+                except Limited as e:
+                    return self._json(e.status, {"error": e.message}, {"Retry-After": str(e.retry_after or 5)})
+                return self._json(200, sanitize(path, obj))
+            if path == "/classic":
+                raise ApiError(404, "not found")
+            if not self._has_studio():
+                return self._send(200, NO_BUILD_PAGE, "text/html; charset=utf-8")
+            if self._static(path):
+                return
+            raise ApiError(404, "not found")
+
+        def _public_get(self, path, q):
+            if path == "/api/session":
+                return self._session_info(None)
+            if path == "/api/state":
+                return app.state()
+            if path == "/api/slots":
+                return app.slots(q.get("level", ""), q.get("status") or None, q.get("q"))
+            if path == "/api/slot":
+                d = app.slot(q.get("id", ""), with_interference=False)  # no on-demand audio decoding
+                if listener.public_previews:
+                    d["public_preview"] = previews.status(d["slot_id"], d["mapping"])
+                return d
+            if path == "/api/ce":
+                return app.ce(q.get("mission", "all"), q.get("q"), q.get("offset", 0), q.get("limit", 100),
+                              q.get("level"), q.get("subs") or None, q.get("hide_used") == "1",
+                              q.get("keep_slot") or None)
+            if path == "/api/ce_line":
+                return app.ce_line(q.get("ref", ""))
+            if path == "/api/builds":
+                return builds.list_builds()
+            if path == "/api/builds/detail":
+                return builds.build_detail(q.get("name", ""))
+            if path == "/api/deploy/history":
+                return builds.history()
+            raise self._visitor_refused("Not available in the public view")
 
         def _get(self, path, q, s):
             if path == "/classic" or (path in ("/", "/index.html") and not self._has_studio()):
@@ -530,6 +690,14 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, app.interference_reference(q.get("slot", ""), q.get("lang", "spanish")))
             if path == "/api/ce_line":
                 return self._json(200, app.ce_line(q.get("ref", "")))
+            if path == "/api/takes/convert/preview":
+                return self._json(200, app.convert_preview(q.get("mcc_tag", "")))
+            if path == "/api/takes/convert/inventory":
+                return self._json(200, app.convert_inventory(q.get("level") or None))
+            if path == "/api/takes/convert/approvable":
+                return self._json(200, app.convert_approvable(q.get("mcc_tag", "")))
+            if path == "/api/takes/convert/revert_preview":
+                return self._json(200, app.convert_revert_preview(q.get("mcc_tag", ""), q.get("rework_drifted") == "1"))
             if path in AUDIO_PATHS:
                 wav, immutable = self._audio_path(path, q)
                 return self._wav(wav, immutable)
@@ -562,6 +730,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
 
         def _post(self, path, body, s):
             """-> (status, response object, extra headers)."""
+            if listener.public or not (s or path in PUBLIC_POSTS):  # defence in depth: _authorize refused already
+                raise self._visitor_refused()
             if path == "/api/login":
                 if not listener.remote:
                     return 200, self._session_info(s), None
@@ -612,8 +782,22 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 if shared.feed and result.get("saved"):
                     shared.feed.note_author(body.get("slot_id"), s["username"])
                 return 200, result, None
+            if path in ("/api/takes/save", "/api/takes/remove", "/api/takes/move", "/api/takes/add_many",
+                        "/api/takes/own_set_on", "/api/takes/own_set_off"):  # added takes, own sets (editor role)
+                op = {"save": app.take_save, "remove": app.take_remove, "move": app.take_move,
+                      "add_many": app.take_add_many, "own_set_on": app.own_set_on,
+                      "own_set_off": app.own_set_off}[path.rsplit("/", 1)[1]]
+                return 200, op(body), None
+            if path in ("/api/takes/convert/stage", "/api/takes/convert/activate", "/api/takes/convert/cancel",
+                        "/api/takes/convert/revert", "/api/takes/convert/approve_unchanged"):  # (editor role)
+                op = {"stage": app.convert_stage, "activate": app.convert_activate, "cancel": app.convert_cancel,
+                      "revert": app.convert_revert,
+                      "approve_unchanged": app.convert_approve_unchanged}[path.rsplit("/", 1)[1]]
+                return 200, op(body), None
             if path == "/api/edit/preview":
                 return 200, app.edit_preview(body), None
+            if path == "/api/edit/preview_combined":
+                return 200, app.edit_preview_combined(body), None
             if path == "/api/progress":
                 return 200, app.set_progress(body), None
             if path == "/api/validate":
@@ -638,7 +822,7 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 except OSError:
                     pass
 
-        do_GET = do_HEAD = do_POST = _handle
+        do_GET = do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = _handle  # the others: 405
 
     return Handler
 
@@ -703,6 +887,8 @@ def main():
     ap.add_argument("--lan", action="store_true", help="also listen for other computers (sign-in required)")
     ap.add_argument("--remote-host", help="remote listener address (default 0.0.0.0: every network)")
     ap.add_argument("--remote-port", type=int, help="remote listener port (default 8766)")
+    ap.add_argument("--public", action="store_true", help="also serve the read-only public view (loopback, port 8081)")
+    ap.add_argument("--public-port", type=int, help="public read-only listener port (default 8081)")
     ap.add_argument("--allowed-host", action="append", default=[], help="extra host name for the remote listener")
     ap.add_argument("--allowed-origin", action="append", default=[], help="extra browser origin (https://name)")
     ap.add_argument("--static-dir", type=Path, help="the built Studio (default frontend/dist)")
@@ -719,7 +905,11 @@ def main():
     if args.stop:
         raise SystemExit(request_stop(args.root, args.config))
 
-    over = {"local": {}, "remote": {}}
+    over = {"local": {}, "remote": {}, "public": {}}
+    if args.public:
+        over["public"]["enabled"] = True
+    if args.public_port:
+        over["public"]["port"] = args.public_port
     if args.port:
         over["local"]["port"] = args.port
     if args.lan:
@@ -805,8 +995,16 @@ def main():
         if not cfg["tls"] and not cfg.get("public_url"):
             print("  Plain HTTP: use it on a trusted network or through Tailscale (docs/remote-access.md).")
 
+    if cfg["public"]["enabled"]:
+        pub = Listener("public", cfg, cfg["public"]["port"])
+        servers.append(_bind(cfg["public"]["host"], cfg["public"]["port"],
+                             make_handler(app, builds=builds, listener=pub, shared=shared)))
+        print(f"Public read-only view on http://{cfg['public']['host']}:{cfg['public']['port']} for a tunnel only "
+              f"(anonymous; no edits, audio or downloads).\n  Public address: {cfg['public']['url'] or '(not set)'}; "
+              f"sign in to edit at: {pub.sign_in_url or '(not set)'}")
+
     for srv in servers[1:]:
-        threading.Thread(target=srv.serve_forever, daemon=True, name="remote-listener").start()
+        threading.Thread(target=srv.serve_forever, daemon=True, name="extra-listener").start()
     state_dir = Path(cfg["sessions_path"]).parent
     stop_file = state_dir / STOP_FILE
     stop_file.unlink(missing_ok=True)
@@ -845,7 +1043,10 @@ def _write_pid_file(state_dir, cfg, access):
             "remote": (f"http://{cfg['remote']['host']}:{cfg['remote']['port']}/" if cfg["remote"]["enabled"]
                        else None),
             "remote_auth": cfg["remote"]["auth"] if cfg["remote"]["enabled"] else None,
-            "public_url": cfg.get("public_url") if access else None}
+            "public_url": cfg.get("public_url") if access else None,
+            "public": (f"http://{cfg['public']['host']}:{cfg['public']['port']}/" if cfg["public"]["enabled"]
+                       else None),
+            "public_view_url": cfg["public"]["url"] if cfg["public"]["enabled"] else None}
     state_dir.mkdir(parents=True, exist_ok=True)
     (state_dir / "server.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
 

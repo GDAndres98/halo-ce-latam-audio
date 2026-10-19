@@ -180,6 +180,32 @@ html[data-layout="tablet"] .menu-toggle {
   letter-spacing: 0.07em;
 }
 
+/* Tablets keep the volume beside the menu button; phones have no room in the band, so it folds into the menu
+   with the account area, as a full-width row. */
+html[data-layout="tablet"] .top .volume {
+  margin-left: 0;
+}
+
+html[data-layout="phone"] .top .volume:not(.open) {
+  display: none;
+}
+
+html[data-layout="phone"] .top .volume.open {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+html[data-layout="phone"] .top .volume.open input[type="range"] {
+  flex: 1;
+  height: var(--touch-min);
+}
+
+html[data-layout="phone"] .top .volume.open .volume-mute {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  justify-content: center;
+}
+
 html[data-layout="phone"] .top nav:not(.open),
 html[data-layout="tablet"] .top nav:not(.open),
 html[data-layout="phone"] .top .who:not(.open),

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "take-set-recovery/1",
+  "title": "Recovery snapshot of local-only data named by replacement-set records (mappings/take_set_recovery.local.json, git-ignored)",
+  "description": "docs/replacement-set-conversion.md §6. Keyed by the record id of an own set's provenance (cv-/rs-). Holds the custom subtitle text and user recording paths the replaced decisions named, so an Undo can restore what went missing; never overwrites newer local text. Records are only added, never changed.",
+  "type": "object",
+  "required": ["schema", "records"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "take-set-recovery/1"},
+    "records": {
+      "type": "object",
+      "propertyNames": {"pattern": "^(cv|rs)-[0-9a-f]{12}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["mcc_tag", "created_at", "custom_subtitles", "user_recordings", "missing"],
+        "additionalProperties": false,
+        "properties": {
+          "mcc_tag": {"type": "string", "pattern": "^sound\\\\dialog\\\\"},
+          "created_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+          "custom_subtitles": {
+            "type": "object",
+            "propertyNames": {"pattern": "^c-[0-9]{6}$"},
+            "additionalProperties": {
+              "type": "object",
+              "required": ["text", "updated_at", "text_sha256"],
+              "additionalProperties": false,
+              "properties": {
+                "text": {"type": "string", "minLength": 1},
+                "updated_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}"},
+                "text_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              }
+            }
+          },
+          "user_recordings": {
+            "type": "object",
+            "propertyNames": {"pattern": "^r-[0-9]{6}$"},
+            "additionalProperties": {
+              "type": "object",
+              "required": ["path", "sha256"],
+              "additionalProperties": false,
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              }
+            }
+          },
+          "missing": {"type": "array", "items": {"type": "string"}, "description": "Refs that were already missing from the local file when the record was made."}
+        }
+      }
+    }
+  }
+}

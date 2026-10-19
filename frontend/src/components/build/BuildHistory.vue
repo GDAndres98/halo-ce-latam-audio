@@ -22,12 +22,14 @@ const props = defineProps<{
   canDeploy: boolean;
   /** A build is installed now: restore first. */
   modInstalled: boolean;
+  /** The public read-only view (docs/public-access.md): no Install action at all. */
+  readOnly?: boolean;
 }>();
 const emit = defineEmits<{ install: [name: string] }>();
 
 /** Builds shown before "Show older builds", when no filter is on. */
 const LIMIT = 8;
-const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
+const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles", experiment: "Experiment" } as const;
 const KINDS: { value: KindFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "audio", label: "Audio" },
@@ -155,7 +157,7 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
               <td class="type small">
                 <span class="icon-label kind">
                   <FileAudio v-if="b.kind !== 'subtitles'" :size="13" aria-hidden="true" />
-                  <Captions v-if="b.kind !== 'audio'" :size="13" aria-hidden="true" />
+                  <Captions v-if="b.kind === 'subtitles' || b.kind === 'both'" :size="13" aria-hidden="true" />
                   {{ KIND_TEXT[b.kind] }}
                 </span>
               </td>
@@ -166,7 +168,8 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
                 </div>
               </td>
               <td class="lines small">
-                <div v-if="b.kind !== 'subtitles'">{{ n(b.counts.replace) }} <span class="muted">audio</span></div>
+                <div v-if="b.kind === 'experiment'">+{{ n(b.counts.extra_takes) }} <span class="muted">takes (test)</span></div>
+                <div v-else-if="b.kind !== 'subtitles'">{{ n(b.counts.replace) }} <span class="muted">audio</span></div>
                 <div v-if="b.subtitles.enabled && b.subtitles.summary">{{ n(b.subtitles.summary.keys_to_write) }} <span class="muted">subtitles</span></div>
               </td>
               <td class="status">
@@ -180,7 +183,7 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
               </td>
               <td class="action">
                 <button
-                  v-if="!isInstalled(b.name)"
+                  v-if="!readOnly && !isInstalled(b.name)"
                   type="button"
                   class="icon-label small-button"
                   aria-label="Install to MCC"
@@ -215,10 +218,11 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
                 <time v-if="b.when" :datetime="b.when.iso">{{ b.when.time }}</time>
                 <span class="icon-label">
                   <FileAudio v-if="b.kind !== 'subtitles'" :size="13" aria-hidden="true" />
-                  <Captions v-if="b.kind !== 'audio'" :size="13" aria-hidden="true" />{{ KIND_TEXT[b.kind] }}
+                  <Captions v-if="b.kind === 'subtitles' || b.kind === 'both'" :size="13" aria-hidden="true" />{{ KIND_TEXT[b.kind] }}
                 </span>
                 <span :title="foldersTitle(b.levels)">{{ b.levels.length }} {{ b.levels.length === 1 ? "folder" : "folders" }}</span>
-                <span v-if="b.kind !== 'subtitles'">{{ n(b.counts.replace) }} audio</span>
+                <span v-if="b.kind === 'experiment'">+{{ n(b.counts.extra_takes) }} takes (test)</span>
+                <span v-else-if="b.kind !== 'subtitles'">{{ n(b.counts.replace) }} audio</span>
                 <span v-if="b.subtitles.enabled && b.subtitles.summary">{{ n(b.subtitles.summary.keys_to_write) }} subtitles</span>
               </p>
               <div class="badges">
@@ -234,7 +238,7 @@ const staleTitle = (b: BuildSummary) => (b.stale ? `Stale: ${b.stale_reasons.joi
                   <ChevronDown v-if="open === b.name" :size="15" aria-hidden="true" />
                   <ChevronRight v-else :size="15" aria-hidden="true" /> Details
                 </button>
-                <button v-if="!isInstalled(b.name)" type="button" class="icon-label" :disabled="installBlocked(b)" :title="installTitle(b)" @click="emit('install', b.name)">
+                <button v-if="!readOnly && !isInstalled(b.name)" type="button" class="icon-label" :disabled="installBlocked(b)" :title="installTitle(b)" @click="emit('install', b.name)">
                   <HardDriveDownload :size="15" aria-hidden="true" /> Install to MCC
                 </button>
               </div>

@@ -8,6 +8,7 @@
 import { ChevronsDown, CircleCheck, Library } from "lucide-vue-next";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
+import { readOnly } from "../../auth/session";
 import { onChange } from "../../live/changes";
 import { togglePlay } from "../../audio/player";
 import { useDebounced } from "../../composables/useDebounced";
@@ -187,7 +188,7 @@ const english = (line: CeLine) => line.subtitles["en"]?.text ?? null;
           <StatusBadge :label="hasText(line, 'en') ? 'EN subtitle' : 'no EN subtitle'" :tone="hasText(line, 'en') ? 'ok' : 'muted'" />
           <StatusBadge v-if="line.used_by?.length" :label="`used by ${line.used_by.length}`" tone="muted" />
           <StatusBadge v-if="chosenRefs.includes(line.ce_line_ref)" label="matched here" tone="ok" />
-          <button type="button" class="use icon-label primary-soft" @click.stop="emit('use', line.ce_line_ref)"><CircleCheck :size="15" aria-hidden="true" /> Use this recording<span class="kbd-hint"> (s)</span></button>
+          <button v-if="!readOnly" type="button" class="use icon-label primary-soft" @click.stop="emit('use', line.ce_line_ref)"><CircleCheck :size="15" aria-hidden="true" /> Use this recording<span class="kbd-hint"> (s)</span></button>
         </div>
       </li>
       <li v-if="!data.lines.length" class="empty-list"><StateMessage kind="empty">No recordings match.</StateMessage></li>

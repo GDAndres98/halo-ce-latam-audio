@@ -49,3 +49,13 @@ def check_ranges(records, num_samples):
     total = sum(c for _, _, c in records)
     return {"contiguous_from_zero": contiguous, "sample_total": total, "bank_samples": num_samples,
             "total_matches_bank": total == num_samples}
+
+
+def build_lst(version, records):
+    """Inverse of parse_lst: (version, [(tag, first_sample_index, sample_count)]) -> bytes. For every shipped
+    index, build_lst(*parse_lst(data).values()) == data (tests/test_mcc_lst.py)."""
+    out = bytearray(struct.pack("<II", version, len(records)))
+    for tag, first, count in records:
+        raw = tag.encode("ascii") + b"\0"
+        out += struct.pack("<I", len(raw)) + raw + struct.pack("<II", first, count)
+    return bytes(out)

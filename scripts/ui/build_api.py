@@ -37,7 +37,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "discovery"))
 from b2_bank_install import running_game_processes  # noqa: E402
 from common.env import load_env  # noqa: E402
 from common.export_config import load_export_config  # noqa: E402
-from common.m6_build import BUILD_KINDS, SUBTITLE_TABLES, mission_folders, plan_audio, subtitle_plan  # noqa: E402
+from common.m6_build import (  # noqa: E402
+    BUILD_KINDS, SUBTITLE_TABLES, mission_folders, own_set_drops, plan_audio, plan_inserts, subtitle_plan)
 from m4_app import ApiError  # noqa: E402
 
 NAME_RE = re.compile(r"^[a-z0-9_]{1,40}$")
@@ -242,7 +243,8 @@ class BuildBoard:
         doc, _ = app._mappings()
         local, _ = app._local()
         idx = dict(slot_index=app.slot_index, ce_lines=app.ce_lines, ce_idx=app.ce_idx, mcc_idx=app.mcc_idx)
-        audio = plan_audio(doc, levels, local=local, **idx)
+        ins = plan_inserts(doc, levels, local=local, subtitle_keys=app._subtitle_keys(), **idx)
+        audio = plan_audio(doc, levels, local=local, dropped_tags=own_set_drops(doc, ins), **idx)
         subs = subtitle_plan(doc, set(levels), local=local, tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)
         acts = {}
         for e in audio["entries"]:
@@ -251,6 +253,9 @@ class BuildBoard:
                     for r in subs["rows"] if r["category"] in ("excluded", "conflict", "missing_key")]
         return {"levels": levels, "scope": label,
                 "audio": {"replace": acts.get("replace", 0), "keep_original": acts.get("keep_original", 0),
+                          "mute": acts.get("mute", 0), "dropped": acts.get("dropped", 0),
+                          "insert": sum(1 for e in ins if e["action"] == "insert"),
+                          "insert_not_eligible": sum(1 for e in ins if e["action"] == "not_eligible"),
                           "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},
                 "subtitles": {**subs["summary"], "excluded_rows": excluded, "conflict_list": subs["conflicts"]}}
 
@@ -371,15 +376,27 @@ class BuildBoard:
                 entry = files.setdefault(f["install_rel"], {"install_rel": f["install_rel"],
                                                             "original_sha256": f["original_sha256"], "builds": []})
                 entry["builds"].append((name, f["candidate_sha256"]))
-        active = set()
+        matched = {}  # build -> how many of its files are installed as its candidates
         for rel, entry in sorted(files.items()):
             installed = folder / rel
             sha = self._hash(installed) if installed.is_file() else None
             matches = [name for name, cand in entry["builds"] if cand == sha]
             state = "original" if sha == entry["original_sha256"] else "build" if matches else "unknown"
-            active.update(matches)
+            for name in matches:
+                matched[name] = matched.get(name, 0) + 1
             out["files"].append({"install_rel": rel, "sha256": sha, "state": state, "builds": matches})
-        out["active_builds"] = sorted(active)
+        # A build is installed when ALL its files are its candidates. Two builds can share a candidate (the
+        # permutation experiments share one index), so one matching file alone does not make a build installed.
+        # A build with only some of its files in place (an interrupted install) is "partial": still restored.
+        full = {n for n, k in matched.items() if k == len(manifests[n]["install_files"])}
+        covered = {f["install_rel"] for n in full for f in manifests[n]["install_files"]}
+        partial = {n for n in set(matched) - full
+                   if any(f["install_rel"] not in covered for f in manifests[n]["install_files"]
+                          if any(n in x["builds"] for x in out["files"] if x["install_rel"] == f["install_rel"]))}
+        for f in out["files"]:
+            f["builds"] = [n for n in f["builds"] if n in full or n in partial]
+        out["active_builds"] = sorted(full)
+        out["partial_builds"] = sorted(partial)
         out["mod_installed"] = any(f["state"] != "original" for f in out["files"])
         # The level settings inside the installed audio, against what the Studio is set to now.
         cfg = load_export_config(self.root)
@@ -418,8 +435,15 @@ class BuildBoard:
                 "subtitles": (f"SU and SP rewritten: {sub.get('keys_to_write', 0)} entr(ies) each at most; "
                               f"{sub.get('excluded', 0)} excluded, {sub.get('conflicts', 0)} conflict(s). "
                               + RUNTIME_NOTE) if kind in ("subtitles", "both")
-                else "not changed (audio-only build)",
-                "audio": "Spanish dialogue bank replaced" if kind in ("audio", "both") else "not changed (subtitle-only build)"}
+                else "not changed (audio-only build)" if kind != "experiment" else "not changed",
+                "audio": ("EXPERIMENT (not made from your decisions): the Spanish dialogue bank AND its sound index "
+                          "(.lst.bin) are replaced together, and restored together; "
+                          + ((m.get("experiment") or {}).get("question") or ""))
+                if kind == "experiment"
+                else ("Spanish dialogue bank AND its sound index (.lst.bin) replaced together: "
+                      f"{(m.get('counts') or {}).get('insert', 0)} added take(s)")
+                if kind in ("audio", "both") and any(f["install_rel"].endswith(".lst.bin") for f in m["install_files"])
+                else "Spanish dialogue bank replaced" if kind in ("audio", "both") else "not changed (subtitle-only build)"}
 
     def _install_args(self, name):
         folder, _ = self.mcc_folder()
@@ -480,7 +504,7 @@ class BuildBoard:
         if body.get("confirm") is not True:
             raise ApiError(400, "restoring changes game files; it needs confirm: true")
         status = self.deploy_status()
-        names = [body["build"]] if body.get("build") else status["active_builds"]
+        names = [body["build"]] if body.get("build") else status["active_builds"] + status["partial_builds"]
         if not names:
             if not status["mod_installed"]:
                 raise ApiError(409, "the game files are already the originals")

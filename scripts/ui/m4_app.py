@@ -34,24 +34,27 @@ import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import audio_edit, interference, radio_clicks, radio_static  # noqa: E402
+from common import audio_combine, audio_edit, interference, radio_clicks, radio_static  # noqa: E402
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common import mapping_store  # noqa: E402
+from common import take_set_conversion as tsc  # noqa: E402
+from common.own_set_state import active_own_tags, is_active  # noqa: E402
 from common.mapping_store import (  # noqa: E402
     EMPTY_SHA256, SCHEMA_ID, SCHEMA_NAME, ProtectedError, StaleError, StoreError, UserAction, check_transition,
     load as load_mappings, load_or_default, save as save_mappings, save_user_file)
 from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
-    READY_STATUSES, audio_fingerprint, build_ce_index, build_mcc_index, level_progress, subtitle_fingerprint,
-    validate_mappings)
+    READY_STATUSES, added_take_fingerprint, audio_fingerprint, build_ce_index, build_mcc_index, level_progress,
+    subtitle_fingerprint, validate_mappings)
 
 MAPPINGS = "mappings/manual_mappings.json"
 LOCAL = "mappings/manual_mappings.local.json"
 VERIFICATIONS = "mappings/verifications.json"
 MISSION_MAP = "mappings/mission_map.json"
 PROGRESS = "mappings/mission_progress.json"
+RECOVERY = "mappings/take_set_recovery.local.json"  # git-ignored: local text named by replacement-set records
 LOC_TABLES = {"SU": "work/mcc/loc/copies/SU_Halo1.bin", "SP": "work/mcc/loc/copies/SP_Halo1.bin",
               "EN": "work/mcc/loc/copies/EN_Halo1.bin"}  # SU = Latin America, SP = Spain, EN = English
 MCC_LANGS = ("spanish", "english")
@@ -149,7 +152,12 @@ def _next_id(prefix, used):
 
 
 def _audio_sem(a):
-    return (a["source"], a["sources"], a["edit"])
+    return (a["source"], a["sources"], a["edit"], a.get("mute_reason"))
+
+
+def _slot_tags(recs):
+    """{slot_id: mcc_tag} for a level's records (level_progress: lines of own-take-set sounds)."""
+    return {sid: r["mcc_tag"] for r in recs for sid in r["slot_ids"]}
 
 
 def _fits(m):
@@ -296,7 +304,8 @@ class M4App:
         for lv, recs in self.levels.items():
             sids = [sid for r in recs for sid in r["slot_ids"]]
             levels.append({"level": lv, "group": ["campaign", "cutscene", "generic"][level_sort_key(lv)[0]],
-                           "tags": len(recs), "slots": len(sids), "progress": level_progress(sids, mappings),
+                           "tags": len(recs), "slots": len(sids),
+                           "progress": level_progress(sids, mappings, [r["mcc_tag"] for r in recs], _slot_tags(recs)),
                            "status": status.get(lv), "ce_missions": self._mission_scope(lv)})
         missions = []
         for m, recs in self.missions.items():
@@ -325,7 +334,28 @@ class M4App:
                       "table_loaded": tbl is not None, "evidence": SUBTITLE_KEY_EVIDENCE}
         return out
 
-    def _slot_filter(self, status, m, s):
+    @staticmethod
+    def _recorded_ids(doc):
+        return [m["mapping_id"] for o in doc.get("own_sets", []) for m in (o.get("provenance") or {}).get("slots", [])]
+
+    @staticmethod
+    def _recorded_slots(doc):
+        """{slot_id: recorded decision} of the sounds whose replacement set is in force: their lines have no decision
+        of their own, but the reminders of the archived one (needs a new recording, needs radio effect, notes) stay
+        operational (docs/replacement-set-conversion.md §6)."""
+        return {m["slot_id"]: m for o in doc.get("own_sets", []) if is_active(o)
+                for m in (o.get("provenance") or {}).get("slots", [])}
+
+    def _slot_filter(self, status, m, s, take_counts=None, own=None, recorded=None):
+        if status == "takes":  # the sound has added takes (counted once per request, not per line)
+            return (take_counts or {}).get(self.slot_index[s["slot_id"]][1]["mcc_tag"], 0) > 0
+        if own:  # every take of the sound is replaced: the line is filtered by its sound's takes (MccColumn shows the same)
+            a = "approved" if own["takes"] and own["approved"] == own["takes"] else                 "needs_rework" if own["needs_rework"] else "draft"
+            return {None: True, "": True, "matched": True, "needs_rework": a == "needs_rework",
+                    "audio_pending": a != "approved", "draft": a == "draft", "approved": a == "approved",
+                    "own_set": True, "stereo": s["channels"] > 1,
+                    "radio": bool(recorded and recorded["radio_effect"]["needed"]),
+                    "recording": _needs_recording(recorded)}.get(status, False)
         st = m["match"]["status"] if m else "unreviewed"
         a = m["audio"]["status"] if m else "draft"
         sub = m["subtitle"]["status"] if m else "draft"
@@ -335,6 +365,7 @@ class M4App:
                 "subtitle_pending": sub != "approved", "draft": "draft" in (a, sub),
                 "approved": a == "approved" and sub == "approved",
                 "keep_original": bool(m and m["audio"]["source"] == "keep_original"),
+                "muted": bool(m and m["audio"]["source"] == "mute"),
                 "radio": bool(m and m["radio_effect"]["needed"]), "fits": _fits(m), "edited": _edited(m),
                 "recording": _needs_recording(m),
                 "stereo": s["channels"] > 1}.get(status, False)
@@ -353,32 +384,42 @@ class M4App:
             raise ApiError(404, f"unknown level {level}")
         mappings, msha = self._mappings()
         by_slot = {s["slot_id"]: s for s in mappings["slots"]}
+        take_counts = self._take_counts(mappings)
+        own_tags = self._own_status(mappings)
+        recorded = self._recorded_slots(mappings)
         terms = parse_query(q)
         out, total = [], 0
         for lv in (self.levels if level == "all" else [level]):
             for r in self.levels[lv]:
                 for s in r["samples"]["spanish"]:
                     m = by_slot.get(s["slot_id"])
-                    if not self._slot_filter(status, m, s):
+                    if not self._slot_filter(status, m, s, take_counts, own_tags.get(r["mcc_tag"]),
+                                             recorded.get(s["slot_id"])):
                         continue
                     if terms and not matches(terms, self._mcc_hay[s["slot_id"]]):
                         continue
                     total += 1
                     if len(out) >= limit:
                         continue
-                    out.append(self._slot_row(lv, r, s, m))
+                    out.append(self._slot_row(lv, r, s, m, take_counts, own_tags, recorded))
                     if terms:  # lets the page show and highlight what matched
                         out[-1]["texts"] = {t: v["text"] for t, v in self._mcc_text(r["mcc_tag"]).items()}
         prog = None
         if level != "all":
-            prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings)
+            prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings,
+                                  [r["mcc_tag"] for r in self.levels[level]], _slot_tags(self.levels[level]))
         return {"level": level, "slots": out, "total": total, "truncated": total > len(out),
                 "progress": prog, "sha256": msha, "terms": terms}
 
-    def _slot_row(self, lv, r, s, m):
-        """One line of the MCC list (also returned by a save, so the page updates that row in place)."""
+    def _slot_row(self, lv, r, s, m, take_counts=None, own_tags=None, recorded=None):
+        """One line of the MCC list (also returned by a save, so the page updates that row in place). A line of a sound
+        whose replacement set is in force has no decision; its archived decision's reminders are shown instead
+        (archived: true)."""
         en = r["samples"]["english"]
         k = s["ordinal_in_tag"]
+        if recorded is None:
+            recorded = self._recorded_slots(self._mappings()[0])
+        arch = recorded.get(s["slot_id"]) if m is None else None
         return {"slot_id": s["slot_id"], "level": lv, "mcc_tag": r["mcc_tag"],
                 "tag_name": r["tag_name"], "kind": r["kind"],
                 "speaker_from_name": r["speaker_from_name"], "ordinal": k,
@@ -387,8 +428,14 @@ class M4App:
                 "english_index": en[k]["index"] if k < len(en) else None,
                 "channels": s["channels"], "flags": r["flags"],
                 "decision": self._decision_summary(m),
-                "radio_effect": bool(m and m["radio_effect"]["needed"]),
-                "different_but_fits": _fits(m), "needs_recording": _needs_recording(m), "edited": _edited(m),
+                "radio_effect": bool(m and m["radio_effect"]["needed"]) or bool(arch and arch["radio_effect"]["needed"]),
+                "different_but_fits": _fits(m), "needs_recording": _needs_recording(m) or _needs_recording(arch),
+                "edited": _edited(m),
+                "archived_reminders": bool(arch and (arch["radio_effect"]["needed"] or _needs_recording(arch)
+                                                     or arch.get("notes"))),
+                "added_takes": (take_counts if take_counts is not None
+                                else self._take_counts(self._mappings()[0])).get(r["mcc_tag"], 0),
+                "own_set": (own_tags if own_tags is not None else self._own_status(self._mappings()[0])).get(r["mcc_tag"]),
                 "preview": self._subtitle_preview(r["mcc_tag"]),
                 "english_preview": self._subtitle_preview(r["mcc_tag"], "EN"),
                 "spanish_index": s["index"]}
@@ -474,7 +521,8 @@ class M4App:
                 "terms": terms, "hidden_used": n_hidden,
                 "order": "catalog order (mission, catalog file, entry index); filter only, never ranked"}
 
-    def slot(self, slot_id):
+    def slot(self, slot_id, with_interference=True):
+        """with_interference=False (the public view) skips the Victor 933 lane defaults, which decode audio."""
         if slot_id not in self.slot_index:
             raise ApiError(404, f"unknown slot {slot_id}")
         level, r, s = self.slot_index[slot_id]
@@ -506,8 +554,10 @@ class M4App:
                 "verifications": self._verifs_for(f"mcc:{slot_id}"), "fingerprint_drift": drift,
                 "edit": {"identity": audio_edit.is_identity(edit), "summary": audio_edit.summary(edit),
                          "available": self.editor is not None, "engine": audio_edit.ENGINE},
-                "interference": {ref: d for ref in refs if (d := self.interference_defaults(ref, slot_id))},
+                "interference": {ref: d for ref in refs if with_interference
+                                 and (d := self.interference_defaults(ref, slot_id))},
                 "ce_missions": self._mission_scope(level),
+                "sound": self.sound(r["mcc_tag"], mappings, local),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
 
     # ------------------------------------------------------------------ audio
@@ -587,6 +637,42 @@ class M4App:
             raise ApiError(422, f"edit: {e}")
         return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_edit.summary(edit),
                 "identity": audio_edit.is_identity(edit), "mcc_reference_lufs": mcc_ref, "export_config": cfg,
+                "urls": {k: f"/audio/preview?key={r['key']}&kind={k}" for k in ("edited", "encoded")}}
+
+    def edit_preview_combined(self, body):
+        """body: {slot_id, source: ce_concat | ce_mix, sources: [{ce_line_ref, language}] x2, edit}. Renders the join
+        or overlay and the build-level gain exactly as M6 would (never saves) -> {key, stats, edit, summary, urls}."""
+        if not self.editor:
+            raise ApiError(503, "previews need ffmpeg and libcelt (see docs/m4-user-guide.md)")
+        sid = body.get("slot_id")
+        if sid not in self.slot_index:
+            raise ApiError(404, f"unknown slot {sid}")
+        level, _r, s = self.slot_index[sid]
+        if s["channels"] != 1:
+            raise ApiError(400, "mono slots only (stereo replacement is deferred)")
+        source = body.get("source")
+        if source not in audio_combine.MODE_OF:
+            raise ApiError(400, "source must be ce_concat (join) or ce_mix (play together)")
+        _src, sources = self._normalize_audio({"source": source, "sources": body.get("sources") or []}, [])
+        edit = self._normalize_combined({"edit": body.get("edit") or {}}, source, sources, {})
+        wavs = [self._ce_wav_for(x)[2] for x in sources]
+        mcc_ref = None
+        if self.mcc_audio:
+            try:
+                mcc_ref = self.editor.reference_lufs(self.mcc_audio.wav(level, "spanish", s))
+            except AudioUnavailable:
+                pass
+        try:
+            cfg = load_export_config(self.root)
+        except ConfigError as e:
+            raise ApiError(500, str(e))
+        try:
+            clicks = self.radio_clicks() if (edit.get("radio") or {}).get("clicks") else None
+            r = self.editor.render_combined(wavs, edit, mcc_ref, cfg["global_gain_db"], cfg["level_mode"], clicks)
+        except audio_edit.EditError as e:
+            raise ApiError(422, f"edit: {e}")
+        return {"key": r["key"], "stats": r["stats"], "edit": edit, "summary": audio_combine.summary(edit),
+                "identity": False, "mcc_reference_lufs": mcc_ref, "export_config": cfg,
                 "urls": {k: f"/audio/preview?key={r['key']}&kind={k}" for k in ("edited", "encoded")}}
 
     def radio_clicks(self):
@@ -670,9 +756,36 @@ class M4App:
             raise ApiError(404, "preview not rendered (render it first)")
         return p
 
+    def _normalize_combined(self, a, source, sources, current):
+        """The combine recipe of a join (ce_concat) or an overlay (ce_mix). Not sent: kept while it still belongs
+        to the same two recordings in the same order and the same mode, otherwise the default (unedited parts, no
+        gap, no offset): a recipe never silently moves to other recordings."""
+        mode = audio_combine.MODE_OF[source]
+        binds = [{"ce_line_ref": s["ce_line_ref"], "language": s["language"]} for s in sources]
+        raw = a.get("edit")
+        if raw is None:
+            if audio_combine.is_combine(current) and current.get("mode") == mode and current.get("for_sources") == binds:
+                return current
+            return audio_combine.default(mode, binds)
+        if not isinstance(raw, dict):
+            raise ApiError(400, "edit must be an object")
+        try:
+            edit = audio_combine.normalize(raw, mode, binds)
+        except audio_edit.EditError as e:
+            raise ApiError(400, f"edit: {e}")
+        durations = [self._wav_duration(self._ce_wav_for(b)[2]) for b in binds] if mode == "concat" else None
+        problems = audio_combine.problems(edit, durations, sources)
+        if problems:
+            raise ApiError(422, "the edit is not valid", problems)
+        return edit
+
     def _normalize_edit(self, a, source, sources, current):
         """The recipe to store with this audio choice. Not sent: kept while it still belongs to the same
         CE source, otherwise reset (an edit never silently moves to another recording)."""
+        if source in audio_combine.MODE_OF:
+            return self._normalize_combined(a, source, sources, current)
+        if audio_combine.is_combine(current):  # leaving a join / overlay: its recipe does not apply to one line
+            current = dict(audio_edit.EDIT_ZERO)
         gap = current.get("gap_s", 0)
         src = ({"ce_line_ref": sources[0]["ce_line_ref"], "language": sources[0]["language"]}
                if source == "ce" and sources else None)
@@ -701,8 +814,17 @@ class M4App:
     # ------------------------------------------------------------------ save
     def _normalize_audio(self, a, refs):
         source = a.get("source")
-        if source not in ("keep_original", "ce", "ce_concat"):
+        if source not in ("keep_original", "ce", "ce_concat", "ce_mix", "mute"):
             raise ApiError(400, f"audio source {source!r} is not supported by the UI")
+        if source == "mute":  # Mute / No replacement: no sources; the reason is part of the decision
+            if a.get("sources"):
+                raise ApiError(400, "a muted line has no audio sources")
+            reason = a.get("mute_reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise ApiError(400, "say why the line is muted (mute_reason)")
+            if len(reason.strip()) > 500:
+                raise ApiError(400, "the mute reason is limited to 500 characters")
+            return source, []
         sources = []
         for x in a.get("sources") or []:
             ref, lang = x.get("ce_line_ref"), x.get("language", "Spanish(Mexico)")
@@ -711,6 +833,10 @@ class M4App:
             if lang not in CE_LANGS:
                 raise ApiError(400, f"unknown language {lang}")
             sources.append({"kind": "ce", "ce_line_ref": ref, "language": lang})
+        if source in audio_combine.MODE_OF and len(sources) != 2:  # join / play together (docs/combine-recordings.md)
+            raise ApiError(400, "joining or playing recordings together uses exactly two Campaign Evolved recordings")
+        if source == "ce" and len(sources) != 1:
+            raise ApiError(400, "a Campaign Evolved replacement uses exactly one recording")
         return source, sources
 
     def save(self, body):
@@ -726,6 +852,10 @@ class M4App:
         level, rec, _s = self.slot_index[slot_id]
         doc, sha = self._mappings()
         local, lsha = self._local()
+        if rec["mcc_tag"] in self._own_tags(doc):
+            raise ApiError(409, "every take of this sound is replaced (own take set), so this line has no decision of "
+                                "its own; approve the takes under 'Takes of this sound', or choose 'Back to Spain's "
+                                "takes' under Replacement audio to decide this line again")
         idx = next((i for i, x in enumerate(doc["slots"]) if x["slot_id"] == slot_id), None)
         if "loaded_slot_sha256" in body:
             # Per line: the save is checked against the version of this line the page loaded, so saves of
@@ -741,7 +871,8 @@ class M4App:
                 raise ApiError(409, "manual_mappings.local.json changed since this page loaded it; reload")
         new_doc = copy.deepcopy(doc)
         if idx is None:
-            slot = default_slot(_next_id("m", [x["mapping_id"] for x in doc["slots"]]), slot_id, rec["mcc_tag"])
+            slot = default_slot(_next_id("m", [x["mapping_id"] for x in doc["slots"]] + self._recorded_ids(doc)),
+                                slot_id, rec["mcc_tag"])
         else:
             slot = new_doc["slots"][idx]
         mid, today = slot["mapping_id"], self.today()
@@ -786,6 +917,9 @@ class M4App:
             source, sources = self._normalize_audio(body["audio"], slot["match"]["ce_line_refs"])
             edit = self._normalize_edit(body["audio"], source, sources, slot["audio"]["edit"])
             want = dict(slot["audio"], source=source, sources=sources, edit=edit)
+            want.pop("mute_reason", None)
+            if source == "mute":
+                want["mute_reason"] = body["audio"]["mute_reason"].strip()
             changed = _audio_sem(want) != _audio_sem(slot["audio"])
             guard("audio", changed)
             if changed:
@@ -903,10 +1037,770 @@ class M4App:
                 # The list row and the level's progress as the server now holds them: the page replaces that
                 # row and the counters instead of reloading the list.
                 "row": self._slot_row(level, rec, _s, detail["mapping"]),
-                "progress": level_progress(level_slots, {"slots": new_doc["slots"]}),
+                "progress": level_progress(level_slots, new_doc, [x["mcc_tag"] for x in self.levels[level]],
+                                           _slot_tags(self.levels[level])),
                 # The project-wide report is refreshed in the background (validate_soon); this is the last
                 # complete one. The decision itself was checked above, before anything was written.
                 "validation": self.last_validation, "validation_pending": self.run_validator}
+
+    # ------------------------------------------------------------------ added takes (docs/added-takes-design.md)
+    @staticmethod
+    def _take_counts(doc):
+        out = {}
+        for t in doc.get("added_takes", []):
+            out[t["mcc_tag"]] = out.get(t["mcc_tag"], 0) + 1
+        return out
+
+    def _tag_record(self, mcc_tag):
+        for lv, recs in self.levels.items():
+            for r in recs:
+                if r["mcc_tag"] == mcc_tag:
+                    return lv, r
+        raise ApiError(404, f"unknown sound {mcc_tag}")
+
+    def take_rule(self, mcc_tag):
+        """-> (allowed, reason). Owner rule 2026-10-17: only sounds without a SU/SP subtitle entry, mono."""
+        _lv, r = self._tag_record(mcc_tag)
+        key = loc_key(mcc_tag)
+        if any(tbl is not None and key in tbl for t, tbl in self.loc.items() if t in ("SU", "SP")):
+            return False, ("this sound has a subtitle entry; added takes are only for sounds without one "
+                           "(every take would show the same text)")
+        if any(s["channels"] != 1 for s in r["samples"]["spanish"]):
+            return False, "stereo sound (stereo replacement is deferred)"
+        return True, ""
+
+    @staticmethod
+    def _own_tags(doc):
+        """Sounds whose replacement set is in force (a staged conversion is not: its lines keep their decisions)."""
+        return active_own_tags(doc)
+
+    @staticmethod
+    def _own_status(doc):
+        """{mcc_tag: {takes, approved, needs_rework}} for the sounds in own-take-set mode (the MCC list shows the
+        sound's state on its lines, which have no decision of their own)."""
+        out = {t: {"takes": 0, "approved": 0, "needs_rework": 0} for t in active_own_tags(doc)}
+        for t in doc.get("added_takes", []):
+            st = out.get(t["mcc_tag"])
+            if st is not None:
+                st["takes"] += 1
+                st["approved"] += t["audio"]["status"] == "approved"
+                st["needs_rework"] += t["audio"]["status"] == "needs_rework"
+        return out
+
+    @staticmethod
+    def takes_version(doc, mcc_tag):
+        """The stored version of one sound's added takes and own-set switch: a take save names the version it was
+        made from."""
+        takes = [t for t in doc.get("added_takes", []) if t["mcc_tag"] == mcc_tag]
+        own = [o for o in doc.get("own_sets", []) if o["mcc_tag"] == mcc_tag]
+        return _sha(json.dumps({"takes": takes, "own_set": own}, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+    def sound(self, mcc_tag, mappings=None, local=None):
+        """One sound: its Spain takes (with their decisions) and its added takes, for the Studio's section."""
+        if mappings is None:
+            mappings, _ = self._mappings()
+        if local is None:
+            local, _ = self._local()
+        lv, r = self._tag_record(mcc_tag)
+        by_slot = {x["slot_id"]: x for x in mappings["slots"]}
+        allowed, reason = self.take_rule(mcc_tag)
+        takes = []
+        for t in sorted((t for t in mappings.get("added_takes", []) if t["mcc_tag"] == mcc_tag),
+                        key=lambda t: t["position"]):
+            drift = (t["audio"]["status"] == "approved"
+                     and t["audio"]["fingerprint"] != added_take_fingerprint(t, self.ce_idx, self.mcc_idx, local))
+            src = (t["audio"]["sources"] or [{}])[0]
+            takes.append({**t, "drift": drift, "edit_summary": audio_edit.summary(t["audio"]["edit"]),
+                          "edited": not audio_edit.is_identity(t["audio"]["edit"]),
+                          "line": self.ce_line(src["ce_line_ref"]) if src.get("ce_line_ref") in self.ce_lines else None})
+        spain = []
+        for s in r["samples"]["spanish"]:
+            m = by_slot.get(s["slot_id"])
+            spain.append({"slot_id": s["slot_id"], "ordinal": s["ordinal_in_tag"], "duration_s": s["duration_s"],
+                          "spanish_index": s["index"], "decision": self._decision_summary(m),
+                          "mapping_id": (m or {}).get("mapping_id"),
+                          "audio_ref": ((m or {}).get("audio", {}).get("sources") or [{}])[0].get("ce_line_ref")})
+        own = next((o for o in mappings.get("own_sets", []) if o["mcc_tag"] == mcc_tag), None)
+        prov = (own or {}).get("provenance")
+        staged = {t["take_id"] for t in (prov or {}).get("takes", []) if t["origin"] == "created"} \
+            if own and not is_active(own) else set()
+        for t in takes:
+            t["staged"] = t["take_id"] in staged
+        return {"mcc_tag": mcc_tag, "level": lv, "tag_name": r["tag_name"], "allowed": allowed, "reason": reason,
+                "spain_takes": spain, "added_takes": takes, "total_takes": len(spain) + len(takes),
+                "warn_above": 12, "version": self.takes_version(mappings, mcc_tag),
+                # Every line decision, take and set of the sound (docs/replacement-set-conversion.md): conversions
+                # and the 4th audio option name this version, because they consume the line decisions too.
+                "sound_version": self._sound_version(mappings, local, mcc_tag),
+                "mode": tsc.mode_of(mappings, mcc_tag),
+                "own_set": {"mcc_tag": own["mcc_tag"], "set_at": own["set_at"]} if own and is_active(own) else None,
+                "reminders": [{"slot_id": m["slot_id"], "mapping_id": m["mapping_id"],
+                               "needs_recording": _needs_recording(m), "radio_effect": m["radio_effect"]["needed"],
+                               "notes": m.get("notes", "")}
+                              for m in (prov or {}).get("slots", []) if own and is_active(own)
+                              and (_needs_recording(m) or m["radio_effect"]["needed"] or m.get("notes"))],
+                "conversion": None if not prov else {
+                    "state": "active" if is_active(own) else "staged", "kind": prov["kind"],
+                    "record_id": prov["record_id"], "created_at": prov["created_at"],
+                    "activated_at": prov["activated_at"], "replaced_decisions": len(prov["slots"]),
+                    "takes": prov["takes"], "acknowledged": prov["acknowledged"],
+                    "decisions": [{"mapping_id": m["mapping_id"], "slot_id": m["slot_id"],
+                                   "audio": m["audio"]["status"], "audio_source": m["audio"]["source"],
+                                   "audio_ref": (m["audio"]["sources"] or [{}])[0].get("ce_line_ref"),
+                                   "subtitle": m["subtitle"]["status"], "notes": m.get("notes", "")}
+                                  for m in prov["slots"]]}}
+
+    def _sound_version(self, doc, local, mcc_tag):
+        _lv, r = self._tag_record(mcc_tag)
+        return tsc.digest(tsc.sound_inputs(doc, mcc_tag, r, has_subtitle_entry=loc_key(mcc_tag) in self._subtitle_keys(),
+                                         ce_idx=self.ce_idx, local=local))
+
+    # ------------------------------------------------------------------ own take sets (docs/custom-take-set-design.md)
+    def own_set_on(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, clear_mapping_ids: [...], audio_list?: [{ce_line_ref, language}]}.
+        Replaces every take of the sound (the line's 4th audio option): the sound then plays only its added takes,
+        plus the recordings in audio_list, added as drafts in the same save (already a take: skipped). At least one
+        take must result. An explicit user action that clears the sound's line decisions:
+        approved ones are first marked Needs rework (a user action, revision + 1), then every decision of the sound
+        is removed. clear_mapping_ids must list exactly the decisions the page showed, or nothing is done."""
+        with self._save_lock:
+            tag = body.get("mcc_tag")
+            self._tag_record(tag)
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+                raise ApiError(409, "This sound's takes changed elsewhere since this page loaded them; reload")
+            if tag in self._own_tags(doc):
+                return {"saved": False, "message": "the own take set is already on", "sound": self.sound(tag, doc, local)}
+            if tag in {o["mcc_tag"] for o in doc.get("own_sets", [])}:
+                raise ApiError(409, "a conversion of this sound is staged; switch it on or cancel it first")
+            if body.get("loaded_sound_sha256") != self._sound_version(doc, local, tag):
+                raise ApiError(409, "This sound's line decisions changed elsewhere since this page listed them; reload")
+            allowed, reason = self.take_rule(tag)
+            if not allowed:
+                raise ApiError(409, f"an own take set is not allowed here: {reason}")
+            items = body.get("audio_list") or []
+            if not isinstance(items, list) or len(items) > 50 or not all(isinstance(x, dict) for x in items):
+                raise ApiError(400, "audio_list must be at most 50 {ce_line_ref, language} items")
+            for ab in items:
+                if ab.get("ce_line_ref") not in self.ce_lines:
+                    raise ApiError(400, f"unknown CE line {ab.get('ce_line_ref')}")
+                if ab.get("language", "Spanish(Mexico)") not in CE_LANGS:
+                    raise ApiError(400, f"unknown language {ab.get('language')}")
+            existing = [t for t in doc.get("added_takes", []) if t["mcc_tag"] == tag]
+            if not existing and not items:
+                raise ApiError(400, "choose at least one Campaign Evolved recording to replace the sound's takes with")
+            mine = [s for s in doc["slots"] if s["mcc_tag"] == tag]
+            if sorted(body.get("clear_mapping_ids") or []) != sorted(s["mapping_id"] for s in mine):
+                raise ApiError(409, "the decisions of this sound changed since the page listed them; reload")
+            # One save of two checked steps (mapping_store.save_sequence): 1. Needs rework on every approved
+            # decision (the only allowed change to an approved object); 2. remove the sound's decisions and turn the
+            # set on. The set's provenance keeps the removed decisions exactly (docs/replacement-set-conversion.md).
+            source = self._sound_version(doc, local, tag)
+            actions = [UserAction("needs_rework", s["mapping_id"], f) for s in mine for f in ("audio", "subtitle")
+                       if s[f]["status"] == "approved"]
+            steps = []
+            if actions:
+                step = copy.deepcopy(doc)
+                for s in step["slots"]:
+                    for f in ("audio", "subtitle"):
+                        if s["mcc_tag"] == tag and s[f]["status"] == "approved":
+                            s[f].update(status="needs_rework", revision=s[f]["revision"] + 1, approved_at=None,
+                                        fingerprint=None)
+                steps.append((step, actions))
+            new_doc = copy.deepcopy(steps[-1][0] if steps else doc)
+            new_doc["slots"] = [s for s in new_doc["slots"] if s["mcc_tag"] != tag]
+            entry = {"mcc_tag": tag, "set_at": self.today(), "provenance": {
+                "kind": "replace", "record_id": "rs-" + source[:12], "created_at": self.today(),
+                "activated_at": self.today(), "source_version": source,
+                "slots": sorted(copy.deepcopy(mine), key=lambda m: m["mapping_id"]),
+                "added_takes": sorted(copy.deepcopy(existing), key=lambda t: t["take_id"]),
+                "custom_subtitles": tsc.custom_refs(mine, local),
+                "takes": [{"take_id": t["take_id"], "origin": "existing", "from_mapping_ids": [],
+                           "spec_sha256": tsc.spec_digest(t["audio"])} for t in existing],
+                "acknowledged": []}}
+            new_doc.setdefault("own_sets", []).append(entry)
+            takes = new_doc.setdefault("added_takes", [])
+            have = {(x.get("ce_line_ref"), x.get("language")) for t in existing for x in t["audio"]["sources"][:1]}
+            added, skipped = [], []
+            for ab in items:
+                key = (ab["ce_line_ref"], ab.get("language", "Spanish(Mexico)"))
+                if key in have:
+                    skipped.append(key[0])
+                    continue
+                have.add(key)
+                added.append(self._new_take(tag, takes, len(existing) + len(added) + 1, ab)["take_id"])
+            by_id = {t["take_id"]: t for t in takes}
+            entry["provenance"]["takes"] += [{"take_id": t, "origin": "created", "from_mapping_ids": [],
+                                              "spec_sha256": tsc.spec_digest(by_id[t]["audio"])} for t in added]
+            if not takes:
+                new_doc.pop("added_takes")
+            steps.append((new_doc, []))
+            errors = self._conversion_errors(new_doc, local, {tag})
+            if errors:
+                raise ApiError(422, "the result would not be valid; nothing was saved", errors)
+            self._save_recovery({entry["provenance"]["record_id"]: tsc.recovery_record(tag, mine, local, self.today())})
+            try:
+                new_sha = mapping_store.save_sequence(self.root / MAPPINGS, steps, sha,
+                                                      reason=f"take-set:replace:{entry['provenance']['record_id']}")
+            except (StaleError, ProtectedError) as e:
+                raise ApiError(409, str(e))
+            except StoreError as e:
+                raise ApiError(422, str(e))
+            self.validate_soon()
+            return {"saved": True, "sha256": new_sha, "sound": self.sound(tag),
+                    "cleared": [s["mapping_id"] for s in mine], "added": added, "skipped": skipped,
+                    "reworked": [f"{a.mapping_id}/{a.field}" for a in actions]}
+
+    def own_set_off(self, body):
+        """body: {mcc_tag, loaded_takes_sha256}. Back to Spain's takes + added takes. Cleared decisions do not come
+        back (the owner chose 'clear', 2026-10-18); the lines start undecided."""
+        with self._save_lock:
+            tag = body.get("mcc_tag")
+            self._tag_record(tag)
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+                raise ApiError(409, "This sound's takes changed elsewhere since this page loaded them; reload")
+            if tag not in self._own_tags(doc):
+                if tag in {o["mcc_tag"] for o in doc.get("own_sets", [])}:
+                    raise ApiError(409, "the conversion of this sound is staged, not on: cancel it instead")
+                return {"saved": False, "message": "the own take set is already off", "sound": self.sound(tag, doc, local)}
+            new_doc = copy.deepcopy(doc)
+            new_doc["own_sets"] = [o for o in new_doc["own_sets"] if o["mcc_tag"] != tag]
+            if not new_doc["own_sets"]:
+                new_doc.pop("own_sets")  # never stored empty (schema: minItems 1)
+            try:
+                new_sha = save_mappings(self.root / MAPPINGS, new_doc, sha)
+            except (StaleError, ProtectedError) as e:
+                raise ApiError(409, str(e))
+            except StoreError as e:
+                raise ApiError(422, str(e))
+            self.validate_soon()
+            return {"saved": True, "sha256": new_sha, "sound": self.sound(tag)}
+
+    # ------------------------------------------------------------------ replacement sets (docs/replacement-set-conversion.md)
+    def _records(self):
+        out = {}
+        for lv, recs in self.levels.items():
+            for r in recs:
+                out.setdefault(r["mcc_tag"], (lv, r))
+        return out
+
+    def _plan(self, doc, local, tag):
+        lv, r = self._tag_record(tag)
+        keys = self._subtitle_keys()
+        return tsc.plan_sound(doc, tag, r, lv, has_subtitle_entry=loc_key(tag) in keys, ce_lines=self.ce_lines,
+                              ce_idx=self.ce_idx, mcc_idx=self.mcc_idx, local=local, subtitle_keys=keys)
+
+    def convert_preview(self, mcc_tag):
+        """Read-only: what converting this sound's per-take decisions into a replacement set would do."""
+        doc, _ = self._mappings()
+        local, _ = self._local()
+        item = self._plan(doc, local, mcc_tag)
+        item["sound_version"] = self._sound_version(doc, local, mcc_tag)
+        return item
+
+    def convert_inventory(self, level=None):
+        """Read-only: every multi-take sound with a decision, an added take or a set, previewed (level: one level)."""
+        doc, sha = self._mappings()
+        local, _ = self._local()
+        recs = self._records()
+        if level and level != "all":
+            if level not in self.levels:
+                raise ApiError(404, f"unknown level {level}")
+            recs = {t: v for t, v in recs.items() if v[0] == level}
+        inv = tsc.inventory(doc, recs, subtitle_keys=self._subtitle_keys(), ce_lines=self.ce_lines,
+                            ce_idx=self.ce_idx, mcc_idx=self.mcc_idx, local=local)
+        for it in inv["sounds"]:  # the list stays light; one sound's preview has the details
+            for k in ("build_now", "build_staged", "build_after", "sources", "proposed", "existing_takes"):
+                it.pop(k, None)
+            it["issues"] = [i for i in it["issues"] if i["severity"] != "info"]
+        return {**inv, "sha256": sha}
+
+    def _conversion_errors(self, new_doc, local, tags, mapping_ids=()):
+        findings, _ = validate_mappings(new_doc, load_schema(SCHEMA_NAME), ce=self.ce_idx, mcc=self.mcc_idx,
+                                        local=local, verifications=self._verifications(),
+                                        current_pins=self._current_pins(), file=MAPPINGS,
+                                        only_mapping_ids=set(mapping_ids), subtitle_keys=self._subtitle_keys())
+        names = {t.rsplit(chr(92), 1)[-1] for t in tags}
+        ids = {t["take_id"] for t in new_doc.get("added_takes", []) if t["mcc_tag"] in tags} | set(mapping_ids)
+        return [f"{f['code']}: {f['message']}" for f in findings if f["severity"] == "error" and (
+            f["code"] == "schema" or any(f"({i})" in f["where"] for i in ids)
+            or any(f"({n})" in f["where"] for n in names))]
+
+    def _commit(self, steps, sha, reason, local, tags, mapping_ids=()):
+        errors = self._conversion_errors(steps[-1][0], local, tags, mapping_ids)
+        if errors:
+            raise ApiError(422, "the result would not be valid; nothing was saved", errors)
+        try:
+            new_sha = mapping_store.save_sequence(self.root / MAPPINGS, steps, sha, reason=reason)
+        except (StaleError, ProtectedError) as e:
+            raise ApiError(409, str(e))
+        except StoreError as e:
+            raise ApiError(422, str(e))
+        self.validate_soon()
+        return new_sha
+
+    def _recovery(self):
+        return self._read_document(RECOVERY, {"schema": "take-set-recovery/1", "records": {}})
+
+    def _save_recovery(self, records):
+        """Adds recovery records (record id -> snapshot) to the git-ignored recovery document before the decisions
+        are saved. Records are only added: an existing one is never changed. None values (nothing local) are
+        skipped."""
+        records = {k: v for k, v in records.items() if v}
+        if not records:
+            return
+        doc, sha = self._recovery()
+        new = copy.deepcopy(doc)
+        for k, v in records.items():
+            new["records"].setdefault(k, v)
+        if new == doc:
+            return
+        try:
+            save_user_file(self.root / RECOVERY, new, sha, "take-set-recovery-1")
+        except StaleError as e:
+            raise ApiError(409, str(e))
+        except StoreError as e:
+            raise ApiError(422, str(e))
+
+    def convert_stage(self, body):
+        """body: {items: [{mcc_tag, token, acknowledged?: [review codes]}], bulk?: bool, confirm: true}. Stages the
+        conversion of each sound in ONE save: new draft takes and a staged set with the record of the decisions; the
+        decisions themselves stay in force. Each token must be the current preview's (a change to any line, take,
+        set, custom text, catalog fact or eligibility of the sound makes it stale). A bulk stage takes only sounds
+        whose preview needs no review. Repeating a stage that was already saved changes nothing."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "staging a replacement set needs confirm: true")
+        items = body.get("items")
+        if not isinstance(items, list) or not items or len(items) > 500:
+            raise ApiError(400, "items must list 1 to 500 sounds")
+        with self._save_lock:
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            used = set(mapping_store.used_take_ids(self.root / MAPPINGS))
+            new_doc, done, already, problems, tags = doc, [], [], [], set()
+            for it in items:
+                tag = it.get("mcc_tag") if isinstance(it, dict) else None
+                if tag in tags:
+                    raise ApiError(400, f"{tag} is listed twice")
+                self._tag_record(tag)
+                tags.add(tag)
+                own = next((o for o in doc.get("own_sets", []) if o["mcc_tag"] == tag), None)
+                rec_id = "cv-" + str(it.get("token", ""))[:12]
+                if own and (own.get("provenance") or {}).get("record_id") == rec_id:
+                    already.append(tag)
+                    continue
+                item = self._plan(doc, local, tag)
+                if it.get("token") != item["token"]:
+                    problems.append(f"{tag}: changed since the preview; preview it again")
+                    continue
+                if body.get("bulk") and item["status"] != "ready":
+                    problems.append(f"{tag}: {item['status']} (bulk staging takes only sounds that need no review)")
+                    continue
+                try:
+                    new_doc, entry = tsc.stage(new_doc, item, today=self.today(), used_take_ids=used,
+                                               acknowledged=list(it.get("acknowledged") or []), local=local)
+                except tsc.ConversionError as e:
+                    problems.append(f"{tag}: {e.message}" + (f" ({', '.join(e.details)})" if e.details else ""))
+                    continue
+                used |= {t["take_id"] for t in entry["provenance"]["takes"]}
+                done.append({"mcc_tag": tag, "record_id": entry["provenance"]["record_id"],
+                             "created": [t["take_id"] for t in entry["provenance"]["takes"] if t["origin"] == "created"]})
+            if problems:
+                raise ApiError(409, "nothing was staged", problems)
+            if not done:
+                return {"saved": False, "message": "already staged", "already": already, "staged": []}
+            errors = self._conversion_errors(new_doc, local, tags)
+            if errors:
+                raise ApiError(422, "the result would not be valid; nothing was saved", errors)
+            self._save_recovery({d["record_id"]: tsc.recovery_record(
+                d["mcc_tag"], [m for m in doc["slots"] if m["mcc_tag"] == d["mcc_tag"]], local, self.today())
+                for d in done})
+            new_sha = self._commit([(new_doc, [])], sha, "take-set:stage:" + ",".join(d["record_id"] for d in done),
+                                   local, tags)
+        out = {"saved": True, "sha256": new_sha, "staged": done, "already": already}
+        if len(items) == 1:
+            out["sound"] = self.sound(items[0]["mcc_tag"])
+        return out
+
+    def _hypothetical_inserts(self, doc, tag):
+        """The build's view of the sound's takes as if its set were switched on (staged takes are never built)."""
+        from common.m6_build import plan_inserts
+        hyp = copy.deepcopy(tsc.sound_doc(doc, tag))
+        for o in hyp.get("own_sets", []):
+            o.pop("state", None)
+        lv, _r = self._tag_record(tag)
+        return [e for e in plan_inserts(hyp, [lv], slot_index=self.slot_index, ce_lines=self.ce_lines,
+                                        ce_idx=self.ce_idx, mcc_idx=self.mcc_idx, subtitle_keys=self._subtitle_keys())
+                if e["mcc_tag"] == tag]
+
+    def convert_activate(self, body):
+        """body: {items: [{mcc_tag, loaded_sound_sha256}], confirm: true}. Switches each staged sound to its
+        replacement set, in ONE save: refused unless every take of each set is approved and buildable and the line
+        decisions are those recorded at staging; the approved ones are marked Needs rework, then removed (they stay
+        in the set's record)."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "switching a sound to its replacement set needs confirm: true")
+        items = body.get("items")
+        if not isinstance(items, list) or not items or len(items) > 500:
+            raise ApiError(400, "items must list 1 to 500 sounds")
+        with self._save_lock:
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            steps, cur, problems, tags, done = [], doc, [], set(), []
+            for it in items:
+                tag = it.get("mcc_tag") if isinstance(it, dict) else None
+                self._tag_record(tag)
+                if tag in tags:
+                    raise ApiError(400, f"{tag} is listed twice")
+                tags.add(tag)
+                if it.get("loaded_sound_sha256") != self._sound_version(doc, local, tag):
+                    problems.append(f"{tag}: changed since the page loaded it; reload")
+                    continue
+                try:
+                    more = tsc.activate(cur, tag, today=self.today(), insert_plan=self._hypothetical_inserts(cur, tag),
+                                        eligible=self.take_rule(tag))
+                except tsc.ConversionError as e:
+                    problems.append(f"{tag}: {e.message}" + (f" ({'; '.join(e.details)})" if e.details else ""))
+                    continue
+                steps += more
+                cur = more[-1][0]
+                done.append({"mcc_tag": tag, "record_id": next(o for o in cur["own_sets"] if o["mcc_tag"] == tag)
+                             ["provenance"]["record_id"],
+                             "reworked": [f"{a.mapping_id}/{a.field}" for st in more for a in st[1]]})
+            if problems:
+                raise ApiError(409, "nothing was switched", problems)
+            new_sha = self._commit(steps, sha, "take-set:activate:" + ",".join(d["record_id"] for d in done),
+                                   local, tags)
+        out = {"saved": True, "sha256": new_sha, "switched": done}
+        if len(items) == 1:
+            out["sound"] = self.sound(items[0]["mcc_tag"])
+        return out
+
+    def convert_approvable(self, mcc_tag):
+        """Read-only: which takes of the staged conversion "Approve unchanged converted takes" would approve, with their
+        source decisions, and which it leaves out and why (take_set_conversion.approvable)."""
+        doc, _ = self._mappings()
+        local, _ = self._local()
+        lv, r = self._tag_record(mcc_tag)
+        try:
+            out = tsc.approvable(doc, mcc_tag, r, lv, ce_lines=self.ce_lines, ce_idx=self.ce_idx, mcc_idx=self.mcc_idx,
+                                 local=local, eligible=self.take_rule(mcc_tag))
+        except tsc.ConversionError as e:
+            raise ApiError(e.status, e.message, e.details)
+        return {**out, "mcc_tag": mcc_tag, "sound_version": self._sound_version(doc, local, mcc_tag)}
+
+    def convert_approve_unchanged(self, body):
+        """body: {mcc_tag, loaded_sound_sha256, take_ids, confirm: true}: the owner's explicit approval of exactly the
+        takes the page listed as unchanged. Everything is checked again now; if the sound changed or the list of
+        approvable takes is not exactly take_ids, nothing is approved. Each take gets a NEW approval: a 'approve'
+        user action, today's date and its own fresh added-take fingerprint (never a slot's), in one save whose
+        history rows carry the reason take-set:approve-unchanged:<record>."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "approving takes needs confirm: true")
+        tag = body.get("mcc_tag")
+        lv, r = self._tag_record(tag)
+        want = body.get("take_ids")
+        if not isinstance(want, list) or not want or len(set(want)) != len(want):
+            raise ApiError(400, "take_ids must list the takes shown, once each")
+        with self._save_lock:
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            if body.get("loaded_sound_sha256") != self._sound_version(doc, local, tag):
+                raise ApiError(409, "This sound changed since the list was shown; nothing was approved. Look again.")
+            try:
+                check = tsc.approvable(doc, tag, r, lv, ce_lines=self.ce_lines, ce_idx=self.ce_idx,
+                                       mcc_idx=self.mcc_idx, local=local, eligible=self.take_rule(tag))
+            except tsc.ConversionError as e:
+                raise ApiError(e.status, e.message, e.details)
+            now = sorted(t["take_id"] for t in check["included"])
+            if sorted(want) != now:
+                raise ApiError(409, "the takes that can be approved are not the ones shown; nothing was approved",
+                               [f"now approvable: {', '.join(now) or 'none'}"])
+            steps = tsc.approve_unchanged(doc, tag, want, today=self.today(),
+                                          fingerprint=lambda t: added_take_fingerprint(t, self.ce_idx, self.mcc_idx, local))
+            new_sha = self._commit(steps, sha, f"take-set:approve-unchanged:{check['record_id']}", local, {tag})
+        return {"saved": True, "sha256": new_sha, "approved": sorted(want), "record_id": check["record_id"],
+                "sound": self.sound(tag)}
+
+    def convert_cancel(self, body):
+        """body: {mcc_tag, loaded_sound_sha256}. Cancels a staged conversion: the takes it created go (approved ones
+        through Needs rework, in the same save) and the line decisions, never touched, stay as they are."""
+        tag = body.get("mcc_tag")
+        self._tag_record(tag)
+        with self._save_lock:
+            doc, sha = self._mappings()
+            local, _ = self._local()
+            if body.get("loaded_sound_sha256") != self._sound_version(doc, local, tag):
+                raise ApiError(409, "This sound changed elsewhere since this page loaded it; reload")
+            try:
+                steps = tsc.cancel(doc, tag)
+            except tsc.ConversionError as e:
+                raise ApiError(e.status, e.message, e.details)
+            rec = next(o for o in doc["own_sets"] if o["mcc_tag"] == tag)["provenance"]["record_id"]
+            new_sha = self._commit(steps, sha, f"take-set:cancel:{rec}", local, {tag})
+        return {"saved": True, "sha256": new_sha, "sound": self.sound(tag), "record_id": rec,
+                "reworked": [f"{a.mapping_id}/{a.field}" for st in steps for a in st[1]]}
+
+    def _revert_plan(self, doc, local, tag, rework_drifted):
+        _lv, r = self._tag_record(tag)
+        try:
+            plan = tsc.revert_plan(doc, tag, local=local, recovery=self._recovery()[0], slot_ids=set(r["slot_ids"]),
+                                   ce_idx=self.ce_idx, mcc_idx=self.mcc_idx, rework_drifted=rework_drifted)
+        except tsc.ConversionError as e:
+            raise ApiError(e.status, e.message, e.details)
+        version = self._sound_version(doc, local, tag)
+        return plan, version, tsc.plan_token(plan, version)
+
+    def convert_revert_preview(self, mcc_tag, rework_drifted=False):
+        """Read-only: what Undo would do for this sound, and every conflict that stops it, before anything changes."""
+        doc, _ = self._mappings()
+        local, _ = self._local()
+        plan, version, token = self._revert_plan(doc, local, mcc_tag, rework_drifted)
+        return {**{k: v for k, v in plan.items() if k != "steps"}, "mcc_tag": mcc_tag, "sound_version": version,
+                "token": token}
+
+    def convert_revert(self, body):
+        """body: {mcc_tag, token, rework_drifted?, confirm: true}, token from convert_revert_preview. Undoes an active
+        replacement set that has a record, exactly as previewed (take_set_conversion.revert_plan): the recorded line
+        decisions come back with their approvals (store action 'restore'), the takes the record created leave the
+        sound (approved ones through Needs rework), earlier takes stay, missing local text is put back from the
+        recovery snapshot (newer local text is never overwritten). Refused while any conflict remains, or if
+        anything changed since the preview. One save of the decisions, reason take-set:revert:<record>."""
+        if body.get("confirm") is not True:
+            raise ApiError(400, "undoing a replacement set needs confirm: true")
+        tag = body.get("mcc_tag")
+        self._tag_record(tag)
+        with self._save_lock:
+            doc, sha = self._mappings()
+            local, lsha = self._local()
+            plan, _version, token = self._revert_plan(doc, local, tag, bool(body.get("rework_drifted")))
+            if body.get("token") != token:
+                raise ApiError(409, "the sound, its record or the local data changed since the preview; nothing was "
+                                    "undone. Preview the undo again.")
+            if plan["conflicts"]:
+                raise ApiError(409, "the undo has conflicts; nothing was changed",
+                               [f"{c['code']}: {c['detail']}" for c in plan["conflicts"]])
+            restore_local = plan["local_restore"]
+            new_local = local
+            if restore_local["custom_subtitles"] or restore_local["user_recordings"]:
+                new_local = copy.deepcopy(local)
+                for k in ("custom_subtitles", "user_recordings"):
+                    for ref, v in restore_local[k].items():
+                        if ref in new_local[k]:  # checked by the plan; never overwrite
+                            raise ApiError(409, f"{ref} reappeared in the local file; nothing was changed")
+                        new_local[k][ref] = v
+            restored = [m["mapping_id"] for m in plan["steps"][-1][0]["slots"] if m["mcc_tag"] == tag]
+            errors = self._conversion_errors(plan["steps"][-1][0], new_local, {tag}, restored)
+            if errors:
+                raise ApiError(422, "the result would not be valid; nothing was saved", errors)
+            if new_local is not local:
+                try:
+                    save_user_file(self.root / LOCAL, new_local, lsha, "manual-mappings-local-1")
+                except StaleError as e:
+                    raise ApiError(409, str(e))
+            new_sha = self._commit(plan["steps"], sha, f"take-set:revert:{plan['record_id']}", new_local, {tag},
+                                   restored)
+        return {"saved": True, "sha256": new_sha, "sound": self.sound(tag), "record_id": plan["record_id"],
+                "restored": restored, "restore": plan["restore"], "removed_takes": plan["remove_takes"],
+                "kept_takes": plan["keep_takes"], "notes": plan["notes"], "local_restored":
+                sorted(restore_local["custom_subtitles"]) + sorted(restore_local["user_recordings"]),
+                "takes_reworked": [f"{a.mapping_id}/{a.field}" for st in plan["steps"] for a in st[1]
+                                   if a.action == "needs_rework"]}
+
+    def _take_edit(self, raw_edit, src, current):
+        """The recipe to store for an added take (the same rules as a line's: _normalize_edit)."""
+        a = {} if raw_edit is None else {"edit": raw_edit}
+        return self._normalize_edit(a, "ce", [src], current)
+
+    def take_save(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, take_id? (absent = a new take), audio?: {ce_line_ref, language, edit?},
+        radio_effect?: {needed}, notes?, actions?: [{action: approve|needs_rework, field: "audio"}]}."""
+        with self._save_lock:
+            return self._take_write(body, "save")
+
+    def take_remove(self, body):
+        """body: {mcc_tag, take_id, loaded_takes_sha256}. Not while approved (Needs rework first)."""
+        with self._save_lock:
+            return self._take_write(body, "remove")
+
+    def take_move(self, body):
+        """body: {mcc_tag, take_id, direction: -1 | 1, loaded_takes_sha256}: swaps it with its neighbour."""
+        with self._save_lock:
+            return self._take_write(body, "move")
+
+    def take_add_many(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, audio_list: [{ce_line_ref, language}, ...]}: adds each recording as
+        a new draft take, in one save (all or nothing). Recordings that are already a take of the sound, or listed
+        twice, are skipped and reported. Never approves."""
+        with self._save_lock:
+            return self._take_write(body, "add_many")
+
+    def _new_take(self, tag, takes, position, ab):
+        """A new draft take of `tag` for the recording ab = {ce_line_ref, language, edit?}; appended to `takes`."""
+        ref, lang = ab.get("ce_line_ref"), ab.get("language", "Spanish(Mexico)")
+        if ref not in self.ce_lines:
+            raise ApiError(400, f"unknown CE line {ref}")
+        if lang not in CE_LANGS:
+            raise ApiError(400, f"unknown language {lang}")
+        used = [t["take_id"] for t in takes] + sorted(mapping_store.used_take_ids(self.root / MAPPINGS))
+        src = {"kind": "ce", "ce_line_ref": ref, "language": lang}
+        edit = self._take_edit(ab.get("edit"), src, {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0})
+        take = {"take_id": _next_id("t", used), "mcc_tag": tag, "position": position,
+                "audio": {"status": "draft", "source": "ce", "sources": [src], "edit": edit,
+                          "fingerprint": None, "approved_at": None, "revision": 1},
+                "radio_effect": {"needed": False, "set_at": None, "revision": 1}, "notes": ""}
+        takes.append(take)
+        return take
+
+    def _take_write(self, body, op):
+        tag = body.get("mcc_tag")
+        self._tag_record(tag)  # 404 for an unknown sound
+        doc, sha = self._mappings()
+        local, _lsha = self._local()
+        if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+            raise ApiError(409, "This sound's added takes changed elsewhere since this page loaded them; reload")
+        new_doc = copy.deepcopy(doc)
+        takes = new_doc.setdefault("added_takes", [])
+        mine = sorted((t for t in takes if t["mcc_tag"] == tag), key=lambda t: t["position"])
+        tid = body.get("take_id")
+        take = next((t for t in mine if t["take_id"] == tid), None) if tid else None
+        if tid and take is None:
+            raise ApiError(404, f"unknown added take {tid} for this sound")
+        user_actions, today = [], self.today()
+        added, skipped = [], []
+        if op == "add_many":
+            items = body.get("audio_list")
+            if not isinstance(items, list) or not items:
+                raise ApiError(400, "audio_list must name at least one Campaign Evolved recording")
+            if len(items) > 50:
+                raise ApiError(400, "at most 50 recordings at a time")
+            allowed, reason = self.take_rule(tag)
+            if not allowed:
+                raise ApiError(409, f"added takes are not allowed here: {reason}")
+            have = {(s.get("ce_line_ref"), s.get("language")) for t in mine for s in t["audio"]["sources"][:1]}
+            for ab in items:
+                if not isinstance(ab, dict):
+                    raise ApiError(400, "each audio_list item must be {ce_line_ref, language}")
+                key = (ab.get("ce_line_ref"), ab.get("language", "Spanish(Mexico)"))
+                if key in have:
+                    skipped.append(key[0])
+                    continue
+                have.add(key)
+                added.append(self._new_take(tag, takes, len(mine) + len(added) + 1, ab)["take_id"])
+        elif op == "remove":
+            if take["audio"]["status"] == "approved":
+                raise ApiError(409, "the take is approved; mark it Needs rework before removing it")
+            takes.remove(take)
+            for k, t in enumerate(x for x in mine if x is not take):
+                t["position"] = k + 1
+        elif op == "move":
+            d = body.get("direction")
+            if d not in (-1, 1):
+                raise ApiError(400, "direction must be -1 or 1")
+            i = mine.index(take)
+            j = i + d
+            if not 0 <= j < len(mine):
+                raise ApiError(400, "the take is already at that end")
+            mine[i]["position"], mine[j]["position"] = mine[j]["position"], mine[i]["position"]
+        else:
+            if take is None:  # a new take: allowed sounds only
+                allowed, reason = self.take_rule(tag)
+                if not allowed:
+                    raise ApiError(409, f"added takes are not allowed here: {reason}")
+                used = [t["take_id"] for t in takes] + sorted(mapping_store.used_take_ids(self.root / MAPPINGS))
+                take = {"take_id": _next_id("t", used), "mcc_tag": tag, "position": len(mine) + 1,
+                        "audio": {"status": "draft", "source": "ce", "sources": [],
+                                  "edit": {"trim_start_s": 0, "trim_end_s": 0, "gap_s": 0},
+                                  "fingerprint": None, "approved_at": None, "revision": 1},
+                        "radio_effect": {"needed": False, "set_at": None, "revision": 1}, "notes": ""}
+                takes.append(take)
+                if not body.get("audio"):
+                    raise ApiError(400, "a new take needs its Campaign Evolved recording (audio.ce_line_ref)")
+            actions = body.get("actions") or []
+            for a in actions:
+                if a.get("action") not in ("approve", "needs_rework") or a.get("field") != "audio":
+                    raise ApiError(400, f"unknown action {a}")
+                user_actions.append(UserAction(a["action"], take["take_id"], "audio"))
+            if any(a.action == "needs_rework" for a in user_actions):
+                if take["audio"]["status"] != "approved":
+                    raise ApiError(400, "the take is not approved; nothing to rework")
+                take["audio"].update(status="needs_rework", revision=take["audio"]["revision"] + 1,
+                                     approved_at=None, fingerprint=None)
+            if body.get("audio"):
+                ab = body["audio"]
+                ref, lang = ab.get("ce_line_ref"), ab.get("language", "Spanish(Mexico)")
+                if ref not in self.ce_lines:
+                    raise ApiError(400, f"unknown CE line {ref}")
+                if lang not in CE_LANGS:
+                    raise ApiError(400, f"unknown language {lang}")
+                src = {"kind": "ce", "ce_line_ref": ref, "language": lang}
+                edit = self._take_edit(ab.get("edit"), src, take["audio"]["edit"])
+                want = dict(take["audio"], sources=[src], edit=edit)
+                if _audio_sem(want) != _audio_sem(take["audio"]):
+                    if take["audio"]["status"] == "approved":
+                        raise ApiError(409, "the take is approved and read-only; choose 'needs rework' first")
+                    take["audio"] = want
+            if "radio_effect" in body:
+                needed = (body["radio_effect"] or {}).get("needed")
+                if not isinstance(needed, bool):
+                    raise ApiError(400, "radio_effect.needed must be true or false")
+                cur = take["radio_effect"]
+                if needed != cur["needed"]:
+                    take["radio_effect"] = {"needed": needed, "set_at": today,
+                                            "revision": cur["revision"] + (1 if tid else 0)}
+            if "notes" in body:
+                notes = body["notes"] or ""
+                if len(notes) > 2000:
+                    raise ApiError(400, "notes are limited to 2000 characters")
+                take["notes"] = notes
+            if any(a.action == "approve" for a in user_actions):
+                if take["audio"]["status"] == "approved":
+                    raise ApiError(400, "the take is already approved")
+                take["audio"].update(status="approved", approved_at=today,
+                                     fingerprint=added_take_fingerprint(take, self.ce_idx, self.mcc_idx, local))
+        if not takes:
+            new_doc.pop("added_takes")  # never stored empty (schema: minItems 1)
+        if new_doc == doc:
+            message = "every recording is already a take of this sound" if skipped else "nothing changed"
+            return {"saved": False, "message": message, "sound": self.sound(tag, doc, local),
+                    **({"added": [], "skipped": skipped} if op == "add_many" else {})}
+        try:
+            check_transition(doc, new_doc, user_actions)
+        except ProtectedError as e:
+            raise ApiError(409, str(e))
+        findings, _ = validate_mappings(new_doc, load_schema(SCHEMA_NAME), ce=self.ce_idx, mcc=self.mcc_idx,
+                                        local=local, verifications=self._verifications(),
+                                        current_pins=self._current_pins(), file=MAPPINGS, only_mapping_ids=set(),
+                                        subtitle_keys=self._subtitle_keys())
+        mine_ids = {t["take_id"] for t in new_doc.get("added_takes", []) if t["mcc_tag"] == tag}
+        errors = [f for f in findings if f["severity"] == "error"
+                  and (f["code"] == "schema" or any(f"({t})" in f["where"] for t in mine_ids))]
+        if errors:
+            raise ApiError(422, "the take is not valid yet", [f"{f['code']}: {f['message']}" for f in errors])
+        try:
+            new_sha = save_mappings(self.root / MAPPINGS, new_doc, sha, user_actions=user_actions)
+        except (StaleError, ProtectedError) as e:
+            raise ApiError(409, str(e))
+        except StoreError as e:
+            raise ApiError(422, str(e))
+        self.validate_soon()
+        if op == "add_many":
+            return {"saved": True, "sha256": new_sha, "sound": self.sound(tag), "added": added, "skipped": skipped}
+        return {"saved": True, "sha256": new_sha, "sound": self.sound(tag),
+                "take_id": None if op == "remove" else take["take_id"]}
+
+    def _subtitle_keys(self):
+        """The SU/SP subtitle keys (computed once per reload; every sound's version reads them)."""
+        if getattr(self, "_sub_keys", None) is None or self._sub_keys[0] is not self.loc:
+            keys = set()
+            for t in ("SU", "SP"):
+                if self.loc.get(t) is not None:
+                    keys |= set(self.loc[t])
+            self._sub_keys = (self.loc, keys)
+        return self._sub_keys[1]
 
     # ------------------------------------------------------------------ level status
     def set_progress(self, body):
@@ -923,7 +1817,8 @@ class M4App:
                 raise ApiError(400, f"'{status}' needs an explicit owner confirmation")
             if status in READY_STATUSES:
                 mappings, _ = self._mappings()
-                prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings)
+                prog = level_progress([sid for r in self.levels[level] for sid in r["slot_ids"]], mappings,
+                                      slot_tags=_slot_tags(self.levels[level]))
                 if not prog["ready_for_build"]:
                     raise ApiError(409, f"{level} is not ready: {prog['slots'] - prog['decided']} slot(s) undecided, "
                                         f"{prog['slots'] - prog['audio_approved']} without approved audio")

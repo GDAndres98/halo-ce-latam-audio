@@ -12,6 +12,12 @@ export interface LevelProgress {
   radio_effect: number;
   different_but_fits: number;
   needs_recording: number;
+  /** Lines muted in game (Mute / No replacement): a subset of no_equivalent, never counted as matched. */
+  muted: number;
+  muted_approved: number;
+  /** Added takes of the level's sounds (docs/added-takes-design.md); never counted as lines or matches. */
+  added_takes?: number;
+  added_takes_approved?: number;
   ready_for_build: boolean;
 }
 
@@ -52,7 +58,11 @@ export interface Hashes {
 
 /** GET /api/session: the address this page came from and who is signed in (docs/remote-access.md). */
 export interface SessionInfo {
-  listener: "local" | "remote";
+  listener: "local" | "remote" | "public";
+  /** The public read-only view (docs/public-access.md): anonymous, no edits, no audio, no downloads. */
+  visitor?: boolean;
+  /** Where a visitor signs in to edit (the owner's Cloudflare Access protected address). */
+  sign_in_url?: string | null;
   auth_required: boolean;
   authenticated: boolean;
   user: string | null;
@@ -65,7 +75,11 @@ export interface SessionInfo {
   sso?: "cloudflare_access" | null;
   /** Where signing out goes in that mode (Cloudflare's own logout page). */
   logout_url?: string | null;
-  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean };
+  /** audio: play recordings, waveforms and editor previews; download: save them as files. Older servers send
+   * neither (then edit stands for both). */
+  permissions: { edit: boolean; admin: boolean; install: boolean; settings_mcc: boolean; audio?: boolean; download?: boolean;
+    /** The public view plays the published edited previews of approved lines (docs/public-access.md §2.1). */
+    previews?: boolean };
 }
 
 export interface NetworkInfo {
@@ -97,7 +111,24 @@ export interface ChangeEvent {
 
 export type MatchStatus = "unreviewed" | "matched" | "no_equivalent" | "deferred";
 export type CeLanguage = "Spanish(Mexico)" | "English(US)" | "Spanish(Spain)";
-export type AudioSource = "keep_original" | "ce";
+/** mute: the line is omitted from gameplay (silence of the original length). */
+export type AudioSource = "keep_original" | "ce" | "ce_concat" | "ce_mix" | "mute";
+/** Two Campaign Evolved recordings in one replacement (docs/combine-recordings.md). */
+export const COMBINED_SOURCES = ["ce_concat", "ce_mix"] as const;
+export type CombinedSource = (typeof COMBINED_SOURCES)[number];
+
+/** The recipe of a join (ce_concat: part 1 then part 2, each with its own edits, gap_s between them; negative =
+ * they overlap) or an overlay (ce_mix: both at once, the second starting offset_s later). radio / echo apply to
+ * the combined result. Rendered by scripts/common/audio_combine.py. */
+export interface CombineEdit {
+  engine?: "audio-combine/1";
+  mode: "concat" | "mix";
+  parts?: [AudioEdit, AudioEdit];
+  gap_s?: number;
+  offset_s?: number;
+  radio?: RadioFilter | null;
+  echo?: EchoEffect | null;
+}
 export type SubtitleSource = "keep_original" | "ce_locres" | "custom" | "none";
 export type ApprovalField = "audio" | "subtitle";
 export type ObjectStatus = "draft" | "approved" | "needs_rework";
@@ -211,6 +242,8 @@ export interface StoredDecision {
     source: AudioSource;
     sources: { kind: "ce"; ce_line_ref: string; language: CeLanguage }[];
     edit: AudioEdit;
+    /** Why the owner muted the line (only when source is "mute"). */
+    mute_reason?: string;
     approved_at: string | null;
     revision: number;
   };
@@ -230,6 +263,13 @@ export interface StoredDecision {
 }
 
 export interface SlotRow {
+  /** Added takes of this line's sound (all its takes share them). */
+  added_takes?: number;
+  /** The line's sound plays its own take set (this Spain take is removed in the build): its takes' state. */
+  own_set?: { takes: number; approved: number; needs_rework: number } | null;
+  /** The line's decision is archived in its sound's replacement-set record; its reminders are shown (radio_effect /
+   * needs_recording above come from it). */
+  archived_reminders?: boolean;
   slot_id: string;
   level: string;
   mcc_tag: string;
@@ -288,7 +328,15 @@ export interface MccSubtitle {
   table_loaded: boolean;
 }
 
+/** The public view only: whether this line's published edited preview can be played, and why not. */
+export interface PublicPreview {
+  available: boolean;
+  url: string | null;
+  reason: string | null;
+}
+
 export interface SlotDetail {
+  public_preview?: PublicPreview;
   slot_id: string;
   level: string;
   mcc_tag: string;
@@ -307,7 +355,203 @@ export interface SlotDetail {
   /** Lines with the one-off interference treatment, by CE line ref (only Victor 933's). */
   interference?: Record<string, InterferenceDefaults>;
   ce_missions: string[];
+  /** The line's sound: its Spain takes and its added takes. */
+  sound?: SoundTakes;
   sha256: Hashes;
+}
+
+/** One added take of a sound (manual_mappings.json added_takes). */
+export interface AddedTake {
+  take_id: string;
+  mcc_tag: string;
+  position: number;
+  audio: StoredDecision["audio"];
+  radio_effect: { needed: boolean; set_at: string | null; revision: number };
+  notes?: string;
+  /** Approved, but the recording or the sound's Spain takes changed since. */
+  drift: boolean;
+  edit_summary: string;
+  edited: boolean;
+  line: CeLine | null;
+  /** Created by a staged conversion: not built until the sound is switched to its replacement set. */
+  staged?: boolean;
+}
+
+/** How a sound is handled (docs/replacement-set-conversion.md). */
+export type SoundMode = "per_take" | "spain_plus_added" | "replacement_set" | "replacement_set_staged";
+
+/** The record a replacement set keeps of the decisions it replaced (own_sets[].provenance, summarised). */
+export interface SetConversion {
+  state: "staged" | "active";
+  /** conversion: made from the sound's line decisions; replace: the 4th audio option (new recordings). */
+  kind: "conversion" | "replace";
+  record_id: string;
+  created_at: string;
+  activated_at: string | null;
+  replaced_decisions: number;
+  takes: { take_id: string; origin: "created" | "existing"; from_mapping_ids: string[] }[];
+  acknowledged: string[];
+  decisions: { mapping_id: string; slot_id: string; audio: string; audio_source: string; audio_ref: string | null;
+               subtitle: string; notes: string }[];
+}
+
+export type IssueSeverity = "blocked" | "review" | "info";
+export interface ConversionIssue { code: string; severity: IssueSeverity; message: string; slot_id?: string; detail?: string }
+
+export interface BuildView {
+  spain: { slot_id: string; action: string; reason: string; ce_line_ref: string | null }[];
+  inserts?: { take_id: string; action: string; reason: string; ce_line_ref: string | null }[];
+  takes_in_game: number;
+  replaced?: number;
+  muted?: number;
+  spain_kept?: number;
+  dropped: number;
+  inserted: number;
+  note?: string;
+}
+
+export type ConversionStatus = "ready" | "review" | "blocked" | "ineligible" | "active" | "staged" | "nothing_to_convert";
+
+/** GET /api/takes/convert/preview: what converting one sound would do. Read-only. */
+export interface ConversionPreview {
+  mcc_tag: string;
+  level: string;
+  tag_name: string;
+  original_takes: number;
+  /** The sound's first Spain take (to open it in Matching). */
+  first_slot_id: string;
+  /** An own set on a sound with one Spain take (listed, counted apart from the multi-take sounds). */
+  single_take?: boolean;
+  /** How many takes the set has (proposed, staged or in force). */
+  replacement_takes?: number;
+  mode: SoundMode;
+  status: ConversionStatus;
+  eligible: boolean;
+  reason: string;
+  /** Names the exact inputs it was made from; staging refuses a stale one. */
+  token: string;
+  sound_version?: string;
+  summary: string;
+  review_codes?: string[];
+  issues: ConversionIssue[];
+  sources?: { slot_id: string; ordinal: number; spanish_index: number; duration_s: number; take: string | null;
+              codes: string[];
+              decision: { mapping_id: string; match: string; match_refs: string[]; audio: string; audio_source: string;
+                          audio_refs: string[]; edit_summary: string | null; subtitle: string; subtitle_source: string;
+                          radio_effect: boolean; different_but_fits: boolean; needs_recording: boolean;
+                          notes: string } | null }[];
+  existing_takes?: { take_id: string; position: number; status: string; ce_line_ref: string | null }[];
+  proposed?: { origin: "existing" | "new"; take_id: string | null; position: number; ce_line_ref: string;
+               language: string; edit_summary: string | null; status: string; radio_effect: boolean; notes: string;
+               from_mapping_ids: string[]; from_slots: string[] }[];
+  build_now?: BuildView;
+  build_staged?: BuildView;
+  build_after?: BuildView;
+  takes_total?: number;
+  takes_approved?: number;
+}
+
+export interface ConversionInventory {
+  sounds: ConversionPreview[];
+  counts: Record<string, number>;
+  sha256: string;
+}
+
+export interface ConversionResponse {
+  saved: boolean;
+  message?: string;
+  sha256?: string;
+  sound?: SoundTakes;
+  staged?: { mcc_tag: string; record_id: string; created: string[] }[];
+  already?: string[];
+  switched?: { mcc_tag: string; record_id: string; reworked: string[] }[];
+  restored?: string[];
+  renamed?: Record<string, string>;
+  reworked?: string[];
+  removed_takes?: string[];
+  kept_takes?: string[];
+  custom_text_changed?: string[];
+  record_id?: string;
+  /** approve_unchanged: the takes approved. revert: what came back. */
+  approved?: string[];
+  restore?: { mapping_id: string; slot_id: string; audio: string; subtitle: string }[];
+  local_restored?: string[];
+  notes?: string[];
+}
+
+/** A sound (tag) as the takes section shows it (GET /api/slot -> sound, and every takes request). */
+export interface SoundTakes {
+  mcc_tag: string;
+  level: string;
+  tag_name: string;
+  /** Owner rule 2026-10-17: only mono sounds without a subtitle entry may get added takes. */
+  allowed: boolean;
+  reason: string;
+  spain_takes: { slot_id: string; ordinal: number; duration_s: number; spanish_index: number;
+                 decision: { match: string; audio: string; subtitle: string; audio_source: string | null } | null;
+                 audio_ref: string | null; mapping_id: string | null }[];
+  added_takes: AddedTake[];
+  total_takes: number;
+  warn_above: number;
+  /** The version the next takes request must name (loaded_takes_sha256). */
+  version: string;
+  /** Every line decision, take and set of the sound: conversions and the 4th audio option name it. */
+  sound_version: string;
+  mode: SoundMode;
+  /** Own take set (docs/custom-take-set-design.md): when on, the sound plays only its added takes. Null while a
+   * conversion is only staged. */
+  own_set: { mcc_tag: string; set_at: string } | null;
+  /** The record of what the set replaced (a staged or active conversion, or the 4th option). */
+  conversion: SetConversion | null;
+  /** Reminders of the archived line decisions of a set in force (needs a new recording, needs radio effect, notes). */
+  reminders: { slot_id: string; mapping_id: string; needs_recording: boolean; radio_effect: boolean; notes: string }[];
+}
+
+/** GET /api/takes/convert/approvable: the staged takes "Approve unchanged converted takes" would approve. */
+export interface ApprovableTakes {
+  mcc_tag: string;
+  record_id: string;
+  sound_version: string;
+  included: ApprovableTake[];
+  excluded: (ApprovableTake & { reasons: string[] })[];
+}
+export interface ApprovableTake {
+  take_id: string;
+  ce_line_ref: string | null;
+  language: string | null;
+  edit_summary: string | null;
+  sources: { mapping_id: string; slot_id: string | null; audio: string | null; approved_at: string | null;
+             ce_line_ref: string | null }[];
+}
+
+/** GET /api/takes/convert/revert_preview: what Undo would do, and what stops it. */
+export interface RevertPreview {
+  mcc_tag: string;
+  record_id: string;
+  kind: "conversion" | "replace";
+  restore: { mapping_id: string; slot_id: string; audio: string; subtitle: string }[];
+  drifted: string[];
+  remove_takes: string[];
+  keep_takes: string[];
+  notes: string[];
+  local_restore: { custom_subtitles: Record<string, unknown>; user_recordings: Record<string, unknown> };
+  conflicts: { code: string; detail: string }[];
+  rework_drifted: boolean;
+  sound_version: string;
+  token: string;
+}
+
+export interface TakeResponse {
+  saved: boolean;
+  message?: string;
+  sound: SoundTakes;
+  take_id?: string | null;
+  /** own_set_on only: the decisions removed, and the approved ones marked Needs rework first. */
+  cleared?: string[];
+  reworked?: string[];
+  /** add_many only: the new take IDs and the recordings skipped (already a take, or listed twice). */
+  added?: string[];
+  skipped?: string[];
 }
 
 export interface CeLine {
@@ -351,6 +595,8 @@ export interface SaveBody {
     sources: { ce_line_ref: string; language: CeLanguage }[];
     /** Sent only when the recipe changed. Omitting it keeps the stored recipe. */
     edit?: AudioEdit;
+    /** Required when source is "mute". */
+    mute_reason?: string;
   };
   subtitle?: {
     source: SubtitleSource;
@@ -391,7 +637,9 @@ export interface ExportSettings {
 }
 
 /** What a build contains: the Spanish dialogue bank, the SU/SP subtitle tables, or all three. */
-export type BuildKind = "audio" | "subtitles" | "both";
+/** "experiment": a prepared test (e.g. the permutation experiment), installed and restored like a build but never
+ * started from the page and not made from the mappings. */
+export type BuildKind = "audio" | "subtitles" | "both" | "experiment";
 
 /** Counts of a subtitle plan (common/m6_build.subtitle_plan "summary"). */
 export interface SubtitleSummary {
@@ -494,7 +742,8 @@ export type BuildScope = "mission" | "levels" | "all_mapped";
 export interface BuildPreview {
   levels: string[];
   scope: string;
-  audio: { replace: number; keep_original: number; not_eligible: number; conflicts: number };
+  audio: { replace: number; keep_original: number; mute: number; insert?: number; insert_not_eligible?: number;
+           not_eligible: number; conflicts: number };
   subtitles: SubtitleSummary & { excluded_rows: ExcludedSubtitle[]; conflict_list: SubtitleConflict[] };
 }
 
@@ -537,6 +786,8 @@ export interface DeployStatus {
   game_running: string[];
   files: { install_rel: string; sha256: string | null; state: "original" | "build" | "unknown"; builds: string[] }[];
   active_builds: string[];
+  /** Builds with only some of their files installed (an interrupted install); Restore covers them too. */
+  partial_builds?: string[];
   mod_installed: boolean;
   /** What the Studio is set to now, and the level settings inside the installed audio build(s). */
   current_level?: { mode: LevelMode; global_gain_db: number };

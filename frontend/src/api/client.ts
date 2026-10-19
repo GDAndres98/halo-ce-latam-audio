@@ -1,4 +1,4 @@
-import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference } from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -140,6 +140,47 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Added takes of one sound: add / change / approve / rework (save), reorder (move), remove. Each request names
+   * the sound's version it was made from (409 when another computer changed the sound's takes). */
+  takeSave: (body: TakeSaveBody) => request<TakeResponse>("/api/takes/save", postJson(body)),
+  takeMove: (body: { mcc_tag: string; take_id: string; direction: -1 | 1; loaded_takes_sha256: string }) =>
+    request<TakeResponse>("/api/takes/move", postJson(body)),
+  takeRemove: (body: { mcc_tag: string; take_id: string; loaded_takes_sha256: string }) =>
+    request<TakeResponse>("/api/takes/remove", postJson(body)),
+  /** Adds several recordings as new draft takes in one save; recordings already a take are skipped. */
+  takeAddMany: (body: { mcc_tag: string; loaded_takes_sha256: string; audio_list: { ce_line_ref: string; language: string }[] }) =>
+    request<TakeResponse>("/api/takes/add_many", postJson(body)),
+  /** Turns a sound's own take set on (clearing the listed line decisions) or off. */
+  ownSetOn: (body: { mcc_tag: string; loaded_takes_sha256: string; loaded_sound_sha256: string;
+                     clear_mapping_ids: string[]; audio_list?: { ce_line_ref: string; language: string }[] }) =>
+    request<TakeResponse>("/api/takes/own_set_on", postJson(body)),
+  ownSetOff: (body: { mcc_tag: string; loaded_takes_sha256: string }) =>
+    request<TakeResponse>("/api/takes/own_set_off", postJson(body)),
+
+  /** Replacement sets (docs/replacement-set-conversion.md). Previews are read-only; every action names what the
+   * page showed (the preview token or the sound's version) and is refused when it changed. */
+  convertPreview: (mccTag: string) =>
+    request<ConversionPreview>(`/api/takes/convert/preview${query({ mcc_tag: mccTag })}`),
+  convertInventory: (level: string) =>
+    request<ConversionInventory>(`/api/takes/convert/inventory${query({ level })}`),
+  convertStage: (body: { items: { mcc_tag: string; token: string; acknowledged?: string[] }[]; bulk?: boolean;
+                         confirm: true }) =>
+    request<ConversionResponse>("/api/takes/convert/stage", postJson(body)),
+  convertActivate: (body: { items: { mcc_tag: string; loaded_sound_sha256: string }[]; confirm: true }) =>
+    request<ConversionResponse>("/api/takes/convert/activate", postJson(body)),
+  convertCancel: (body: { mcc_tag: string; loaded_sound_sha256: string }) =>
+    request<ConversionResponse>("/api/takes/convert/cancel", postJson(body)),
+  convertApprovable: (mccTag: string) =>
+    request<ApprovableTakes>(`/api/takes/convert/approvable${query({ mcc_tag: mccTag })}`),
+  /** The owner's explicit approval of exactly the takes listed as unchanged (nothing is approved if the list moved). */
+  convertApproveUnchanged: (body: { mcc_tag: string; loaded_sound_sha256: string; take_ids: string[]; confirm: true }) =>
+    request<ConversionResponse>("/api/takes/convert/approve_unchanged", postJson(body)),
+  convertRevertPreview: (mccTag: string, reworkDrifted = false) =>
+    request<RevertPreview>(`/api/takes/convert/revert_preview${query({ mcc_tag: mccTag, rework_drifted: reworkDrifted ? "1" : undefined })}`),
+  /** Undo exactly as previewed (token); refused while a conflict remains or if anything changed. */
+  convertRevert: (body: { mcc_tag: string; token: string; rework_drifted?: boolean; confirm: true }) =>
+    request<ConversionResponse>("/api/takes/convert/revert", postJson(body)),
+
   exportSettings: () => request<ExportSettings>("/api/settings/export"),
 
   /** Saves the global gain and/or the level mode (null keeps the saved value). `loadedSha256` must be the hash
@@ -182,6 +223,15 @@ export const api = {
     request<InterferenceReference>(`/api/interference/reference${query({ slot, lang })}`),
 
   /** Renders an edit as M6 would, for listening only. Writes nothing to the mappings. */
+  /** A join or an overlay of two recordings, rendered as the build would (never saved). */
+  editPreviewCombined: (body: { slot_id: string; source: string; sources: { ce_line_ref: string; language: string }[];
+                                edit: CombineEdit }, signal?: AbortSignal) =>
+    request<EditPreviewResponse>("/api/edit/preview_combined", {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   editPreview: (body: { slot_id: string; ce_line_ref: string; language: string; edit: AudioEdit }, signal?: AbortSignal) =>
     request<EditPreviewResponse>("/api/edit/preview", {
       method: "POST",
@@ -192,6 +242,14 @@ export const api = {
 };
 
 /** Audio is streamed by the API; these are the URLs the players use (same ones as the classic page). */
+export interface TakeSaveBody {
+  mcc_tag: string;
+  loaded_takes_sha256: string;
+  take_id?: string;
+  audio?: { ce_line_ref: string; language: string };
+  actions?: { action: "approve" | "needs_rework"; field: "audio" }[];
+}
+
 export const audioUrl = {
   mcc: (level: string, lang: "spanish" | "english", index: number) =>
     `/audio/mcc${query({ level, lang, index })}`,

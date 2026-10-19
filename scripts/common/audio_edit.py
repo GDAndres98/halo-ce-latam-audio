@@ -141,10 +141,16 @@ class EditError(ValueError):
 
 
 # --------------------------------------------------------------------------- recipe rules
+COMBINE_ENGINE = "audio-combine/1"  # two recordings in one replacement (common/audio_combine.py)
+
+
 def is_identity(edit):
-    """True when the recipe changes nothing (gap_s only matters between concatenated lines).
+    """True when the recipe changes nothing (gap_s only matters between concatenated lines). A combine recipe
+    (two recordings, common/audio_combine.py) is never the identity: it always needs its own render.
     Removed fields (speed, gain_db) are ignored here; `removed_fields` reports them."""
     e = edit or {}
+    if e.get("engine") == COMBINE_ENGINE:
+        return False
     return (not e.get("trim_start_s") and not e.get("trim_end_s") and not e.get("cuts") and not e.get("silences")
             and not e.get("fade_in_ms") and not e.get("fade_out_ms") and not e.get("radio") and not e.get("echo")
             and not e.get("interference"))
@@ -364,8 +370,12 @@ def normalize(edit, for_source=None):
 
 
 def problems(edit, duration_s=None):
-    """Rule violations of a stored recipe (empty = fine). With duration_s, also checks the timeline."""
+    """Rule violations of a stored recipe (empty = fine). With duration_s, also checks the timeline.
+    A combine recipe is checked by common/audio_combine.problems (duration_s is not used for it)."""
     e = edit or {}
+    if e.get("engine") == COMBINE_ENGINE:
+        from . import audio_combine
+        return audio_combine.problems(e)
     out = [f"{k} is no longer supported (removed 2026-10-09); run scripts/validate/migrate_reset_speed_gain.py"
            for k in removed_fields(e)]
     if is_identity(e):
@@ -419,6 +429,9 @@ def problems(edit, duration_s=None):
 
 def summary(edit):
     """Short human description, e.g. 'trim 0.12/0.30 s · 1 cut (0.25 s) · fades 10/10 ms'."""
+    if (edit or {}).get("engine") == COMBINE_ENGINE:
+        from . import audio_combine
+        return audio_combine.summary(edit)
     if is_identity(edit):
         return "no edits"
     e, bits = edit, []
@@ -816,39 +829,33 @@ def match_spain(y, measured_lufs, ref_lufs, ceiling_db=PEAK_CEILING_DB, max_limi
                "limiter_fraction": frac}
 
 
-def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE, clicks=None,
-           static=None):
-    """44.1 kHz mono 16-bit PCM + recipe + level (build-level mode) -> {"pcm": bytes, "stats": {...}}.
-    Deterministic. ref_lufs: loudness of the original MCC recording (the target in match_spain mode,
-    reported only in global_gain mode). In global_gain mode an identity recipe with no global gain returns
-    the input unchanged. clicks: the MCC radio clicks (common/radio_clicks.from_wav), needed only when the
-    recipe's radio filter has clicks on."""
-    if level_mode not in LEVEL_MODES:
-        raise EditError(f"unknown level mode {level_mode!r}")
-    x = pcm16_to_float(pcm)
+def edit_stage(x, edit, fs=SAMPLE_RATE):
+    """Stage 1 on float samples: trims, cuts (crossfaded), fades, inserted silences.
+    -> (samples, kept segments [(a, b)], inserted silence samples). An identity recipe returns x unchanged."""
     n = len(x)
-    bad = problems(edit, n / fs)
-    if bad:
-        raise EditError("; ".join(bad))
-    identity = is_identity(edit)
-    warnings, segs, inserted = [], [(0, n)], 0
-    interference = None
-    if edit.get("interference"):  # 0. transmission interference, on the source timeline (before trims and cuts)
-        x, interference = interference_effect(x, edit["interference"], static, fs)
-    y = x
-    if not identity:  # 1. trims, cuts, fades, inserted silences
-        segs = kept_segments(n, edit, fs)
-        y = splice(x, segs, int(round(edit["crossfade_ms"] * fs / 1000)))
-        y = fade(y, int(round(edit["fade_in_ms"] * fs / 1000)), int(round(edit["fade_out_ms"] * fs / 1000)))
-        if edit.get("silences"):
-            pts = [(spliced_position(c["at_s"], edit, fs), int(round(c["dur_s"] * fs))) for c in edit["silences"]]
-            inserted = sum(k for _, k in pts)
-            y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
+    if is_identity(edit):
+        return x, [(0, n)], 0
+    segs = kept_segments(n, edit, fs)
+    y = splice(x, segs, int(round(edit["crossfade_ms"] * fs / 1000)))
+    y = fade(y, int(round(edit["fade_in_ms"] * fs / 1000)), int(round(edit["fade_out_ms"] * fs / 1000)))
+    inserted = 0
+    if edit.get("silences"):
+        pts = [(spliced_position(c["at_s"], edit, fs), int(round(c["dur_s"] * fs))) for c in edit["silences"]]
+        inserted = sum(k for _, k in pts)
+        y = insert_silences(list(y), pts, int(round(edit["crossfade_ms"] / 2 * fs / 1000)))
+    return y, segs, inserted
+
+
+def finish(y, effects, *, warnings, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE,
+           clicks=None):
+    """Stages 1b to 3 on edited float samples: the radio filter and echo of `effects` (a recipe; only its radio /
+    echo are read), the level (global gain or match Spain), the radio clicks, 16-bit. Appends to `warnings`.
+    -> (pcm bytes, {edited, measured, method, match, used_mode, g_applied, g_short, radio, echo, final})."""
     radio = echo = None
-    if edit.get("radio"):  # 1b. radio filter
-        y, radio = radio_filter(y, edit["radio"], fs)
-    if edit.get("echo"):  # 1c. echo
-        y, echo = echo_effect(y, edit["echo"], fs)
+    if effects.get("radio"):  # 1b. radio filter
+        y, radio = radio_filter(y, effects["radio"], fs)
+    if effects.get("echo"):  # 1c. echo
+        y, echo = echo_effect(y, effects["echo"], fs)
     if radio or echo:
         pk = peak_db(y)
         trim = 0.0
@@ -880,7 +887,7 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
         if g_short > 0:
             warnings.append(f"global gain: only {g_applied:+.1f} of {global_gain_db:+.1f} dB applied "
                             f"({g_short:.1f} dB short: the peak would pass {PEAK_CEILING_DB:g} dBFS)")
-    if radio and edit["radio"].get("clicks"):  # 2b. MCC key-up / key-down clicks, at their game level
+    if radio and effects["radio"].get("clicks"):  # 2b. MCC key-up / key-down clicks, at their game level
         if not clicks:
             raise EditError("the radio clicks need MCC's Spain reference recording (common/radio_clicks.py); "
                             "it could not be decoded")
@@ -888,19 +895,54 @@ def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_g
         radio["clicks"] = {"in_s": round(len(clicks["in"]) / fs, 3), "out_s": round(len(clicks["out"]) / fs, 3),
                            "sha256": clicks["sha256"], "reference": clicks["reference"]["slot_id"]}
     out = float_to_pcm16(z)  # 3. 16-bit
-    final = pcm16_to_float(out)
+    return out, {"edited": edited, "measured": measured, "method": method, "match": match, "used_mode": used_mode,
+                 "g_applied": g_applied, "g_short": g_short, "radio": radio, "echo": echo,
+                 "final": pcm16_to_float(out)}
+
+
+def level_stats(f, *, ref_lufs, global_gain_db, level_mode, fs=SAMPLE_RATE):
+    """The level / output part of the render stats, from finish()'s result (same keys and order as always)."""
+    final, match, used_mode = f["final"], f["match"], f["used_mode"]
+    return {"loudness_method": f["method"], "loudness_before_gain_lufs": _rnd(f["measured"]),
+            "mcc_reference_lufs": _rnd(ref_lufs),
+            "level_mode": level_mode, "level_mode_used": used_mode,
+            "global_gain_requested_db": global_gain_db if used_mode == "global_gain" else 0.0,
+            "global_gain_applied_db": f["g_applied"], "global_gain_shortfall_db": f["g_short"],
+            "match": match, "radio": f["radio"], "echo": f["echo"]}
+
+
+def render(pcm, edit, *, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", fs=SAMPLE_RATE, clicks=None,
+           static=None):
+    """44.1 kHz mono 16-bit PCM + recipe + level (build-level mode) -> {"pcm": bytes, "stats": {...}}.
+    Deterministic. ref_lufs: loudness of the original MCC recording (the target in match_spain mode,
+    reported only in global_gain mode). In global_gain mode an identity recipe with no global gain returns
+    the input unchanged. clicks: the MCC radio clicks (common/radio_clicks.from_wav), needed only when the
+    recipe's radio filter has clicks on."""
+    if level_mode not in LEVEL_MODES:
+        raise EditError(f"unknown level mode {level_mode!r}")
+    x = pcm16_to_float(pcm)
+    n = len(x)
+    bad = problems(edit, n / fs)
+    if bad:
+        raise EditError("; ".join(bad))
+    identity = is_identity(edit)
+    warnings = []
+    interference = None
+    if edit.get("interference"):  # 0. transmission interference, on the source timeline (before trims and cuts)
+        x, interference = interference_effect(x, edit["interference"], static, fs)
+    y, segs, inserted = edit_stage(x, edit, fs)  # 1. trims, cuts, fades, inserted silences
+    out, f = finish(y, edit, warnings=warnings, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                    level_mode=level_mode, fs=fs, clicks=clicks)
+    final, match = f["final"], f["match"]
     stats = {"engine": RENDER_ENGINE, "recipe_format": ENGINE, "identity": identity,
              "source_samples": n, "source_s": round(n / fs, 3),
              "kept_segments_s": [[round(a / fs, 3), round(b / fs, 3)] for a, b in segs],
-             "edited_samples": edited, "edited_s": round(edited / fs, 3), "inserted_silence_s": round(inserted / fs, 3),
+             "edited_samples": f["edited"], "edited_s": round(f["edited"] / fs, 3),
+             "inserted_silence_s": round(inserted / fs, 3),
              "output_samples": len(final), "output_s": round(len(final) / fs, 3),
-             "loudness_method": method, "loudness_before_gain_lufs": _rnd(measured),
-             "mcc_reference_lufs": _rnd(ref_lufs),
-             "level_mode": level_mode, "level_mode_used": used_mode,
-             "global_gain_requested_db": global_gain_db if used_mode == "global_gain" else 0.0,
-             "global_gain_applied_db": g_applied, "global_gain_shortfall_db": g_short,
-             "match": match, "radio": radio, "echo": echo, "interference": interference,
-             "total_gain_db": match["applied_db"] if match else g_applied,
+             **level_stats(f, ref_lufs=ref_lufs, global_gain_db=global_gain_db, level_mode=level_mode),
+             "interference": interference,
+             "total_gain_db": match["applied_db"] if match else f["g_applied"],
              "output_lufs": _rnd(loudness(final, fs)[0]), "output_peak_dbfs": _rnd(peak_db(final)),
              "warnings": warnings}
     return {"pcm": out, "stats": stats}

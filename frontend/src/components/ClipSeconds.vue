@@ -5,6 +5,7 @@
 
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { clipDuration } from "../audio/clipInfo";
+import { canListen } from "../auth/session";
 
 const props = defineProps<{ url: string; known?: number | null; disabled?: boolean }>();
 
@@ -13,13 +14,13 @@ const el = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
 async function measure() {
-  if (seconds.value !== null || props.disabled) return;
+  if (seconds.value !== null || props.disabled || !canListen.value) return;
   seconds.value = await clipDuration(props.url);
 }
 
 function observe() {
   observer?.disconnect();
-  if (seconds.value !== null || props.disabled || !el.value) return;
+  if (seconds.value !== null || props.disabled || !canListen.value || !el.value) return;
   observer = new IntersectionObserver((entries) => {
     if (entries.some((e) => e.isIntersecting)) {
       observer?.disconnect();
@@ -42,6 +43,6 @@ onBeforeUnmount(() => observer?.disconnect());
 
 <template>
   <span ref="el" class="mono small clip-seconds" data-testid="clip-seconds">{{
-    disabled ? "—" : seconds === null ? "… s" : `${seconds.toFixed(2)} s`
+    disabled ? "—" : seconds === null ? (canListen ? "… s" : "") : `${seconds.toFixed(2)} s`
   }}</span>
 </template>

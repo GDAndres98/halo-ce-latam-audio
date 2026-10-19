@@ -7,6 +7,7 @@ import { ChevronRight, ListMusic } from "lucide-vue-next";
 import { computed } from "vue";
 import type { MatchState } from "../../composables/useMatch";
 import type { Pane } from "../../layout/layoutMode";
+import { canListen, readOnly } from "../../auth/session";
 import { markFor } from "../../matching/status";
 import AudioButton from "../AudioButton.vue";
 
@@ -22,6 +23,9 @@ const SECTIONS: { id: string; label: string }[] = [
   { id: "save", label: "Save" },
 ];
 
+const sections = computed(() =>
+  SECTIONS.filter((s) => (s.id !== "compare" || canListen.value) && (s.id !== "save" || !readOnly.value)),
+);
 const detail = computed(() => props.match.detail.value);
 /** The key is shown at once from the URL, even while the line loads. */
 const key = computed(() => props.slotId ?? "");
@@ -52,7 +56,7 @@ const marks = computed(() => {
         <span v-else class="small muted">loading…</span>
       </div>
       <nav v-if="pane === 'match' && loaded" class="section-chips" aria-label="Sections of the decision">
-        <button v-for="s in SECTIONS" :key="s.id" type="button" class="chip" @click="emit('jump', s.id)">{{ s.label }}</button>
+        <button v-for="s in sections" :key="s.id" type="button" class="chip" @click="emit('jump', s.id)">{{ s.label }}</button>
       </nav>
     </template>
     <div v-else class="context-line">

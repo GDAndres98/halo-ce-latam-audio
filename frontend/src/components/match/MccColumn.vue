@@ -3,7 +3,7 @@
 // Filters and the search live in the URL (through the parent's v-model), so a reload keeps the list.
 // Changing a filter never changes the selected line: the line stays open even when it is filtered out.
 
-import { ChevronsDown, ListMusic } from "lucide-vue-next";
+import { ChevronsDown, Layers, ListMusic, VolumeX } from "lucide-vue-next";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import { onChange, onReconnect } from "../../live/changes";
@@ -37,6 +37,8 @@ const STATUS_OPTIONS: [string, string][] = [
   ["approved", "Approved (both)"],
   ["needs_rework", "Needs rework"],
   ["keep_original", "Keep Spain audio"],
+  ["muted", "Muted in game"],
+  ["takes", "Has added takes"],
   ["radio", FLAGS.radio.label],
   ["recording", FLAGS.recording.label],
   ["fits", FLAGS.fits.label],
@@ -103,7 +105,7 @@ function updateRow(row: SlotRow, progress?: LevelProgress) {
   if (progress && row.level === data.value.level) data.value.progress = progress;
 }
 
-const unmatched = (r: SlotRow) => !r.decision || r.decision.match === "unreviewed";
+const unmatched = (r: SlotRow) => !r.own_set && (!r.decision || r.decision.match === "unreviewed");
 
 /** The next line after the selected one (wrapping) that has no match decision yet, among the listed lines. */
 function nextUnmatched(): string | null {
@@ -128,6 +130,12 @@ const matchTone = (state: string) => (state === "matched" ? "ok" : state === "no
 /** A line with no saved decision is listed as undecided (the server sends no summary for it). */
 const UNDECIDED = { match: "unreviewed", audio: "draft", subtitle: "draft" };
 function decisionOf(row: SlotRow) {
+  const own = row.own_set;
+  if (own) {
+    // Every take of the sound is replaced: the line shows the sound's takes (its own decision no longer exists).
+    const audio = own.takes && own.approved === own.takes ? "approved" : own.needs_rework ? "needs_rework" : "draft";
+    return { match: "matched", audio, subtitle: "no_subtitle_entry" };
+  }
   return row.decision ?? UNDECIDED;
 }
 
@@ -148,6 +156,15 @@ function toggleFlagFilter(name: FlagName) {
 
 function mccAudio(row: SlotRow) {
   return audioUrl.mcc(row.level, "spanish", row.spanish_index);
+}
+
+/** Where a row sits in a run of rows of the same sound (several Spain takes): drawn as a bracket. */
+function groupOf(index: number): "" | "grp-first" | "grp-mid" | "grp-last" {
+  const rows = data.value?.slots ?? [];
+  const tag = rows[index]?.mcc_tag;
+  const prev = rows[index - 1]?.mcc_tag === tag;
+  const next = rows[index + 1]?.mcc_tag === tag;
+  return prev && next ? "grp-mid" : next ? "grp-first" : prev ? "grp-last" : "";
 }
 
 /** The line's name as the classic page shows it: the tag, and "#n" when the tag has several takes. */
@@ -201,7 +218,8 @@ function rowLabel(row: SlotRow) {
     <p v-if="data?.progress" class="progress small">
       Decided {{ data.progress.decided }} / {{ data.progress.slots }} ·
       audio approved {{ data.progress.audio_approved }} ·
-      subtitles approved {{ data.progress.subtitle_approved }}
+      subtitles approved {{ data.progress.subtitle_approved }}<template v-if="data.progress.muted"> ·
+      muted {{ data.progress.muted }}</template>
       <StatusBadge v-if="data.progress.ready_for_build" label="ready to build" tone="ok" />
     </p>
     <StateMessage v-if="error" kind="error">{{ error }}</StateMessage>
@@ -212,17 +230,25 @@ function rowLabel(row: SlotRow) {
 
     <ul v-if="data" class="rows" role="listbox" aria-label="MCC dialogue lines">
       <li
-        v-for="row in data.slots"
+        v-for="(row, i) in data.slots"
         :id="`mcc-${row.slot_id}`"
         :key="row.slot_id"
         class="row-item"
-        :class="{ selected: row.slot_id === selectedId }"
+        :class="[{ selected: row.slot_id === selectedId }, groupOf(i)]"
         role="option"
         :aria-selected="row.slot_id === selectedId"
         @click="emit('select', row.slot_id)"
       >
         <div class="line-head">
           <strong class="tag">{{ rowLabel(row) }}</strong>
+          <span
+            v-if="row.permutations > 1"
+            class="pill take-of"
+            :title="`One sound with ${row.permutations} Spain takes; the game picks one at random each time`"
+            data-testid="take-of"
+          >Spain take {{ row.ordinal + 1 }}/{{ row.permutations }}</span>
+          <span v-if="row.own_set" class="pill take-of" title="The sound plays its own take set; this Spain take is removed"
+                data-testid="own-set-pill">own set {{ row.own_set.approved }}/{{ row.own_set.takes }}</span>
           <span class="muted small">{{ row.speaker_from_name || "—" }} · {{ row.duration_s.toFixed(2) }} s</span>
           <span class="play-group">
             <AudioButton :url="mccAudio(row)" label="ES" title="Spain Spanish recording" @click.stop />
@@ -243,6 +269,20 @@ function rowLabel(row: SlotRow) {
                 :aria-label="`audio: ${markFor(decisionOf(row).audio).word}`">A{{ markFor(decisionOf(row).audio).glyph }}</span>
           <span class="pill" :class="markFor(decisionOf(row).subtitle).tone" :title="`subtitle: ${markFor(decisionOf(row).subtitle).word}`"
                 :aria-label="`subtitle: ${markFor(decisionOf(row).subtitle).word}`">S{{ markFor(decisionOf(row).subtitle).glyph }}</span>
+          <span
+            v-if="row.decision?.audio_source === 'mute'"
+            class="pill muted-pill"
+            title="Muted in game (no replacement)"
+            aria-label="Muted in game"
+            data-testid="muted-pill"
+          ><VolumeX :size="12" aria-hidden="true" /> muted</span>
+          <span
+            v-if="row.added_takes"
+            class="pill takes-pill"
+            :title="`${row.added_takes} added take(s) for this sound`"
+            :aria-label="`${row.added_takes} added takes`"
+            data-testid="takes-pill"
+          ><Layers :size="12" aria-hidden="true" /> +{{ row.added_takes }}</span>
           <span
             v-for="flag in rowFlags(row)"
             :key="flag.name"

@@ -50,6 +50,41 @@ class EditPreview:
             raise ValueError("bad preview key or kind")
         return self.dir / key / f"{kind}.wav"
 
+    def render_combined(self, src_wavs, edit, ref_lufs, global_gain_db, level_mode="global_gain", clicks=None):
+        """Like render(), for a join or an overlay of two recordings (common/audio_combine)."""
+        from . import audio_combine
+        with self._lock:
+            pcms = [self._source(w) for w in src_wavs]
+            key = hashlib.sha256(json.dumps({"engine": audio_combine.RENDER_ENGINE,
+                                             "pcm": [hashlib.sha256(p).hexdigest() for p in pcms], "edit": edit,
+                                             "ref": ref_lufs, "global_gain_db": global_gain_db,
+                                             "level_mode": level_mode, "clicks": clicks["sha256"] if clicks else None},
+                                            sort_keys=True).encode()).hexdigest()[:24]
+            out = self.dir / key
+            if (out / "stats.json").is_file():
+                return {"key": key, "stats": json.loads((out / "stats.json").read_text(encoding="utf-8"))}
+            r = audio_combine.render(pcms, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                                     level_mode=level_mode, clicks=clicks)
+            return self._store(out, key, r)
+
+    def _store(self, out, key, r):
+        edited, stats = r["pcm"], r["stats"]
+        if self._celt is None:
+            self._celt = self._celt_factory()
+        encoded, enc = codec_roundtrip(self._celt, edited)
+        stats["encoded_sample_count"] = enc["sample_count"]
+        stats["encoded_s"] = round(enc["sample_count"] / audio_edit.SAMPLE_RATE, 3)
+        tmp = out.with_name(out.name + ".tmp")
+        tmp.mkdir(parents=True, exist_ok=True)
+        audio_edit.write_wav(tmp / "edited.wav", edited)
+        audio_edit.write_wav(tmp / "encoded.wav", encoded)
+        (tmp / "stats.json").write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
+        try:
+            os.replace(tmp, out)
+        except OSError:  # another render of the same key won the race
+            pass
+        return {"key": key, "stats": stats}
+
     def render(self, src_wav, edit, ref_lufs, global_gain_db, level_mode="global_gain", clicks=None, static=None):
         """-> {"key", "stats"}; writes edited.wav / encoded.wav. Raises audio_edit.EditError.
         Same processing as M6 for every line: recipe, then the build-level level mode (global export gain,

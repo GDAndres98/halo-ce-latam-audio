@@ -217,6 +217,21 @@ class DeployTests(unittest.TestCase):
             time.sleep(0.01)
         self.fail("job did not finish")
 
+    def test_builds_sharing_a_file_count_as_installed_only_when_all_their_files_match(self):
+        bank_rel, su_rel, sp_rel = list(self.files)
+        # two experiments with the same index candidate (here SU stands in for the .lst.bin), different banks
+        write_build(self.root, "exp4", "x", kind="experiment",
+                    install_files=[self.install_file(bank_rel, b"bank 4"), self.install_file(su_rel, b"index")])
+        write_build(self.root, "exp6", "x", kind="experiment",
+                    install_files=[self.install_file(bank_rel, b"bank 6"), self.install_file(su_rel, b"index")])
+        (self.game / bank_rel).write_bytes(b"bank 6")
+        (self.game / su_rel).write_bytes(b"index")
+        s = self.board.deploy_status()
+        self.assertEqual((s["active_builds"], s["partial_builds"]), (["exp6"], []))
+        (self.game / bank_rel).write_bytes(b"bank")  # an interrupted install: only the index is in place
+        s = self.board.deploy_status()
+        self.assertEqual((s["active_builds"], s["partial_builds"]), ([], ["exp4", "exp6"]))  # both restore it
+
     def test_restore_without_a_name_restores_every_installed_build(self):
         bank_rel, su_rel, sp_rel = list(self.files)
         write_build(self.root, "audio1", "x", kind="audio", install_files=[self.install_file(bank_rel, b"new bank")])

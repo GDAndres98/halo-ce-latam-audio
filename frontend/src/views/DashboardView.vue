@@ -147,6 +147,8 @@ async function onListKey(event: KeyboardEvent) {
           <dl class="texts figures">
             <dt>Matched</dt><dd>{{ current.progress.matched }}</dd>
             <dt>No equivalent</dt><dd>{{ current.progress.no_equivalent }}</dd>
+            <dt>Added takes</dt><dd data-testid="takes-count">{{ current.progress.added_takes ?? 0 }} ({{ current.progress.added_takes_approved ?? 0 }} approved)</dd>
+            <dt>Muted in game</dt><dd data-testid="muted-count">{{ current.progress.muted ?? 0 }} ({{ current.progress.muted_approved ?? 0 }} approved)</dd>
             <dt>Deferred</dt><dd>{{ current.progress.deferred }}</dd>
             <dt>Needs rework</dt><dd :class="{ bad: current.progress.needs_rework > 0 }">{{ current.progress.needs_rework }}</dd>
             <dt class="flag-term"><component :is="FLAGS.radio.icon" :size="14" aria-hidden="true" /> {{ FLAGS.radio.label }}</dt>

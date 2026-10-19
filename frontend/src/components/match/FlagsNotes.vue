@@ -6,21 +6,22 @@ import { Flag } from "lucide-vue-next";
 import type { Draft } from "../../matching/draft";
 import { FLAGS, FLAG_ORDER } from "./flags";
 
-defineProps<{ draft: Draft }>();
+// readOnly: the public read-only view: the flags are shown but cannot change; notes are not public.
+defineProps<{ draft: Draft; readOnly?: boolean }>();
 </script>
 
 <template>
   <section class="block" aria-label="Flags and notes" data-section="flags">
     <h3><Flag :size="15" aria-hidden="true" /> Flags &amp; notes</h3>
-    <div class="flag-list">
+    <fieldset class="flag-list" :disabled="readOnly">
       <label v-for="name in FLAG_ORDER" :key="name" class="opt" :title="FLAGS[name].hint" :data-testid="`flag-${name}`">
         <input v-model="draft[name]" type="checkbox" />
         <component :is="FLAGS[name].icon" :size="16" :class="`flag-${name}`" aria-hidden="true" />
         {{ FLAGS[name].label }}
       </label>
-    </div>
+    </fieldset>
     <p class="small muted">{{ FLAGS.radio.hint }}</p>
-    <label class="block-label">Notes
+    <label v-if="!readOnly" class="block-label">Notes
       <textarea v-model="draft.notes" rows="2" maxlength="2000"></textarea>
     </label>
   </section>

@@ -8,7 +8,12 @@ game files. `--kind` chooses what is built for the selected level(s):
              (common/m6_build.plan_audio) through the validated pipeline (common/audio_pipeline: CE WAV ->
              ffmpeg 44.1 kHz -> [owner's edit recipe, the same render the M4 editor previews] -> global gain
              -> pad codec delay -> CELT 0.11 "fmod" profile), assembled into ONE new bank from
-             reference-audio/stage1/. Untouched samples stay byte-identical; .lst.bin is never written.
+             reference-audio/stage1/. Approved muted lines become digital silence of their original length.
+             Untouched samples stay byte-identical. Approved added takes (docs/added-takes-design.md) are
+             inserted after their sound's Spain takes; only then the Spanish .lst.bin is written too, and the
+             bank and the index are installed and restored together. Without added takes .lst.bin is never
+             written. A sound in own-take-set mode (docs/custom-take-set-design.md) with at least one take
+             to insert loses its Spain samples: it holds only its inserted takes.
   subtitles  SU_Halo1.bin and SP_Halo1.bin from the approved subtitle decisions (common/m6_build.subtitle_plan:
              CE es-MX/EN text, custom text, or an approved empty entry; drafts, needs-rework, drift, conflicts
              and lines without a key are excluded and reported), written by common/mcc_loc_writer (variable
@@ -50,15 +55,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ui"))
 from common import mapping_store  # noqa: E402
 from common import audio_edit, interference, radio_clicks, radio_static  # noqa: E402
-from common.audio_pipeline import derive, derive_processed, needs_processing, sha256_file, snr_db  # noqa: E402
+from common.audio_pipeline import (  # noqa: E402
+    derive, derive_combined, derive_processed, needs_processing, sha256_file, silent_stream, snr_db)
 from common.export_config import LEVEL_MODES, ConfigError, load_export_config  # noqa: E402
 from common.celt011 import DEFAULT_DLL, Celt011  # noqa: E402
 from common.env import REPO_ROOT  # noqa: E402
 from common.fsb5_lib import parse_header  # noqa: E402
+from common.fsb5_writer import decompose  # noqa: E402
 from common.m6_build import (  # noqa: E402
     BUILD_KINDS, FOLDER_GROUPS, SUBTITLE_COPY, SUBTITLE_INSTALL, SUBTITLE_PINS, SUBTITLE_TABLES, assemble, build_tables,
-    compare_plans, compare_subtitle_plans, entry_group, folder_summary, mission_folders, multi_structural_checks,
-    plan_audio, subtitle_plan)
+    compare_inserts, compare_plans, compare_subtitle_plans, entry_group, folder_summary, insert_checks, insert_takes,
+    mission_folders, multi_structural_checks, own_set_drops, plan_audio, plan_inserts, subtitle_plan)
 from common.mcc_loc import parse_mcc_loc  # noqa: E402
 from common.mcc_loc_writer import WRITER, TableError, charset  # noqa: E402
 from common.ondemand_audio import CeAudio, MccAudio, ce_source_reader, vgmstream_decoder  # noqa: E402
@@ -68,6 +75,7 @@ from m4_app import M4App  # noqa: E402
 BANK = REPO_ROOT / "reference-audio" / "stage1" / "fsb" / "sounds_dialogs_spanish.fsb"
 LST = REPO_ROOT / "reference-audio" / "stage1" / "lst" / "sounds_dialogs_spanish.lst.bin"
 INSTALL_BANK = "halo1/sound/pc/sounds_dialogs_spanish.fsb"
+INSTALL_LST = "halo1/sound/pc/lst/sounds_dialogs_spanish.lst.bin"
 DERIVED = REPO_ROOT / "work" / "derived"
 MIN_SNR_DB = 30.0
 MANIFEST_SCHEMA = "m6-build-manifest/1"
@@ -176,31 +184,74 @@ def level_summary(cfg, slots):
             "loudness_vs_spain_db": dist([round(v, 2) for v in vs])}
 
 
-def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None, static=None):
+def mute_checks(exe, cand_path, e, res, idx=None):
+    """vgmstream decode of one muted sample: digital silence, the original's length, Custom CELT.
+    idx: its index in the candidate (default: unchanged, i.e. no inserted takes before it)."""
+    idx = e["spanish_index"] if idx is None else idx
+    wav = decode_pcm(exe, cand_path, idx + 1)
+    if wav is None:
+        return {"vgm_target_decodes": False}
+    pcm = wav[wav.index(b"data") + 8:]
+    m = meta(exe, cand_path, idx + 1)
+    return {"vgm_target_decodes": True, "vgm_equals_own_decode": pcm == res["decoded"][:len(pcm)],
+            "decodes_to_digital_silence": not pcm.strip(b"\0"),
+            "sample_count_equals_original": res["sample_count"] == e["original_sample_count"],
+            "vgm_sample_count": (meta_value(m, "stream total samples") or "").split(" ")[0] == str(res["sample_count"]),
+            "vgm_encoding_custom_celt": meta_value(m, "encoding") == "Custom CELT",
+            "stream_length_equals_original": res["stream_bytes"] == res["original_stream_bytes"]}
+
+
+def encode_line(e, ce_audio, ffmpeg, celt, cfg, ref_lufs, clicks, static, label):
+    """One CE recording through the validated pipeline (the M4 preview's render, global gain or match Spain,
+    CELT "fmod" profile) -> the derive result. Used for replacements and added takes alike."""
+    gain, mode = cfg["global_gain_db"], cfg["level_mode"]
+    if e.get("sources"):  # a join or an overlay of two CE lines (common/audio_combine.py)
+        wavs = [ce_audio.wav(s["ce_mission"], s["language"], s["media"]) for s in e["sources"]]
+        metas = [{"ce_line_ref": s["ce_line_ref"], "language": s["language"], "media_id": s["media"]["media_id"],
+                  "wem_sha256": s["media"]["wem_sha256"]} for s in e["sources"]]
+        try:
+            res = derive_combined(wavs, e["edit"], ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, ref_lufs=ref_lufs,
+                                  global_gain_db=gain, level_mode=mode, profile="fmod", gain_source=cfg["source"],
+                                  sources_meta=metas, clicks=clicks)
+        except audio_edit.EditError as ex:
+            raise SystemExit(f"{label}: audio cannot be processed: {ex}")
+        res["wav"], res["wav_sha256"] = wavs[0], sha256_file(wavs[0])
+        res["wavs"] = [{"wav": w, "sha256": sha256_file(w)} for w in wavs]
+        return res
+    wav = ce_audio.wav(e["ce_mission"], e["language"], e["media"])
+    meta = {"ce_line_ref": e["ce_line_ref"], "language": e["language"],
+            "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
+    edit = e.get("edit") or audio_edit.EDIT_ZERO
+    if needs_processing(edit, gain, mode):
+        try:
+            res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED,
+                                   ref_lufs=ref_lufs, global_gain_db=gain, level_mode=mode,
+                                   profile="fmod", gain_source=cfg["source"], source_meta=meta,
+                                   clicks=clicks, static=static)
+        except audio_edit.EditError as ex:
+            raise SystemExit(f"{label}: audio cannot be processed: {ex}")
+    else:  # unedited, global_gain mode with no gain: the original path, byte for byte
+        res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
+                     source_meta=meta)
+    res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
+    return res
+
+
+def build_once(original, targets, ce_audio, ffmpeg, celt, cfg, refs=None, clicks=None, static=None, mutes=(),
+               model=None):
     """Encode every target and assemble the bank. -> (candidate bytes, {index: derive result}).
     cfg: the export config (level mode and global gain, the same for every replacement); refs: Spain
     loudness per slot (the match target, or reported only); clicks: MCC's radio clicks
     (common/radio_clicks.py), required when a recipe has radio clicks on."""
     results = {}
-    gain, mode = cfg["global_gain_db"], cfg["level_mode"]
     refs = refs or {}
     for e in targets:
-        wav = ce_audio.wav(e["ce_mission"], e["language"], e["media"])
-        meta = {"ce_line_ref": e["ce_line_ref"], "language": e["language"],
-                "media_id": e["media"]["media_id"], "wem_sha256": e["media"]["wem_sha256"]}
-        edit = e.get("edit") or audio_edit.EDIT_ZERO
-        if needs_processing(edit, gain, mode):
-            try:
-                res = derive_processed(wav, edit, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED,
-                                       ref_lufs=refs.get(e["slot_id"]), global_gain_db=gain, level_mode=mode,
-                                       profile="fmod", gain_source=cfg["source"], source_meta=meta,
-                                       clicks=clicks, static=static)
-            except audio_edit.EditError as ex:
-                raise SystemExit(f"{e['slot_id']}: audio cannot be processed: {ex}")
-        else:  # unedited, global_gain mode with no gain: the original path, byte for byte
-            res = derive(wav, ffmpeg=ffmpeg, celt=celt, out_root=DERIVED, channels=1, profile="fmod",
-                         source_meta=meta)
-        res["wav"], res["wav_sha256"] = wav, sha256_file(wav)
+        results[e["spanish_index"]] = encode_line(e, ce_audio, ffmpeg, celt, cfg, refs.get(e["slot_id"]), clicks,
+                                                  static, e["slot_id"])
+    for e in mutes:  # Mute / No replacement: silence of exactly the original sample count
+        res = silent_stream(celt, e["original_sample_count"])
+        res["stream_bytes"] = len(res["stream"])
+        res["original_stream_bytes"] = len(model["samples"][e["spanish_index"]]["stream"])
         results[e["spanish_index"]] = res
     cand = assemble(original, {k: (r["stream"], r["sample_count"]) for k, r in results.items()})
     return cand, results
@@ -276,7 +327,8 @@ def test_report(name, manifest, report, app):
     audio = kind in ("audio", "both")
     ents = manifest["slots"]
     rep = [e for e in ents if e["action"] == "replace"]
-    keep = [e for e in ents if e["action"] != "replace"]
+    muted = [e for e in ents if e["action"] == "mute"]
+    keep = [e for e in ents if e["action"] not in ("replace", "mute")]
     su = lambda e: (app._mcc_text(e["mcc_tag"])["SU"]["text"] or "")[:70]  # noqa: E731
     L = [f"# M6 test build `{name}` — {'PASS' if report['ok'] else 'FAILED'}", "",
          f"Built {manifest['built_at']} from `manual_mappings.json` sha256 `{manifest['inputs']['mappings_sha256'][:16]}…` "
@@ -296,10 +348,27 @@ def test_report(name, manifest, report, app):
                                                                          ("≈", e["different_but_fits"]),
                                                                          ("E", bool(e.get("edit")))) if on)),
                             ("MCC LATAM subtitle (SU) before", su)])
+        if muted:
+            L += ["", f"### Muted lines ({len(muted)}): digital silence of the original length", "",
+                  "Listen for: nothing plays where the line was, the scene's timing is unchanged, and no click or "
+                  "noise. Check the subtitle separately (a muted line's subtitle is its own decision).", ""]
+            L += md_table(muted, [("Slot", lambda e: f"`{e['slot_id']}`"), ("Spain s", lambda e: e["original_seconds"]),
+                                  ("Why muted", lambda e: e.get("mute_reason") or ""),
+                                  ("MCC LATAM subtitle (SU) before", su)])
+        ins = manifest.get("inserts") or []
+        if ins:
+            done = [e for e in ins if e["action"] == "insert"]
+            L += ["", f"### Added takes ({len(done)} inserted; docs/added-takes-design.md)", "",
+                  "Each plays as an extra take of its sound: the game picks among all the sound's takes (in game: "
+                  "v-000020, v-000021). The bank and the Spanish .lst.bin are installed and restored together.", ""]
+            L += md_table(ins, [("Take", lambda e: f"`{e['take_id']}`"), ("Sound", lambda e: f"`{e['mcc_tag']}`"),
+                                ("#", lambda e: e["position"]), ("CE line", lambda e: f"`{e.get('ce_line_ref', '')}`"),
+                                ("s", lambda e: e.get("new_seconds", "")),
+                                ("Result", lambda e: "inserted" if e["action"] == "insert" else e["reason"])])
         L += ["", "## Per folder", ""]
         L += md_table([{"f": f, **v} for f, v in manifest["folders"].items()],
                       [("Folder", lambda r: f"`{r['f']}`"), ("Slots", lambda r: r["slots"]),
-                       ("LATAM (approved CE)", lambda r: r["replace"]),
+                       ("LATAM (approved CE)", lambda r: r["replace"]), ("Muted", lambda r: r["muted"]), ("Dropped (own set)", lambda r: r.get("dropped", 0)),
                        ("Approved keep Spain", lambda r: r["approved_keep_spain"]),
                        ("Not approved", lambda r: r["not_approved"]), ("Unmapped", lambda r: r["unmapped"]),
                        ("Unsupported", lambda r: r["unsupported"]), ("Invalid", lambda r: r["invalid"]),
@@ -372,8 +441,8 @@ def test_report(name, manifest, report, app):
     L += ["## Known limitations", ""]
     if audio:
         L += ["- Radio effects not applied (v1.1); flagged lines play the clean CE recording.",
-              "- Not built: stereo slots, concatenations (`ce_concat`), user recordings. Edited lines (flag E) are "
-              "built from their recipes.",
+              "- Not built: stereo slots, user recordings. Edited lines (flag E), joins (`ce_concat`) and overlays "
+              "(`ce_mix`) of two CE lines are built from their recipes.",
               (f"- Level matched to each Spain recording, limiting capped at "
                f"{audio_edit.MATCH_MAX_LIMITING_DB:g} dB (lines listed under “Level” got less)."
                if (manifest.get("level") or {}).get("mode") == "match_spain" else
@@ -439,8 +508,16 @@ def read_local(path):
     return json.loads(raw.decode("utf-8")), hashlib.sha256(raw).hexdigest()
 
 
-def build_audio(out, targets, original, args, cfg, pins, app):
-    """The audio stage: encode, assemble, validate the bank. -> (checks, results, per_target, report extras)."""
+def app_drop_entries(app, drops):
+    """Every Spain sample of the sounds in `drops` (from the catalog), for the removal check."""
+    drops = set(drops)
+    return [{"spanish_index": smp["index"]} for _sid, (_lv, rec, smp) in app.slot_index.items()
+            if rec["mcc_tag"] in drops]
+
+
+def build_audio(out, targets, original, args, cfg, pins, app, mutes=(), inserts=(), drops=()):
+    """The audio stage: encode, assemble, validate the bank (and, with added takes, the index).
+    -> (checks, results, per_target, report extras, install files, inserted take results)."""
     checks = {"bank_copy_matches_pin": hashlib.sha256(original).hexdigest() == pins["spanish.fsb"]["sha256"],
               "lst_copy_matches_pin": sha256_file(LST) == pins["spanish.lst"]["sha256"]}
     if not checks["bank_copy_matches_pin"]:
@@ -449,17 +526,20 @@ def build_audio(out, targets, original, args, cfg, pins, app):
     ce_audio = CeAudio(REPO_ROOT, vgmstream_decoder(exe), ce_source_reader(args.oodle_dll))
     print(f"measuring the loudness of the {len(targets)} Spain recording(s) being replaced...")
     refs = spain_references(targets, app, vgmstream_decoder(exe))
+    # an added take is levelled against its sound's first Spain take (the same rule as a replacement)
+    ins_refs = spain_references([{"slot_id": e["ref_slot_id"]} for e in inserts], app, vgmstream_decoder(exe)) \
+        if inserts else {}
     checks["spain_references_measured"] = sum(v is not None for v in refs.values()) == len(targets) \
         or cfg["level_mode"] != "match_spain"
     clicks = None
-    if any(((e.get("edit") or {}).get("radio") or {}).get("clicks") for e in targets):
+    if any(((e.get("edit") or {}).get("radio") or {}).get("clicks") for e in (*targets, *inserts)):
         try:
             clicks = radio_clicks.load(MccAudio(REPO_ROOT, vgmstream_decoder(exe)), app.slot_index)
         except Exception as ex:  # noqa: BLE001 (decode failure or pin mismatch: the build stops)
             raise SystemExit(f"radio clicks unavailable: {ex}")
         checks["radio_clicks_match_pins"] = clicks["sha256"] == radio_clicks.PINNED
     static = None
-    if any(interference.needs_mcc_static((e.get("edit") or {}).get("interference")) for e in targets):
+    if any(interference.needs_mcc_static((e.get("edit") or {}).get("interference")) for e in (*targets, *inserts)):
         try:
             static = radio_static.load(MccAudio(REPO_ROOT, vgmstream_decoder(exe)), app.slot_index)
         except Exception as ex:  # noqa: BLE001 (decode failure or pin mismatch: the build stops)
@@ -467,38 +547,83 @@ def build_audio(out, targets, original, args, cfg, pins, app):
         checks["radio_static_matches_pin"] = static["sha256"] == radio_static.PINNED
     celt = Celt011()
     n_edit = sum(1 for e in targets if e.get("edit"))
-    print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes (pass 1)...")
-    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
+    model = decompose(original) if mutes else None
+    print(f"encoding {len(targets)} line(s), {n_edit} with edit recipes, {len(mutes)} muted (pass 1)...")
+    cand, results = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static, mutes, model)
     print("encoding again (pass 2, determinism)...")
-    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static)
-    celt.close()
+    cand2, results2 = build_once(original, targets, ce_audio, args.ffmpeg, celt, cfg, refs, clicks, static, mutes, model)
+    del model
     checks["deterministic_streams"] = all(results[k]["stream"] == results2[k]["stream"] for k in results)
     checks["deterministic_bank"] = cand == cand2
     del cand2, results2
-    cand_path = out / "sounds_dialogs_spanish.fsb"
-    cand_path.write_bytes(cand)
+    # Stage 1: the bank with replacements and mutes (same samples, same order) gets the usual checks.
     checks.update(multi_structural_checks(original, cand, {k: (r["stream"], r["sample_count"])
                                                            for k, r in results.items()}))
     count = parse_header(original)["num_samples"]
-    print(f"decoding all {count} subsongs of the original (cached) and the candidate...")
+    index_map, new_index, ins_results, lst_new = list(range(count)), {}, {}, None
+    if inserts:
+        # Stage 2: added takes inserted after their sound's Spain takes; the index rewritten.
+        print(f"encoding {len(inserts)} added take(s) (twice, determinism)...")
+        for e in inserts:
+            ins_results[e["take_id"]] = encode_line(e, ce_audio, args.ffmpeg, celt, cfg, ins_refs.get(e["ref_slot_id"]),
+                                                    clicks, static, e["take_id"])
+        again = {e["take_id"]: encode_line(e, ce_audio, args.ffmpeg, celt, cfg, ins_refs.get(e["ref_slot_id"]),
+                                           clicks, static, e["take_id"]) for e in inserts}
+        checks["deterministic_added_takes"] = all(again[t]["stream"] == r["stream"] for t, r in ins_results.items())
+        lst_old = LST.read_bytes()
+        items = [{"take_id": e["take_id"], "mcc_tag": e["mcc_tag"], "stream": ins_results[e["take_id"]]["stream"],
+                  "sample_count": ins_results[e["take_id"]]["sample_count"]} for e in inserts]
+        base = cand
+        cand, lst_new, index_map, new_index = insert_takes(base, lst_old, items, drops)
+        cand2, lst2, _, _ = insert_takes(base, lst_old, items, drops)  # position order matters, so the same order
+        checks["deterministic_insert"] = cand == cand2 and lst_new == lst2
+        del cand2, lst2
+        checks.update(insert_checks(base, cand, lst_old, lst_new, index_map, new_index, items, drops))
+        del base
+    celt.close()
+    cand_path = out / "sounds_dialogs_spanish.fsb"
+    cand_path.write_bytes(cand)
+    new_count = count + len(inserts) - sum(1 for j in index_map if j is None)
+    print(f"decoding all {count} subsongs of the original (cached) and the {new_count} of the candidate...")
     vkey = f"{pins['spanish.fsb']['sha256']}:{sha256_file(exe)}"
     full_o = decode_hashes_cached(exe, BANK, count, REPO_ROOT / "work/m6/_cache/original_decode.json", vkey)
-    full_c = decode_all(exe, cand_path, count)
-    differ = sorted(k for k, (a, b) in enumerate(zip(full_o, full_c)) if a != b)
-    checks["vgm_all_subsongs_decode"] = None not in full_o and None not in full_c and len(full_c) == count
+    full_c = decode_all(exe, cand_path, new_count)
+    differ = sorted(k for k in range(count) if index_map[k] is not None and full_o[k] != full_c[index_map[k]])
+    checks["removed_samples_are_exactly_the_own_set_sounds"] = \
+        sorted(k for k in range(count) if index_map[k] is None) == sorted(
+            e["spanish_index"] for e in app_drop_entries(app, drops))
+    checks["vgm_all_subsongs_decode"] = None not in full_o and None not in full_c and len(full_c) == new_count
     checks["vgm_only_targets_differ"] = differ == sorted(results)
     per_target, all_target_ok = {}, True
     for e in targets:
         k = e["spanish_index"]
-        c, extra = content_checks(exe, cand_path, k, results[k])
+        c, extra = content_checks(exe, cand_path, index_map[k], results[k])
         per_target[e["slot_id"]] = {"checks": c, **extra}
         all_target_ok &= all(c.values())
+    for e in mutes:
+        c = mute_checks(exe, cand_path, e, results[e["spanish_index"]], index_map[e["spanish_index"]])
+        per_target[e["slot_id"]] = {"checks": c, "muted": True}
+        all_target_ok &= all(c.values())
+    for e in inserts:
+        c, extra = content_checks(exe, cand_path, new_index[e["take_id"]], ins_results[e["take_id"]])
+        per_target[e["take_id"]] = {"checks": c, "added_take": True, **extra}
+        all_target_ok &= all(c.values())
     checks["every_target_content_ok"] = all_target_ok
-    checks["lst_not_written"] = sha256_file(LST) == pins["spanish.lst"]["sha256"]
-    install = {"install_rel": INSTALL_BANK, "original_sha256": pins["spanish.fsb"]["sha256"],
-               "candidate": cand_path.relative_to(REPO_ROOT).as_posix(), "candidate_sha256": hashlib.sha256(cand).hexdigest(),
-               "size": len(cand), "growth_bytes": len(cand) - len(original)}
-    return checks, results, per_target, {"differing_subsongs": [k + 1 for k in differ]}, install
+    checks["lst_copy_still_matches_pin"] = sha256_file(LST) == pins["spanish.lst"]["sha256"]
+    files = [{"install_rel": INSTALL_BANK, "original_sha256": pins["spanish.fsb"]["sha256"],
+              "candidate": cand_path.relative_to(REPO_ROOT).as_posix(), "candidate_sha256": hashlib.sha256(cand).hexdigest(),
+              "size": len(cand), "growth_bytes": len(cand) - len(original)}]
+    if inserts:
+        lst_path = out / "sounds_dialogs_spanish.lst.bin"
+        lst_path.write_bytes(lst_new)
+        checks["lst_file_on_disk_verified"] = sha256_file(lst_path) == hashlib.sha256(lst_new).hexdigest()
+        files.append({"install_rel": INSTALL_LST, "original_sha256": pins["spanish.lst"]["sha256"],
+                      "candidate": lst_path.relative_to(REPO_ROOT).as_posix(),
+                      "candidate_sha256": hashlib.sha256(lst_new).hexdigest(), "size": len(lst_new),
+                      "growth_bytes": len(lst_new) - LST.stat().st_size})
+    for t, r in ins_results.items():
+        r["new_index"] = new_index[t]
+    return checks, results, per_target, {"differing_subsongs": [k + 1 for k in differ]}, files, ins_results
 
 
 def build_subtitles(out, subs):
@@ -596,7 +721,8 @@ def main():
         raise SystemExit(f"unknown level(s) {unknown}")
     idx = dict(slot_index=app.slot_index, ce_lines=app.ce_lines, ce_idx=app.ce_idx, mcc_idx=app.mcc_idx)
     inv = inventory(doc, app, progress)
-    plan = plan_audio(doc, levels, local=local, **idx)
+    ins_plan = plan_inserts(doc, levels, local=local, subtitle_keys=app._subtitle_keys(), **idx)
+    plan = plan_audio(doc, levels, local=local, dropped_tags=own_set_drops(doc, ins_plan), **idx)
     subs = subtitle_plan(doc, set(levels), local=local, tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)
     out.mkdir(parents=True, exist_ok=True)
     (out / "inventory.json").write_text(json.dumps({"schema": "m6-inventory/1", "mappings_sha256": msha,
@@ -611,6 +737,17 @@ def main():
               f" (slots {v['slots']}, stereo {v['stereo']}, stereo replaced {v['stereo_replaced']})")
     print(f"plan {', '.join(levels)}: audio {acts.get('replace', 0)} replace, {acts.get('keep_original', 0)} keep Spain, "
           f"{acts.get('not_eligible', 0)} not eligible; audio conflicts {len(plan['conflicts'])}")
+    ins_acts = Counter(e["action"] for e in ins_plan)
+    drops = own_set_drops(doc, ins_plan)
+    if ins_plan:
+        print(f"added takes: {ins_acts.get('insert', 0)} to insert, {ins_acts.get('skip', 0)} not approved, "
+              f"{ins_acts.get('not_eligible', 0)} not eligible")
+    if drops:
+        print(f"own take sets: {len(drops)} sound(s) lose their Spain takes ({acts.get('dropped', 0)} sample(s)): "
+              + ", ".join(d.rsplit(chr(92), 1)[-1] for d in drops))
+        for e in ins_plan:
+            if e["action"] == "not_eligible":
+                print(f"  {e['take_id']} ({e['mcc_tag']}): {e['reason']}")
     print(f"subtitles: {ss['approved_subtitles']} approved decision(s) in scope; {ss['keys_to_write']} entr(ies) to "
           f"write (SU {ss['keys_written']['SU']}, SP {ss['keys_written']['SP']}; variable length SU "
           f"{ss['variable_length']['SU']}, SP {ss['variable_length']['SP']}); excluded {ss['excluded']} "
@@ -622,11 +759,14 @@ def main():
     if want_audio and plan["conflicts"]:
         raise SystemExit(f"conflicts: {plan['conflicts']}")
     targets = [e for e in plan["entries"] if e["action"] == "replace"]
-    if want_audio and not targets:
-        raise SystemExit("nothing eligible to build: no approved Campaign Evolved audio in this scope")
+    mutes = [e for e in plan["entries"] if e["action"] == "mute"]
+    inserts = [e for e in ins_plan if e["action"] == "insert"]
+    if want_audio and not targets and not mutes and not inserts:
+        raise SystemExit("nothing eligible to build: no approved Campaign Evolved audio, muted line or added take "
+                         "in this scope")
     if want_subs and not ss["keys_to_write"]:
         raise SystemExit("nothing eligible to build: no approved subtitle text in this scope")
-    if want_audio and not args.ffmpeg:
+    if want_audio and (targets or inserts) and not args.ffmpeg:
         raise SystemExit("ffmpeg not found")
     try:
         cfg = load_export_config(REPO_ROOT)
@@ -646,14 +786,14 @@ def main():
 
     pins = json.loads((REPO_ROOT / "work/mcc/build.json").read_text(encoding="utf-8"))["files"]
     checks = {"validator_clean": True}
-    install_files, results, per_target, audio_extra = [], {}, {}, {"differing_subsongs": []}
+    install_files, results, per_target, audio_extra, ins_results = [], {}, {}, {"differing_subsongs": []}, {}
     original = None
     if want_audio:
         original = BANK.read_bytes()
-        a_checks, results, per_target, audio_extra, bank_file = build_audio(out, targets, original, args, cfg, pins,
-                                                                            app)
+        a_checks, results, per_target, audio_extra, audio_files, ins_results = build_audio(
+            out, targets, original, args, cfg, pins, app, mutes, inserts, drops)
         checks.update(a_checks)
-        install_files.append(bank_file)
+        install_files += audio_files
     sub_tables, sub_warnings = {}, []
     if want_subs:
         print(f"writing SU and SP ({ss['keys_to_write']} entr(ies) each at most) from the pinned copies...")
@@ -665,9 +805,14 @@ def main():
     # are no longer the approved decisions.
     doc_after, msha_after = mapping_store.load(REPO_ROOT / "mappings" / "manual_mappings.json")
     local_after, local_sha_after = read_local(local_p)
+    ins_after = plan_inserts(doc_after, levels, local=local_after, subtitle_keys=app._subtitle_keys(), **idx)
     drift_during = compare_plans(plan["entries"] if want_audio else [],
-                                 plan_audio(doc_after, levels, local=local_after, **idx)["entries"]) \
+                                 plan_audio(doc_after, levels, local=local_after,
+                                            dropped_tags=own_set_drops(doc_after, ins_after), **idx)["entries"]) \
         if want_audio else {"changed_or_revoked": [], "newly_eligible": []}
+    if want_audio:
+        di = compare_inserts(ins_plan, ins_after)
+        drift_during = {k: drift_during[k] + di[k] for k in drift_during}
     if want_subs:
         sub_after = subtitle_plan(doc_after, set(levels), local=local_after,
                                   tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)
@@ -688,8 +833,24 @@ def main():
             e["global_gain_applied_db"] = st["global_gain_applied_db"] if st else 0.0
             e["total_gain_db"] = st["total_gain_db"] if st else 0.0
             e["warnings"] = st["warnings"] if st else []
+        elif want_audio and e["action"] == "mute":
+            r = results[e["spanish_index"]]
+            e.update(new_sample_count=r["sample_count"], new_seconds=round(r["sample_count"] / 44100, 3),
+                     stream_sha256=hashlib.sha256(r["stream"]).hexdigest())
+    for e in ins_plan:
+        r = ins_results.get(e["take_id"]) if want_audio else None
+        if r:
+            e.update(new_index=r["new_index"], new_sample_count=r["sample_count"],
+                     new_seconds=round(r["sample_count"] / 44100, 3), stream_sha256=r["recipe"]["output"]["stream_sha256"],
+                     source_wav=r["wav"].relative_to(REPO_ROOT).as_posix(), source_wav_sha256=r["wav_sha256"],
+                     derived_dir=r["dir"].relative_to(REPO_ROOT).as_posix(),
+                     content_snr_db=(per_target.get(e["take_id"]) or {}).get("content_snr_db"),
+                     audio_stats=r.get("edit_stats"))
     slots = plan["entries"] if want_audio else []
     counts = dict(acts) if want_audio else {}
+    if want_audio and ins_plan:
+        counts.update(insert=ins_acts.get("insert", 0), insert_skipped=ins_acts.get("skip", 0),
+                      insert_not_eligible=ins_acts.get("not_eligible", 0))
     if want_subs:
         counts.update(subtitle_entries=ss["keys_to_write"], subtitle_excluded=ss["excluded"],
                       subtitle_conflicts=ss["conflicts"])
@@ -706,7 +867,8 @@ def main():
                    "subtitle_writer": WRITER if want_subs else None,
                    "libcelt_sha256": sha256_file(DEFAULT_DLL) if want_audio else None,
                    "vgmstream_sha256": sha256_file(args.vgmstream_cli) if want_audio else None,
-                   "ffmpeg": next(iter(results.values()))["recipe"]["steps"][0]["version"] if want_audio else None,
+                   "ffmpeg": next((r["recipe"]["steps"][0]["version"] for r in results.values() if "recipe" in r),
+                                  None) if want_audio else None,
                    "celt_profile": "fmod (prediction 0, complexity 0: all intra, no transients)" if want_audio else None},
         "install_files": install_files,
         "not_written": [p for p in ("halo1/sound/pc/lst/sounds_dialogs_spanish.lst.bin", INSTALL_BANK,
@@ -716,6 +878,7 @@ def main():
         "counts": counts,
         "radio_effect_slots": [e["slot_id"] for e in slots if e["radio_effect"]],
         "edited_slots": [e["slot_id"] for e in slots if e["action"] == "replace" and e.get("edit")],
+        "muted_slots": [e["slot_id"] for e in slots if e["action"] == "mute"],
         "audio_edit_engine": audio_edit.ENGINE, "render_engine": audio_edit.RENDER_ENGINE,
         "level": level_summary(cfg, slots) if want_audio else None,
         "global_gain": {"configured_db": cfg["global_gain_db"], "source": cfg["source"],
@@ -730,6 +893,7 @@ def main():
                                   and (e.get("audio_stats") or {}).get("global_gain_shortfall_db")]},
         "warnings": {e["slot_id"]: e["warnings"] for e in slots if e.get("warnings")},
         "slots": slots,
+        "inserts": ins_plan if want_audio else [],
         "subtitles": {**subs, "enabled": want_subs, "tables": sub_tables, "warnings": sub_warnings},
         "level_status": inv,
     }
@@ -746,7 +910,7 @@ def main():
     bad_targets = {s: [k for k, v in t["checks"].items() if not v] for s, t in per_target.items()
                    if not all(t["checks"].values())}
     print(f"{'PASS' if ok else 'FAILED'}: {len(checks) - len(failed)}/{len(checks)} checks; "
-          f"{len(results)} sample(s) replaced; {ss['keys_to_write'] if want_subs else 0} subtitle entr(ies) written; "
+          f"{len(targets) if want_audio else 0} sample(s) replaced, {len(mutes) if want_audio else 0} muted; {ss['keys_to_write'] if want_subs else 0} subtitle entr(ies) written; "
           f"{report['seconds']} s")
     for f in install_files:
         print(f"  {f['install_rel']}: candidate {f['candidate_sha256'][:16]}… ({f['growth_bytes']:+,} B)")

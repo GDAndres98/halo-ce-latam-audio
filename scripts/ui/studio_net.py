@@ -5,6 +5,8 @@ The server has two kinds of listener (docs/remote-access.md):
   context: no sign-in, and the only place where the game can be installed into or restored.
 - **remote** (off unless enabled): the LAN / Tailscale address. Every API and audio request needs a signed-in
   account; installing into or restoring the game is refused whatever the role.
+- **public** (off unless enabled; docs/public-access.md): a read-only view for anonymous visitors, reached only
+  through a tunnel on this computer (loopback). No identity at all: never edits, never streams audio.
 
 Settings come from config/studio_server.json (git-ignored; see config/studio_server.example.json), then the
 command-line options. Unknown keys are refused, so a typo never silently leaves a default in place.
@@ -26,6 +28,16 @@ DEFAULTS = {
     # cloudflare_access.users (cf_access.py, docs/deploy-cloudflare.md); password sign-in is then off.
     "remote": {"enabled": False, "host": "0.0.0.0", "port": 8766, "tls_cert": None, "tls_key": None,
                "auth": "password"},
+    # The public read-only listener for anonymous visitors (public_view.py, docs/public-access.md). Loopback only
+    # (a Cloudflare Tunnel on this computer reaches it). url: the public https address visitors open (its own
+    # host, never the remote listener's). sign_in_url: where "Sign in to edit" goes (default: public_url).
+    # previews: visitors may play the published edited previews of APPROVED lines (public_previews.py; published by
+    # scripts/build/publish_previews.py). Never the original recordings. Off by default: anything a browser plays
+    # can be saved (docs/public-access.md §2.1).
+    # originals: visitors may also play the original recordings (MCC Spain / English, unedited Campaign Evolved) and
+    # see waveforms (owner request 2026-10-17). Off by default.
+    "public": {"enabled": False, "host": "127.0.0.1", "port": 8081, "url": None, "sign_in_url": None,
+               "previews": False, "originals": False},
     # Extra host names the remote listener answers to (e.g. "studio-pc.tail1234.ts.net"). The machine's own
     # names and addresses are always accepted.
     "allowed_hosts": [],
@@ -88,6 +100,7 @@ def load_server_config(root, path=None, overrides=None):
     cfg = _merge(cfg, overrides or {}, "command line")
     _port(cfg["local"]["port"], "local.port")
     _port(cfg["remote"]["port"], "remote.port")
+    _port(cfg["public"]["port"], "public.port")
     if cfg["secure_cookies"] not in ("auto", True, False):
         raise ConfigError("secure_cookies must be \"auto\", true or false")
     if cfg["remote"]["enabled"] and cfg["remote"]["port"] == cfg["local"]["port"]:
@@ -110,6 +123,23 @@ def load_server_config(root, path=None, overrides=None):
             raise ConfigError("with remote.auth \"cloudflare_access\", Cloudflare terminates HTTPS: leave tls_cert unset")
         if not str(cfg.get("public_url") or "").startswith("https://"):
             raise ConfigError("with remote.auth \"cloudflare_access\", public_url must be the https:// address")
+    if cfg["public"]["enabled"]:
+        pub = cfg["public"]
+        if not _is_loopback(pub["host"]):
+            raise ConfigError("public.host must be 127.0.0.1: only the tunnel on this computer may reach the public "
+                              "read-only listener")
+        if pub["port"] == cfg["local"]["port"] or (cfg["remote"]["enabled"] and pub["port"] == cfg["remote"]["port"]):
+            raise ConfigError("the public listener needs its own port")
+        for key in ("previews", "originals"):
+            if not isinstance(pub[key], bool):
+                raise ConfigError(f"public.{key} must be true or false")
+        for key in ("url", "sign_in_url"):
+            if pub[key] is not None and not (str(pub[key]).startswith("https://") and urlparse(pub[key]).hostname):
+                raise ConfigError(f"public.{key} must be an https:// address")
+        own = (urlparse(pub["url"] or "").hostname or "").lower()
+        if own and own == (urlparse(cfg.get("public_url") or "").hostname or "").lower():
+            raise ConfigError("public.url must be its own host name, not the remote listener's public_url (the "
+                              "editing address keeps its Cloudflare Access protection)")
     if not _is_loopback(cfg["local"]["host"]):
         raise ConfigError("local.host must be a loopback address (127.0.0.1, ::1 or localhost): it is the "
                           "no-sign-in administrator address; use the remote listener for other computers")
@@ -177,6 +207,14 @@ class HostPolicy:
     def __init__(self, cfg, kind, port):
         self.kind, self.port = kind, port
         names = {"localhost", "127.0.0.1", "::1"}
+        self.origins = set()
+        if kind == "public":  # the tunnel's public name only; never the machine's LAN names or addresses
+            url = cfg["public"]["url"]
+            self.hosts = {n for n in names | {(urlparse(url or "").hostname or "").lower()} if n}
+            if url:
+                u = urlparse(url)
+                self.origins.add(f"{u.scheme}://{u.netloc}".lower())
+            return
         if kind == "remote":
             host = socket.gethostname().lower()
             names |= {host, f"{host}.local", *local_addresses()}
@@ -253,4 +291,5 @@ def connection_info(cfg, remote_running):
         "public_url": cfg.get("public_url"),
         "config_file": CONFIG_REL if cfg["config_found"] else None,
         "session": cfg["session"],
+        "public": {"enabled": bool(cfg["public"]["enabled"]), "url": cfg["public"]["url"]},
     }

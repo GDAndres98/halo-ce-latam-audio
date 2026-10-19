@@ -13,6 +13,7 @@ import { LayoutTemplate } from "lucide-vue-next";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, type LocationQueryRaw } from "vue-router";
 import { api, audioUrl } from "../api/client";
+import { readOnly } from "../auth/session";
 import type { LevelProgress, SlotRow } from "../api/types";
 import { stop, togglePlay } from "../audio/player";
 import { stopCurrent } from "../audio/transport";
@@ -198,7 +199,7 @@ onBeforeUnmount(() => {
 
 /** Save the draft (no approval), then open the next unmatched line of the list. */
 async function saveAndNext() {
-  if (match.saving.value) return;
+  if (match.saving.value || readOnly.value) return;
   if (match.dirty() && !(await match.save())) return; // a refused save keeps the draft and the line
   if (!mccColumn.value?.nextUnmatched()) match.message.value = "Saved. No unmatched line left in this list.";
 }
@@ -236,7 +237,7 @@ useShortcuts({
   ArrowUp: () => ceColumn.value?.move(-1),
   e: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "Spanish(Mexico)")),
   n: () => candidateRef.value && togglePlay(audioUrl.ce(candidateRef.value, "English(US)")),
-  s: () => focusedRef.value && void useCandidate(focusedRef.value),
+  s: () => !readOnly.value && focusedRef.value && void useCandidate(focusedRef.value),
   "1": () => ceColumn.value?.playNth(0),
   "2": () => ceColumn.value?.playNth(1),
   "3": () => ceColumn.value?.playNth(2),
@@ -248,8 +249,8 @@ useShortcuts({
   "9": () => ceColumn.value?.playNth(8),
   "/": () => mccColumn.value?.focusSearch(),
   "\\": () => ceColumn.value?.focusSearch(),
-  "ctrl+s": () => void match.save(),
-  "ctrl+enter": () => void saveAndNext(),
+  "ctrl+s": () => !readOnly.value && void match.save(),
+  "ctrl+enter": () => !readOnly.value && void saveAndNext(),
   u: () => mccColumn.value?.nextUnmatched(),
   escape: () => {
     stop();
@@ -315,6 +316,7 @@ onMounted(async () => {
         :class="{ 'pane-active': pane === 'match' }"
         :match="match"
         :slot-id="selectedSlot"
+        :focused-ref="focusedRef"
         @save-next="saveAndNext"
         @browse="setPane('mcc')"
       />

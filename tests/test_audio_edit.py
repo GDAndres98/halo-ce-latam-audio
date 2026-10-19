@@ -113,7 +113,7 @@ class RecipeTests(unittest.TestCase):
     def test_schema_accepts_recipes_and_old_files_unchanged(self):
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
-        edit_schema = schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"]
+        edit_schema = schema["$defs"]["audio"]["properties"]["edit"]
         r = ae.normalize({"trim_start_s": 0.1, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
                           "silences": [{"at_s": 0.8, "dur_s": 0.4}]}, SRC)
         self.assertEqual(validate(r, {**edit_schema, "$defs": schema["$defs"]}), [])
@@ -150,7 +150,7 @@ class RecipeTests(unittest.TestCase):
                 ae.normalize({"radio": bad}, SRC)
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
-        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        full = {**schema["$defs"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
         self.assertEqual(validate(r, full), [])
         self.assertEqual(validate(c, full), [])
         self.assertTrue(validate(dict(r, radio=dict(r["radio"], slope_db_oct=18)), full))
@@ -300,7 +300,7 @@ class EchoTests(unittest.TestCase):
             ae.normalize({"radio": {"preset": "custom", "presence_db": 3, "presence_hz": 50}}, SRC)
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
-        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        full = {**schema["$defs"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
         self.assertEqual(validate(r, full), [])
         self.assertEqual(validate(c, full), [])
         self.assertTrue(validate(dict(r, echo=dict(r["echo"], delay_ms=5)), full))
@@ -373,7 +373,7 @@ class InterferenceTests(unittest.TestCase):
         self.assertTrue(ae.problems(e, 0.5))  # a point past the end of the recording
         from common.jsonschema_lite import validate
         schema = load_schema("manual-mappings-3")
-        full = {**schema["$defs"]["slot"]["properties"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
+        full = {**schema["$defs"]["audio"]["properties"]["edit"], "$defs": schema["$defs"]}
         self.assertEqual(validate(e, full), [])
 
     def test_mapping(self):

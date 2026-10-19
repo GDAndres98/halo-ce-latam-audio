@@ -21,6 +21,7 @@ import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.e
 import TimelinePlugin from "wavesurfer.js/dist/plugins/timeline.esm.js";
 import { AudioWaveform, Crosshair, Hand, Maximize, Pause, Play, RotateCcw, Square, TextCursor, X, ZoomIn, ZoomOut } from "lucide-vue-next";
 import { endPlayback, startPlayback, type Playback } from "../../audio/transport";
+import { attachVolume } from "../../audio/volume";
 import { formatPosition } from "../../audio/format";
 import { coarsePointer } from "../../layout/useLayoutMode";
 import { loadPeaks } from "../../audio/peaks";
@@ -105,6 +106,7 @@ const touchSelect = computed(() => props.editable && !panMode.value);
 let wave: WaveSurfer | null = null;
 let regions: ReturnType<typeof RegionsPlugin.create> | null = null;
 let stopDragSelection: (() => void) | null = null;
+let detachVolume: (() => void) | null = null;
 let lastPlayed: Span | null = null;
 /** The media element is being unlocked for later playback (prime()): its play and pause are not the user's. */
 let priming = false;
@@ -138,6 +140,8 @@ onMounted(() => {
       }),
     ],
   });
+  const media = wave.getMediaElement();
+  if (media) detachVolume = attachVolume(media);
   wave.on("ready", (seconds) => {
     loading.value = false;
     if (!props.url) return; // the blank left by empty(): nothing to play
@@ -192,6 +196,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   endPlayback(owner);
   stopDragSelection?.();
+  detachVolume?.();
   wave?.destroy();
   wave = null;
   regions = null;

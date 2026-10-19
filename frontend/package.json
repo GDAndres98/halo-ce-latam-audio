@@ -18,6 +18,10 @@
     "test:ux": "node e2e/ux.mjs",
     "test:editor": "node e2e/editor.mjs",
     "test:radio": "node e2e/radio.mjs",
+    "test:mute": "node e2e/mute.mjs",
+    "test:takes": "node e2e/takes.mjs",
+    "test:take-sets": "node e2e/take-sets.mjs",
+    "test:combine": "node e2e/combine.mjs",
     "test:interference": "node e2e/interference.mjs",
     "test:downloads": "node e2e/downloads.mjs",
     "test:workflow": "node e2e/workflow.mjs",
@@ -31,6 +35,7 @@
     "test:mobile": "node e2e/mobile.mjs",
     "test:layout": "node e2e/layout.mjs",
     "test:pwa": "node e2e/pwa.mjs",
+    "test:visitor": "node e2e/visitor.mjs",
     "icons": "node scripts/make-icons.mjs",
     "perf": "node e2e/perf.mjs",
     "docs:screenshots": "node e2e/screenshots.mjs"

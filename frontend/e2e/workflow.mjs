@@ -169,6 +169,7 @@ async function main() {
       );
       const expected = [
         "Replacement audio",
+        "Takes of this sound",
         "Flags and notes",
         "Audio editing",
         "Compare the original and the replacement",

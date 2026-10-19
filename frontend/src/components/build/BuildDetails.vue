@@ -23,7 +23,7 @@ const failed = computed(() => Object.entries(detail.value?.checks ?? {}).filter(
 const passed = computed(() => Object.values(detail.value?.checks ?? {}).filter(Boolean).length);
 const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 const size = (n: number) => (n > 4 * 1048576 ? `${(n / 1048576).toFixed(1)} MB` : kb(n));
-const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles" } as const;
+const KIND_TEXT = { audio: "Audio", subtitles: "Subtitles", both: "Audio + subtitles", experiment: "Experiment" } as const;
 const when = computed(() => builtAtParts(props.build?.built_at));
 const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
@@ -60,9 +60,13 @@ async function loadLog() {
           <dd>{{ KIND_TEXT[build.kind] }}</dd>
           <dt>Folders</dt>
           <dd data-testid="detail-folders"><strong>{{ build.levels.length }}</strong> · <span class="mono">{{ build.levels.join(", ") }}</span></dd>
-          <template v-if="build.kind !== 'subtitles'">
+          <template v-if="build.kind === 'experiment'">
+            <dt>Experiment</dt>
+            <dd data-testid="experiment-note">Prepared test, not made from your decisions: replaces the Spanish bank and its sound index together ({{ n(build.counts.extra_takes) }} extra takes). See its test_report.md.</dd>
+          </template>
+          <template v-else-if="build.kind !== 'subtitles'">
             <dt>Audio</dt>
-            <dd>{{ n(build.counts.replace) }} replaced · {{ n(build.counts.keep_original) }} kept original</dd>
+            <dd>{{ n(build.counts.replace) }} replaced · {{ n(build.counts.mute) }} muted · {{ n(build.counts.keep_original) }} kept original</dd>
           </template>
           <template v-if="build.subtitles.enabled && build.subtitles.summary">
             <dt>Subtitles</dt>

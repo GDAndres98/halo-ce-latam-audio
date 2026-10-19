@@ -184,6 +184,27 @@
   cursor: pointer;
 }
 
+/* Rows of the same sound (several Spain takes) are joined by a bracket on the left. */
+.row-item.grp-first,
+.row-item.grp-mid,
+.row-item.grp-last {
+  border-left: 3px solid var(--frame);
+}
+.row-item.grp-first,
+.row-item.grp-mid {
+  margin-bottom: 0.1rem;
+  border-bottom-left-radius: 0;
+}
+.row-item.grp-mid,
+.row-item.grp-last {
+  border-top-left-radius: 0;
+}
+.row-item .take-of {
+  margin-left: 0.35rem;
+  font-size: 0.75em;
+  white-space: nowrap;
+}
+
 .row-item:hover {
   transition: border-color var(--fast) ease, background-color var(--fast) ease;
   border-color: var(--frame-dim);
@@ -359,6 +380,10 @@
 .flag-list {
   display: grid;
   gap: 0.2rem;
+  /* a fieldset (disabled as a whole in the public read-only view) that looks like a plain list */
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .flag-list .opt svg {
@@ -585,4 +610,10 @@ span.source-key {
   .controls {
     grid-template-columns: 1fr;
   }
+}
+
+/* A join shows two part editors (CombineEditor.vue): the one the keyboard shortcuts act on. */
+.editor.active-part {
+  outline: 1px solid var(--frame, currentColor);
+  outline-offset: 2px;
 }

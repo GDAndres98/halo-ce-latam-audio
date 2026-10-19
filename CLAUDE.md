@@ -271,6 +271,23 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       in `cloudflare_access.users`); no password sign-in there, installs still local-only. Start/stop/status/
       startup task: `scripts/deploy/studio.ps1` (`m4_server.py --stop` = clean stop file). Tests:
       `tests/test_cf_access.py`. Never read the tunnel token or change the Cloudflare config yourself.
+    - **Public read-only view (owner prompt 50, 2026-10-17):** `docs/public-access.md`. A third listener, `public`
+      (`127.0.0.1:8081`, `"public"` block in `config/studio_server.json`, `--public`): anonymous, no identity read
+      at all, allowlist `scripts/ui/public_view.py` `PUBLIC_GETS` with sanitised answers (no paths, notes, logs or
+      game folder). No writes, downloads, settings, live feed or original audio (401). With `public.previews: true`
+      (owner request 2026-10-17; ships off, copyright assessment in §2.2) visitors play `GET /audio/public?slot=`: the
+      edited previews of APPROVED lines, pre-rendered by the owner with `scripts/build/publish_previews.py`
+      (`scripts/ui/public_previews.py`), served only while the line is unchanged; anonymous requests never render.
+      With `public.originals: true` (owner request 2026-10-17, ships off; the owner explicitly accepted the copyright
+      risk, §2.2) visitors also play `/audio/mcc` and `/audio/ce` and see `/audio/peaks` (only for an allowed `src`)
+      in Listen and compare (B = unedited CE or the published preview; no "encoded"); still refused: downloads,
+      `/audio/preview`, `POST /api/edit/preview`, the interference reference, writes. Browser test:
+      `E2E_PUBLIC_ORIGINALS=1 npm run test:visitor`.
+      The UI shows Read-only + Sign in to edit.
+      Plan: `studio.andresgustavo.com` → 8081 public, `admin.andresgustavo.com` → 8080 with Access (same Access
+      app, same AUD). The dashboard steps (§6) are the owner's. Tests: `tests/test_public_access.py`,
+      `npm run test:visitor`. Never add an endpoint to `PUBLIC_GETS` that streams audio or reveals paths
+      (public audio goes only through `Listener.public_audio_ok`).
     - **Mobile layout (owner prompt 46, 2026-10-13):** `docs/mobile.md`. Same Vue app and server, no
       backend change: `<html data-layout="phone|tablet|desktop">` from `frontend/src/layout/useLayoutMode.ts`
       (media queries, not innerWidth), styles in `frontend/src/styles/mobile.css`. Phones get one pane at a time
@@ -279,6 +296,52 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       Installable PWA ("Halo Studio", `vite-plugin-pwa` 1.3.0, owner-requested): app-shell precache only, never
       `/api`, `/audio`, `/classic`; update via a Reload prompt; icons from `npm run icons`. HTTPS (Tailscale) to
       install. Test: `npm run test:pwa` (docs/mobile.md §9).
+    - **Mute / LATAM language / permutations (owner prompt 49, 2026-10-15):** `docs/mute-language-permutations.md`.
+      - Audio source `mute` (+ required `audio.mute_reason`, match must be `no_equivalent`; additive, no migration).
+        M6 action `mute` = `audio_pipeline.silent_stream`: exact original sample count, MCC's own CELT silence
+        packet (retail `x70\cor_19` is already all silence). An empty subtitle (`none`) is written only when every
+        take of the tag agrees. Studio: "Mute in game", filter, badge, `muted` counts. Never mute lines yourself.
+      - A new H1 audio language is not supported (closed `localizations` list in `initial_ps.s3dpak`
+        `sound_config.ps`; fallback is per language). Replacing the Spain bank stays the route.
+      - `.lst.bin` sample ranges are per language (names identical, counts differ). Extra permutations are
+        structurally possible (bank + Spanish `.lst.bin` together; offline proof
+        `scripts/discovery/p49_offline_proofs.py permutations`); selection in game is unverified, and no installer
+        writes the `.lst.bin` yet.
+      - **Permutation experiment prepared (owner, 2026-10-16):** `docs/permutation-experiment.md`.
+        `python scripts/discovery/perm_experiment.py` → build `exp_grunt_death_violent_4` (kind `experiment`, bank +
+        Spanish `.lst.bin` as one unit, 19/19 offline). Installed/restored only by the owner from Build & Test
+        (`m6_install.py` handles both files; bank-only builds refuse a non-original index: `companion_check`).
+        The map tag has 4 permutations, #3 skip fraction 1.0. Johnson variant (`--preset johnson`): **in-game PASS
+        (owner, 2026-10-17, `v-000020`): all 4 takes heard**, so MCC selects added takes via the Spanish index.
+        6 takes (`--preset johnson6`, beyond the tag's 4): **PASS, all 6 heard (`v-000021`)**: the take count comes
+        from the Spanish index, not the map tag.
+      - **Added takes built (owner, 2026-10-17):** `docs/added-takes-design.md`. `manual_mappings.json` optional
+        `added_takes` (take_id `t-NNNNNN`, never reused; database v5); sounds without a SU/SP entry, mono; warning
+        above 12. Studio "Takes of this sound" (`AddedTakes.vue`, `/api/takes/save|move|remove`, `npm run
+        test:takes`). M6 `plan_inserts` / `insert_takes`: bank + Spanish `.lst.bin`, installed together. The editor
+        for added takes is not in the page yet. In-game check of a real build pending. Never add or approve takes
+        yourself.
+    - **Own take sets (owner, 2026-10-18):** `docs/custom-take-set-design.md`. Optional `own_sets` in
+      `manual_mappings.json` (database v6): the sound plays only its added takes; M6 removes its Spain samples
+      (`dropped`) once one take is approved. Turning it on clears the sound's line decisions (Needs rework, then
+      removal) only as the owner's confirmed action: the line's 4th audio option *Replace every take of this sound*
+      (`WholeSoundReplace.vue`, `/api/takes/own_set_on` + `audio_list`). Also: *Add several takes…*
+      (`/api/takes/add_many`). In-game check of a build that removes samples is pending. Never turn sets on yourself.
+    - **Replacement sets from existing selections (owner prompt, 2026-10-18):** `docs/replacement-set-conversion.md`.
+      A sound's per-take *selected* audio becomes one own set (equal CE line + language + effective recipe = one take;
+      match-only refs never count). Staged first (`own_sets[].state: "staged"`, line decisions stay in force, staged
+      takes never built), each take approved by the owner (approvals are never copied), then switched in one
+      `mapping_store.save_sequence`. `own_sets[].provenance` keeps the replaced decisions exactly (read-only); Undo
+      restores them exactly (store action `restore`, only for that record; conflicts previewed first). Owner action
+      *Approve unchanged converted takes* (new approvals, never copied). Local text is kept in git-ignored
+      `mappings/take_set_recovery.local.json`. Ask `common/own_set_state.py` which sets are in force. Read-only inventory:
+      `python scripts/validate/take_set_inventory.py` (never opens the DB writable). Never stage, switch, cancel or
+      undo on the real mappings yourself.
+    - **Join / play together (owner, 2026-10-19):** `docs/combine-recordings.md`. Line decisions only: `ce_concat`
+      (two CE lines one after the other, each part with its own recipe, a gap that may be negative) and new `ce_mix`
+      (both at once, a start offset), with `audio.edit` a combine recipe (`audio-combine/1`,
+      `common/audio_combine.py`); radio/echo on the result; no per-recording volume (a sum past -1 dBFS is lowered
+      just enough, reported). Built by M6 (`derive_combined`); preview == build. Not checked in game.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**
@@ -595,6 +658,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   - The Workshop release (M8) is gated on the M8.1 rights memo and the
     M8.2 alternatives.
   - Never commit or redistribute CE content.
+
+**How matching works end to end (data model, approval rules, API, build actions, agent rules):**
+[`docs/matching-for-ai.md`](docs/matching-for-ai.md). Read it before touching `mappings/` or the Studio's decision code.
 
 Full findings, open questions, and the proposed next experiment are in
 [`docs/feasibility.md`](docs/feasibility.md) and the Phase 2 docs above.
