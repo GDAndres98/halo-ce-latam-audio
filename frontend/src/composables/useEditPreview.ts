@@ -11,7 +11,8 @@
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { api, ApiError } from "../api/client";
 import { canListen, readOnly } from "../auth/session";
-import type { AudioEdit, CeLanguage } from "../api/types";
+import type { AudioEdit, CeLanguage, CombineEdit } from "../api/types";
+import { isCombined } from "../matching/draft";
 import type { MatchState } from "./useMatch";
 
 export interface RenderedPreview {
@@ -26,7 +27,10 @@ interface PreviewRequest {
   slot_id: string;
   ce_line_ref: string;
   language: CeLanguage;
-  edit: AudioEdit;
+  edit: AudioEdit | CombineEdit;
+  /** A join / an overlay (docs/combine-recordings.md): rendered through /api/edit/preview_combined. */
+  source?: string;
+  sources?: { ce_line_ref: string; language: CeLanguage }[];
 }
 
 /** How long the recipe must stay unchanged before it is rendered (dragging a handle changes it often). */
@@ -46,6 +50,12 @@ export function useEditPreview(match: MatchState, delayMs = PREVIEW_DELAY_MS) {
     const draft = match.draft;
     // Rendering a preview is a write on the server: never in the read-only view, never without audio.
     if (!detail || detail.edit?.available === false || !canListen.value || readOnly.value) return null;
+    if (isCombined(draft.audioSource)) {
+      if (!draft.audioRef || !draft.audioRefB || !draft.combine) return null;
+      return { slot_id: detail.slot_id, ce_line_ref: `${draft.audioRef}+${draft.audioRefB}`, language: draft.audioLanguage,
+               source: draft.audioSource, edit: draft.combine,
+               sources: [draft.audioRef, draft.audioRefB].map((ref) => ({ ce_line_ref: ref, language: draft.audioLanguage })) };
+    }
     if (draft.audioSource !== "ce" || !draft.audioRef) return null;
     return { slot_id: detail.slot_id, ce_line_ref: draft.audioRef, language: draft.audioLanguage, edit: draft.edit };
   });
@@ -62,7 +72,10 @@ export function useEditPreview(match: MatchState, delayMs = PREVIEW_DELAY_MS) {
   async function render(body: PreviewRequest, bodyKey: string, mine: number) {
     controller = new AbortController();
     try {
-      const result = await api.editPreview(body, controller.signal);
+      const result = body.sources
+        ? await api.editPreviewCombined({ slot_id: body.slot_id, source: body.source as string, sources: body.sources,
+                                          edit: body.edit as CombineEdit }, controller.signal)
+        : await api.editPreview(body as PreviewRequest & { edit: AudioEdit }, controller.signal);
       if (mine !== sequence) return;
       rendered.value = { key: bodyKey, edited: result.urls.edited, encoded: result.urls.encoded, stats: result.stats };
     } catch (e) {

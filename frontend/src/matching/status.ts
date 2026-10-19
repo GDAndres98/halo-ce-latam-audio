@@ -20,6 +20,8 @@ export function markFor(state: string): StatusMark {
       return { glyph: "⊘", word: "no equivalent", tone: "muted" };
     case "deferred":
       return { glyph: "…", word: "deferred", tone: "muted" };
+    case "no_subtitle_entry":
+      return { glyph: "⊘", word: "no subtitle entry (the sound has none)", tone: "muted" };
     default:
       return { glyph: "–", word: "unmatched", tone: "muted" };
   }

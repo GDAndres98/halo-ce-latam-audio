@@ -161,7 +161,10 @@ class SyncTests(unittest.TestCase):
         try:
             self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], mapping_db.DB_SCHEMA_VERSION)  # v4, v5
             self.assertEqual(conn.execute("SELECT COUNT(*), MAX(reason) FROM slot_history").fetchone(), (1, None))
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM added_takes").fetchone()[0], 0)  # v5: additive table
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM added_takes").fetchone()[0],
+                             len(doc.get("added_takes", [])))  # v5: additive table
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM own_sets").fetchone()[0],
+                             len(doc.get("own_sets", [])))  # v6: additive table
             self.assertEqual(mapping_db.export_bytes(conn), self.path.read_bytes())  # same export as before
         finally:
             conn.close()
@@ -272,9 +275,12 @@ class ExportFromBodiesTests(unittest.TestCase):
             self.skipTest("needs the live mappings file")
         doc = json.loads(LIVE.read_bytes().decode("utf-8"))
         bodies = [mapping_db.body_of(x) for x in doc["slots"]]
-        self.assertEqual(mapping_db.serialize_from_bodies(doc["schema"], doc["pins"], bodies), mapping_db.serialize(doc))
+        takes = [mapping_db.body_of(t) for t in doc.get("added_takes", [])]
+        sets = [mapping_db.body_of(o) for o in doc.get("own_sets", [])]
+        self.assertEqual(mapping_db.serialize_from_bodies(doc["schema"], doc["pins"], bodies, takes, sets),
+                         mapping_db.serialize(doc))
         for n in (0, 1, 2):
-            part = {**doc, "slots": doc["slots"][:n]}
+            part = {"schema": doc["schema"], "pins": doc["pins"], "slots": doc["slots"][:n]}
             self.assertEqual(mapping_db.serialize_from_bodies(part["schema"], part["pins"], bodies[:n]),
                              mapping_db.serialize(part))
 

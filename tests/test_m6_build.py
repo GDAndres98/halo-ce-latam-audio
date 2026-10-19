@@ -132,7 +132,7 @@ class PlanTests(unittest.TestCase):
         self.assertIn("drift", e["reason"])
         concat = copy.deepcopy(doc)
         concat["slots"][0]["audio"]["source"] = "ce_concat"
-        self.assertIn("ce_concat", self.plan(concat)[0]["entries"][0]["reason"])
+        self.assertIn("a join needs exactly two CE lines", self.plan(concat)[0]["entries"][0]["reason"])  # one source
         dup = copy.deepcopy(doc)
         dup["slots"].append(dict(copy.deepcopy(doc["slots"][0]), mapping_id="m-000009"))
         plan = self.plan(dup)[0]

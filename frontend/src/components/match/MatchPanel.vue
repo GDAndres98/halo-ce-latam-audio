@@ -9,11 +9,11 @@
 // The save bar stays in view at the bottom: one Save draft writes audio, subtitle, flags and notes together.
 
 import { FileAudio, ListChecks, Unlink } from "lucide-vue-next";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { audioUrl } from "../../api/client";
 import { canListen, canPlayPreviews, readOnly } from "../../auth/session";
 import AudioButton from "../AudioButton.vue";
-import type { CeLine } from "../../api/types";
+import type { CeLine, SoundTakes } from "../../api/types";
 import { useEditPreview } from "../../composables/useEditPreview";
 import type { MatchState } from "../../composables/useMatch";
 import StatusBadge from "../StatusBadge.vue";
@@ -23,7 +23,9 @@ import StateMessage from "../ui/StateMessage.vue";
 import AudioCompare from "../waveform/AudioCompare.vue";
 import AddedTakes from "./AddedTakes.vue";
 import AudioDecision from "./AudioDecision.vue";
+import WholeSoundReplace from "./WholeSoundReplace.vue";
 import AudioEditor from "./AudioEditor.vue";
+import CombineEditor from "./CombineEditor.vue";
 import FlagsNotes from "./FlagsNotes.vue";
 import { FLAGS, FLAG_ORDER } from "./flags";
 import { canUnmatch } from "../../matching/draft";
@@ -52,8 +54,40 @@ const switching = computed(
 const draft = computed(() => props.match.draft);
 const stored = computed(() => detail.value?.mapping ?? null);
 // The public read-only view (docs/public-access.md) shows every decision as it is stored, never editable.
-const audioLocked = computed(() => readOnly.value || stored.value?.audio.status === "approved");
-const subtitleLocked = computed(() => readOnly.value || stored.value?.subtitle.status === "approved");
+/** "Spain take n of N" when the line's sound has several Spain takes (they share "Takes of this sound"). */
+const takeOf = computed(() => {
+  const s = detail.value?.sound;
+  if (!s || s.spain_takes.length < 2) return null;
+  const i = s.spain_takes.findIndex((t) => t.slot_id === detail.value?.slot_id);
+  return i < 0 ? null : { n: i + 1, spain: s.spain_takes.length, added: s.added_takes.length };
+});
+/** The line's sound plays its own take set: this Spain take is removed, so the line takes no decision. */
+const ownSet = computed(() => Boolean(detail.value?.sound?.own_set));
+/** The 4th audio option ("Replace every take of this sound") is open; reset when another line opens. */
+const wholeChosen = ref(false);
+watch(() => detail.value?.slot_id, () => (wholeChosen.value = false));
+const whole = computed(() => ownSet.value || wholeChosen.value);
+/** The sound's takes at a glance, for the bottom band while the own take set is on. */
+const ownSetStatus = computed(() => {
+  const takes = detail.value?.sound?.added_takes ?? [];
+  const ok = takes.filter((t) => t.audio.status === "approved").length;
+  return ok === takes.length && ok > 0
+    ? { label: `all ${ok} takes approved`, tone: "ok" as const }
+    : { label: `${ok} of ${takes.length} takes approved`, tone: "warn" as const };
+});
+/** A takes save: keep the panel's copy of the sound current; switching the own take set changes this line's own
+ * decision on the server (cleared, or decidable again), so the line is reloaded. */
+function onTakesChanged(s: SoundTakes) {
+  const d = props.match.detail.value;
+  if (!d) return;
+  const switched = Boolean(d.sound?.own_set) !== Boolean(s.own_set);
+  d.sound = s;
+  if (!switched) return;
+  if (!s.own_set) wholeChosen.value = false; // back to Spain's takes: the 4th option closes
+  void props.match.load(d.slot_id);
+}
+const audioLocked = computed(() => readOnly.value || ownSet.value || stored.value?.audio.status === "approved");
+const subtitleLocked = computed(() => readOnly.value || ownSet.value || stored.value?.subtitle.status === "approved");
 
 const mccUrl = computed(() => (detail.value ? audioUrl.mcc(detail.value.level, "spanish", detail.value.spanish.index) : null));
 /** The MCC English takes of the line, which A can play instead of Spain's under "Listen and compare". */
@@ -77,7 +111,8 @@ const replacement = computed(() => {
   const d = draft.value;
   const unedited = d.audioSource === "ce" && d.audioRef ? audioUrl.ce(d.audioRef, d.audioLanguage) : null;
   if (readOnly.value) return { unedited, edited: publicPreviewUrl.value, encoded: null };
-  const current = unedited ? preview.current.value : null;
+  const combined = d.audioSource === "ce_concat" || d.audioSource === "ce_mix";  // B = the rendered join / overlay
+  const current = unedited || combined ? preview.current.value : null;
   return { unedited, edited: current?.edited ?? null, encoded: current?.encoded ?? null };
 });
 
@@ -149,6 +184,18 @@ async function choose(ref: string) {
           <div v-else class="source-meta line-title">
             <h2>{{ detail.tag_name }}</h2>
             <p class="small muted">speaker {{ detail.speaker_from_name || "—" }} · {{ detail.spanish.duration_s.toFixed(2) }} s (Spain)</p>
+            <p v-if="ownSet" class="small warn" data-testid="own-set-line">
+              Every take of this sound is replaced: this Spain take is not used, and the line takes no decision of its
+              own (choose "Back to Spain's takes" under Replacement audio to decide it again).
+            </p>
+            <p v-if="detail.sound?.mode === 'replacement_set_staged'" class="small warn" data-testid="staged-set-line">
+              A replacement set for this sound is staged: this line's decision still applies until the sound is switched.
+              Changing it now means the conversion has to be cancelled and previewed again before the switch.
+            </p>
+            <p v-if="takeOf" class="small muted" data-testid="take-of-sound">
+              Spain take {{ takeOf.n }} of {{ takeOf.spain }} of this sound<template v-if="takeOf.added"> · plus {{ takeOf.added }} added</template>:
+              the other takes are listed under "Takes of this sound".
+            </p>
           </div>
         </div>
 
@@ -207,6 +254,10 @@ async function choose(ref: string) {
               <span v-else-if="preview.rendering.value" class="small muted" data-testid="draft-rendering">rendering the draft…</span>
             </span>
           </template>
+          <code v-else-if="(draft.audioSource === 'ce_concat' || draft.audioSource === 'ce_mix') && draft.audioRef"
+                class="source-key" data-testid="ce-key-combined">
+            {{ draft.audioRef }} {{ draft.audioSource === "ce_concat" ? "then" : "with" }} {{ draft.audioRefB ?? "?" }}
+          </code>
           <span v-else-if="draft.audioSource === 'mute'" class="source-key muted" data-testid="ce-muted">None: the line is muted in game</span>
           <span v-else class="source-key muted">None: Spain's audio stays</span>
         </div>
@@ -230,7 +281,18 @@ async function choose(ref: string) {
           </span>
         </div>
 
-        <AudioDecision :draft="draft" :locked="audioLocked" :read-only="readOnly" @choose="choose" @remove="match.removeMatch" @mute="match.mute" />
+        <AudioDecision
+          :draft="draft" :locked="audioLocked" :read-only="readOnly" :whole="whole" :whole-on="ownSet"
+          :whole-allowed="detail.sound ? detail.sound.allowed && detail.sound.mode !== 'replacement_set_staged' : false"
+          :whole-reason="detail.sound?.mode === 'replacement_set_staged' ? 'a replacement set of this sound is staged (see Takes of this sound)' : detail.sound?.reason ?? 'no takes information'"
+          @choose="choose" @remove="match.removeMatch" @mute="match.mute" @whole="(on) => (wholeChosen = on)"
+        />
+        <WholeSoundReplace
+          v-if="whole && detail.sound"
+          :key="`whole-${detail.slot_id}`" :sound="detail.sound" :slot-id="detail.slot_id"
+          :focused-ref="props.focusedRef ?? null" :can-listen="canListen" :read-only="readOnly"
+          @changed="onTakesChanged"
+        />
         <p class="decision-status"><StatusBadge v-bind="statusOf('audio')" /></p>
       </section>
 
@@ -239,9 +301,10 @@ async function choose(ref: string) {
         :key="`takes-${detail.slot_id}`"
         :sound="detail.sound ?? null"
         :focused-ref="props.focusedRef ?? null"
+        :slot-id="detail.slot_id"
         :read-only="readOnly"
         :can-listen="canListen"
-        @changed="(s) => { if (match.detail.value) match.detail.value.sound = s; }"
+        @changed="onTakesChanged"
       />
 
       <!-- 2. Flags & notes -->
@@ -253,6 +316,12 @@ async function choose(ref: string) {
 
       <!-- 3. Audio editing (a read-only summary in the public view, or where recordings cannot be played) -->
       <RecipeSummary v-if="readOnly || !canListen" :detail="detail" :draft="draft" />
+      <CombineEditor
+        v-else-if="draft.audioSource === 'ce_concat' || draft.audioSource === 'ce_mix'"
+        :key="`combine-${detail.slot_id}`" :draft="draft" :locked="audioLocked" :slot-id="detail.slot_id"
+        :original-url="mccUrl" :preview-url="replacement.edited" :stats="preview.current.value?.stats ?? null"
+        :rendering="preview.rendering.value" :errors="preview.errors.value"
+      />
       <AudioEditor
         v-else
         :key="detail.slot_id" :draft="draft" :locked="audioLocked"
@@ -288,6 +357,16 @@ async function choose(ref: string) {
       </SubtitleDecision>
 
       <ReadOnlyNotice v-if="readOnly" />
+      <!-- Every take of the sound is replaced: the line has no decision of its own to save or approve; the takes are
+           approved one by one under "Takes of this sound". -->
+      <section v-else-if="ownSet" class="save-bar action-band" aria-label="Save the decision" data-section="save"
+               data-testid="own-set-savebar">
+        <p class="small">
+          <StatusBadge :label="ownSetStatus.label" :tone="ownSetStatus.tone" />
+          Nothing to save or approve on this line: every take of <span class="mono">{{ detail.sound?.tag_name }}</span>
+          is replaced. Approve the takes one by one under "Takes of this sound".
+        </p>
+      </section>
       <SaveBar v-else :match="match" @save-next="emit('saveNext')" />
     </template>
 

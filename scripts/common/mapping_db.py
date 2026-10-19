@@ -18,6 +18,7 @@ Why this shape:
   tables or columns through explicit migrations here; it never reshapes rows silently.
   v2 -> v3: the documents tables. v3 -> v4: slot_history.reason (why a row was written:
   NULL for an ordinary Studio save, "import:<sha256>" for an explicit JSON import).
+  v4 -> v5: the added_takes tables. v5 -> v6: the own_sets tables (docs/custom-take-set-design.md).
 - SQLite is the source of truth. The JSON file is rewritten from it after every save; a file
   that differs (a git checkout, an editor) is never read back silently. The owner either
   re-exports the database over it or imports it explicitly (mapping_store.preview_import /
@@ -32,7 +33,8 @@ from pathlib import Path
 
 from .jsonschema_lite import load_schema, validate
 
-DB_SCHEMA_VERSION = 5
+DB_SCHEMA_VERSION = 6
+TOP_LEVEL_ORDER = ("schema", "pins", "slots", "added_takes", "own_sets")  # the file's key order
 SOURCE_SCHEMA = "manual-mappings/3"
 
 DDL = """
@@ -82,6 +84,19 @@ CREATE TABLE added_take_history (
     reason      TEXT
 );
 CREATE INDEX added_take_history_take ON added_take_history (take_id);
+CREATE TABLE own_sets (
+    position INTEGER PRIMARY KEY,                   -- order in the file's own_sets list
+    mcc_tag  TEXT NOT NULL UNIQUE,
+    body     TEXT NOT NULL                          -- exact JSON as stored in the file
+);
+CREATE TABLE own_set_history (
+    id          INTEGER PRIMARY KEY,
+    changed_at  TEXT NOT NULL,
+    mcc_tag     TEXT NOT NULL,
+    before_body TEXT,                               -- NULL when the set was turned on
+    after_body  TEXT,                               -- NULL when it was turned off
+    reason      TEXT
+);
 CREATE TABLE documents (
     name               TEXT PRIMARY KEY,            -- e.g. manual_mappings.local.json
     body               TEXT NOT NULL,               -- exact file text (canonical JSON): the source of truth
@@ -99,7 +114,8 @@ CREATE TABLE document_history (
 
 # Version 2 -> 3 only adds the two document tables. Nothing existing is touched.
 DDL_V3_DOCUMENTS = DDL[DDL.index("CREATE TABLE documents"):]
-DDL_V5_TAKES = DDL[DDL.index("CREATE TABLE added_takes"):DDL.index("CREATE TABLE documents")]
+DDL_V5_TAKES = DDL[DDL.index("CREATE TABLE added_takes"):DDL.index("CREATE TABLE own_sets")]
+DDL_V6_OWN_SETS = DDL[DDL.index("CREATE TABLE own_sets"):DDL.index("CREATE TABLE documents")]
 
 
 class MappingDbError(Exception):
@@ -116,7 +132,9 @@ def db_path_for(path):
 
 
 def serialize(doc):
-    """The exact bytes the store writes. Used to prove the export is byte-identical to the file."""
+    """The exact bytes the store writes. Used to prove the export is byte-identical to the file. Top-level keys
+    are written in TOP_LEVEL_ORDER whatever order the dict has (unknown keys after them, as given)."""
+    doc = {**{k: doc[k] for k in TOP_LEVEL_ORDER if k in doc}, **doc}
     return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
@@ -136,7 +154,7 @@ def _list_block(bodies):
     return "[\n" + ",\n".join("    " + b.replace("\n", "\n    ") for b in bodies) + "\n  ]"
 
 
-def serialize_from_bodies(schema, pins, bodies, take_bodies=()):
+def serialize_from_bodies(schema, pins, bodies, take_bodies=(), set_bodies=()):
     """serialize({"schema", "pins", "slots"[, "added_takes"]}) built from the stored bodies instead of encoding
     every slot again. Byte-identical: json.dumps(indent=2) writes a slot at depth 2 exactly as body_of() writes
     it at depth 0, with every line indented four more spaces (tests/test_mapping_sync.py checks it on the live
@@ -148,6 +166,8 @@ def serialize_from_bodies(schema, pins, bodies, take_bodies=()):
     text = head[:-len("[]\n}")] + _list_block(bodies)
     if take_bodies:
         text += ',\n  "added_takes": ' + _list_block(take_bodies)
+    if set_bodies:
+        text += ',\n  "own_sets": ' + _list_block(set_bodies)
     return (text + "\n}\n").encode("utf-8")
 
 
@@ -194,6 +214,9 @@ def open_existing(path):
     if version == 4:
         upgrade_v4_to_v5(conn)
         version = 5
+    if version == 5:
+        upgrade_v5_to_v6(conn)
+        version = 6
     if version != DB_SCHEMA_VERSION:
         conn.close()
         raise MappingDbError(f"{path}: database schema {version}, this build expects {DB_SCHEMA_VERSION}")
@@ -222,6 +245,13 @@ def upgrade_v4_to_v5(conn):
     conn.executescript(DDL_V5_TAKES.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ")
                        .replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS "))
     conn.execute("PRAGMA user_version = 5")
+    conn.commit()
+
+
+def upgrade_v5_to_v6(conn):
+    """Adds the own_sets tables (docs/custom-take-set-design.md). Additive only: no existing row changes."""
+    conn.executescript(DDL_V6_OWN_SETS.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS "))
+    conn.execute("PRAGMA user_version = 6")
     conn.commit()
 
 
@@ -272,6 +302,8 @@ def import_document(conn, doc, json_sha256):
     conn.executemany(
         "INSERT INTO added_takes (position, take_id, mcc_tag, audio_status, body) VALUES (?, ?, ?, ?, ?)",
         [(position, *take_columns(t), body_of(t)) for position, t in enumerate(doc.get("added_takes", []))])
+    conn.executemany("INSERT INTO own_sets (position, mcc_tag, body) VALUES (?, ?, ?)",
+                     [(position, o["mcc_tag"], body_of(o)) for position, o in enumerate(doc.get("own_sets", []))])
     conn.commit()
 
 
@@ -315,9 +347,16 @@ def store_document(conn, doc, changed_at, *, reason=None, data=None, changed_ids
                     for _, t, b in new_takes if old_takes.get(t["take_id"]) != b]
     kept = {t["take_id"] for _, t, _ in new_takes}
     take_history += [(changed_at, tid, b, None, reason) for tid, b in old_takes.items() if tid not in kept]
+    # Own sets: the same, keyed by their sound.
+    old_sets = {tag: body for tag, body in conn.execute("SELECT mcc_tag, body FROM own_sets")}
+    new_sets = [(position, o, body_of(o)) for position, o in enumerate(doc.get("own_sets", []))]
+    set_history = [(changed_at, o["mcc_tag"], old_sets.get(o["mcc_tag"]), b, reason)
+                   for _, o, b in new_sets if old_sets.get(o["mcc_tag"]) != b]
+    kept_sets = {o["mcc_tag"] for _, o, _ in new_sets}
+    set_history += [(changed_at, tag, b, None, reason) for tag, b in old_sets.items() if tag not in kept_sets]
     if data is None:
         data = serialize_from_bodies(doc["schema"], doc["pins"], [b for _, _, b in new],
-                                     [b for _, _, b in new_takes])
+                                     [b for _, _, b in new_takes], [b for _, _, b in new_sets])
     export_sha = sha256(data)
     try:
         conn.execute("BEGIN")
@@ -342,6 +381,13 @@ def store_document(conn, doc, changed_at, *, reason=None, data=None, changed_ids
                              "VALUES (?, ?, ?, ?, ?)", [(p, *take_columns(t), b) for p, t, b in new_takes])
             conn.executemany("INSERT INTO added_take_history (changed_at, take_id, before_body, after_body, reason) "
                              "VALUES (?, ?, ?, ?, ?)", take_history)
+        stored_sets = [(tag, body) for tag, body in conn.execute("SELECT mcc_tag, body FROM own_sets ORDER BY position")]
+        if stored_sets != [(o["mcc_tag"], b) for _, o, b in new_sets]:
+            conn.execute("DELETE FROM own_sets")
+            conn.executemany("INSERT INTO own_sets (position, mcc_tag, body) VALUES (?, ?, ?)",
+                             [(p, o["mcc_tag"], b) for p, o, b in new_sets])
+            conn.executemany("INSERT INTO own_set_history (changed_at, mcc_tag, before_body, after_body, reason) "
+                             "VALUES (?, ?, ?, ?, ?)", set_history)
         _write_meta(conn, [
             ("source_schema", doc["schema"]),
             ("pins", json.dumps(doc["pins"], ensure_ascii=False)),
@@ -370,6 +416,9 @@ def export_document(conn):
     takes = [json.loads(body) for (body,) in conn.execute("SELECT body FROM added_takes ORDER BY position")]
     if takes:
         doc["added_takes"] = takes
+    sets = [json.loads(body) for (body,) in conn.execute("SELECT body FROM own_sets ORDER BY position")]
+    if sets:
+        doc["own_sets"] = sets
     return doc
 
 

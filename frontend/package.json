@@ -20,6 +20,8 @@
     "test:radio": "node e2e/radio.mjs",
     "test:mute": "node e2e/mute.mjs",
     "test:takes": "node e2e/takes.mjs",
+    "test:take-sets": "node e2e/take-sets.mjs",
+    "test:combine": "node e2e/combine.mjs",
     "test:interference": "node e2e/interference.mjs",
     "test:downloads": "node e2e/downloads.mjs",
     "test:workflow": "node e2e/workflow.mjs",

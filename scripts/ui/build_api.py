@@ -38,7 +38,7 @@ from b2_bank_install import running_game_processes  # noqa: E402
 from common.env import load_env  # noqa: E402
 from common.export_config import load_export_config  # noqa: E402
 from common.m6_build import (  # noqa: E402
-    BUILD_KINDS, SUBTITLE_TABLES, mission_folders, plan_audio, plan_inserts, subtitle_plan)
+    BUILD_KINDS, SUBTITLE_TABLES, mission_folders, own_set_drops, plan_audio, plan_inserts, subtitle_plan)
 from m4_app import ApiError  # noqa: E402
 
 NAME_RE = re.compile(r"^[a-z0-9_]{1,40}$")
@@ -243,8 +243,8 @@ class BuildBoard:
         doc, _ = app._mappings()
         local, _ = app._local()
         idx = dict(slot_index=app.slot_index, ce_lines=app.ce_lines, ce_idx=app.ce_idx, mcc_idx=app.mcc_idx)
-        audio = plan_audio(doc, levels, local=local, **idx)
         ins = plan_inserts(doc, levels, local=local, subtitle_keys=app._subtitle_keys(), **idx)
+        audio = plan_audio(doc, levels, local=local, dropped_tags=own_set_drops(doc, ins), **idx)
         subs = subtitle_plan(doc, set(levels), local=local, tables={t: app.loc.get(t) for t in SUBTITLE_TABLES}, **idx)
         acts = {}
         for e in audio["entries"]:
@@ -253,7 +253,7 @@ class BuildBoard:
                     for r in subs["rows"] if r["category"] in ("excluded", "conflict", "missing_key")]
         return {"levels": levels, "scope": label,
                 "audio": {"replace": acts.get("replace", 0), "keep_original": acts.get("keep_original", 0),
-                          "mute": acts.get("mute", 0),
+                          "mute": acts.get("mute", 0), "dropped": acts.get("dropped", 0),
                           "insert": sum(1 for e in ins if e["action"] == "insert"),
                           "insert_not_eligible": sum(1 for e in ins if e["action"] == "not_eligible"),
                           "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},

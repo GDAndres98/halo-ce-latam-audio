@@ -239,3 +239,66 @@ def derive_processed(src, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global
     }
     out = _write_derived(out_root, stream_sha, pcm, 1, recipe)
     return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, "edit_stats": st, **enc}
+
+
+def render_combined(srcs, edit, *, ffmpeg, ref_lufs=None, global_gain_db=0.0, level_mode="global_gain", clicks=None):
+    """Two source WAVs -> 44.1 kHz PCM each -> combine recipe (join or overlay, common/audio_combine) -> level.
+    -> (source PCMs, render result). The single function both the M4 preview and the M6 build call."""
+    from . import audio_combine
+    pcms = [to_mcc_pcm(ffmpeg, s, 1) for s in srcs]
+    return pcms, audio_combine.render(pcms, edit, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                                      level_mode=level_mode, clicks=clicks)
+
+
+def derive_combined(srcs, edit, *, ffmpeg, celt, out_root, ref_lufs=None, global_gain_db=0.0, profile="fmod",
+                    sources_meta=None, gain_source=None, level_mode="global_gain", clicks=None):
+    """`derive_processed` for two recordings in one replacement: both converted, combined by the recipe, then the
+    same level stage, CELT encode (fmod profile) and recipe.json under work/derived/<stream sha>/."""
+    from . import audio_combine
+    srcs = [Path(s) for s in srcs]
+    pcms, r = render_combined(srcs, edit, ffmpeg=ffmpeg, ref_lufs=ref_lufs, global_gain_db=global_gain_db,
+                              level_mode=level_mode, clicks=clicks)
+    pcm, st = r["pcm"], r["stats"]
+    enc = encode_for_mcc(celt, pcm, 1, profile)
+    decoded = celt.decode(enc["packets"], channels=1)
+    stream_sha = sha256_bytes(enc["stream"])
+    n = len(pcm) // 2
+    steps = [{"op": "ffmpeg_convert", "version": ffmpeg_version(ffmpeg), "args": ffmpeg_args("<source>", 1),
+              "sources": len(srcs)},
+             {"op": "audio_combine", "engine": audio_combine.ENGINE, "render_engine": audio_combine.RENDER_ENGINE,
+              "recipe": edit, "summary": audio_combine.summary(edit),
+              "source_pcm_sha256": [sha256_bytes(p) for p in pcms], "overlap_s": st["overlap_s"],
+              "sum_trim_db": st["sum_trim_db"]}]
+    if st["level_mode_used"] == "match_spain":
+        steps.append({"op": "match_spain", "spain_lufs": st["mcc_reference_lufs"],
+                      "line_lufs_before": st["loudness_before_gain_lufs"], **st["match"], "source": gain_source})
+    else:
+        steps.append({"op": "global_gain", "requested_db": st["global_gain_requested_db"],
+                      "applied_db": st["global_gain_applied_db"], "shortfall_db": st["global_gain_shortfall_db"],
+                      "source": gain_source})
+    if st.get("echo"):
+        steps.append({"op": "echo", **st["echo"]})
+    if (st.get("radio") or {}).get("clicks"):
+        steps.append({"op": "radio_clicks", **st["radio"]["clicks"]})
+    steps += [
+        {"op": "pad_end", "samples": CODEC_DELAY, "reason": "CELT 0.11 codec delay"},
+        {"op": "celt_encode", "library": "libcelt-0110.dll (vgmstream r2117)", "profile": profile,
+         "settings": {str(k): v for k, v in PROFILES[profile].items()}, "sample_rate": SAMPLE_RATE,
+         "frame_samples": FRAME_SAMPLES, "packet_bytes": sorted({len(p) for p in enc["packets"]})}]
+    metas = sources_meta or [{} for _ in srcs]
+    recipe = {
+        "schema": RECIPE_SCHEMA, "render_engine": audio_combine.RENDER_ENGINE,
+        "sources": [{"file": s.name, "sha256": sha256_file(s), **wav_info(s), **m} for s, m in zip(srcs, metas)],
+        "steps": steps,
+        "content_changes": "owner combine recipe: " + audio_combine.summary(edit) + "; "
+        + (f"matched to Spain {st['total_gain_db']:+g} dB" if st["level_mode_used"] == "match_spain"
+           else f"global gain {st['global_gain_applied_db']:+g} dB")
+        + (f"; lowered {-st['sum_trim_db']:g} dB where the recordings add up" if st["sum_trim_db"] else ""),
+        "stats": st,
+        "pcm_44100": {"sha256": sha256_bytes(pcm), "samples": n, "seconds": round(n / SAMPLE_RATE, 3)},
+        "output": {"stream_sha256": stream_sha, "stream_bytes": len(enc["stream"]), "frames": enc["frames"],
+                   "sample_count": enc["sample_count"], "seconds": round(enc["sample_count"] / SAMPLE_RATE, 3),
+                   "own_decode_snr_db": round(snr_db(pcm, decoded), 1)},
+    }
+    out = _write_derived(out_root, stream_sha, pcm, 1, recipe)
+    return {"recipe": recipe, "pcm": pcm, "decoded": decoded, "dir": out, "edit_stats": st, **enc}

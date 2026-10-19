@@ -12,9 +12,14 @@ Audio eligibility (per mapping in the selected levels):
                   catalog), never an English index. An edited line carries its recipe (`edit`);
                   the CLI renders it with common/audio_edit, exactly as the M4 preview does.
   keep_original   audio approved as "keep Spain" -> sample preserved byte for byte.
+  replace (two)   the same for a join (`ce_concat`) or an overlay (`ce_mix`) of two CE lines: both resolved, a valid
+                  combine recipe made for exactly those two (common/audio_combine.py); the entry carries `sources`
+                  and the CLI renders it with audio_pipeline.derive_combined (docs/combine-recordings.md).
   mute            audio approved as "Mute / No replacement", mono slot, no drift, no recipe -> the sample
                   becomes digital silence of exactly its original sample count (common/audio_pipeline.
                   silent_stream: MCC's own CELT silence packet, so the stream keeps its exact byte length).
+  dropped         the sound plays its own take set (docs/custom-take-set-design.md) and at least one of its added
+                  takes is inserted: the sound's Spain samples are removed from the bank and the Spanish index.
   not_eligible    draft / needs_rework / unsupported (ce_concat, user_recording, composite, stereo,
                   gap on one line) / invalid (drift, unresolved media, test event, bad recipe) -> sample
                   preserved, reason
@@ -25,10 +30,11 @@ SU and SP separately; common/mcc_loc_writer writes the tables (variable length, 
 import json
 from collections import Counter, defaultdict
 
-from . import audio_edit
+from . import audio_combine, audio_edit
 from .fsb5_lib import parse_header
 from .fsb5_writer import ALIGN, build, decompose, replace_sample, sample_spans
 from .mcc_loc import loc_key, parse_mcc_loc
+from .own_set_state import active_own_tags, staged_take_ids
 from .project_validation import added_take_fingerprint, audio_fingerprint, subtitle_fingerprint
 
 PLAN_SCHEMA = "m6-build-plan/1"
@@ -38,8 +44,19 @@ def _flag(m, name, key):
     return bool((m.get(name) or {}).get(key))
 
 
-def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None):
-    """-> {"entries": [...], "conflicts": [...]} for every Spanish slot in `levels` (mapped or not)."""
+def own_set_drops(doc, insert_entries):
+    """Sounds whose Spain samples a build removes: in own-take-set mode with at least one take to insert. A sound
+    in that mode without an insertable take keeps Spain's takes (never an empty sound). A staged conversion
+    (docs/replacement-set-conversion.md) is not in force: its sound plays as before."""
+    own = active_own_tags(doc)
+    return sorted(own & {e["mcc_tag"] for e in insert_entries if e["action"] == "insert"})
+
+
+def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None, dropped_tags=()):
+    """-> {"entries": [...], "conflicts": [...]} for every Spanish slot in `levels` (mapped or not).
+    dropped_tags: own_set_drops(); their slots get the action `dropped`."""
+    dropped_tags = set(dropped_tags)
+    own = active_own_tags(doc)
     levels = set(levels)
     by_slot = defaultdict(list)
     for m in doc["slots"]:
@@ -54,6 +71,13 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
              "original_seconds": sample["duration_s"], "mapping_id": None, "action": "keep_original",
              "reason": "no mapping (Spain audio stays)", "radio_effect": False, "different_but_fits": False,
              "edit": None}
+        if rec["mcc_tag"] in dropped_tags:
+            e.update(action="dropped", reason="own take set: Spain's take is removed (the sound plays its own takes)",
+                     mapping_id=ms[0]["mapping_id"] if ms else None)
+            entries.append(e)
+            continue
+        if rec["mcc_tag"] in own and not ms:
+            e["reason"] = "own take set without an approved take yet: Spain audio stays"
         if len(ms) > 1:
             conflicts.append({"code": "duplicate_mapping_for_slot", "slot_id": sid,
                               "mapping_ids": [m["mapping_id"] for m in ms]})
@@ -87,6 +111,8 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
             else:
                 e.update(action="mute", reason="approved: mute (silence of the original length)",
                          mute_reason=a.get("mute_reason"))
+        elif a["source"] in audio_combine.MODE_OF:
+            e.update(_plan_combined(m, sample, ce_lines, ce_idx, mcc_idx, local))
         elif a["source"] != "ce":
             e.update(action="not_eligible", reason=f"unsupported in this build: audio source {a['source']}")
         elif sample["channels"] != 1:
@@ -130,13 +156,51 @@ def plan_audio(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None
     return {"schema": PLAN_SCHEMA, "levels": sorted(levels), "entries": entries, "conflicts": conflicts}
 
 
+def _plan_combined(m, sample, ce_lines, ce_idx, mcc_idx, local):
+    """The plan fields of an approved join / overlay (two CE lines in one replacement)."""
+    a = m["audio"]
+    word = "join" if a["source"] == "ce_concat" else "overlay"
+    if sample["channels"] != 1:
+        return {"action": "not_eligible", "reason": "unsupported: stereo slot (stereo replacement deferred)"}
+    if len(a["sources"]) != 2 or any(s.get("kind") != "ce" for s in a["sources"]):
+        return {"action": "not_eligible", "reason": f"unsupported: a {word} needs exactly two CE lines"}
+    srcs = []
+    for s in a["sources"]:
+        ref, lang = s["ce_line_ref"], s["language"]
+        line = ce_lines.get(ref)
+        media = ((line[2]["media"].get(lang) or {}) if line else {})
+        if not line:
+            return {"action": "not_eligible", "reason": f"invalid: unknown CE line {ref}"}
+        if "test_event" in line[1]["flags"]:
+            return {"action": "not_eligible", "reason": f"invalid: {ref} is a test event"}
+        if media.get("evidence") != "explicit" or len(media.get("media", [])) != 1:
+            return {"action": "not_eligible", "reason": f"invalid: {ref} has no single resolved {lang} media"}
+        srcs.append({"ce_line_ref": ref, "language": lang, "ce_mission": line[0], "media": media["media"][0]})
+    if a["fingerprint"] != audio_fingerprint(m, ce_idx, mcc_idx, local):
+        return {"action": "not_eligible",
+                "reason": "invalid: approved fingerprint no longer matches the catalogs (drift); rework it"}
+    edit = a["edit"]
+    probs = (["the recipe is not a join/overlay recipe"] if not audio_combine.is_combine(edit)
+             else [f"the recipe is a {edit.get('mode')}, the source a {word}"]
+             if edit.get("mode") != audio_combine.MODE_OF[a["source"]]
+             else audio_combine.problems(edit, sources=a["sources"]))
+    if probs:
+        return {"action": "not_eligible", "reason": "invalid: recipe: " + "; ".join(probs)}
+    first = srcs[0]
+    return {"action": "replace", "reason": f"approved CE {word} of two lines", "ce_line_ref": first["ce_line_ref"],
+            "language": first["language"], "ce_mission": first["ce_mission"], "media": first["media"],
+            "sources": srcs, "combine": edit["mode"], "edit": edit, "edit_summary": audio_combine.summary(edit)}
+
+
 def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None, subtitle_keys=None):
     """Approved added takes of the sounds in `levels` -> one entry each (docs/added-takes-design.md):
       insert        approved, its sound mono and without a subtitle entry, one resolved CE line, no drift, a valid
                     recipe made for that line -> inserted after the sound's Spain takes, in position order
-      skip          draft / needs_rework: left out (reported)
+      skip          draft / needs_rework, or created by a staged conversion that is not switched on yet
+                    (docs/replacement-set-conversion.md): left out (reported)
       not_eligible  invalid (reason reported). Nothing is approved or changed here."""
     levels = set(levels)
+    own, staged = active_own_tags(doc), staged_take_ids(doc)
     tags = {}
     for _sid, (lv, rec, _smp) in slot_index.items():
         tags.setdefault(rec["mcc_tag"], (lv, rec))
@@ -149,13 +213,17 @@ def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=No
         sp = rec["samples"]["spanish"]
         a = t["audio"]
         e = {"take_id": t["take_id"], "mcc_tag": t["mcc_tag"], "level": lv, "position": t["position"],
+             "own_set": t["mcc_tag"] in own,
              "spain_takes": len(sp), "ref_slot_id": sp[0]["slot_id"], "audio_status": a["status"],
              "radio_effect": bool(t["radio_effect"]["needed"]), "action": "not_eligible", "reason": "", "edit": None}
         src = (a["sources"] or [{}])[0]
         ref, lang = src.get("ce_line_ref"), src.get("language")
         line = ce_lines.get(ref)
         media = ((line[2]["media"].get(lang) or {}) if line else {})
-        if a["status"] != "approved":
+        if t["take_id"] in staged:
+            e.update(action="skip", reason="staged replacement set: inserted only after the sound is switched to its "
+                                           f"set (audio {a['status']})")
+        elif a["status"] != "approved":
             e.update(action="skip", reason=f"audio {a['status']} (not approved): not inserted")
         elif any(x["channels"] != 1 for x in sp):
             e.update(reason="unsupported: stereo sound (stereo replacement deferred)")
@@ -183,10 +251,13 @@ def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=No
     return out
 
 
-def insert_takes(bank, lst_bytes, inserts):
+def insert_takes(bank, lst_bytes, inserts, drop_tags=()):
     """bank (FSB5 bytes, any replacements already applied), the Spanish index (.lst.bin bytes) and
     inserts [{"take_id", "mcc_tag", "stream", "sample_count"}] in position order -> (bank bytes, lst bytes,
-    index_map [original index -> new index], {take_id: new index}).
+    index_map [original index -> new index, None for a removed sample], {take_id: new index}).
+
+    drop_tags: sounds in own-take-set mode; their own samples are left out, so the sound holds only its inserted
+    takes (each must have at least one).
 
     Each sound's added takes go right after its own samples; the index gets the new counts and shifted
     starts. A new sample copies the head bits of its sound's first sample (frequency, mono) and gets a LOOP
@@ -200,13 +271,19 @@ def insert_takes(bank, lst_bytes, inserts):
     by_tag = defaultdict(list)
     for x in inserts:
         by_tag[x["mcc_tag"]].append(x)
-    unknown = set(by_tag) - {t for t, _, _ in lst["records"]}
+    unknown = (set(by_tag) | set(drop_tags)) - {t for t, _, _ in lst["records"]}
     if unknown:
         raise ValueError(f"sounds not in the index: {sorted(unknown)}")
+    empty = sorted(t for t in drop_tags if not by_tag.get(t))
+    if empty:
+        raise ValueError(f"refusing to remove every take of {empty}: no take to insert")
     samples, names, records, index_map, new_index = [], [], [], [], {}
     for tag, first, count in lst["records"]:
         start = len(samples)
         for i in range(first, first + count):
+            if tag in drop_tags:
+                index_map.append(None)
+                continue
             index_map.append(len(samples))
             samples.append(model["samples"][i])
             names.append(model["names"][i])
@@ -226,8 +303,9 @@ def insert_takes(bank, lst_bytes, inserts):
     return build(new), build_lst(lst["version"], records), index_map, new_index
 
 
-def insert_checks(base, cand, lst_old, lst_new, index_map, new_index, inserts):
-    """Independent checks of insert_takes: `cand` == `base` with the inserts added, and the index consistent."""
+def insert_checks(base, cand, lst_old, lst_new, index_map, new_index, inserts, drop_tags=()):
+    """Independent checks of insert_takes: `cand` == `base` with the inserts added (and the samples of drop_tags
+    removed), and the index consistent."""
     from .mcc_lst import build_lst, check_ranges, parse_lst
     mb, mc = decompose(base), decompose(cand)
     lo, ln = parse_lst(lst_old), parse_lst(lst_new)
@@ -235,13 +313,17 @@ def insert_checks(base, cand, lst_old, lst_new, index_map, new_index, inserts):
     for x in inserts:
         by_tag[x["mcc_tag"]] += 1
     rng = check_ranges(ln["records"], len(mc["samples"]))
+    drop = set(drop_tags)
+    dropped = {i for t, f, n in lo["records"] if t in drop for i in range(f, f + n)}
+    kept = lambda o: 0 if o[0] in drop else o[2]  # noqa: E731
     return {
         "insert:round_trip": build(mc) == cand,
-        "insert:sample_count": len(mc["samples"]) == len(mb["samples"]) + len(inserts),
+        "insert:sample_count": len(mc["samples"]) == len(mb["samples"]) + len(inserts) - len(dropped),
+        "insert:removed_exactly_the_own_set_sounds": {i for i, j in enumerate(index_map) if j is None} == dropped,
         "insert:header_tail_unchanged": mc["header_tail"] == mb["header_tail"] and mc["mode"] == mb["mode"],
         "insert:every_existing_sample_byte_identical_at_its_new_place": all(
             mc["samples"][index_map[i]] == s and mc["names"][index_map[i]] == mb["names"][i]
-            for i, s in enumerate(mb["samples"])),
+            for i, s in enumerate(mb["samples"]) if index_map[i] is not None),
         "insert:inserted_streams_and_counts": all(
             mc["samples"][new_index[x["take_id"]]]["stream"] == x["stream"]
             and mc["samples"][new_index[x["take_id"]]]["sample_count"] == x["sample_count"] for x in inserts),
@@ -251,9 +333,14 @@ def insert_checks(base, cand, lst_old, lst_new, index_map, new_index, inserts):
         "insert:lst_writer_reproduces_the_original_index": build_lst(lo["version"], lo["records"]) == lst_old,
         "insert:lst_same_tags_same_order": [r[0] for r in ln["records"]] == [r[0] for r in lo["records"]],
         "insert:lst_contiguous_and_covers_the_bank": rng["contiguous_from_zero"] and rng["total_matches_bank"],
-        "insert:lst_counts": all(n[2] == o[2] + by_tag.get(o[0], 0) for o, n in zip(lo["records"], ln["records"])),
+        "insert:lst_counts": all(n[2] == kept(o) + by_tag.get(o[0], 0) for o, n in zip(lo["records"], ln["records"])),
+        "insert:own_set_sounds_hold_only_their_takes": all(
+            n[2] == by_tag.get(o[0], 0) > 0 and all(new_index[x["take_id"]] in range(n[1], n[1] + n[2])
+                                                    for x in inserts if x["mcc_tag"] == o[0])
+            for o, n in zip(lo["records"], ln["records"]) if o[0] in drop),
         "insert:every_sound_resolves_to_its_old_samples_first": all(
-            [mc["samples"][j] for j in range(n[1], n[1] + o[2])] == [mb["samples"][i] for i in range(o[1], o[1] + o[2])]
+            [mc["samples"][j] for j in range(n[1], n[1] + kept(o))]
+            == [mb["samples"][i] for i in range(o[1], o[1] + kept(o))]
             for o, n in zip(lo["records"], ln["records"])),
     }
 
@@ -281,8 +368,9 @@ def edit_problems(edit, ref, lang):
     return out
 
 
-FOLDER_GROUPS = ("replace", "muted", "approved_keep_spain", "not_approved", "unmapped", "unsupported", "invalid")
-BUILT_ACTIONS = ("replace", "mute")  # actions that change a bank sample
+FOLDER_GROUPS = ("replace", "muted", "dropped", "approved_keep_spain", "not_approved", "unmapped", "unsupported",
+                 "invalid")
+BUILT_ACTIONS = ("replace", "mute", "dropped")  # actions that change a bank sample
 
 
 def entry_group(e):
@@ -291,6 +379,8 @@ def entry_group(e):
         return "replace"
     if e["action"] == "mute":
         return "muted"
+    if e["action"] == "dropped":
+        return "dropped"
     if e["mapping_id"] is None:
         return "unmapped"
     if e["action"] == "not_eligible":
@@ -316,7 +406,9 @@ def folder_summary(entries):
 def _built_key(e):
     """What a built slot depends on: same action, mapping, source media and edit recipe -> same sample."""
     return (e["action"], e.get("mapping_id"), e.get("ce_line_ref"), e.get("language"),
-            (e.get("media") or {}).get("wem_sha256"), json.dumps(e.get("edit"), sort_keys=True))
+            (e.get("media") or {}).get("wem_sha256"), json.dumps(e.get("edit"), sort_keys=True),
+            json.dumps([(s["ce_line_ref"], s["language"], s["media"].get("wem_sha256")) for s in e["sources"]])
+            if e.get("sources") else None)
 
 
 def compare_plans(built_entries, current_entries):

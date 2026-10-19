@@ -321,6 +321,27 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         test:takes`). M6 `plan_inserts` / `insert_takes`: bank + Spanish `.lst.bin`, installed together. The editor
         for added takes is not in the page yet. In-game check of a real build pending. Never add or approve takes
         yourself.
+    - **Own take sets (owner, 2026-10-18):** `docs/custom-take-set-design.md`. Optional `own_sets` in
+      `manual_mappings.json` (database v6): the sound plays only its added takes; M6 removes its Spain samples
+      (`dropped`) once one take is approved. Turning it on clears the sound's line decisions (Needs rework, then
+      removal) only as the owner's confirmed action: the line's 4th audio option *Replace every take of this sound*
+      (`WholeSoundReplace.vue`, `/api/takes/own_set_on` + `audio_list`). Also: *Add several takes…*
+      (`/api/takes/add_many`). In-game check of a build that removes samples is pending. Never turn sets on yourself.
+    - **Replacement sets from existing selections (owner prompt, 2026-10-18):** `docs/replacement-set-conversion.md`.
+      A sound's per-take *selected* audio becomes one own set (equal CE line + language + effective recipe = one take;
+      match-only refs never count). Staged first (`own_sets[].state: "staged"`, line decisions stay in force, staged
+      takes never built), each take approved by the owner (approvals are never copied), then switched in one
+      `mapping_store.save_sequence`. `own_sets[].provenance` keeps the replaced decisions exactly (read-only); Undo
+      restores them exactly (store action `restore`, only for that record; conflicts previewed first). Owner action
+      *Approve unchanged converted takes* (new approvals, never copied). Local text is kept in git-ignored
+      `mappings/take_set_recovery.local.json`. Ask `common/own_set_state.py` which sets are in force. Read-only inventory:
+      `python scripts/validate/take_set_inventory.py` (never opens the DB writable). Never stage, switch, cancel or
+      undo on the real mappings yourself.
+    - **Join / play together (owner, 2026-10-19):** `docs/combine-recordings.md`. Line decisions only: `ce_concat`
+      (two CE lines one after the other, each part with its own recipe, a gap that may be negative) and new `ce_mix`
+      (both at once, a start offset), with `audio.edit` a combine recipe (`audio-combine/1`,
+      `common/audio_combine.py`); radio/echo on the result; no per-recording volume (a sum past -1 dBFS is lowered
+      just enough, reported). Built by M6 (`derive_combined`); preview == build. Not checked in game.
     - **Deferred (owner):** `temp_mocap_VO` (backlog) and stereo replacement
       (stereo slots are only shown and played).
     - **Workshop**
@@ -637,6 +658,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   - The Workshop release (M8) is gated on the M8.1 rights memo and the
     M8.2 alternatives.
   - Never commit or redistribute CE content.
+
+**How matching works end to end (data model, approval rules, API, build actions, agent rules):**
+[`docs/matching-for-ai.md`](docs/matching-for-ai.md). Read it before touching `mappings/` or the Studio's decision code.
 
 Full findings, open questions, and the proposed next experiment are in
 [`docs/feasibility.md`](docs/feasibility.md) and the Phase 2 docs above.

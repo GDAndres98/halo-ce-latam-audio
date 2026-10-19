@@ -273,7 +273,27 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
         for k in audio_edit.removed_fields(a["edit"]):  # speed / gain_db, removed 2026-10-09
             out.append(finding("error", "audio_edit_removed_field", file, w + "/audio/edit",
                                f"{k} is no longer supported; run python scripts/validate/migrate_reset_speed_gain.py"))
-        if not audio_edit.is_identity(a["edit"]):  # owner's edit recipe (non-destructive, applied by M6)
+        combined = a["source"] in ("ce_concat", "ce_mix")  # two CE lines in one replacement (audio_combine)
+        if combined:
+            sev = "error" if a["status"] == "approved" else "warning"
+            mode = {"ce_concat": "concat", "ce_mix": "mix"}[a["source"]]
+            if len(a["sources"]) != 2:
+                out.append(finding(sev, "combine_needs_two_lines", file, w + "/audio",
+                                   "joining or playing together uses exactly two CE lines"))
+            if (a["edit"] or {}).get("engine") != audio_edit.COMBINE_ENGINE:
+                out.append(finding(sev, "combine_recipe_missing", file, w + "/audio/edit",
+                                   "a join or an overlay needs its combine recipe (save it again in the Studio)"))
+            elif a["edit"].get("mode") != mode:
+                out.append(finding("error", "combine_recipe_mode", file, w + "/audio/edit",
+                                   f"the recipe is a {a['edit'].get('mode')}, the source {a['source']}"))
+            else:
+                from .audio_combine import problems as combine_problems
+                for p in combine_problems(a["edit"], sources=a["sources"]):
+                    out.append(finding(sev, "invalid_audio_edit", file, w + "/audio/edit", p))
+        elif (a["edit"] or {}).get("engine") == audio_edit.COMBINE_ENGINE:
+            out.append(finding("error", "audio_edit_unsupported_source", file, w + "/audio/edit",
+                               f"a combine recipe belongs to a join or an overlay, not to source {a['source']!r}"))
+        elif not audio_edit.is_identity(a["edit"]):  # owner's edit recipe (non-destructive, applied by M6)
             sev = "error" if a["status"] == "approved" else "warning"
             for p in audio_edit.problems({k: v for k, v in a["edit"].items() if k not in audio_edit.REMOVED_FIELDS}):
                 out.append(finding("error", "invalid_audio_edit", file, w + "/audio/edit", p))
@@ -329,6 +349,7 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
                               "slot_id": s["slot_id"], "approved": obj["fingerprint"], "current": cur})
 
     out += added_take_findings(doc, ce=ce, mcc=mcc, local=local, file=file, subtitle_keys=subtitle_keys)
+    out += own_set_findings(doc, mcc=mcc, file=file, subtitle_keys=subtitle_keys)
     for t in doc.get("added_takes", []):
         if t["audio"]["status"] == "approved" and have_mcc and have_ce:
             cur = added_take_fingerprint(t, ce, mcc, local)
@@ -349,6 +370,63 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
 
 
 TAKE_WARN_COUNT = 12  # owner, 2026-10-17: no hard limit; a warning above 12 takes per sound
+
+
+def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=None):
+    """Rules for own take sets (docs/custom-take-set-design.md): the sound plays only its added takes. Same sound
+    rules as added takes; turning a set on clears the sound's line decisions, so any left are an error."""
+    from .mcc_loc import loc_key
+    out, seen = [], set()
+    have_mcc = bool(mcc["slots"])
+    tags = mcc.get("tags") or {}
+    lines = {}
+    for s in doc["slots"]:
+        lines.setdefault(s["mcc_tag"], []).append(s["mapping_id"])
+    takes = {}
+    for t in doc.get("added_takes", []):
+        takes.setdefault(t["mcc_tag"], []).append(t)
+    take_ids = {t["take_id"] for t in doc.get("added_takes", [])}
+    for o in doc.get("own_sets", []):
+        tag_path = o["mcc_tag"]
+        w = f"/own_sets ({tag_path.rsplit(chr(92), 1)[-1]})"
+        prov = o.get("provenance")
+        if prov and any(m["mcc_tag"] != tag_path for m in prov["slots"]):
+            out.append(finding("error", "own_set_provenance_other_sound", file, w,
+                               "the recorded decisions belong to another sound"))
+        if o.get("state") == "staged":  # docs/replacement-set-conversion.md: prepared, not in force
+            if not prov or prov["kind"] != "conversion":
+                out.append(finding("error", "staged_set_without_provenance", file, w,
+                                   "a staged replacement set needs the record of the decisions it converts"))
+                continue
+            gone = [t["take_id"] for t in prov["takes"] if t["origin"] == "created" and t["take_id"] not in take_ids]
+            if gone:
+                out.append(finding("warning", "staged_take_removed", file, w,
+                                   "takes the conversion created were removed: " + ", ".join(gone)))
+            out.append(finding("info", "replacement_set_staged", file, w,
+                               "conversion staged: the line decisions stay in force until the sound is switched"))
+            if tag_path in seen:
+                out.append(finding("error", "duplicate_own_set", file, w, tag_path))
+            seen.add(tag_path)
+            continue
+        if tag_path in seen:
+            out.append(finding("error", "duplicate_own_set", file, w, tag_path))
+        seen.add(tag_path)
+        tag = tags.get(tag_path)
+        if not tag:
+            out.append(finding("error" if have_mcc else "warning", "unknown_mcc_tag", file, w, tag_path))
+        elif tag.get("spanish_channels") and tag["spanish_channels"] != [1]:
+            out.append(finding("error", "own_set_stereo_sound", file, w, "own take sets are for mono sounds only"))
+        if subtitle_keys is not None and loc_key(tag_path) in subtitle_keys:
+            out.append(finding("error", "own_set_on_subtitled_sound", file, w,
+                               "own take sets are only for sounds without a subtitle entry"))
+        if lines.get(tag_path):
+            out.append(finding("error", "own_set_with_line_decisions", file, w,
+                               "the sound's Spain takes are dropped, yet it has line decisions: "
+                               + ", ".join(sorted(lines[tag_path]))))
+        if not any(t["audio"]["status"] == "approved" for t in takes.get(tag_path, [])):
+            out.append(finding("warning", "own_set_without_approved_take", file, w,
+                               "no approved take yet: until one is approved, the build keeps Spain's takes"))
+    return out
 
 
 def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", subtitle_keys=None):
@@ -440,12 +518,18 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
     if not head_doc:
         return out
     cur = {s["mapping_id"]: s for s in doc.get("slots", [])}
+    # Decisions an own set replaced live on, byte for byte, in its provenance (docs/replacement-set-conversion.md).
+    kept = {m["mapping_id"]: m for o in doc.get("own_sets", []) for m in (o.get("provenance") or {}).get("slots", [])}
     for hs in head_doc.get("slots", []):
         approved = [f for f in ("audio", "subtitle") if hs[f]["status"] == "approved"]
         if not approved:
             continue
         s = cur.get(hs["mapping_id"])
         if s is None:
+            if kept.get(hs["mapping_id"]) == hs:
+                out.append(finding("info", "approved_mapping_in_replacement_set", file, hs["mapping_id"],
+                                   "replaced by its sound's replacement set; recorded unchanged in the set's provenance"))
+                continue
             out.append(finding("error", "approved_mapping_removed", file, hs["mapping_id"],
                                "a mapping with an approved decision was deleted"))
             continue
@@ -554,14 +638,33 @@ def validate_mission_map(doc, schema, *, ce_missions, mcc_levels, file="mission_
 READY_STATUSES = ("ready_for_build", "in_game_tested", "reviewed")
 
 
-def level_progress(level_slot_ids, mappings_doc, level_tags=()):
+def level_progress(level_slot_ids, mappings_doc, level_tags=(), slot_tags=None):
     """Slot-level progress of one MCC level, derived from manual_mappings.json. Pure. level_tags: the level's
-    sound tags, to count its added takes (never counted as lines or matches)."""
-    by_slot = {s["slot_id"]: s for s in (mappings_doc or {}).get("slots", [])}
+    sound tags, to count its added takes (never counted as lines or matches). slot_tags {slot_id: mcc_tag}: lets
+    the lines of a sound in own-take-set mode count as decided (their Spain takes are dropped), and as having
+    approved audio once the sound has an approved take."""
+    from .own_set_state import active_own_tags
+    doc = mappings_doc or {}
+    by_slot = {s["slot_id"]: s for s in doc.get("slots", [])}
+    own = active_own_tags(doc)  # a staged conversion is not in force: its lines count as before
+    # the archived decisions of sets in force: their reminders (needs radio effect / a new recording) keep counting
+    archived = {m["slot_id"]: m for o in doc.get("own_sets", []) if o["mcc_tag"] in own
+                for m in (o.get("provenance") or {}).get("slots", [])}
+    own_ready = {t["mcc_tag"] for t in doc.get("added_takes", []) if t["audio"]["status"] == "approved"} & own
     out = {"slots": len(level_slot_ids), "decided": 0, "matched": 0, "no_equivalent": 0, "deferred": 0,
            "audio_approved": 0, "subtitle_approved": 0, "needs_rework": 0, "radio_effect": 0,
-           "different_but_fits": 0, "needs_recording": 0, "muted": 0, "muted_approved": 0}
+           "different_but_fits": 0, "needs_recording": 0, "muted": 0, "muted_approved": 0, "own_set_lines": 0}
     for sid in level_slot_ids:
+        tag = (slot_tags or {}).get(sid)
+        if tag in own:
+            out["own_set_lines"] += 1
+            out["decided"] += 1
+            out["audio_approved"] += tag in own_ready
+            arch = archived.get(sid)
+            if arch:
+                out["radio_effect"] += bool((arch.get("radio_effect") or {}).get("needed"))
+                out["needs_recording"] += bool((arch.get("needs_recording") or {}).get("marked"))
+            continue
         s = by_slot.get(sid)
         if not s:
             continue
@@ -583,6 +686,7 @@ def level_progress(level_slot_ids, mappings_doc, level_tags=()):
     takes = [t for t in (mappings_doc or {}).get("added_takes", []) if t["mcc_tag"] in tags]
     out["added_takes"] = len(takes)
     out["added_takes_approved"] = sum(1 for t in takes if t["audio"]["status"] == "approved")
+    out["own_sets"] = len(own & tags)
     out["ready_for_build"] = bool(level_slot_ids) and out["decided"] == out["audio_approved"] == len(level_slot_ids)
     return out
 

@@ -104,6 +104,14 @@ Slot filters (left):
      entry (AI chatter such as Grunt deaths), add extra Campaign Evolved recordings: focus one on the right, then
      *Add as extra take*. Each added take is approved, reworked, reordered or removed on its own; the game picks
      among all the sound's takes. Lines whose sound has added takes show **+N**; filter *Has added takes*.
+     Several at once, and *Replace every take of this sound*: see §4.3.
+   - **Join two matched recordings** / **Play two matched recordings at the same time** (2026-10-19,
+     `docs/combine-recordings.md`): match two Campaign Evolved lines first, then choose which plays first.
+     *Join*: each part gets its own editor (trims, cuts, silences, fades), and you set the gap between them
+     (negative = they overlap). *Play together*: both play unedited; set when the second starts. A radio filter
+     or echo applies to the combined result. There is no volume per recording; if the two add up too loud, the
+     result is lowered just enough and the panel says so. The result is rendered as the build makes it and heard as
+     B in Listen and compare. In a join, the keyboard shortcuts act on the part you clicked last (outlined).
    - **Mute in game (no replacement)** (Studio only, 2026-10-15): the line is omitted; the build
      writes silence of the same length, so the scene's timing stays. Say why (required). It marks
      the line *no equivalent* and proposes subtitle *none* (a tag's subtitle is only removed when
@@ -236,6 +244,76 @@ in the M4 preview and the M6 build.
   - For M6, **rebuild** the bank (`python scripts/build/m6_build.py …`). Every build records the
     value and its source in `build_manifest.json` (`global_gain`).
 - **Your mappings are never changed by this setting.**
+
+### 4.3 Sounds with several takes
+
+**A sound is not a line.** The game plays a *sound*; many sounds (especially AI chatter: Grunt deaths, Marine
+barks) have several recorded **takes**, and each time the sound plays the game picks one take at random. In the
+list, every Spain take is its own line: rows of the same sound are joined by a bar on the left and say
+**Spain take 1/2**, **Spain take 2/2**, and the panel says "Spain take 1 of 2 of this sound". Spain and English
+often have a different number of takes.
+
+**One subtitle per sound.** All takes of a sound share one subtitle. If you approve different subtitles on two
+takes of the same sound, the build leaves that subtitle unchanged and reports a conflict. *None* (no subtitle) is
+written only when every take agrees.
+
+**Three ways to handle a sound with several takes:**
+
+| Way | How | What the game plays |
+|---|---|---|
+| **One take at a time** (default) | Decide each Spain take as its own line: keep, replace or mute. | Spain's takes, each as you decided it. |
+| **Add takes** | Under **Takes of this sound**: *Add as extra take* (the recording selected on the right) or *Add several takes…* (tick several). Approve each added take. | Spain's takes **plus** your added ones. |
+| **Replace every take** | Replacement audio → option 4, **Replace every take of this sound**: it lists every Spain take it replaces (press **ES** to hear each), then tick the recordings to play instead and confirm. Approve each take under **Takes of this sound**. | **Only** your takes; Spain's are removed. |
+| **Replacement set from your selections** | Already matched the takes one by one? Under **Takes of this sound**, *Preview a replacement set from my selections*, then *Stage*, approve each take, *Switch*. See below. | **Only** the set's takes; equal choices become one take. |
+
+The header of **Takes of this sound** says which way the sound uses (*per take*, *Spain + added takes*, *replacement
+set*, *replacement set staged*) and sums it up, e.g. **3 original MCC takes → 2 replacement takes**.
+
+**Turning your per-take work into a replacement set** (`docs/replacement-set-conversion.md`):
+1. **Preview** (nothing is saved). If take 1 → ce1, take 2 → ce2 and take 3 → ce1, you get two takes, [ce1, ce2]:
+   the same recording with the same language and the same edits is one take. The same recording with different trims
+   or effects stays two. Only audio you **chose** counts; a recording that is only matched does not.
+2. Points that need your review are listed with a tick box each: a take with no decision or kept as Spain (the set
+   removes it), a muted take (the set removes it instead of playing silence), a take marked Needs rework, a subtitle
+   text on a sound without subtitles, and so on. Things that can't become a take (missing recording, bad edit) block
+   it.
+3. **Stage.** New takes are added as drafts. Nothing changes in a build yet: your line decisions still apply.
+4. **Approve the takes.** *Approve unchanged converted takes…* lists the takes that carry exactly audio you already
+   approved: unchanged since staging, still valid, no review point. It also lists the ones it leaves out and why
+   (for example, merged with a draft line). Confirm the list to approve those takes; it's a new approval of each
+   take, not a copy. Approve the others one by one. Nothing is approved if anything changed since the list was shown.
+5. **Switch to the replacement set**, once every take is approved and can be built. Its lines' decisions stop
+   applying (approved ones are marked Needs rework, then removed, in one save) and are kept in the set's record. This
+   changes your decisions and the next build; it doesn't touch the installed game.
+6. Changed your mind? **Cancel the conversion** while staged: your lines were never touched, and approved takes are
+   marked Needs rework, then removed. Or **Undo the replacement set** after switching: a preview shows what comes
+   back and any conflict first. Undo brings the line decisions back exactly, approvals included (as long as they
+   still match the catalogs), and the build is what it was before.
+
+After the switch, if a take of the set is marked Needs rework or its recording changes, the next build leaves that
+take out (the panel says so). If no take is left, the build plays Spain's own recordings for that sound.
+"Needs a new recording" and "needs radio effect" reminders of the replaced lines stay visible: on the line, in the
+list filters and counters, and under *Takes of this sound*.
+
+The **Take sets** page lists every sound with several takes and what its set would be. Filter it by *ready*,
+*needs review*, *blocked*, *staged*… and use *Stage N ready* or *Switch N staged* to do many at once. Both ask
+you first, and nothing happens if any of those sounds changed since the list loaded. Sounds that need review are
+staged one by one from the line panel.
+
+Good to know:
+- A **muted** take is still picked by the game: it plays silence. If you want a sound without silent takes, use
+  *Replace every take* instead of muting one of them.
+- *Add takes*, *Replace every take* and replacement sets are only for sounds **without** a subtitle (barks, deaths,
+  chatter). Story lines are always decided one take at a time.
+- *Replace every take* clears the decisions of that sound's lines (the confirmation lists them first). They are kept
+  in the set's record: *Undo the replacement set* brings them back, approvals included. *Back to Spain's takes* turns the
+  set off and leaves the lines undecided.
+- Until at least one of your takes is approved, the build keeps Spain's takes.
+- While a sound plays your own takes, its lines show **own set 6/6** (approved/total) and their M/A/S marks show
+  the sound's state; the line itself has nothing to save or approve.
+- The order of added takes doesn't change how often each one plays.
+- A build with added or replaced takes also writes the Spanish sound index, and Build & Test installs and restores
+  both together. The in-game check of a build that removes Spain's takes is still pending.
 
 ### Lines with no source subtitle
 

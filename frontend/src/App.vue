@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AudioLines, Database, ExternalLink, Eye, Hammer, LayoutDashboard, LogIn, LogOut, Menu, Network, UserRound, X } from "lucide-vue-next";
+import { AudioLines, Database, ExternalLink, Eye, Hammer, Layers, LayoutDashboard, LogIn, LogOut, Menu, Network, UserRound, X } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { canListen, loadSession, session, signedIn, signOut, visitor } from "./auth/session";
@@ -67,6 +67,7 @@ watch(
       <RouterLink to="/"><LayoutDashboard :size="15" aria-hidden="true" /> Dashboard</RouterLink>
       <RouterLink to="/match"><AudioLines :size="15" aria-hidden="true" /> Matching</RouterLink>
       <RouterLink to="/builds"><Hammer :size="15" aria-hidden="true" /> Build &amp; Test</RouterLink>
+      <RouterLink v-if="!visitor" to="/take-sets"><Layers :size="15" aria-hidden="true" /> Take sets</RouterLink>
       <RouterLink v-if="!visitor" to="/data"><Database :size="15" aria-hidden="true" /> Data</RouterLink>
       <RouterLink v-if="!visitor" to="/network"><Network :size="15" aria-hidden="true" /> Network</RouterLink>
       <InstallApp compact />

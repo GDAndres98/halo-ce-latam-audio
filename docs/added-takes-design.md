@@ -5,7 +5,10 @@ sounds only; independent of Spain's places; no hard limit, warning above 12). **
 `be4582b`, `abf21a1`, `e55f389`); step 5, the in-game check of a real build, is the owner's.
 
 **Built, and how to use it:** Matching → open a line of a sound without subtitles (e.g. a Grunt bark) → focus a
-Campaign Evolved recording on the right → **Takes of this sound** → *Add as extra take* → *Approve*. Build audio
+Campaign Evolved recording on the right → **Takes of this sound** → *Add as extra take* → *Approve*. To add
+several at once (owner request, 2026-10-18): *Add several takes…* opens a picker with its own search (it starts
+from the focused recording's ID without `#n`, so its variations are listed); tick any number and *Add N as extra
+takes*: one save (`POST /api/takes/add_many`), all drafts, recordings already a take are skipped. Build audio
 as usual: a build with approved added takes writes the bank **and** the Spanish `.lst.bin`, and Build & Test
 installs and restores both together. **Not in the page yet:** the audio editor for an added take (trims, radio,
 echo). The data, the validator and the build already support a recipe; for now added takes play unedited.

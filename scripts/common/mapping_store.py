@@ -29,12 +29,14 @@ from pathlib import Path
 from . import mapping_db
 from .jsonschema_lite import load_schema, validate
 
-UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework
+UserAction = namedtuple("UserAction", "action mapping_id field")  # action: approve | needs_rework | restore
 SCHEMA_ID = "manual-mappings/3"
 SCHEMA_NAME = "manual-mappings-3"
 OWNER_FLAGS = ("radio_effect", "different_but_fits", "needs_recording")  # slot-level flags outside the approved objects
 DB_MANAGED = "manual_mappings.json"  # the decisions file: SQLite is its writer, this JSON is the export
-DOCUMENT_FILES = ("manual_mappings.local.json", "mission_progress.json")  # user files stored as documents
+# User files stored as documents. take_set_recovery.local.json (git-ignored): the local-only text and paths that
+# replacement-set records name, so an Undo can restore them (docs/replacement-set-conversion.md §6).
+DOCUMENT_FILES = ("manual_mappings.local.json", "mission_progress.json", "take_set_recovery.local.json")
 
 
 class StoreError(Exception):
@@ -143,7 +145,8 @@ def _lf(data):
 
 
 def _check_document_schema(path, raw):
-    name = {"manual_mappings.local.json": "manual-mappings-local-1", "mission_progress.json": "mission-progress-1"}
+    name = {"manual_mappings.local.json": "manual-mappings-local-1", "mission_progress.json": "mission-progress-1",
+            "take_set_recovery.local.json": "take-set-recovery-1"}
     try:
         doc = json.loads(raw.decode("utf-8"))
     except ValueError as e:
@@ -190,13 +193,14 @@ def _atomic_write(path, data):
     os.replace(tmp, path)
 
 
-def _write_database_backed(path, doc, now, *, data=None, changed_ids=None):
+def _write_database_backed(path, doc, now, *, data=None, changed_ids=None, reason=None):
     """Save the decisions: commit SQLite first (with slot history), then write the JSON export.
-    data: exact bytes to write (a restore); otherwise the export is built from the stored slot bodies."""
+    data: exact bytes to write (a restore); otherwise the export is built from the stored slot bodies.
+    reason: written on every history row of this save (None = an ordinary Studio save)."""
     changed_at = (now or dt.datetime.now()).isoformat(timespec="microseconds")
     conn = mapping_db.open_existing(mapping_db.db_path_for(path))
     try:
-        _, data = mapping_db.store_document(conn, doc, changed_at, data=data, changed_ids=changed_ids)
+        _, data = mapping_db.store_document(conn, doc, changed_at, data=data, changed_ids=changed_ids, reason=reason)
         _atomic_write(path, data)
         mapping_db.mark_json_synced(conn, mapping_db.sha256(data))
     finally:
@@ -277,10 +281,24 @@ def check_transition(old_doc, new_doc, user_actions=()):
             if not ok:
                 problems.append(f"{mid}/{f}: approved decisions are immutable (only a user 'needs_rework' "
                                 "action with revision + 1 may change them)")
+    # 'restore' (docs/replacement-set-conversion.md §8): the owner's Undo of a replacement set brings back a line
+    # decision exactly as its set's record holds it, approval included. Accepted only for a decision that does not
+    # exist before, whose object equals the recorded one byte for byte (status, fingerprint, approved_at, revision),
+    # for the same slot, and only in the save that removes that set (its record is consumed). Nothing else can use it.
+    recorded = {m["mapping_id"]: (o["mcc_tag"], m) for o in old_doc.get("own_sets", [])
+                for m in (o.get("provenance") or {}).get("slots", [])}
+    consumed = {o["mcc_tag"] for o in old_doc.get("own_sets", [])} - {o["mcc_tag"] for o in new_doc.get("own_sets", [])}
+
+    def restored(mid, ns, f):
+        hit = recorded.get(mid)
+        return (allowed.get((mid, f)) == "restore" and mid not in old and hit is not None and hit[0] in consumed
+                and hit[1]["slot_id"] == ns["slot_id"] and hit[1]["mcc_tag"] == ns["mcc_tag"] and hit[1][f] == ns[f])
+
     for mid, ns in new.items():
         for f in ("audio", "subtitle"):
             was = old.get(mid, {}).get(f, {}).get("status")
-            if ns[f]["status"] == "approved" and was != "approved" and allowed.get((mid, f)) != "approve":
+            if ns[f]["status"] == "approved" and was != "approved" and allowed.get((mid, f)) != "approve" \
+                    and not restored(mid, ns, f):
                 problems.append(f"{mid}/{f}: only an explicit user 'approve' action can approve")
     for mid, ns in new.items():  # owner flags are independent of approvals, but every change is counted
         for flag in OWNER_FLAGS:
@@ -312,7 +330,27 @@ def check_transition(old_doc, new_doc, user_actions=()):
         ofl, nfl = old_t.get(tid, {}).get("radio_effect"), nt["radio_effect"]
         if ofl and ofl != nfl and nfl["revision"] != ofl["revision"] + 1:
             problems.append(f"{tid}/radio_effect: a change must bump its revision by exactly 1")
-    unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework")]
+    # Own take sets (docs/replacement-set-conversion.md): the provenance of a set is the recovery record of the
+    # decisions it replaced. It never changes, except activated_at being set once when a staged set is switched
+    # on; a set never goes back from active to staged.
+    old_o = {o["mcc_tag"]: o for o in old_doc.get("own_sets", [])}
+    for o in new_doc.get("own_sets", []):
+        was = old_o.get(o["mcc_tag"])
+        if was is None:
+            continue
+        if was.get("state") is None and o.get("state") == "staged":
+            problems.append(f"own set {o['mcc_tag']}: an active set cannot become staged again")
+        op, np_ = was.get("provenance"), o.get("provenance")
+        if op is not None and op != np_:
+            switched = (np_ is not None and op.get("activated_at") is None and np_.get("activated_at")
+                        and {**np_, "activated_at": None} == op)
+            if not switched:
+                problems.append(f"own set {o['mcc_tag']}: its provenance (the record of the decisions it replaced) "
+                                "is read-only")
+    unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework", "restore")]
+    stray = [k for k, a in allowed.items() if a == "restore" and not (k[0] in new and restored(k[0], new[k[0]], k[1]))]
+    if stray:
+        problems.append(f"'restore' only brings back a recorded decision while undoing its set: {stray}")
     if unused:
         problems.append(f"unknown user actions {unused}")
     if problems:
@@ -338,9 +376,9 @@ def save(path, new_doc, loaded_sha256, *, user_actions=(), history_dir=None, now
     return _write(path, current, new_doc, loaded_sha256, history_dir, now, changed_ids=only)
 
 
-def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None, changed_ids=None):
+def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None, changed_ids=None, reason=None):
     """Back up the previous bytes to .history/, then write atomically. -> new sha256.
-    raw: exact bytes to write instead of serializing new_doc (restore). changed_ids: see store_document."""
+    raw: exact bytes to write instead of serializing new_doc (restore). changed_ids, reason: see store_document."""
     history = Path(history_dir) if history_dir else path.parent / ".history"
     if current:  # every save keeps the previous bytes (M3 rule 5), also for the decisions file
         history.mkdir(parents=True, exist_ok=True)
@@ -351,12 +389,42 @@ def _write(path, current, new_doc, loaded_sha256, history_dir, now, raw=None, ch
         # table (the schema migration, or a brand-new file) the JSON is written directly; the import
         # happens on the next read.
         doc = new_doc if raw is None else json.loads(raw.decode("utf-8"))
-        return _write_database_backed(path, doc, now, data=raw, changed_ids=changed_ids if raw is None else None)
+        return _write_database_backed(path, doc, now, data=raw, changed_ids=changed_ids if raw is None else None,
+                                      reason=reason)
     data = raw if raw is not None else mapping_db.serialize(new_doc)
     if path.name in DOCUMENT_FILES:
         return _write_document(path, data, now)
     _atomic_write(path, data)
     return hashlib.sha256(data).hexdigest()
+
+
+def save_sequence(path, steps, loaded_sha256, *, reason=None, history_dir=None, now=None, schema=None):
+    """Several protected transitions, committed as ONE save (one database transaction, one JSON write).
+
+    steps: [(doc, user_actions), ...]. Each step is checked against the one before it (the first against the
+    stored document) with check_transition, exactly as if it were saved on its own: e.g. an approved decision is
+    first marked needs_rework (a user action, revision + 1) and only the next step removes it. Only the last
+    document is written, so either every step happens or none does. reason: recorded on each history row
+    ("take-set:<action>:<record id>"). -> new sha256."""
+    path = Path(path)
+    if not steps:
+        raise StoreError("save_sequence needs at least one step")
+    current = _current(path)
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded; reload and re-apply your edit")
+    old_doc = json.loads(current.decode("utf-8")) if current else {"slots": []}
+    prev = old_doc
+    for doc, actions in steps:
+        if current and prev.get("schema") != doc.get("schema"):
+            raise StoreError("a save sequence cannot change the schema version")
+        check_transition(prev, doc, actions)
+        prev = doc
+    final = steps[-1][0]
+    only = changed_mapping_ids(old_doc, final) if current else None
+    errs = schema_errors(final, schema or load_schema(SCHEMA_NAME), only)
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, final, loaded_sha256, history_dir, now, changed_ids=only, reason=reason)
 
 
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()  # loaded hash of a file that doesn't exist yet
@@ -569,6 +637,9 @@ def _read_import_candidate(path):
     tids = [t["take_id"] for t in doc.get("added_takes", [])]
     if len(set(tids)) != len(tids):
         raise StoreError(f"{path.name} repeats a take_id")
+    sets = [o["mcc_tag"] for o in doc.get("own_sets", [])]
+    if len(set(sets)) != len(sets):
+        raise StoreError(f"{path.name} lists a sound twice in own_sets")
     return raw, data, doc
 
 
@@ -609,6 +680,18 @@ def preview_import(path):
                             "fields": sorted(k for k in (a or {}).keys() | (b or {}).keys()
                                              if (a or {}).get(k) != (b or {}).get(k)),
                             "database": summary(a) if a else None, "file": summary(b) if b else None})
+
+    old_o = {o["mcc_tag"]: o for o in current.get("own_sets", [])}
+    new_o = {o["mcc_tag"]: o for o in doc.get("own_sets", [])}
+    for tag in sorted(old_o.keys() | new_o.keys()):
+        a, b = old_o.get(tag), new_o.get(tag)
+        if a != b:
+            name = tag.rsplit(chr(92), 1)[-1]
+            changes.append({"mapping_id": f"own set {name}", "slot_id": f"own take set of {name}",
+                            "kind": "added" if a is None else "removed" if b is None else "changed",
+                            "fields": sorted(k for k in (a or {}).keys() | (b or {}).keys()
+                                             if (a or {}).get(k) != (b or {}).get(k)),
+                            "database": a, "file": b})
 
     def approvals(d):
         return ({(x["mapping_id"], f) for x in d["slots"] for f in ("audio", "subtitle") if x[f]["status"] == "approved"}

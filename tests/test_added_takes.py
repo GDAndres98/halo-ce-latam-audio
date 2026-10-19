@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import mapping_db, mapping_store  # noqa: E402
 from common.mapping_store import ProtectedError, UserAction  # noqa: E402
-from common.project_validation import added_take_findings, level_progress  # noqa: E402
+from common.project_validation import added_take_findings, level_progress, own_set_findings  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 from test_m3_validation import mcc_record  # noqa: E402
 from test_m4 import T, make_root  # noqa: E402
@@ -44,6 +44,9 @@ class AddedTakeTests(unittest.TestCase):
 
     def version(self, tag=DEATH):
         return self.app.sound(tag)["version"]
+
+    def sv(self, tag=DEATH):
+        return self.app.sound(tag)["sound_version"]
 
     def add(self, ref="line_a#0", **extra):
         return self.app.take_save({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(),
@@ -121,6 +124,112 @@ class AddedTakeTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)  # byte-identical to before any take
         self.add("line_a#0")
         self.assertEqual(self.doc()["added_takes"][0]["take_id"], "t-000003")  # IDs are never reused
+
+    def test_add_several_in_one_save(self):
+        self.add("line_a#0")
+        r = self.app.take_add_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "audio_list": [
+            {"ce_line_ref": "line_a#0", "language": MX},   # already a take: skipped
+            {"ce_line_ref": "line_b#0", "language": MX},
+            {"ce_line_ref": "line_b#0", "language": MX}]})  # listed twice: skipped
+        self.assertEqual((r["saved"], r["added"], r["skipped"]), (True, ["t-000002"], ["line_a#0", "line_b#0"]))
+        takes = sorted(self.doc()["added_takes"], key=lambda t: t["position"])
+        self.assertEqual([(t["take_id"], t["position"], t["audio"]["status"]) for t in takes],
+                         [("t-000001", 1, "draft"), ("t-000002", 2, "draft")])
+        again = self.app.take_add_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(),
+                                        "audio_list": [{"ce_line_ref": "line_b#0", "language": MX}]})
+        self.assertFalse(again["saved"])
+        before = self.path.read_bytes()
+        for bad, status in (([{"ce_line_ref": "aa_early#0", "language": MX}, {"ce_line_ref": "nope#9", "language": MX}], 400),
+                            ([], 400)):
+            with self.assertRaises(ApiError) as e:
+                self.app.take_add_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "audio_list": bad})
+            self.assertEqual(e.exception.status, status)
+        self.assertEqual(self.path.read_bytes(), before)  # all or nothing
+        with self.assertRaises(ApiError) as e:
+            self.app.take_add_many({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES),
+                                    "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
+        self.assertEqual(e.exception.status, 409)
+
+    # ------------------------------------------------------------------ own take sets (docs/custom-take-set-design.md)
+    def line_save(self, **body):
+        return self.app.save({"slot_id": "es:Z10_030_death#0", "loaded_sha256": mapping_store.load(self.path)[1],
+                              **body})
+
+    def test_own_set_on_clears_the_line_decisions_through_needs_rework(self):
+        self.line_save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
+                       audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0", "language": MX}]})
+        self.line_save(actions=[{"action": "approve", "field": "audio"}])
+        mid = self.doc()["slots"][-1]["mapping_id"]
+        self.assertEqual(self.doc()["slots"][-1]["audio"]["status"], "approved")
+        with self.assertRaises(ApiError) as e:  # the page must name exactly what it clears
+            self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [],
+                                 "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
+        self.assertEqual(e.exception.status, 409)
+        with self.assertRaises(ApiError) as e:  # replacing every take with nothing
+            self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [mid]})
+        self.assertEqual(e.exception.status, 400)
+        r = self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [mid],
+                                 "audio_list": [{"ce_line_ref": "line_b#0", "language": MX},
+                                                {"ce_line_ref": "line_b#0", "language": MX}]})
+        self.assertEqual((r["saved"], r["cleared"], r["reworked"]), (True, [mid], [f"{mid}/audio"]))
+        self.assertEqual((r["added"], r["skipped"]), (["t-000001"], ["line_b#0"]))
+        self.assertEqual([(t["take_id"], t["audio"]["status"]) for t in self.doc()["added_takes"]], [("t-000001", "draft")])
+        doc = self.doc()
+        self.assertEqual([s for s in doc["slots"] if s["mcc_tag"] == DEATH], [])
+        own = doc["own_sets"][0]
+        self.assertEqual((own["mcc_tag"], own["set_at"], own["provenance"]["kind"]), (DEATH, "2026-10-17", "replace"))
+        # The cleared decision is recorded exactly as it was (approved), and the set lists the take it created.
+        self.assertEqual([m["audio"]["status"] for m in own["provenance"]["slots"]], ["approved"])
+        self.assertEqual([{k: t[k] for k in ("take_id", "origin", "from_mapping_ids")} for t in own["provenance"]["takes"]],
+                         [{"take_id": "t-000001", "origin": "created", "from_mapping_ids": []}])
+        self.assertEqual(r["sound"]["own_set"], {"mcc_tag": DEATH, "set_at": "2026-10-17"})
+        conn = sqlite3.connect(self.root / "mappings/manual_mappings.db")  # one save: approved -> removed
+        rows = conn.execute("SELECT before_body, after_body, reason FROM slot_history WHERE mapping_id = ? ORDER BY id",
+                            (mid,)).fetchall()
+        self.assertEqual((json.loads(rows[-1][0])["audio"]["status"], rows[-1][1], rows[-1][2][:16]),
+                         ("approved", None, "take-set:replace"))
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM own_set_history").fetchone()[0], 1)
+        conn.close()
+        with self.assertRaises(ApiError) as e:  # its lines can't be decided while the set is on
+            self.line_save(match={"status": "matched", "ce_line_refs": ["line_a#0"]})
+        self.assertEqual(e.exception.status, 409)
+        row = self.app.slots("z10")["slots"]
+        self.assertEqual(next(x for x in row if x["slot_id"] == "es:Z10_030_death#0")["own_set"],
+                         {"takes": 1, "approved": 0, "needs_rework": 0})
+        ids = lambda st: [x["slot_id"] for x in self.app.slots("z10", status=st)["slots"]]  # noqa: E731
+        self.assertIn("es:Z10_030_death#0", ids("matched"))  # filtered by its sound's takes, not as undecided
+        self.assertNotIn("es:Z10_030_death#0", ids("undecided"))
+        self.assertIn("es:Z10_030_death#0", ids("draft"))
+        self.act("t-000001", "approve")
+        self.assertIn("es:Z10_030_death#0", ids("approved"))
+
+    def test_own_set_rules_progress_and_off(self):
+        with self.assertRaises(ApiError) as e:
+            self.app.own_set_on({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES), "loaded_sound_sha256": self.sv(KEYES), "clear_mapping_ids": []})
+        self.assertEqual(e.exception.status, 409)  # subtitled sound
+        before = self.path.read_bytes()
+        self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [], "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
+        mcc = self.app.mcc_idx
+        keys = self.app._subtitle_keys()
+        self.assertEqual([f["code"] for f in own_set_findings(self.doc(), mcc=mcc, subtitle_keys=keys)],
+                         ["own_set_without_approved_take"])
+        p = level_progress(["es:Z10_030_death#0"], self.doc(), [DEATH], {"es:Z10_030_death#0": DEATH})
+        self.assertEqual((p["own_sets"], p["own_set_lines"], p["decided"], p["audio_approved"]), (1, 1, 1, 0))
+        self.act("t-000001", "approve")
+        self.assertEqual(own_set_findings(self.doc(), mcc=mcc, subtitle_keys=keys), [])
+        p = level_progress(["es:Z10_030_death#0"], self.doc(), [DEATH], {"es:Z10_030_death#0": DEATH})
+        self.assertTrue(p["ready_for_build"])
+        bad = copy.deepcopy(self.doc())
+        bad["slots"].append({"mapping_id": "m-000999", "slot_id": "es:Z10_030_death#0", "mcc_tag": DEATH})
+        bad["own_sets"].append({"mcc_tag": KEYES, "set_at": "2026-10-17"})
+        codes = {f["code"] for f in own_set_findings(bad, mcc=mcc, subtitle_keys=keys)}
+        self.assertTrue({"own_set_with_line_decisions", "own_set_on_subtitled_sound"} <= codes)
+        self.app.own_set_off({"mcc_tag": DEATH, "loaded_takes_sha256": self.version()})
+        self.assertNotIn("own_sets", self.doc())
+        self.app.take_save({"mcc_tag": DEATH, "take_id": "t-000001", "loaded_takes_sha256": self.version(),
+                            "actions": [{"action": "needs_rework", "field": "audio"}]})
+        self.app.take_remove({"mcc_tag": DEATH, "take_id": "t-000001", "loaded_takes_sha256": self.version()})
+        self.assertEqual(self.path.read_bytes(), before)  # byte-identical to before (never stored empty)
 
     def test_a_save_made_from_an_old_version_is_refused(self):
         old = self.version()
@@ -214,6 +323,31 @@ class InsertBuildTests(unittest.TestCase):
         bad = insert_checks(bank, cand, lst, new_lst, index_map, {**new_index, "t-000003": 6}, items)
         self.assertFalse(bad["insert:inserted_streams_and_counts"])
 
+    def test_an_own_set_sound_holds_only_its_inserted_takes(self):
+        from common.m6_build import insert_checks, insert_takes
+        from common.mcc_lst import parse_lst
+        from test_fsb5_writer import celt_stream
+        bank, lst = self.bank_and_index()
+        items = [{"take_id": "t-000001", "mcc_tag": "sound\\dialog\\x\\a", "stream": celt_stream(2, 370, 80),
+                  "sample_count": 1024},
+                 {"take_id": "t-000002", "mcc_tag": "sound\\dialog\\x\\a", "stream": celt_stream(1, 370, 81),
+                  "sample_count": 512},
+                 {"take_id": "t-000003", "mcc_tag": "sound\\dialog\\x\\c", "stream": celt_stream(3, 370, 82),
+                  "sample_count": 1536}]
+        drop = ["sound\\dialog\\x\\a"]
+        cand, new_lst, index_map, new_index = insert_takes(bank, lst, items, drop)
+        self.assertEqual(index_map, [None, None, 2, 3, 4])
+        self.assertEqual(new_index, {"t-000001": 0, "t-000002": 1, "t-000003": 5})
+        self.assertEqual([r[1:] for r in parse_lst(new_lst)["records"]], [(0, 2), (2, 1), (3, 3)])
+        checks = insert_checks(bank, cand, lst, new_lst, index_map, new_index, items, drop)
+        self.assertTrue(all(checks.values()), {k: v for k, v in checks.items() if not v})
+        self.assertEqual(insert_takes(bank, lst, items, drop)[0], cand)  # deterministic
+        with self.assertRaises(ValueError):  # never an empty sound
+            insert_takes(bank, lst, items, ["sound\\dialog\\x\\b"])
+        kept = insert_takes(bank, lst, items)  # a check made for "no drop" fails on a dropping build
+        self.assertFalse(insert_checks(bank, cand, lst, new_lst, index_map, new_index, items)["insert:sample_count"])
+        self.assertNotEqual(kept[0], cand)
+
     def test_compare_inserts(self):
         from common.m6_build import compare_inserts
         built = [{"take_id": "t-1", "action": "insert", "ce_line_ref": "x#0", "language": "L", "media": {"wem_sha256": "h"}}]
@@ -244,6 +378,28 @@ class InsertPlanTests(AddedTakeTests):
         e = plan_inserts(doc, ["z10"], slot_index=self.app.slot_index, ce_lines=self.app.ce_lines,
                          ce_idx=self.app.ce_idx, mcc_idx=self.app.mcc_idx)[0]
         self.assertIn("drift", e["reason"])
+
+    def test_own_set_drops_spain_only_with_a_take_to_insert(self):
+        from common.m6_build import BUILT_ACTIONS, compare_plans, own_set_drops, plan_audio
+        idx = dict(slot_index=self.app.slot_index, ce_lines=self.app.ce_lines, ce_idx=self.app.ce_idx,
+                   mcc_idx=self.app.mcc_idx)
+        self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [], "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
+        self.assertEqual(own_set_drops(self.doc(), self.plan()), [])  # a draft take: Spain's takes stay
+        e = next(x for x in plan_audio(self.doc(), ["z10"], **idx)["entries"] if x["slot_id"] == "es:Z10_030_death#0")
+        self.assertEqual(e["action"], "keep_original")
+        self.assertIn("own take set", e["reason"])
+        self.act("t-000001", "approve")
+        drops = own_set_drops(self.doc(), self.plan())
+        self.assertEqual(drops, [DEATH])
+        self.assertTrue(all(x["own_set"] for x in self.plan()))
+        built = plan_audio(self.doc(), ["z10"], dropped_tags=drops, **idx)["entries"]
+        e = next(x for x in built if x["slot_id"] == "es:Z10_030_death#0")
+        self.assertEqual(e["action"], "dropped")
+        self.assertIn("dropped", BUILT_ACTIONS)
+        # turned off after the build: the install check sees the change and refuses
+        self.app.own_set_off({"mcc_tag": DEATH, "loaded_takes_sha256": self.version()})
+        now = plan_audio(self.doc(), ["z10"], dropped_tags=own_set_drops(self.doc(), self.plan()), **idx)["entries"]
+        self.assertIn("es:Z10_030_death#0", compare_plans(built, now)["changed_or_revoked"])
 
 
 for _name in [n for n in dir(AddedTakeTests) if n.startswith("test_")]:

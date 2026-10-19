@@ -1,3 +1,10 @@
+<script lang="ts">
+import { ref as moduleRef } from "vue";
+// Joins show two part editors (CombineEditor.vue): their keyboard shortcuts act on the part last clicked or focused,
+// never on both. A single editor is not affected.
+const activePart = moduleRef<symbol | null>(null);
+</script>
+
 <script setup lang="ts">
 // Non-destructive editing of the replacement recording, on its waveform.
 //
@@ -80,6 +87,11 @@ const props = defineProps<{
   locked: boolean;
   interference?: InterferenceDefaults | null;
   slotId?: string;
+  /** One part of a join (CombineEditor.vue): the radio filter, echo and interference are not offered here, they
+   * apply to the joined result. */
+  partOnly?: boolean;
+  /** Heading of the editor (a part of a join is named). */
+  title?: string;
   /** Spain's original and the edited result (null while it renders), playable from the full-screen editor. */
   originalUrl?: string | null;
   previewUrl?: string | null;
@@ -269,19 +281,28 @@ function onSelectionField(event: Event, edge: "start" | "end") {
 }
 
 // Editing keys; they only act on an editable recording and never fire while typing in a field.
+const partId = Symbol("part");
+if (props.partOnly && activePart.value === null) activePart.value = partId;  // the first part, until another is used
+onBeforeUnmount(() => {
+  if (activePart.value === partId) activePart.value = null;
+});
+const mine = (action: () => unknown) => () => {
+  if (!props.partOnly || activePart.value === partId) action();
+};
 useShortcuts({
-  w: () => replacement.value?.togglePlay(),
-  x: cutSelection,
-  t: keepSelection,
-  "ctrl+z": undo,
-  escape: () => expanded.value && setExpanded(false),
+  w: mine(() => replacement.value?.togglePlay()),
+  x: mine(cutSelection),
+  t: mine(keepSelection),
+  "ctrl+z": mine(undo),
+  escape: mine(() => expanded.value && setExpanded(false)),
 });
 </script>
 
 <template>
-  <section class="block editor" :class="{ expanded }" aria-label="Audio editing" data-section="editor">
+  <section class="block editor" :class="{ expanded, 'active-part': partOnly && activePart === partId }" aria-label="Audio editing"
+           data-section="editor" @pointerdown.capture="partOnly && (activePart = partId)" @focusin="partOnly && (activePart = partId)">
     <header class="block-head">
-      <h3><SlidersHorizontal :size="15" aria-hidden="true" /> Audio editing</h3>
+      <h3><SlidersHorizontal :size="15" aria-hidden="true" /> {{ title ?? "Audio editing" }}</h3>
       <span v-if="usesCe" class="small muted editor-note">Edits are a recipe; the original recording is never changed.</span>
       <button
         v-if="usesCe"
@@ -423,6 +444,7 @@ useShortcuts({
         </label>
       </fieldset>
 
+      <template v-if="!partOnly">
       <section class="radio-filter" aria-label="Radio filter" data-testid="radio-filter">
         <header class="radio-head">
           <h4><Radio :size="14" aria-hidden="true" /> Radio filter</h4>
@@ -581,6 +603,7 @@ useShortcuts({
             </button>
           </p>
         </section>
+      </template>
       </template>
 
 

@@ -7,6 +7,7 @@
 
 import type {
   AudioEdit,
+  CombineEdit,
   CeLanguage,
   CeLine,
   MatchStatus,
@@ -25,8 +26,13 @@ export interface Draft {
   /** Campaign Evolved lines the user associated with this MCC line. */
   ceRefs: string[];
   audioSource: AudioSource;
-  /** The CE line used as the replacement. Must be one of ceRefs when audioSource is "ce". */
+  /** The CE line used as the replacement. Must be one of ceRefs when audioSource is "ce" (the first recording of
+   * a join or an overlay). */
   audioRef: string | null;
+  /** The second recording of a join (ce_concat) or an overlay (ce_mix); one of ceRefs. */
+  audioRefB: string | null;
+  /** Their recipe (docs/combine-recordings.md); null for one recording. */
+  combine: CombineEdit | null;
   audioLanguage: CeLanguage;
   /** Why the line is muted (audioSource "mute"); kept in the draft so switching back and forth keeps it. */
   muteReason: string;
@@ -79,6 +85,48 @@ function editWithoutBinding(edit: AudioEdit): AudioEdit {
   return copy;
 }
 
+/** Whether the audio choice uses two recordings (join or play together). */
+export const isCombined = (source: AudioSource) => source === "ce_concat" || source === "ce_mix";
+
+/** The recipe a new join / overlay starts from: unedited parts, no gap, no offset, no effects (as the server's). */
+export function defaultCombine(source: AudioSource): CombineEdit {
+  return source === "ce_concat"
+    ? { mode: "concat", parts: [defaultEdit(), defaultEdit()], gap_s: 0 }
+    : { mode: "mix", offset_s: 0 };
+}
+
+/** A stored combine recipe as the editors work on it (parts completed, bindings dropped: the server recomputes). */
+function completeCombine(stored: CombineEdit & { for_sources?: unknown }): CombineEdit {
+  const copy = JSON.parse(JSON.stringify(stored)) as CombineEdit & { for_sources?: unknown; engine?: unknown };
+  delete copy.for_sources;
+  delete copy.engine;
+  if (copy.parts) copy.parts = [completeEdit(copy.parts[0]), completeEdit(copy.parts[1])];
+  return copy;
+}
+
+/**
+ * Join two matched recordings (ce_concat) or play two at the same time (ce_mix), in the draft only. The first is
+ * the recording already chosen (or the first matched), the second the next matched one. The recipe starts unedited.
+ */
+export function chooseCombined(draft: Draft, source: "ce_concat" | "ce_mix"): void {
+  const a = draft.audioRef && draft.ceRefs.includes(draft.audioRef) ? draft.audioRef : draft.ceRefs[0] ?? null;
+  const b = draft.audioRefB && draft.ceRefs.includes(draft.audioRefB) && draft.audioRefB !== a
+    ? draft.audioRefB : draft.ceRefs.find((r) => r !== a) ?? null;
+  const same = draft.audioSource === source && draft.audioRef === a && draft.audioRefB === b;
+  draft.audioSource = source;
+  draft.audioRef = a;
+  draft.audioRefB = b;
+  if (draft.ceRefs.length) draft.matchStatus = "matched";
+  if (!same || !draft.combine) draft.combine = defaultCombine(source);
+}
+
+/** Changes the first or second recording of a join / overlay: its recipe starts again (it never moves). */
+export function setCombinedRef(draft: Draft, which: 0 | 1, ref: string): void {
+  if (which === 0) draft.audioRef = ref;
+  else draft.audioRefB = ref;
+  draft.combine = defaultCombine(draft.audioSource);
+}
+
 /** The draft a page starts from: the stored decision, or an empty one for a line not yet decided. */
 export function draftFrom(detail: SlotDetail): Draft {
   const m: StoredDecision | null = detail.mapping;
@@ -88,11 +136,13 @@ export function draftFrom(detail: SlotDetail): Draft {
     ceRefs: [...(m?.match.ce_line_refs ?? [])],
     audioSource: m?.audio.source ?? "keep_original",
     audioRef: firstSource?.ce_line_ref ?? null,
+    audioRefB: m && isCombined(m.audio.source) ? m.audio.sources[1]?.ce_line_ref ?? null : null,
+    combine: m && isCombined(m.audio.source) ? completeCombine(m.audio.edit as unknown as CombineEdit) : null,
     audioLanguage: firstSource?.language ?? DEFAULT_LANGUAGE,
     muteReason: m?.audio.mute_reason ?? "",
     // The server stores only the fields that were set (a new line has just the trims and gap), so the
     // missing ones are filled with the defaults, as the classic page does.
-    edit: m ? completeEdit(m.audio.edit) : defaultEdit(),
+    edit: m && !isCombined(m.audio.source) ? completeEdit(m.audio.edit) : defaultEdit(),
     subtitleSource: m?.subtitle.source ?? "keep_original",
     subtitleRef: m?.subtitle.ce_locres?.ce_line_ref ?? null,
     subtitleCulture: m?.subtitle.ce_locres?.culture ?? "es-MX",
@@ -179,6 +229,13 @@ function audioProblems(draft: Draft): string[] {
     if (draft.matchStatus !== "no_equivalent") problems.push("A muted line must be marked No equivalent.");
     return problems;
   }
+  if (isCombined(draft.audioSource)) {
+    if (!draft.audioRef || !draft.audioRefB) return ["Choose the two Campaign Evolved recordings (match a second one first)."];
+    if (!draft.ceRefs.includes(draft.audioRef) || !draft.ceRefs.includes(draft.audioRefB)) {
+      return ["Both recordings must be matched lines."];
+    }
+    return [];
+  }
   if (draft.audioSource !== "ce") return [];
   if (!draft.audioRef) return ["Choose the Campaign Evolved recording to use, or keep Spain's audio."];
   if (!draft.ceRefs.includes(draft.audioRef)) return ["The replacement must be one of the matched lines."];
@@ -197,7 +254,7 @@ function subtitleProblems(draft: Draft): string[] {
 /** Flags that the validator refuses in this state (they never block an approval: they are saved first). */
 function flagProblems(draft: Draft): string[] {
   const problems: string[] = [];
-  if (draft.radio && draft.audioSource !== "ce") {
+  if (draft.radio && draft.audioSource !== "ce" && !isCombined(draft.audioSource)) {
     problems.push("Needs radio effect applies to a chosen Campaign Evolved replacement; untick it to keep Spain's audio.");
   }
   if (draft.fits && !draft.ceRefs.length) problems.push("Different but fits needs a Campaign Evolved line in the match.");
@@ -243,6 +300,8 @@ export function unmatchDraft(draft: Draft): void {
   draft.ceRefs = [];
   draft.audioSource = "keep_original";
   draft.audioRef = null;
+  draft.audioRefB = null;
+  draft.combine = null;
   draft.edit = defaultEdit(draft.edit.gap_s);
   if (draft.subtitleSource === "ce_locres") {
     draft.subtitleSource = "keep_original";
@@ -263,6 +322,8 @@ export function muteDraft(draft: Draft, subtitleApproved: boolean): void {
   draft.ceRefs = [];
   draft.audioSource = "mute";
   draft.audioRef = null;
+  draft.audioRefB = null;
+  draft.combine = null;
   draft.edit = defaultEdit(draft.edit.gap_s);
   draft.radio = false;
   draft.fits = false;
@@ -328,6 +389,17 @@ export function buildSaveBody(detail: SlotDetail, draft: Draft, baseline: Draft,
 }
 
 function audioSection(draft: Draft, baseline: Draft): NonNullable<SaveBody["audio"]> {
+  if (isCombined(draft.audioSource)) {  // a join / an overlay: both recordings, and the recipe when it changed
+    const refs = [draft.audioRef, draft.audioRefB].filter((r): r is string => Boolean(r));
+    const section: NonNullable<SaveBody["audio"]> = {
+      source: draft.audioSource,
+      sources: refs.map((ref) => ({ ce_line_ref: ref, language: draft.audioLanguage })),
+    };
+    if (draft.combine && JSON.stringify(draft.combine) !== JSON.stringify(baseline.combine)) {
+      section.edit = draft.combine as unknown as AudioEdit;
+    }
+    return section;
+  }
   const usesCe = draft.audioSource === "ce" && draft.audioRef !== null;
   const section: NonNullable<SaveBody["audio"]> = {
     source: draft.audioSource,

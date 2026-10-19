@@ -6,12 +6,15 @@ import {
   canApprove,
   canRework,
   canUnmatch,
+  chooseCombined,
+  defaultCombine,
   defaultEdit,
   draftFrom,
   draftProblems,
   isDirty,
   muteDraft,
   proposeSubtitle,
+  setCombinedRef,
   subtitleDirty,
   unmatchDraft,
   type Draft,
@@ -323,5 +326,50 @@ describe("mute / no replacement", () => {
     muteDraft(d, false);
     unmatchDraft(d);
     expect([d.matchStatus, d.audioSource]).toEqual(["unreviewed", "keep_original"]);
+  });
+});
+
+describe("two recordings in one replacement", () => {
+  const twoMatched = () => {
+    const d = draftFrom(slot(decision({ match: { status: "matched", ce_line_refs: ["line_a#0", "line_b#0"], decided_at: "2026-10-19", revision: 1 } })));
+    return { d, base: draftFrom(slot(decision())) };
+  };
+
+  it("joins the chosen recording with the next matched one, unedited", () => {
+    const { d, base } = twoMatched();
+    chooseCombined(d, "ce_concat");
+    expect([d.audioSource, d.audioRef, d.audioRefB]).toEqual(["ce_concat", "line_a#0", "line_b#0"]);
+    expect(d.combine).toEqual(defaultCombine("ce_concat"));
+    expect(draftProblems(d)).toEqual([]);
+    const body = buildSaveBody(slot(decision()), d, base);
+    expect(body.audio?.sources.map((s) => s.ce_line_ref)).toEqual(["line_a#0", "line_b#0"]);
+    expect((body.audio?.edit as unknown as { mode: string }).mode).toBe("concat");
+  });
+
+  it("starts the recipe again when a recording changes, and needs two matched lines", () => {
+    const { d } = twoMatched();
+    chooseCombined(d, "ce_mix");
+    d.combine!.offset_s = 0.4;
+    setCombinedRef(d, 1, "line_a#0");
+    expect(d.combine).toEqual(defaultCombine("ce_mix"));
+    d.ceRefs = ["line_a#0"];
+    d.audioRefB = "line_b#0";
+    expect(draftProblems(d)).toEqual(["Both recordings must be matched lines."]);
+  });
+
+  it("reads a stored join back, and unmatching drops it", () => {
+    const stored = decision({
+      match: { status: "matched", ce_line_refs: ["line_a#0", "line_b#0"], decided_at: "2026-10-19", revision: 1 },
+      audio: { status: "draft", source: "ce_concat", approved_at: null, revision: 1,
+               sources: [{ kind: "ce", ce_line_ref: "line_a#0", language: "Spanish(Mexico)" },
+                         { kind: "ce", ce_line_ref: "line_b#0", language: "Spanish(Mexico)" }],
+               edit: { engine: "audio-combine/1", mode: "concat", for_sources: [], gap_s: -0.2,
+                       parts: [{ trim_start_s: 0.1, trim_end_s: 0, gap_s: 0 }, { trim_start_s: 0, trim_end_s: 0, gap_s: 0 }] } as never },
+    });
+    const d = draftFrom(slot(stored));
+    expect([d.audioRefB, d.combine?.gap_s, d.combine?.parts?.[0].trim_start_s, d.combine?.parts?.[0].cuts]).toEqual(["line_b#0", -0.2, 0.1, []]);
+    expect(buildSaveBody(slot(stored), d, draftFrom(slot(stored))).audio?.edit).toBeUndefined();  // unchanged: not sent
+    unmatchDraft(d);
+    expect([d.audioSource, d.audioRefB, d.combine]).toEqual(["keep_original", null, null]);
   });
 });

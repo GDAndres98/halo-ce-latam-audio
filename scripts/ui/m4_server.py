@@ -46,8 +46,18 @@ API (all JSON unless noted):
     GET  /audio/peaks?src=<one of the audio URLs above>    waveform peaks (JSON)
     POST /api/edit/preview                        {slot_id, ce_line_ref, language, edit} -> render as M6
                                                   would; writes only work/m4/preview/, never mappings
+    POST /api/edit/preview_combined               {slot_id, source: ce_concat|ce_mix, sources, edit}: the same for a
+                                                  join or an overlay of two recordings (docs/combine-recordings.md)
     POST /api/save                                see M4App.save; 409 = stale or protected
     POST /api/takes/save | remove | move          added takes of a sound (M4App.take_save / take_remove / take_move)
+    POST /api/takes/add_many                      several recordings as new draft takes, one save (M4App.take_add_many)
+    POST /api/takes/own_set_on | own_set_off      own take set of a sound (M4App.own_set_on / own_set_off)
+    GET  /api/takes/convert/preview?mcc_tag=      read-only: converting a sound's per-take decisions into a
+                                                  replacement set (docs/replacement-set-conversion.md)
+    GET  /api/takes/convert/inventory?level=all|<level>    read-only: every multi-take sound, previewed
+    GET  /api/takes/convert/approvable?mcc_tag=   read-only: the staged takes "approve unchanged" would approve
+    GET  /api/takes/convert/revert_preview?mcc_tag=&rework_drifted=1    read-only: an undo's plan and conflicts
+    POST /api/takes/convert/stage | activate | cancel | revert | approve_unchanged    owner actions (M4App.convert_*)
     POST /api/progress                            {level, status, note, verification, confirm, loaded_sha256}
     POST /api/validate                            run the read-only validator
     GET  /api/data/status                         manual_mappings.json vs the database
@@ -540,7 +550,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                     status = e.status
                     raise
                 finally:
-                    if path not in ("/api/edit/preview", "/api/builds/preview", "/api/data/import/preview"):
+                    if path not in ("/api/edit/preview", "/api/edit/preview_combined", "/api/builds/preview",
+                                    "/api/data/import/preview"):
                         entry = {"listener": listener.kind, "user": (s or {}).get("username"),
                                  "from": self._peer(), "path": path, "status": status}
                         if path == "/api/save":
@@ -548,6 +559,14 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                         if path.startswith("/api/takes/"):
                             entry.update(mcc_tag=body.get("mcc_tag"), take_id=body.get("take_id"),
                                          actions=body.get("actions") or [])
+                            if isinstance(body.get("clear_mapping_ids"), list):
+                                entry["cleared"] = body["clear_mapping_ids"][:50]
+                            if isinstance(body.get("audio_list"), list):
+                                entry["count"] = len(body["audio_list"])
+                            if isinstance(body.get("take_ids"), list):  # approve unchanged: each target
+                                entry["take_ids"] = [str(t) for t in body["take_ids"][:50]]
+                            if isinstance(body.get("items"), list):  # conversions: the sounds named
+                                entry["items"] = [i.get("mcc_tag") for i in body["items"][:50] if isinstance(i, dict)]
                         if path == "/api/login":
                             entry["user"] = str(body.get("username") or "")[:40]
                         shared.audit(entry)
@@ -671,6 +690,14 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, app.interference_reference(q.get("slot", ""), q.get("lang", "spanish")))
             if path == "/api/ce_line":
                 return self._json(200, app.ce_line(q.get("ref", "")))
+            if path == "/api/takes/convert/preview":
+                return self._json(200, app.convert_preview(q.get("mcc_tag", "")))
+            if path == "/api/takes/convert/inventory":
+                return self._json(200, app.convert_inventory(q.get("level") or None))
+            if path == "/api/takes/convert/approvable":
+                return self._json(200, app.convert_approvable(q.get("mcc_tag", "")))
+            if path == "/api/takes/convert/revert_preview":
+                return self._json(200, app.convert_revert_preview(q.get("mcc_tag", ""), q.get("rework_drifted") == "1"))
             if path in AUDIO_PATHS:
                 wav, immutable = self._audio_path(path, q)
                 return self._wav(wav, immutable)
@@ -755,11 +782,22 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 if shared.feed and result.get("saved"):
                     shared.feed.note_author(body.get("slot_id"), s["username"])
                 return 200, result, None
-            if path in ("/api/takes/save", "/api/takes/remove", "/api/takes/move"):  # added takes (editor role)
-                op = {"save": app.take_save, "remove": app.take_remove, "move": app.take_move}[path.rsplit("/", 1)[1]]
+            if path in ("/api/takes/save", "/api/takes/remove", "/api/takes/move", "/api/takes/add_many",
+                        "/api/takes/own_set_on", "/api/takes/own_set_off"):  # added takes, own sets (editor role)
+                op = {"save": app.take_save, "remove": app.take_remove, "move": app.take_move,
+                      "add_many": app.take_add_many, "own_set_on": app.own_set_on,
+                      "own_set_off": app.own_set_off}[path.rsplit("/", 1)[1]]
+                return 200, op(body), None
+            if path in ("/api/takes/convert/stage", "/api/takes/convert/activate", "/api/takes/convert/cancel",
+                        "/api/takes/convert/revert", "/api/takes/convert/approve_unchanged"):  # (editor role)
+                op = {"stage": app.convert_stage, "activate": app.convert_activate, "cancel": app.convert_cancel,
+                      "revert": app.convert_revert,
+                      "approve_unchanged": app.convert_approve_unchanged}[path.rsplit("/", 1)[1]]
                 return 200, op(body), None
             if path == "/api/edit/preview":
                 return 200, app.edit_preview(body), None
+            if path == "/api/edit/preview_combined":
+                return 200, app.edit_preview_combined(body), None
             if path == "/api/progress":
                 return 200, app.set_progress(body), None
             if path == "/api/validate":
