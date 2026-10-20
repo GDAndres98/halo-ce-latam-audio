@@ -29,6 +29,7 @@
     "test:navigation": "node e2e/navigation.mjs",
     "test:deploy": "node e2e/deploy.mjs",
     "test:subtitles": "node e2e/subtitles.mjs",
+    "test:build-conflicts": "node e2e/build-conflicts.mjs",
     "test:level": "node e2e/level.mjs",
     "test:theme": "node e2e/theme.mjs",
     "test:remote": "node e2e/remote.mjs",

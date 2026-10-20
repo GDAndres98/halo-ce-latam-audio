@@ -24,7 +24,7 @@ from test_m3_validation import mcc_record  # noqa: E402
 from test_m4 import T, make_root  # noqa: E402
 
 DEATH = T + "z10_030_death"          # no subtitle entry: added takes allowed
-KEYES = T + "z10_010_keyes"          # has a subtitle entry: refused
+KEYES = T + "z10_010_keyes"          # has a subtitle entry: allowed since 2026-10-19 (one subtitle per set)
 MX = "Spanish(Mexico)"
 
 
@@ -60,15 +60,16 @@ class AddedTakeTests(unittest.TestCase):
         return json.loads(self.path.read_text(encoding="utf-8"))
 
     # ------------------------------------------------------------------ rules
-    def test_only_mono_sounds_without_a_subtitle_entry(self):
+    def test_mono_sounds_with_or_without_a_subtitle_entry(self):
+        # Owner, 2026-10-19: the barks-only rule is lifted; a subtitled sound may get added takes too.
         self.assertEqual(self.app.take_rule(DEATH), (True, ""))
-        allowed, reason = self.app.take_rule(KEYES)
-        self.assertFalse(allowed)
-        self.assertIn("subtitle", reason)
-        with self.assertRaises(ApiError) as e:
-            self.app.take_save({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES),
+        self.assertEqual(self.app.take_rule(KEYES), (True, ""))
+        r = self.app.take_save({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES),
                                 "audio": {"ce_line_ref": "line_a#0", "language": MX}})
-        self.assertEqual(e.exception.status, 409)
+        self.assertTrue(r["saved"])
+        self.assertTrue(r["sound"]["has_subtitle_entry"])
+        self.assertEqual(r["sound"]["mcc_text"]["SU"], "Despierte, Jefe Maestro.")
+        self.assertIsNone(r["sound"]["set_subtitle"])  # no own set: the line subtitle decisions govern the key
 
     # ------------------------------------------------------------------ the decision and its storage
     def test_add_take_is_stored_in_the_database_and_exported(self):
@@ -145,10 +146,9 @@ class AddedTakeTests(unittest.TestCase):
                 self.app.take_add_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "audio_list": bad})
             self.assertEqual(e.exception.status, status)
         self.assertEqual(self.path.read_bytes(), before)  # all or nothing
-        with self.assertRaises(ApiError) as e:
-            self.app.take_add_many({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES),
+        r = self.app.take_add_many({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES),
                                     "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
-        self.assertEqual(e.exception.status, 409)
+        self.assertTrue(r["saved"])  # a subtitled sound may get added takes since 2026-10-19
 
     # ------------------------------------------------------------------ own take sets (docs/custom-take-set-design.md)
     def line_save(self, **body):
@@ -195,7 +195,7 @@ class AddedTakeTests(unittest.TestCase):
         self.assertEqual(e.exception.status, 409)
         row = self.app.slots("z10")["slots"]
         self.assertEqual(next(x for x in row if x["slot_id"] == "es:Z10_030_death#0")["own_set"],
-                         {"takes": 1, "approved": 0, "needs_rework": 0})
+                         {"takes": 1, "approved": 0, "needs_rework": 0, "subtitle": None})
         ids = lambda st: [x["slot_id"] for x in self.app.slots("z10", status=st)["slots"]]  # noqa: E731
         self.assertIn("es:Z10_030_death#0", ids("matched"))  # filtered by its sound's takes, not as undecided
         self.assertNotIn("es:Z10_030_death#0", ids("undecided"))
@@ -204,9 +204,14 @@ class AddedTakeTests(unittest.TestCase):
         self.assertIn("es:Z10_030_death#0", ids("approved"))
 
     def test_own_set_rules_progress_and_off(self):
-        with self.assertRaises(ApiError) as e:
+        with self.assertRaises(ApiError) as e:  # nothing to replace the takes with
             self.app.own_set_on({"mcc_tag": KEYES, "loaded_takes_sha256": self.version(KEYES), "loaded_sound_sha256": self.sv(KEYES), "clear_mapping_ids": []})
-        self.assertEqual(e.exception.status, 409)  # subtitled sound
+        self.assertEqual(e.exception.status, 400)
+        with self.assertRaises(ApiError) as e:  # a sound without a subtitle entry has no set subtitle
+            self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH),
+                                 "clear_mapping_ids": [], "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}],
+                                 "subtitle": {"source": "none"}})
+        self.assertEqual(e.exception.status, 400)
         before = self.path.read_bytes()
         self.app.own_set_on({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH), "clear_mapping_ids": [], "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
         mcc = self.app.mcc_idx
@@ -223,7 +228,8 @@ class AddedTakeTests(unittest.TestCase):
         bad["slots"].append({"mapping_id": "m-000999", "slot_id": "es:Z10_030_death#0", "mcc_tag": DEATH})
         bad["own_sets"].append({"mcc_tag": KEYES, "set_at": "2026-10-17"})
         codes = {f["code"] for f in own_set_findings(bad, mcc=mcc, subtitle_keys=keys)}
-        self.assertTrue({"own_set_with_line_decisions", "own_set_on_subtitled_sound"} <= codes)
+        self.assertTrue({"own_set_with_line_decisions", "own_set_subtitle_not_approved"} <= codes)
+        self.assertNotIn("own_set_on_subtitled_sound", codes)  # rule lifted (owner, 2026-10-19)
         self.app.own_set_off({"mcc_tag": DEATH, "loaded_takes_sha256": self.version()})
         self.assertNotIn("own_sets", self.doc())
         self.app.take_save({"mcc_tag": DEATH, "take_id": "t-000001", "loaded_takes_sha256": self.version(),
@@ -269,7 +275,7 @@ class AddedTakeTests(unittest.TestCase):
         codes = {f["code"] for f in added_take_findings(bad, ce=self.app.ce_idx, mcc=self.app.mcc_idx, local=None,
                                                         subtitle_keys=self.app._subtitle_keys())}
         self.assertIn("duplicate_take_position", codes)
-        self.assertIn("added_take_on_subtitled_sound", codes)
+        self.assertNotIn("added_take_on_subtitled_sound", codes)  # rule lifted (owner, 2026-10-19)
         self.assertEqual(added_take_findings(doc, ce=self.app.ce_idx, mcc=self.app.mcc_idx, local=None,
                                              subtitle_keys=self.app._subtitle_keys()), [])
 

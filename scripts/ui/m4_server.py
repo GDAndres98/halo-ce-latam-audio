@@ -52,6 +52,7 @@ API (all JSON unless noted):
     POST /api/takes/save | remove | move          added takes of a sound (M4App.take_save / take_remove / take_move)
     POST /api/takes/add_many                      several recordings as new draft takes, one save (M4App.take_add_many)
     POST /api/takes/own_set_on | own_set_off      own take set of a sound (M4App.own_set_on / own_set_off)
+    POST /api/takes/set_subtitle                  the ONE subtitle of a sound's own set (M4App.set_subtitle)
     GET  /api/takes/convert/preview?mcc_tag=      read-only: converting a sound's per-take decisions into a
                                                   replacement set (docs/replacement-set-conversion.md)
     GET  /api/takes/convert/inventory?level=all|<level>    read-only: every multi-take sound, previewed
@@ -783,10 +784,11 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                     shared.feed.note_author(body.get("slot_id"), s["username"])
                 return 200, result, None
             if path in ("/api/takes/save", "/api/takes/remove", "/api/takes/move", "/api/takes/add_many",
-                        "/api/takes/own_set_on", "/api/takes/own_set_off"):  # added takes, own sets (editor role)
+                        "/api/takes/own_set_on", "/api/takes/own_set_off",
+                        "/api/takes/set_subtitle"):  # added takes, own sets, a set's subtitle (editor role)
                 op = {"save": app.take_save, "remove": app.take_remove, "move": app.take_move,
                       "add_many": app.take_add_many, "own_set_on": app.own_set_on,
-                      "own_set_off": app.own_set_off}[path.rsplit("/", 1)[1]]
+                      "own_set_off": app.own_set_off, "set_subtitle": app.set_subtitle}[path.rsplit("/", 1)[1]]
                 return 200, op(body), None
             if path in ("/api/takes/convert/stage", "/api/takes/convert/activate", "/api/takes/convert/cancel",
                         "/api/takes/convert/revert", "/api/takes/convert/approve_unchanged"):  # (editor role)

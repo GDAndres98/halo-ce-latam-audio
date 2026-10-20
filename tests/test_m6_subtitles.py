@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.mcc_loc import parse_mcc_loc  # noqa: E402
 from common.m6_build import build_tables, compare_subtitle_plans, subtitle_plan, table_changes  # noqa: E402
+from build_api import BuildBoard, conflict_details  # noqa: E402
 from m4_app import M4App  # noqa: E402
 from test_m3_validation import mcc_record  # noqa: E402
 from test_m4 import T, make_root  # noqa: E402
@@ -26,7 +27,7 @@ KEYES0, KEYES1, CORTANA, STEREO = "es:Z10_010_keyes#0", "es:Z10_010_keyes#1", "e
 APPROVE = [{"action": "approve", "field": "subtitle"}]
 
 
-class SubtitlePlanTests(unittest.TestCase):
+class SubtitleFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = make_root(self.tmp.name)
@@ -69,6 +70,8 @@ class SubtitlePlanTests(unittest.TestCase):
         self.save(slot, subtitle={"source": "ce_locres", "ce_locres": {"ce_line_ref": ref, "culture": "es-MX"}},
                   actions=APPROVE)
 
+
+class SubtitlePlanTests(SubtitleFixture):
     def test_only_approved_decisions_are_written(self):
         self.ce_text(KEYES0)
         self.save(CORTANA, subtitle={"source": "custom", "custom_text": "Texto propio"})   # a draft
@@ -155,6 +158,68 @@ class SubtitlePlanTests(unittest.TestCase):
             self.assertEqual(sorted(got.values()), sorted(["Jefe Maestro, despierte",
                                                            "Una línea mucho más larga que antes, ¿no?"]))
             self.assertEqual(parse_mcc_loc(cand)["name"], f"{t}_Halo1")
+
+
+class ConflictListTests(SubtitleFixture):
+    """The Build & Test page lists subtitle conflicts take by take (build_api.conflict_details): POST
+    /api/builds/preview and GET /api/builds/detail. Read-only: built from the planner's rows."""
+
+    def preview(self):
+        board = BuildBoard(self.root, lambda: set(self.app.levels), runner=lambda *_: (0, ""), app=self.app)
+        before = (self.root / "mappings/manual_mappings.json").read_bytes()
+        out = board.preview({"scope": "levels", "levels": ["z10"]})["subtitles"]
+        self.assertEqual((self.root / "mappings/manual_mappings.json").read_bytes(), before)  # read-only
+        return out
+
+    def test_preview_lists_what_each_take_would_write(self):
+        self.save(KEYES0, subtitle={"source": "custom", "custom_text": "Texto propio"}, actions=APPROVE)
+        self.save(KEYES1, subtitle={"source": "keep_original"}, actions=APPROVE)
+        subs = self.preview()
+        self.assertEqual(subs["conflicts"], 1)
+        (c,) = subs["conflict_list"]
+        self.assertEqual((c["code"], c["level"], c["key_hex"]), ("keep_and_change_for_one_subtitle_key", "z10",
+                                                                  f"0x{c['key']:08X}"))
+        self.assertTrue(c["mcc_tag"].endswith("z10_010_keyes"))
+        takes = {t["slot_id"]: t for t in c["takes"]}
+        self.assertEqual(list(takes), [KEYES0, KEYES1])
+        self.assertEqual({k: takes[KEYES0][k] for k in ("level", "outcome", "text", "source", "status")},
+                         {"level": "z10", "outcome": "text", "text": "Texto propio", "source": "custom",
+                          "status": "approved"})
+        self.assertEqual((takes[KEYES1]["outcome"], takes[KEYES1]["text"]), ("keep", None))
+        # the rows stay in excluded_rows (category "conflict"); the page lists them under Conflicts only
+        self.assertEqual({r["slot_id"] for r in subs["excluded_rows"] if r["category"] == "conflict"},
+                         {KEYES0, KEYES1})
+
+    def test_different_texts_and_no_subtitle_outcomes(self):
+        self.ce_text(KEYES0)
+        self.save(KEYES1, subtitle={"source": "none"}, actions=APPROVE)
+        (c,) = self.preview()["conflict_list"]
+        self.assertEqual(c["code"], "different_texts_for_one_subtitle_key")
+        self.assertEqual([(t["outcome"], t["text"]) for t in c["takes"]],
+                         [("text", "Jefe Maestro, despierte"), ("empty", None)])
+
+    def test_no_subtitle_not_agreed_names_the_other_takes(self):
+        self.save(KEYES0, subtitle={"source": "none"}, actions=APPROVE)    # KEYES1 has no decision at all
+        (c,) = self.preview()["conflict_list"]
+        self.assertEqual(c["code"], "empty_subtitle_not_agreed_by_every_take")
+        self.assertEqual([(t["slot_id"], t["outcome"], t["level"]) for t in c["takes"]],
+                         [(KEYES0, "empty", "z10"), (KEYES1, "not_approved", "z10")])
+
+    def test_build_detail_uses_the_manifest_rows(self):
+        self.ce_text(KEYES0)
+        self.ce_text(KEYES1, "line_b#0")
+        plan = self.plan()
+        folder = self.root / "work/m6/subs_test"
+        folder.mkdir(parents=True)
+        (folder / "build_manifest.json").write_text(json.dumps(
+            {"name": "subs_test", "kind": "subtitles", "levels": ["z10"], "subtitles": dict(plan, enabled=True)}))
+        board = BuildBoard(self.root, lambda: {"z10"}, runner=lambda *_: (0, ""))
+        (c,) = board.build_detail("subs_test")["conflicts"]
+        self.assertEqual(c, conflict_details(plan["conflicts"], plan["rows"])[0])
+        self.assertEqual([t["outcome"] for t in c["takes"]], ["text", "text"])
+        self.assertEqual(len({t["text"] for t in c["takes"]}), 2)
+        # without the planner's rows the conflict is still listed, its outcomes unknown (never guessed)
+        self.assertEqual(conflict_details(plan["conflicts"], [])[0]["takes"][0]["outcome"], "unknown")
 
 
 if __name__ == "__main__":

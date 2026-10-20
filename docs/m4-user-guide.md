@@ -255,7 +255,10 @@ often have a different number of takes.
 
 **One subtitle per sound.** All takes of a sound share one subtitle. If you approve different subtitles on two
 takes of the same sound, the build leaves that subtitle unchanged and reports a conflict. *None* (no subtitle) is
-written only when every take agrees.
+written only when every take agrees. On Build & Test, the scope preview and each build's details list the
+conflicts under **Conflicts** (open when there are any): the line, its key, why it conflicts, and every take with
+what it would write (its text, *keep MCC text* or *no subtitle*), each linked to that take in Matching. Those
+takes are not repeated under Excluded.
 
 **Three ways to handle a sound with several takes:**
 

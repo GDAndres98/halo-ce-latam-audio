@@ -25,8 +25,9 @@ It is **not a new model**. A replacement set is the existing own take set (`own_
 - a recovery record;
 - an undo that restores the earlier behaviour.
 
-Eligibility is unchanged: mono sounds without a SU/SP subtitle entry (`M4App.take_rule`). Nothing switches a sound to
-another mode on its own.
+Eligibility: mono sounds (`M4App.take_rule`). Since 2026-10-19 (owner) with or without a SU/SP subtitle entry: a
+subtitled sound gets **one subtitle per set** (`own_sets[].subtitle`, `docs/custom-take-set-design.md` §2.1). Nothing
+switches a sound to another mode on its own.
 
 ## 2. Modes
 
@@ -59,13 +60,23 @@ every consumer (store, validator, build planner, Studio) asks it.
   - Notes are copied only when the merged decisions agree.
   - IDs come from `used_take_ids` (current and history) and are never reused.
 
+- **The set's one subtitle (subtitled sounds, 2026-10-19):** `set_subtitle_proposal` looks at every Spain take.
+  Only when each take has exactly one decision and all of them show the same thing (same source, same CE subtitle,
+  same custom text; status ignored) does staging write the set's subtitle, as a **draft** at revision 1 (approvals
+  are never copied; an agreed custom text gets its own new `custom_ref` in the local file). Otherwise it stays
+  undecided and the preview reports `set_subtitle_undecided` (review). Muted takes and keep-Spain audio are still not
+  takes; their subtitle decisions count in this comparison like every other take's. On these sounds the per-take
+  `subtitle_text` / `subtitle_keep` codes are not used.
+
 ## 4. The preview and its review points
 
 `take_set_conversion.plan_sound` classifies every Spain take:
 - **blocked:** `unsupported_source`, `unresolved_media`, `invalid_recipe`, `gap_on_one_line`, `conflicting_decision`,
   `duplicate_decision`, `nothing_selected`.
 - **review:** `undecided_take`, `keep_original`, `mute`, `match_only`, `needs_rework_source`, `approved_drift`,
-  `subtitle_text`, `custom_subtitle_missing`, `needs_recording`, `radio_flag_conflict`, `notes_differ`.
+  `subtitle_text` (sounds without an entry), `custom_subtitle_missing`, `needs_recording`, `radio_flag_conflict`,
+  `notes_differ`, `set_subtitle_undecided` (subtitled sounds whose takes disagree).
+- **info** includes `set_subtitle_prefilled` (subtitled sounds whose takes agree).
 - **info:** the rest.
 
 Sounds with review points are staged **one by one** from the line panel, each point ticked. A bulk stage takes only
@@ -138,8 +149,8 @@ Each history row carries the reason `take-set:approve-unchanged:<record>`. The S
 - the set holds exactly the recorded takes (none added or removed since staging), each with the specification
   recorded at staging;
 - every take is approved **and buildable now**: `plan_inserts` → `insert` on the sound as if switched. That covers
-  resolved media, a valid recipe for its recording, no drift, mono and no subtitle entry. "Approved" alone is not
-  ready.
+  resolved media, a valid recipe for its recording, no drift and mono. "Approved" alone is not ready;
+- a sound with a subtitle entry: the set's one subtitle is approved and drift-free (`set_subtitle_problem`).
 
 Any problem stops the switch with the full list (409), and nothing changes. The switch is one save:
 1. approved line objects become Needs rework (user actions);
@@ -198,7 +209,8 @@ the owner confirms that exact plan (token = plan + sound version); any change in
 - missing local text, from the recovery snapshot.
 
 **Removes:** the takes the record created (approved ones through Needs rework in the same save). Their history stays
-and their IDs are never reused.
+and their IDs are never reused. The set's own subtitle goes with the set (an approved one is reworked first, same
+save); the recorded line subtitle decisions come back exactly, like the rest of each decision.
 
 **Leaves as they are now:** the sound's earlier added takes (a later change to them is reported, not undone).
 
@@ -249,6 +261,7 @@ as drafts; the build keeps Spain's takes until one is approved, as designed). It
 | Studio API | `GET /api/takes/convert/preview`, `/inventory`, `/approvable`, `/revert_preview`; `POST /api/takes/convert/stage`, `/approve_unchanged`, `/activate`, `/cancel`, `/revert` (`M4App.convert_*`) |
 | Studio UI | `ReplacementSet.vue` (preview, stage, approve unchanged, switch, cancel, next-build notice, undo preview), `AddedTakes.vue` (mode, summary, reminders), `TakeSetsView.vue` (inventory; own sets on single-take sounds under their own filter and count; bulk stage of ready sounds; bulk switch) |
 | Read-only inventory | `python scripts/validate/take_set_inventory.py` (JSON + catalogs; the DB only with SQLite `mode=ro`) |
+| Set subtitle | `take_set_conversion.set_subtitle_proposal`, `new_set_subtitle`, `set_subtitle_problem`, `rework_set_subtitle_steps`; `M4App.set_subtitle`; `POST /api/takes/set_subtitle`; `SetSubtitle.vue`; `tests/test_set_subtitles.py` |
 | Tests | `tests/test_take_set_conversion.py`: `PreviewTests`, `StageActivateTests`, `BuildNeutralTests`, `ApproveUnchangedTests`, `SwitchTests`, `RecoveryTests`, `LocalRecoveryTests`, `VisibilityTests`, `BuildTests`, `ReadOnlyInventoryTests`; `npm run test:take-sets` |
 
 ## 12. Still open

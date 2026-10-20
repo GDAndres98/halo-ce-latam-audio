@@ -9,6 +9,7 @@ import { api } from "../../api/client";
 import type { BuildDetail, BuildLevel, BuildSummary } from "../../api/types";
 import { builtAtParts } from "../../build/history";
 import StatusBadge from "../StatusBadge.vue";
+import SubtitleConflicts from "./SubtitleConflicts.vue";
 
 const props = defineProps<{ name: string; hasLog: boolean; build?: BuildSummary }>();
 
@@ -29,6 +30,9 @@ const n = (v: number | undefined) => (v ?? 0).toLocaleString("en-US");
 const db = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)} dB`);
 const levelName = (l: BuildLevel) => (l.mode === "match_spain" ? "Match Spain" : `Global gain ${db(l.global_gain_db)}`);
 const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "no subtitle entry" } as const;
+// Conflict takes are listed under Conflicts, not again among the excluded rows.
+const excludedOnly = computed(() => detail.value?.excluded.filter((r) => r.category !== "conflict") ?? []);
+const excludedCount = (s: { excluded: number; rows?: Record<string, number> }) => s.excluded - (s.rows?.conflict ?? 0);
 
 onMounted(async () => {
   try {
@@ -72,7 +76,7 @@ async function loadLog() {
             <dt>Subtitles</dt>
             <dd>
               {{ n(build.subtitles.summary.keys_to_write) }} written ·
-              <span :class="{ warn: build.subtitles.summary.excluded }">{{ n(build.subtitles.summary.excluded) }} excluded</span> ·
+              <span :class="{ warn: excludedCount(build.subtitles.summary) }">{{ n(excludedCount(build.subtitles.summary)) }} excluded</span> ·
               <span :class="{ error: build.subtitles.conflicts }">{{ build.subtitles.conflicts }} conflicts</span>
             </dd>
           </template>
@@ -141,14 +145,15 @@ async function loadLog() {
             Show all {{ detail.written.length }}
           </button>
         </details>
-        <details data-testid="detail-excluded" :open="detail.conflicts.length > 0">
-          <summary>Excluded ({{ detail.excluded.length }}) and conflicts ({{ detail.conflicts.length }}): these lines keep MCC's text</summary>
+        <details v-if="detail.conflicts.length" data-testid="detail-conflicts" class="conflicts" open>
+          <summary>Conflicts ({{ detail.conflicts.length }}): the takes of these lines disagree, so they keep MCC's text</summary>
+          <SubtitleConflicts :conflicts="detail.conflicts" />
+        </details>
+        <details data-testid="detail-excluded">
+          <summary>Excluded ({{ excludedOnly.length }}): these lines keep MCC's text</summary>
           <ul class="small plain">
-            <li v-for="c in detail.conflicts" :key="c.key_hex" class="error">
-              Conflict <code>{{ c.key_hex }}</code> {{ c.mcc_tag.split("\\").pop() }}: {{ c.code.replace(/_/g, " ") }} ({{ c.slots.join(", ") }})
-            </li>
-            <li v-for="r in detail.excluded" :key="r.slot_id"><code>{{ r.slot_id }}</code> · {{ CATEGORY[r.category] }}: {{ r.result }}</li>
-            <li v-if="!detail.excluded.length && !detail.conflicts.length" class="muted">none</li>
+            <li v-for="r in excludedOnly" :key="r.slot_id"><code>{{ r.slot_id }}</code> · {{ CATEGORY[r.category] }}: {{ r.result }}</li>
+            <li v-if="!excludedOnly.length" class="muted">none</li>
           </ul>
         </details>
       </section>

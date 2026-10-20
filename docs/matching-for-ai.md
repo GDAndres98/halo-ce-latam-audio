@@ -118,8 +118,10 @@ change bumps its own `revision`. The "Needs radio effect" flag is never applied 
 ```
 
 Extra CE recordings for a sound, inserted after its Spain takes. The game picks among all takes listed in the
-Spanish `.lst.bin` range (proven in game: `v-000020`, `v-000021`). Allowed only on **mono sounds without a SU/SP
-subtitle entry** (barks, deaths, combat chatter), because takes share one subtitle. Warning above 12 takes.
+Spanish `.lst.bin` range (proven in game: `v-000020`, `v-000021`). Allowed on **mono sounds** (owner, 2026-10-19:
+with or without a SU/SP subtitle entry; before, barks only). Takes share one subtitle: on a subtitled sound without an
+own set, the line subtitle decisions decide it (the Studio warns); with one, the set's subtitle (§3.3). Added takes on
+scripted story lines are not yet proven in game. Warning above 12 takes.
 Same approval rules as a slot's audio; the fingerprint also pins the sound's Spain samples.
 
 ### 3.3 Own take sets (sound level)
@@ -132,6 +134,12 @@ Same approval rules as a slot's audio; the fingerprint also pins the sound's Spa
 `dropped`) once ≥1 added take is approved and eligible. Same sound rules as added takes. While on, the sound's slots
 must have **no** slot decisions (validator error) and the API refuses slot saves. Design:
 `docs/custom-take-set-design.md`.
+
+Optional `"subtitle"` (2026-10-19, sounds with a SU/SP entry only): the set's **one** subtitle, shaped like a slot's
+subtitle object minus `mcc_key_hash`/`mcc_key_verification` (`keep_original` / `ce_locres` / `custom` / `none`; custom
+text in the local file). Same lifecycle as a slot subtitle; the user action names the sound:
+`UserAction(approve|needs_rework, <mcc_tag>, "subtitle")`. A set whose subtitle is approved cannot be removed until it
+is reworked (off / cancel / undo add that step to their save). Built only while the set is in force and approved.
 
 Two optional fields (2026-10-18, `docs/replacement-set-conversion.md`):
 - `"state": "staged"`: a conversion of the sound's own selections is prepared but **not in force**. The line
@@ -171,8 +179,10 @@ have several recorded *takes*; each Spain take is a separate *slot* with its own
 - **Subtitles are per sound, not per take.** The SU/SP key is the CRC of the tag path, so every take of a sound
   shows the same subtitle. Consequences: the approved subtitle decisions of a sound's takes must agree (different
   texts, or a text next to an approved "keep", is a *conflict*: the key is left unchanged and reported); `none`
-  (empty entry) is written only when **every** take approved `none`; and extra takes may only be added to sounds
-  **without** a subtitle entry (a take that says something else would show the wrong text).
+  `none`
+  (empty entry) is written only when **every** take approved `none`. Since 2026-10-19 extra takes and own sets are
+  allowed on subtitled sounds too: without a set the line decisions above govern the key; with a set in force, the
+  set's one subtitle does.
 
 ### 4.2 The three ways to handle a multi-take sound
 
@@ -186,8 +196,10 @@ have several recorded *takes*; each Spain take is a separate *slot* with its own
 Rules that follow from the table:
 - In A and B a **muted** Spain take stays in the rotation as silence (the game can pick it). C exists to avoid that:
   it removes Spain's takes instead.
-- B and C are only allowed for **mono sounds without a SU/SP subtitle entry** (`M4App.take_rule`; validator
-  `added_take_on_subtitled_sound`, `own_set_on_subtitled_sound`). Scripted story lines always use A.
+- B and C are allowed for **mono sounds** (`M4App.take_rule`), with or without a SU/SP subtitle entry (owner,
+  2026-10-19; the validator codes `added_take_on_subtitled_sound` / `own_set_on_subtitled_sound` are gone). A
+  subtitled sound in C has one subtitle per set (`own_sets[].subtitle`); conversion prefills it as a draft only when
+  every Spain take's subtitle decision agrees, and the switch needs it approved.
 - Two ways into C:
   - **4th audio option** (`own_set_on`): new recordings; the sound's slot decisions are cleared (owner-confirmed;
     approved ones `needs_rework` then removed, in one save) and recorded in the set's provenance.
@@ -309,8 +321,9 @@ Vue Studio (frontend/src)  ──HTTP──►  scripts/ui/m4_server.py  ──�
 | `POST /api/takes/save` | `{mcc_tag, loaded_takes_sha256, take_id?, audio?, actions?}` | New take (no `take_id`) or change/approve/rework one |
 | `POST /api/takes/add_many` | `{mcc_tag, loaded_takes_sha256, audio_list}` | Several new draft takes in one save |
 | `POST /api/takes/move` / `remove` | | Reorder / remove (not while approved) |
-| `POST /api/takes/own_set_on` | `{mcc_tag, loaded_takes_sha256, loaded_sound_sha256, clear_mapping_ids, audio_list?}` | Replace every take: clear the listed slot decisions (recorded), turn the set on, add drafts |
-| `POST /api/takes/own_set_off` | `{mcc_tag, loaded_takes_sha256}` | Back to Spain's takes (lines undecided; use undo to restore) |
+| `POST /api/takes/own_set_on` | `{mcc_tag, loaded_takes_sha256, loaded_sound_sha256, clear_mapping_ids, audio_list?, subtitle?}` | Replace every take: clear the listed slot decisions (recorded), turn the set on, add drafts |
+| `POST /api/takes/own_set_off` | `{mcc_tag, loaded_takes_sha256}` | Back to Spain's takes (lines undecided; use undo to restore; an approved set subtitle is reworked in the same save) |
+| `POST /api/takes/set_subtitle` | `{mcc_tag, loaded_takes_sha256, subtitle?: {source, ce_locres?, custom_text?} \| null, actions?: [{action: approve\|needs_rework}]}` | The set's one subtitle (subtitled sound with a staged or active set) |
 | `GET /api/takes/convert/preview?mcc_tag=` / `inventory?level=` | | Read-only conversion preview of one sound / every multi-take sound |
 | `POST /api/takes/convert/stage` | `{items: [{mcc_tag, token, acknowledged?}], bulk?, confirm: true}` | Staged set + draft takes; line decisions untouched |
 | `GET /api/takes/convert/approvable?mcc_tag=` | | Read-only: staged takes "approve unchanged" would approve, and the excluded ones with reasons |
@@ -364,7 +377,8 @@ Client rules mirror the server for usability only (`frontend/src/matching/draft.
 Added takes (`plan_inserts`): approved + eligible → `insert` after the sound's Spain samples (or as the whole sound
 when dropped); the Spanish `.lst.bin` is then rewritten and installed with the bank as one unit.
 Subtitles (`subtitle_plan`): approved decisions only, per key, per table (SU and SP independently); takes of one
-sound that disagree = conflict, left unchanged; keys are never added.
+sound that disagree = conflict, left unchanged; keys are never added. A sound whose own set is in force: the set's
+approved subtitle is the key's outcome (row `own set <tag_name>`); not approved = excluded, MCC text stays.
 Every CE replacement goes through the same render as the Studio preview: ffmpeg 44.1 kHz → recipe → level stage
 (`config/audio_export.json`) → CELT 0.11 **`fmod` profile** (never `default`: it crashed MCC, `v-000017`).
 `m6_install.py` refuses a build whose built lines no longer match the current approved decisions.

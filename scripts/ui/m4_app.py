@@ -47,7 +47,7 @@ from common.mcc_loc import loc_key, parse_mcc_loc, split_speaker  # noqa: E402
 from common.ondemand_audio import AudioUnavailable  # noqa: E402
 from common.project_validation import (  # noqa: E402
     READY_STATUSES, added_take_fingerprint, audio_fingerprint, build_ce_index, build_mcc_index, level_progress,
-    subtitle_fingerprint, validate_mappings)
+    own_set_subtitle_fingerprint, subtitle_fingerprint, validate_mappings)
 
 MAPPINGS = "mappings/manual_mappings.json"
 LOCAL = "mappings/manual_mappings.local.json"
@@ -943,8 +943,7 @@ class M4App:
                     raise ApiError(400, "custom subtitle text is empty")
                 custom_ref = slot["subtitle"]["custom_ref"]
                 if not custom_ref:
-                    used = list(local["custom_subtitles"]) + [x["subtitle"]["custom_ref"] for x in doc["slots"]]
-                    custom_ref = _next_id("c", used)
+                    custom_ref = _next_id("c", self._used_custom_refs(doc, local))
                 old_text = (local["custom_subtitles"].get(custom_ref) or {}).get("text")
                 if old_text != text:
                     guard("subtitle", True)
@@ -1059,12 +1058,10 @@ class M4App:
         raise ApiError(404, f"unknown sound {mcc_tag}")
 
     def take_rule(self, mcc_tag):
-        """-> (allowed, reason). Owner rule 2026-10-17: only sounds without a SU/SP subtitle entry, mono."""
+        """-> (allowed, reason). Mono sounds only (stereo replacement is deferred). Owner, 2026-10-19: with or without
+        a SU/SP subtitle entry (before: barks only). On a sound with one, every take shows the same text: the line
+        subtitle decisions decide it, or, while the sound plays its own take set, the set's ONE subtitle."""
         _lv, r = self._tag_record(mcc_tag)
-        key = loc_key(mcc_tag)
-        if any(tbl is not None and key in tbl for t, tbl in self.loc.items() if t in ("SU", "SP")):
-            return False, ("this sound has a subtitle entry; added takes are only for sounds without one "
-                           "(every take would show the same text)")
         if any(s["channels"] != 1 for s in r["samples"]["spanish"]):
             return False, "stereo sound (stereo replacement is deferred)"
         return True, ""
@@ -1074,11 +1071,28 @@ class M4App:
         """Sounds whose replacement set is in force (a staged conversion is not: its lines keep their decisions)."""
         return active_own_tags(doc)
 
+    def has_subtitle_entry(self, mcc_tag):
+        return loc_key(mcc_tag) in self._subtitle_keys()
+
     @staticmethod
-    def _own_status(doc):
-        """{mcc_tag: {takes, approved, needs_rework}} for the sounds in own-take-set mode (the MCC list shows the
-        sound's state on its lines, which have no decision of their own)."""
-        out = {t: {"takes": 0, "approved": 0, "needs_rework": 0} for t in active_own_tags(doc)}
+    def _used_custom_refs(doc, local):
+        """Every custom subtitle ref in use or on record: local texts, line decisions, sets' subtitles and the
+        decisions replacement-set records keep (a new ref never collides with one an Undo would bring back)."""
+        return (list((local or {}).get("custom_subtitles") or {})
+                + [x["subtitle"]["custom_ref"] for x in doc["slots"]]
+                + [(o.get("subtitle") or {}).get("custom_ref") for o in doc.get("own_sets", [])]
+                + [m["subtitle"]["custom_ref"] for o in doc.get("own_sets", [])
+                   for m in (o.get("provenance") or {}).get("slots", [])])
+
+    def _own_status(self, doc):
+        """{mcc_tag: {takes, approved, needs_rework, subtitle}} for the sounds in own-take-set mode (the MCC list shows
+        the sound's state on its lines, which have no decision of their own). subtitle: the set's one subtitle status
+        ("undecided" when there is none) for a sound with a subtitle entry, else None."""
+        out = {t: {"takes": 0, "approved": 0, "needs_rework": 0,
+                   "subtitle": None if not self.has_subtitle_entry(t) else "undecided"} for t in active_own_tags(doc)}
+        for o in doc.get("own_sets", []):
+            if o["mcc_tag"] in out and out[o["mcc_tag"]]["subtitle"] and o.get("subtitle"):
+                out[o["mcc_tag"]]["subtitle"] = o["subtitle"]["status"]
         for t in doc.get("added_takes", []):
             st = out.get(t["mcc_tag"])
             if st is not None:
@@ -1088,12 +1102,16 @@ class M4App:
         return out
 
     @staticmethod
-    def takes_version(doc, mcc_tag):
-        """The stored version of one sound's added takes and own-set switch: a take save names the version it was
-        made from."""
+    def takes_version(doc, mcc_tag, local=None):
+        """The stored version of one sound's added takes and own-set switch (with the set's subtitle and, when it is
+        custom, its text): a take save names the version it was made from."""
         takes = [t for t in doc.get("added_takes", []) if t["mcc_tag"] == mcc_tag]
         own = [o for o in doc.get("own_sets", []) if o["mcc_tag"] == mcc_tag]
-        return _sha(json.dumps({"takes": takes, "own_set": own}, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+        data = {"takes": takes, "own_set": own}
+        ref = ((own[0] if own else {}).get("subtitle") or {}).get("custom_ref")
+        if ref:  # only for a set with a custom subtitle: every other version is unchanged
+            data["set_custom_text"] = (((local or {}).get("custom_subtitles") or {}).get(ref) or {}).get("text")
+        return _sha(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8"))
 
     def sound(self, mcc_tag, mappings=None, local=None):
         """One sound: its Spain takes (with their decisions) and its added takes, for the Studio's section."""
@@ -1126,9 +1144,16 @@ class M4App:
             if own and not is_active(own) else set()
         for t in takes:
             t["staged"] = t["take_id"] in staged
+        entry = self.has_subtitle_entry(mcc_tag)
         return {"mcc_tag": mcc_tag, "level": lv, "tag_name": r["tag_name"], "allowed": allowed, "reason": reason,
                 "spain_takes": spain, "added_takes": takes, "total_takes": len(spain) + len(takes),
-                "warn_above": 12, "version": self.takes_version(mappings, mcc_tag),
+                "warn_above": 12, "version": self.takes_version(mappings, mcc_tag, local),
+                # Owner, 2026-10-19: a sound with a SU/SP entry shows ONE text for every take (MCC's texts here, for
+                # the set subtitle panel); while it plays its own take set, the set's subtitle decides it.
+                "has_subtitle_entry": entry,
+                "mcc_text": ({t: v["text"] for t, v in self._mcc_text(mcc_tag).items() if t in ("SU", "SP")}
+                             if entry else None),
+                "set_subtitle": self._set_subtitle_view(own, local) if own and entry else None,
                 # Every line decision, take and set of the sound (docs/replacement-set-conversion.md): conversions
                 # and the 4th audio option name this version, because they consume the line decisions too.
                 "sound_version": self._sound_version(mappings, local, mcc_tag),
@@ -1150,6 +1175,136 @@ class M4App:
                                    "subtitle": m["subtitle"]["status"], "notes": m.get("notes", "")}
                                   for m in prov["slots"]]}}
 
+    def _set_subtitle_view(self, own, local):
+        """The set's one subtitle for the page: the decision, its custom text, the text it shows and drift."""
+        sub = own.get("subtitle")
+        if not sub:
+            return {"decision": None, "custom_text": None, "text": None, "drift": False}
+        custom = (((local or {}).get("custom_subtitles") or {}).get(sub["custom_ref"]) or {}).get("text") \
+            if sub["custom_ref"] else None
+        text = None
+        if sub["source"] == "ce_locres" and sub["ce_locres"]["ce_line_ref"] in self.ce_lines:
+            e = self.ce_lines[sub["ce_locres"]["ce_line_ref"]][2]
+            text = (e["subtitles"].get(sub["ce_locres"]["culture"]) or {}).get("text")
+        elif sub["source"] == "custom":
+            text = custom
+        elif sub["source"] == "keep_original":
+            text = self._mcc_text(own["mcc_tag"])["SU"]["text"]
+        elif sub["source"] == "none":
+            text = ""
+        drift = sub["status"] == "approved" and sub["fingerprint"] != own_set_subtitle_fingerprint(
+            own, self.ce_idx, self.mcc_idx, local)
+        return {"decision": sub, "custom_text": custom, "text": text, "drift": drift}
+
+    def _set_subtitle_object(self, body_sub, current, doc, local, new_local, today):
+        """A set subtitle choice from the page -> (subtitle object, local changed). body_sub: {source, ce_locres?:
+        {ce_line_ref, culture}, custom_text?}. Same sources and rules as a line's subtitle; never approved here."""
+        if not isinstance(body_sub, dict):
+            raise ApiError(400, "subtitle must be {source, ce_locres?, custom_text?}")
+        source = body_sub.get("source")
+        if source not in ("keep_original", "ce_locres", "custom", "none"):
+            raise ApiError(400, f"unknown subtitle source {source!r}")
+        cur = current or {"status": "draft", "source": "keep_original", "ce_locres": None, "custom_ref": None,
+                          "fingerprint": None, "approved_at": None, "revision": 1}
+        ce_locres, custom_ref, local_changed = None, None, False
+        if source == "ce_locres":
+            c = body_sub.get("ce_locres") or {}
+            if c.get("ce_line_ref") not in self.ce_lines or c.get("culture") not in CULTURES:
+                raise ApiError(400, "subtitle ce_locres needs a known CE line and culture")
+            ce_locres = {"ce_line_ref": c["ce_line_ref"], "culture": c["culture"]}
+        if source == "custom":
+            text = (body_sub.get("custom_text") or "").strip()
+            if not text:
+                raise ApiError(400, "custom subtitle text is empty")
+            if len(text) > 2000:
+                raise ApiError(400, "the subtitle text is limited to 2000 characters")
+            custom_ref = cur["custom_ref"] or _next_id("c", self._used_custom_refs(doc, new_local))
+            if (new_local["custom_subtitles"].get(custom_ref) or {}).get("text") != text:
+                if cur["status"] == "approved":
+                    raise ApiError(409, "the set's subtitle is approved and read-only; choose 'needs rework' first")
+                new_local["custom_subtitles"][custom_ref] = {"text": text, "updated_at": today}
+                local_changed = True
+        want = dict(cur, source=source, ce_locres=ce_locres, custom_ref=custom_ref)
+        if _subtitle_sem(want) != _subtitle_sem(cur) and cur["status"] == "approved":
+            raise ApiError(409, "the set's subtitle is approved and read-only; choose 'needs rework' first")
+        return want, local_changed
+
+    def set_subtitle(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, subtitle?: {source, ce_locres?, custom_text?} | null,
+        actions?: [{action: approve | needs_rework}]}. The ONE subtitle of a sound that has a SU/SP entry and an own
+        take set, staged or in force (owner, 2026-10-19). Same rules as a line's subtitle: saved as a draft; approved
+        only by an explicit 'approve' action (fingerprint pinned); approved = read-only until 'needs_rework'
+        (revision + 1). null removes an unapproved one (undecided again). The custom text stays in the git-ignored
+        local file."""
+        with self._save_lock:
+            tag = body.get("mcc_tag")
+            self._tag_record(tag)
+            doc, sha = self._mappings()
+            local, lsha = self._local()
+            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag, local):
+                raise ApiError(409, "This sound's takes changed elsewhere since this page loaded them; reload")
+            if not self.has_subtitle_entry(tag):
+                raise ApiError(409, "this sound has no subtitle entry in SU or SP (keys are never added)")
+            new_doc = copy.deepcopy(doc)
+            own = next((o for o in new_doc.get("own_sets", []) if o["mcc_tag"] == tag), None)
+            if own is None:
+                raise ApiError(409, "the sound has no own take set; its line subtitle decisions decide its text")
+            actions = body.get("actions") or []
+            user_actions = []
+            for a in actions:
+                if not isinstance(a, dict) or a.get("action") not in ("approve", "needs_rework") \
+                        or a.get("field", "subtitle") != "subtitle":
+                    raise ApiError(400, f"unknown action {a}")
+                user_actions.append(UserAction(a["action"], tag, "subtitle"))
+            kinds = {a.action for a in user_actions}
+            if len(kinds) != len(user_actions) or kinds == {"approve", "needs_rework"}:
+                raise ApiError(400, "one action at a time")
+            today = self.today()
+            sub = own.get("subtitle")
+            if "needs_rework" in kinds:
+                if not sub or sub["status"] != "approved":
+                    raise ApiError(400, "the set's subtitle is not approved; nothing to rework")
+                sub = dict(sub, status="needs_rework", revision=sub["revision"] + 1, approved_at=None, fingerprint=None)
+            new_local, local_changed = copy.deepcopy(local), False
+            if "subtitle" in body:
+                if body["subtitle"] is None:
+                    if sub and sub["status"] == "approved":
+                        raise ApiError(409, "the set's subtitle is approved; mark it Needs rework before clearing it")
+                    sub = None
+                else:
+                    sub, local_changed = self._set_subtitle_object(body["subtitle"], sub, doc, local, new_local, today)
+            if "approve" in kinds:
+                if not sub:
+                    raise ApiError(400, "choose the set's subtitle before approving it")
+                if sub["status"] == "approved":
+                    raise ApiError(400, "the set's subtitle is already approved")
+                sub = dict(sub, status="approved", approved_at=today)
+                sub["fingerprint"] = own_set_subtitle_fingerprint({"mcc_tag": tag, "subtitle": sub}, self.ce_idx,
+                                                                  self.mcc_idx, new_local)
+            if sub is None:
+                own.pop("subtitle", None)
+            else:
+                own["subtitle"] = sub
+            if new_doc == doc and not local_changed:
+                return {"saved": False, "message": "nothing changed", "sound": self.sound(tag, doc, local)}
+            try:
+                check_transition(doc, new_doc, user_actions)
+            except ProtectedError as e:
+                raise ApiError(409, str(e))
+            errors = self._conversion_errors(new_doc, new_local, {tag})
+            if errors:
+                raise ApiError(422, "the set's subtitle is not valid yet", errors)
+            try:
+                if local_changed:
+                    save_user_file(self.root / LOCAL, new_local, lsha, "manual-mappings-local-1")
+                new_sha = save_mappings(self.root / MAPPINGS, new_doc, sha, user_actions=user_actions)
+            except (StaleError, ProtectedError) as e:
+                raise ApiError(409, str(e))
+            except StoreError as e:
+                raise ApiError(422, str(e))
+            self.validate_soon()
+            return {"saved": True, "sha256": new_sha, "sound": self.sound(tag)}
+
     def _sound_version(self, doc, local, mcc_tag):
         _lv, r = self._tag_record(mcc_tag)
         return tsc.digest(tsc.sound_inputs(doc, mcc_tag, r, has_subtitle_entry=loc_key(mcc_tag) in self._subtitle_keys(),
@@ -1157,7 +1312,9 @@ class M4App:
 
     # ------------------------------------------------------------------ own take sets (docs/custom-take-set-design.md)
     def own_set_on(self, body):
-        """body: {mcc_tag, loaded_takes_sha256, clear_mapping_ids: [...], audio_list?: [{ce_line_ref, language}]}.
+        """body: {mcc_tag, loaded_takes_sha256, clear_mapping_ids: [...], audio_list?: [{ce_line_ref, language}],
+        subtitle?: {source, ce_locres?, custom_text?}}. subtitle: the set's ONE subtitle, saved as a DRAFT (sounds with
+        a SU/SP entry only, owner 2026-10-19; approve it under Takes of this sound).
         Replaces every take of the sound (the line's 4th audio option): the sound then plays only its added takes,
         plus the recordings in audio_list, added as drafts in the same save (already a take: skipped). At least one
         take must result. An explicit user action that clears the sound's line decisions:
@@ -1167,8 +1324,8 @@ class M4App:
             tag = body.get("mcc_tag")
             self._tag_record(tag)
             doc, sha = self._mappings()
-            local, _ = self._local()
-            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+            local, lsha = self._local()
+            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag, local):
                 raise ApiError(409, "This sound's takes changed elsewhere since this page loaded them; reload")
             if tag in self._own_tags(doc):
                 return {"saved": False, "message": "the own take set is already on", "sound": self.sound(tag, doc, local)}
@@ -1193,6 +1350,12 @@ class M4App:
             mine = [s for s in doc["slots"] if s["mcc_tag"] == tag]
             if sorted(body.get("clear_mapping_ids") or []) != sorted(s["mapping_id"] for s in mine):
                 raise ApiError(409, "the decisions of this sound changed since the page listed them; reload")
+            new_local, local_changed, set_sub = copy.deepcopy(local), False, None
+            if body.get("subtitle") is not None:
+                if not self.has_subtitle_entry(tag):
+                    raise ApiError(400, "this sound has no subtitle entry: its set has no subtitle")
+                set_sub, local_changed = self._set_subtitle_object(body["subtitle"], None, doc, local, new_local,
+                                                                   self.today())
             # One save of two checked steps (mapping_store.save_sequence): 1. Needs rework on every approved
             # decision (the only allowed change to an approved object); 2. remove the sound's decisions and turn the
             # set on. The set's provenance keeps the removed decisions exactly (docs/replacement-set-conversion.md).
@@ -1219,6 +1382,8 @@ class M4App:
                 "takes": [{"take_id": t["take_id"], "origin": "existing", "from_mapping_ids": [],
                            "spec_sha256": tsc.spec_digest(t["audio"])} for t in existing],
                 "acknowledged": []}}
+            if set_sub:
+                entry["subtitle"] = set_sub
             new_doc.setdefault("own_sets", []).append(entry)
             takes = new_doc.setdefault("added_takes", [])
             have = {(x.get("ce_line_ref"), x.get("language")) for t in existing for x in t["audio"]["sources"][:1]}
@@ -1236,10 +1401,15 @@ class M4App:
             if not takes:
                 new_doc.pop("added_takes")
             steps.append((new_doc, []))
-            errors = self._conversion_errors(new_doc, local, {tag})
+            errors = self._conversion_errors(new_doc, new_local, {tag})
             if errors:
                 raise ApiError(422, "the result would not be valid; nothing was saved", errors)
             self._save_recovery({entry["provenance"]["record_id"]: tsc.recovery_record(tag, mine, local, self.today())})
+            if local_changed:  # the set's custom subtitle text: git-ignored local file, written first (as line saves)
+                try:
+                    save_user_file(self.root / LOCAL, new_local, lsha, "manual-mappings-local-1")
+                except StaleError as e:
+                    raise ApiError(409, str(e))
             try:
                 new_sha = mapping_store.save_sequence(self.root / MAPPINGS, steps, sha,
                                                       reason=f"take-set:replace:{entry['provenance']['record_id']}")
@@ -1260,18 +1430,21 @@ class M4App:
             self._tag_record(tag)
             doc, sha = self._mappings()
             local, _ = self._local()
-            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+            if body.get("loaded_takes_sha256") != self.takes_version(doc, tag, local):
                 raise ApiError(409, "This sound's takes changed elsewhere since this page loaded them; reload")
             if tag not in self._own_tags(doc):
                 if tag in {o["mcc_tag"] for o in doc.get("own_sets", [])}:
                     raise ApiError(409, "the conversion of this sound is staged, not on: cancel it instead")
                 return {"saved": False, "message": "the own take set is already off", "sound": self.sound(tag, doc, local)}
-            new_doc = copy.deepcopy(doc)
+            # The set's approved subtitle goes with the set: Needs rework first (a user action), same save.
+            steps, cur = tsc.rework_set_subtitle_steps(doc, tag)
+            new_doc = copy.deepcopy(cur)
             new_doc["own_sets"] = [o for o in new_doc["own_sets"] if o["mcc_tag"] != tag]
             if not new_doc["own_sets"]:
                 new_doc.pop("own_sets")  # never stored empty (schema: minItems 1)
+            steps.append((new_doc, []))
             try:
-                new_sha = save_mappings(self.root / MAPPINGS, new_doc, sha)
+                new_sha = mapping_store.save_sequence(self.root / MAPPINGS, steps, sha, reason=f"take-set:off:{tag}")
             except (StaleError, ProtectedError) as e:
                 raise ApiError(409, str(e))
             except StoreError as e:
@@ -1378,9 +1551,10 @@ class M4App:
             raise ApiError(400, "items must list 1 to 500 sounds")
         with self._save_lock:
             doc, sha = self._mappings()
-            local, _ = self._local()
+            local, lsha = self._local()
             used = set(mapping_store.used_take_ids(self.root / MAPPINGS))
             new_doc, done, already, problems, tags = doc, [], [], [], set()
+            new_local, local_changed = copy.deepcopy(local), False
             for it in items:
                 tag = it.get("mcc_tag") if isinstance(it, dict) else None
                 if tag in tags:
@@ -1399,9 +1573,17 @@ class M4App:
                 if body.get("bulk") and item["status"] != "ready":
                     problems.append(f"{tag}: {item['status']} (bulk staging takes only sounds that need no review)")
                     continue
+                prefill = (item.get("set_subtitle") or {}).get("prefill")
+                ref = None
+                if prefill and prefill["source"] == "custom":  # the set gets its own copy of the agreed text
+                    ref = _next_id("c", self._used_custom_refs(new_doc, new_local))
                 try:
                     new_doc, entry = tsc.stage(new_doc, item, today=self.today(), used_take_ids=used,
-                                               acknowledged=list(it.get("acknowledged") or []), local=local)
+                                               acknowledged=list(it.get("acknowledged") or []), local=local,
+                                               set_subtitle_custom_ref=ref)
+                    if ref:
+                        new_local["custom_subtitles"][ref] = {"text": prefill["custom_text"], "updated_at": self.today()}
+                        local_changed = True
                 except tsc.ConversionError as e:
                     problems.append(f"{tag}: {e.message}" + (f" ({', '.join(e.details)})" if e.details else ""))
                     continue
@@ -1412,14 +1594,19 @@ class M4App:
                 raise ApiError(409, "nothing was staged", problems)
             if not done:
                 return {"saved": False, "message": "already staged", "already": already, "staged": []}
-            errors = self._conversion_errors(new_doc, local, tags)
+            errors = self._conversion_errors(new_doc, new_local, tags)
             if errors:
                 raise ApiError(422, "the result would not be valid; nothing was saved", errors)
             self._save_recovery({d["record_id"]: tsc.recovery_record(
                 d["mcc_tag"], [m for m in doc["slots"] if m["mcc_tag"] == d["mcc_tag"]], local, self.today())
                 for d in done})
+            if local_changed:
+                try:
+                    save_user_file(self.root / LOCAL, new_local, lsha, "manual-mappings-local-1")
+                except StaleError as e:
+                    raise ApiError(409, str(e))
             new_sha = self._commit([(new_doc, [])], sha, "take-set:stage:" + ",".join(d["record_id"] for d in done),
-                                   local, tags)
+                                   new_local, tags)
         out = {"saved": True, "sha256": new_sha, "staged": done, "already": already}
         if len(items) == 1:
             out["sound"] = self.sound(items[0]["mcc_tag"])
@@ -1461,7 +1648,9 @@ class M4App:
                     continue
                 try:
                     more = tsc.activate(cur, tag, today=self.today(), insert_plan=self._hypothetical_inserts(cur, tag),
-                                        eligible=self.take_rule(tag))
+                                        eligible=self.take_rule(tag), subtitle_problem=tsc.set_subtitle_problem(
+                                            cur, tag, has_subtitle_entry=self.has_subtitle_entry(tag),
+                                            ce_idx=self.ce_idx, mcc_idx=self.mcc_idx, local=local))
                 except tsc.ConversionError as e:
                     problems.append(f"{tag}: {e.message}" + (f" ({'; '.join(e.details)})" if e.details else ""))
                     continue
@@ -1487,7 +1676,8 @@ class M4App:
         lv, r = self._tag_record(mcc_tag)
         try:
             out = tsc.approvable(doc, mcc_tag, r, lv, ce_lines=self.ce_lines, ce_idx=self.ce_idx, mcc_idx=self.mcc_idx,
-                                 local=local, eligible=self.take_rule(mcc_tag))
+                                 local=local, eligible=self.take_rule(mcc_tag),
+                                 has_subtitle_entry=self.has_subtitle_entry(mcc_tag))
         except tsc.ConversionError as e:
             raise ApiError(e.status, e.message, e.details)
         return {**out, "mcc_tag": mcc_tag, "sound_version": self._sound_version(doc, local, mcc_tag)}
@@ -1512,7 +1702,8 @@ class M4App:
                 raise ApiError(409, "This sound changed since the list was shown; nothing was approved. Look again.")
             try:
                 check = tsc.approvable(doc, tag, r, lv, ce_lines=self.ce_lines, ce_idx=self.ce_idx,
-                                       mcc_idx=self.mcc_idx, local=local, eligible=self.take_rule(tag))
+                                       mcc_idx=self.mcc_idx, local=local, eligible=self.take_rule(tag),
+                                       has_subtitle_entry=self.has_subtitle_entry(tag))
             except tsc.ConversionError as e:
                 raise ApiError(e.status, e.message, e.details)
             now = sorted(t["take_id"] for t in check["included"])
@@ -1660,7 +1851,7 @@ class M4App:
         self._tag_record(tag)  # 404 for an unknown sound
         doc, sha = self._mappings()
         local, _lsha = self._local()
-        if body.get("loaded_takes_sha256") != self.takes_version(doc, tag):
+        if body.get("loaded_takes_sha256") != self.takes_version(doc, tag, local):
             raise ApiError(409, "This sound's added takes changed elsewhere since this page loaded them; reload")
         new_doc = copy.deepcopy(doc)
         takes = new_doc.setdefault("added_takes", [])

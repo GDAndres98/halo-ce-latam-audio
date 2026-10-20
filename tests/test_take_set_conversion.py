@@ -226,10 +226,11 @@ class PreviewTests(Base):
         with self.assertRaises(ApiError) as e:
             self.stage(STEREO, item=item)
         self.assertEqual(e.exception.status, 409)
-        lv, rec = self.app._tag_record(GRUNT)  # a subtitle entry makes a sound ineligible too
+        lv, rec = self.app._tag_record(GRUNT)  # a subtitle entry no longer makes a sound ineligible (2026-10-19)
         sub = tsc.plan_sound(self.doc(), GRUNT, rec, lv, has_subtitle_entry=True, ce_lines=self.app.ce_lines,
                              ce_idx=self.app.ce_idx, mcc_idx=self.app.mcc_idx)
-        self.assertEqual(sub["status"], "ineligible")
+        self.assertTrue(sub["eligible"])
+        self.assertEqual(sub["status"], "nothing_to_convert")
         # an own set already on is never converted again
         self.app.own_set_on({"mcc_tag": PAIR, "loaded_takes_sha256": self.app.sound(PAIR)["version"],
                              "loaded_sound_sha256": self.app.sound(PAIR)["sound_version"], "clear_mapping_ids": [],

@@ -11,6 +11,8 @@
 // take of this sound", WholeSoundReplace.vue). Here it only changes how the list reads: Spain's takes show removed.
 // Replacement set from the owner's selections (docs/replacement-set-conversion.md): ReplacementSet.vue, at the end.
 // The header says which way the sound is handled and sums it up ("3 original MCC takes -> 2 replacement takes").
+// Sounds with a SU/SP subtitle entry (owner, 2026-10-19): allowed too. Every take shows the same text: without an own
+// set the line subtitle decisions decide it (a warning says so); with one, "Subtitle of this sound" (SetSubtitle.vue).
 
 import { ArrowDown, ArrowUp, Layers, ListPlus, Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
@@ -20,6 +22,7 @@ import { confirmAction } from "../../composables/useConfirm";
 import AudioButton from "../AudioButton.vue";
 import StatusBadge from "../StatusBadge.vue";
 import ReplacementSet from "./ReplacementSet.vue";
+import SetSubtitle from "./SetSubtitle.vue";
 import TakePicker from "./TakePicker.vue";
 
 const props = defineProps<{
@@ -266,6 +269,14 @@ function spainUses(take: SoundTakes["spain_takes"][number]) {
       </li>
     </ol>
 
+    <p v-if="current.has_subtitle_entry && current.added_takes.length && !current.set_subtitle" class="small warn"
+       data-testid="takes-shared-subtitle">
+      This sound has a subtitle entry: every take, added ones included, shows the same text, the one its lines'
+      subtitle decisions give (takes that disagree leave MCC's text). Added takes on scripted story lines are not yet
+      proven in game.
+    </p>
+    <SetSubtitle v-if="current.set_subtitle" :sound="current" :read-only="readOnly"
+                 @changed="(s) => { current = s; emit('changed', s); }" />
     <p v-if="shownTotal > current.warn_above" class="small warn">
       {{ shownTotal }} takes: above {{ current.warn_above }}. It works, but each take adds to the bank.
     </p>
@@ -280,6 +291,7 @@ function spainUses(take: SoundTakes["spain_takes"][number]) {
           <ListPlus :size="15" aria-hidden="true" /> Add several takes…
         </button>
         <span class="small muted">
+          <template v-if="current.has_subtitle_entry && !current.added_takes.length">Every take shares this sound's one subtitle. </template>
           <template v-if="!focusedRef">Select a Campaign Evolved recording on the right first.</template>
           <template v-else-if="alreadyAdded"><span class="mono">{{ focusedRef }}</span> is already a take of this sound.</template>
           <template v-else>Adds <span class="mono">{{ focusedRef }}</span> (es-MX) as a draft.</template>

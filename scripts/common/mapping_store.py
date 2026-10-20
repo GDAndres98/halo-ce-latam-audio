@@ -347,6 +347,28 @@ def check_transition(old_doc, new_doc, user_actions=()):
             if not switched:
                 problems.append(f"own set {o['mcc_tag']}: its provenance (the record of the decisions it replaced) "
                                 "is read-only")
+    # The ONE subtitle of an own set (owner, 2026-10-19; docs/custom-take-set-design.md §2.1): the same rules as a
+    # line's subtitle. A user action names it by the sound: UserAction(action, mcc_tag, "subtitle"). An approved set
+    # subtitle changes only through needs_rework (revision + 1), and a set holding one cannot be removed until then.
+    new_o = {o["mcc_tag"]: o for o in new_doc.get("own_sets", [])}
+    for tag, oo in old_o.items():
+        osub = oo.get("subtitle")
+        if not osub or osub["status"] != "approved":
+            continue
+        no = new_o.get(tag)
+        if no is None:
+            problems.append(f"own set {tag}: cannot remove a set whose subtitle is approved (Needs rework first)")
+            continue
+        nsub = no.get("subtitle")
+        if nsub != osub and not (allowed.get((tag, "subtitle")) == "needs_rework" and nsub
+                                 and nsub["status"] == "needs_rework" and nsub["revision"] == osub["revision"] + 1):
+            problems.append(f"own set {tag}/subtitle: approved decisions are immutable (only a user 'needs_rework' "
+                            "action with revision + 1 may change them)")
+    for tag, no in new_o.items():
+        nsub = no.get("subtitle")
+        was = ((old_o.get(tag) or {}).get("subtitle") or {}).get("status")
+        if nsub and nsub["status"] == "approved" and was != "approved" and allowed.get((tag, "subtitle")) != "approve":
+            problems.append(f"own set {tag}/subtitle: only an explicit user 'approve' action can approve")
     unused = [k for k, a in allowed.items() if a not in ("approve", "needs_rework", "restore")]
     stray = [k for k, a in allowed.items() if a == "restore" and not (k[0] in new and restored(k[0], new[k[0]], k[1]))]
     if stray:
@@ -695,7 +717,9 @@ def preview_import(path):
 
     def approvals(d):
         return ({(x["mapping_id"], f) for x in d["slots"] for f in ("audio", "subtitle") if x[f]["status"] == "approved"}
-                | {(t["take_id"], "audio") for t in d.get("added_takes", []) if t["audio"]["status"] == "approved"})
+                | {(t["take_id"], "audio") for t in d.get("added_takes", []) if t["audio"]["status"] == "approved"}
+                | {("own set " + o["mcc_tag"].rsplit(chr(92), 1)[-1], "subtitle") for o in d.get("own_sets", [])
+                   if (o.get("subtitle") or {}).get("status") == "approved"})
 
     return {"file_sha256": mapping_db.sha256(raw), "db_export_sha256": db_sha,
             "line_endings": "CRLF" if b"\r\n" in raw else "LF",

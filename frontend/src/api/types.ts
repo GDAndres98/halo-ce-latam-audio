@@ -266,7 +266,9 @@ export interface SlotRow {
   /** Added takes of this line's sound (all its takes share them). */
   added_takes?: number;
   /** The line's sound plays its own take set (this Spain take is removed in the build): its takes' state. */
-  own_set?: { takes: number; approved: number; needs_rework: number } | null;
+  own_set?: { takes: number; approved: number; needs_rework: number;
+              /** The set's one subtitle status ("undecided" if none) for a sound with a subtitle entry, else null. */
+              subtitle?: "draft" | "approved" | "needs_rework" | "undecided" | null } | null;
   /** The line's decision is archived in its sound's replacement-set record; its reminders are shown (radio_effect /
    * needs_recording above come from it). */
   archived_reminders?: boolean;
@@ -449,6 +451,30 @@ export interface ConversionPreview {
   build_after?: BuildView;
   takes_total?: number;
   takes_approved?: number;
+  /** The sound has a SU/SP subtitle entry (owner 2026-10-19: allowed, one subtitle per set). */
+  has_subtitle_entry?: boolean;
+  /** Subtitled sounds: the set's one subtitle as staging would prefill it (a draft), or why it stays undecided. */
+  set_subtitle?: { prefill: { source: SubtitleSource; ce_locres: { ce_line_ref: string; culture: string } | null;
+                              custom_text: string | null } | null;
+                   reason: string; from_mapping_ids: string[] };
+}
+
+/** A set subtitle choice sent to the server (custom text goes to the git-ignored local file). */
+export interface SetSubtitleChoice {
+  source: SubtitleSource;
+  ce_locres?: { ce_line_ref: string; culture: string };
+  custom_text?: string;
+}
+
+/** The ONE subtitle of a sound's own take set (own_sets[].subtitle; owner 2026-10-19). */
+export interface SetSubtitleDecision {
+  status: "draft" | "approved" | "needs_rework";
+  source: SubtitleSource;
+  ce_locres: { ce_line_ref: string; culture: string } | null;
+  custom_ref: string | null;
+  fingerprint: Record<string, unknown> | null;
+  approved_at: string | null;
+  revision: number;
 }
 
 export interface ConversionInventory {
@@ -484,7 +510,7 @@ export interface SoundTakes {
   mcc_tag: string;
   level: string;
   tag_name: string;
-  /** Owner rule 2026-10-17: only mono sounds without a subtitle entry may get added takes. */
+  /** Mono sounds may get added takes (owner 2026-10-19: with or without a subtitle entry; stereo is deferred). */
   allowed: boolean;
   reason: string;
   spain_takes: { slot_id: string; ordinal: number; duration_s: number; spanish_index: number;
@@ -505,6 +531,13 @@ export interface SoundTakes {
   conversion: SetConversion | null;
   /** Reminders of the archived line decisions of a set in force (needs a new recording, needs radio effect, notes). */
   reminders: { slot_id: string; mapping_id: string; needs_recording: boolean; radio_effect: boolean; notes: string }[];
+  /** The sound has a SU/SP subtitle entry: every take shows the same text. */
+  has_subtitle_entry?: boolean;
+  /** MCC's LATAM (SU) and Spain (SP) texts of the sound (subtitled sounds only). */
+  mcc_text?: { SU: string | null; SP: string | null } | null;
+  /** The set's one subtitle (subtitled sound with an own set, staged or in force); null otherwise. */
+  set_subtitle?: { decision: SetSubtitleDecision | null; custom_text: string | null; text: string | null;
+                   drift: boolean } | null;
 }
 
 /** GET /api/takes/convert/approvable: the staged takes "Approve unchanged converted takes" would approve. */
@@ -667,11 +700,30 @@ export interface SubtitleTableInfo {
   size_after: number;
 }
 
+/** What one take of a conflicting line would write (build_api.conflict_details, from the planner's rows):
+ * "text" = an approved text, "empty" = approved "no subtitle", "keep" = approved "keep MCC text",
+ * "not_approved" = no approved "no subtitle" (when "no subtitle" needs every take), "unknown" = not recorded. */
+export interface SubtitleConflictTake {
+  slot_id: string;
+  level: string | null;
+  outcome: "text" | "empty" | "keep" | "not_approved" | "unknown";
+  text: string | null;
+  source: string | null;
+  status: string | null;
+  result: string | null;
+}
+
+/** Takes of one MCC tag share one subtitle key; their approved subtitles disagree, so the key keeps MCC's text. */
 export interface SubtitleConflict {
-  code: string;
+  code: "different_texts_for_one_subtitle_key" | "keep_and_change_for_one_subtitle_key"
+    | "empty_subtitle_not_agreed_by_every_take" | (string & {});
+  key?: number;
   key_hex: string;
   mcc_tag: string;
+  level?: string | null;
   slots: string[];
+  takes_without_approved_none?: string[];
+  takes?: SubtitleConflictTake[];
 }
 
 export interface ExcludedSubtitle {

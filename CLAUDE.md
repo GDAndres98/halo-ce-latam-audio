@@ -316,7 +316,7 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
         6 takes (`--preset johnson6`, beyond the tag's 4): **PASS, all 6 heard (`v-000021`)**: the take count comes
         from the Spanish index, not the map tag.
       - **Added takes built (owner, 2026-10-17):** `docs/added-takes-design.md`. `manual_mappings.json` optional
-        `added_takes` (take_id `t-NNNNNN`, never reused; database v5); sounds without a SU/SP entry, mono; warning
+        `added_takes` (take_id `t-NNNNNN`, never reused; database v5); mono sounds (since 2026-10-19 also with a SU/SP entry); warning
         above 12. Studio "Takes of this sound" (`AddedTakes.vue`, `/api/takes/save|move|remove`, `npm run
         test:takes`). M6 `plan_inserts` / `insert_takes`: bank + Spanish `.lst.bin`, installed together. The editor
         for added takes is not in the page yet. In-game check of a real build pending. Never add or approve takes
@@ -337,6 +337,12 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
       `mappings/take_set_recovery.local.json`. Ask `common/own_set_state.py` which sets are in force. Read-only inventory:
       `python scripts/validate/take_set_inventory.py` (never opens the DB writable). Never stage, switch, cancel or
       undo on the real mappings yourself.
+    - **Subtitled sounds get takes and sets too (owner, 2026-10-19):** the barks-only rule is lifted (mono sounds with
+      or without a SU/SP entry; stereo still refused), with **one subtitle per set**: optional `own_sets[].subtitle`
+      (a line subtitle's shape and lifecycle; `POST /api/takes/set_subtitle`, `SetSubtitle.vue` under *Takes of this
+      sound*, also chosen in the 4th option). Conversion prefills it as a draft only when every Spain take agrees; the
+      switch needs it approved; M6 applies it only while the set is in force and approved. Added takes on scripted
+      story lines are not yet proven in game. Docs: `docs/custom-take-set-design.md` §2.1. Never approve it yourself.
     - **Join / play together (owner, 2026-10-19):** `docs/combine-recordings.md`. Line decisions only: `ce_concat`
       (two CE lines one after the other, each part with its own recipe, a gap that may be negative) and new `ce_mix`
       (both at once, a start offset), with `audio.edit` a combine recipe (`audio-combine/1`,

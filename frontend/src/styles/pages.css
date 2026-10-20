@@ -330,6 +330,43 @@ details.order ol {
   margin: 0.35rem 0;
 }
 
+/* Subtitle conflicts (SubtitleConflicts.vue): one group per line, its takes and what each would write. */
+.scope-preview details ul.subtitle-conflicts,
+.build-detail details ul.subtitle-conflicts {
+  max-height: 24rem;
+}
+
+.subtitle-conflicts .conflict-group {
+  padding: 0.35rem 0 0.35rem 0.6rem;
+  border-left: 2px solid var(--bad);
+  overflow-wrap: anywhere;
+}
+
+.subtitle-conflicts .conflict-group + .conflict-group {
+  margin-top: 0.35rem;
+}
+
+.subtitle-conflicts .conflict-group p {
+  margin: 0.1rem 0;
+}
+
+.scope-preview details ul.conflict-takes,
+.build-detail details ul.conflict-takes {
+  max-height: none;
+  overflow: visible;
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+}
+
+.conflict-takes li {
+  padding: 0.1rem 0;
+}
+
+.conflict-takes .conflict-text {
+  display: block;
+  margin-left: 1rem;
+}
+
 .builds-view .build-actions {
   flex-wrap: wrap;
   gap: 0.5rem;

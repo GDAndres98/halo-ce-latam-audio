@@ -10,11 +10,14 @@ const lastNotes = reactive(new Map<string, string>());
 // owner tick several Campaign Evolved recordings to play instead. Applying is the owner's explicit, confirmed action:
 // it clears the sound's line decisions (approved ones are marked Needs rework first, by the server) and adds the ticked
 // recordings as draft takes, in one request. The takes are then approved one by one under "Takes of this sound".
+// A sound with a SU/SP subtitle entry (owner, 2026-10-19) has ONE subtitle per set: its line subtitle decisions are
+// cleared too, so the set's subtitle can be chosen here (saved as a draft with the set) or later under "Takes of this
+// sound" (SetSubtitle.vue), where it is approved.
 
 import { Undo2 } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
-import type { SoundTakes, TakeResponse } from "../../api/types";
+import type { SetSubtitleChoice, SoundTakes, TakeResponse } from "../../api/types";
 import { confirmAction } from "../../composables/useConfirm";
 import AudioButton from "../AudioButton.vue";
 import StatusBadge from "../StatusBadge.vue";
@@ -39,6 +42,15 @@ const note = computed({
   set: (v: string) => void lastNotes.set(props.sound.mcc_tag, v),
 });
 const ticked = ref<string[]>([]);
+/** Subtitled sounds: the set's one subtitle, chosen with the replacement (a draft) or later. */
+const subSource = ref<"later" | "keep_original" | "none" | "custom">("later");
+const subText = ref(props.sound.mcc_text?.SU ?? "");
+const subChoice = computed<SetSubtitleChoice | undefined>(() => {
+  if (!props.sound.has_subtitle_entry || subSource.value === "later") return undefined;
+  if (subSource.value === "custom") return subText.value.trim() ? { source: "custom", custom_text: subText.value.trim() } : undefined;
+  return { source: subSource.value };
+});
+const SUB_WORD = { later: "decide later", keep_original: "keep MCC's text", none: "no subtitle", custom: "my own text" } as const;
 
 const on = computed(() => Boolean(props.sound.own_set));
 const word = (status: string) => (status === "needs_rework" ? "needs rework" : status);
@@ -95,7 +107,9 @@ async function apply(refs: string[]) {
           (approved.length ? `\n\n${approved.length} of them are approved: they are marked Needs rework first, then removed, in one save.` : "") +
           (selected.value ? `\n\n${selected.value} of them already select Campaign Evolved audio: "Preview a replacement set from my ` +
             `selections" under "Takes of this sound" keeps that work instead.` : "")
-        : ""),
+        : "") +
+      (s.has_subtitle_entry ? `\n\nSubtitle of this sound (one for every take): ${SUB_WORD[subSource.value]}` +
+        (subSource.value === "later" ? "; until it is approved the build keeps MCC's text." : " (saved as a draft; approve it under \"Takes of this sound\").") : ""),
     confirmLabel: lines.length ? `Clear ${lines.length} and replace` : "Replace",
     tone: lines.length ? "warning" : "default",
   });
@@ -107,6 +121,7 @@ async function apply(refs: string[]) {
       mcc_tag: s.mcc_tag, loaded_takes_sha256: s.version, loaded_sound_sha256: s.sound_version,
       clear_mapping_ids: decided.value.map((t) => t.mapping_id as string),
       audio_list: refs.map((ce_line_ref) => ({ ce_line_ref, language: LANGUAGE })),
+      ...(subChoice.value ? { subtitle: subChoice.value } : {}),
     }),
   );
   if (r?.saved) ticked.value = [];
@@ -177,6 +192,19 @@ async function turnOff() {
         </li>
       </ul>
     </template>
+
+    <fieldset v-if="sound.has_subtitle_entry && !on && !readOnly" class="choice small" data-testid="whole-sound-subtitle">
+      <legend>Subtitle of this sound (one for every take; its line subtitle decisions are cleared too)</legend>
+      <label v-for="(w, k) in SUB_WORD" :key="k" class="opt">
+        <input v-model="subSource" type="radio" :value="k" :data-testid="`whole-sound-subtitle-${k}`" /> {{ w }}
+      </label>
+      <textarea v-if="subSource === 'custom'" v-model="subText" rows="2" data-testid="whole-sound-subtitle-text"></textarea>
+      <span class="muted">MCC LATAM (SU): {{ sound.mcc_text?.SU ? `“${sound.mcc_text.SU}”` : "an empty entry (no text shown today)" }}. A Campaign Evolved subtitle can be chosen after, under “Takes of this sound”.</span>
+    </fieldset>
+    <p v-else-if="sound.has_subtitle_entry && on" class="small" data-testid="whole-sound-subtitle-on">
+      Subtitle of this sound: {{ sound.set_subtitle?.decision?.status?.replace("_", " ") ?? "undecided" }}
+      (choose and approve it under “Takes of this sound”).
+    </p>
 
     <template v-if="!readOnly">
       <h4 class="small">{{ on ? "Add more recordings" : "Recordings to play instead" }}</h4>

@@ -45,6 +45,15 @@ const canConvert = computed(() => props.sound.allowed && (mode.value === "per_ta
   && props.sound.spain_takes.some((t) => t.mapping_id));
 const approved = computed(() => props.sound.added_takes.filter((t) => t.audio.status === "approved").length);
 const allApproved = computed(() => props.sound.added_takes.length > 0 && approved.value === props.sound.added_takes.length);
+/** Subtitled sounds (owner 2026-10-19): the set's ONE subtitle must be approved (and unchanged) before the switch. */
+const subtitleReady = computed(() => {
+  if (!props.sound.has_subtitle_entry) return true;
+  const st = props.sound.set_subtitle;
+  return st?.decision?.status === "approved" && !st.drift;
+});
+const SUBTITLE_WORD: Record<string, string> = {
+  keep_original: "keep MCC's text", ce_locres: "a Campaign Evolved subtitle", custom: "your own text", none: "no subtitle",
+};
 /** Active set: takes the next build would leave out (not approved, or changed since approval). */
 const notBuilt = computed(() => props.sound.added_takes.filter((t) => t.audio.status !== "approved" || t.drift));
 const DRIFT_ONLY = ["approval_drift"];
@@ -238,6 +247,7 @@ async function revert() {
         Replacement set staged on {{ conv.created_at }} ({{ conv.record_id }}): the line decisions still apply.
         {{ approved }} of {{ sound.added_takes.length }} take(s) approved.
         <template v-if="!allApproved"> Approve every take above, then switch.</template>
+        <template v-if="!subtitleReady"> <strong data-testid="set-subtitle-needed">The sound has a subtitle entry: approve the set's subtitle above before the switch.</strong></template>
       </p>
       <div v-if="!readOnly && !allApproved" class="row">
         <button type="button" class="icon-label" :disabled="busy" data-testid="set-approvable" @click="loadApprovable">
@@ -272,7 +282,7 @@ async function revert() {
         </div>
       </div>
       <div v-if="!readOnly" class="row">
-        <button type="button" class="icon-label" :disabled="busy || !allApproved" data-testid="set-activate" @click="activate">
+        <button type="button" class="icon-label" :disabled="busy || !allApproved || !subtitleReady" data-testid="set-activate" @click="activate">
           <Shuffle :size="15" aria-hidden="true" /> Switch to the replacement set
         </button>
         <button type="button" class="icon-label" :disabled="busy" data-testid="set-cancel" @click="cancel">
@@ -374,6 +384,16 @@ async function revert() {
             </span>
           </li>
         </ul>
+        <p v-if="preview.has_subtitle_entry && preview.set_subtitle" class="small" data-testid="set-subtitle-proposal">
+          <strong>Subtitle of the set (one for every take):</strong>
+          <template v-if="preview.set_subtitle.prefill">
+            starts as a draft of {{ SUBTITLE_WORD[preview.set_subtitle.prefill.source] }}<template
+              v-if="preview.set_subtitle.prefill.custom_text"> (“{{ preview.set_subtitle.prefill.custom_text }}”)</template><template
+              v-else-if="preview.set_subtitle.prefill.ce_locres"> ({{ preview.set_subtitle.prefill.ce_locres.ce_line_ref }}, {{ preview.set_subtitle.prefill.ce_locres.culture }})</template>:
+            every Spain take has that choice. You approve it yourself.
+          </template>
+          <template v-else>left undecided ({{ preview.set_subtitle.reason }}); choose it under “Subtitle of this sound” after staging.</template>
+        </p>
         <div v-if="issuesBy('blocked').length" class="issues bad" data-testid="set-blocked">
           <p v-for="(i, k) in issuesBy('blocked')" :key="k" class="small"><span v-if="i.slot_id" class="mono">{{ i.slot_id }}: </span>{{ i.message }}<template v-if="i.detail"> ({{ i.detail }})</template></p>
         </div>

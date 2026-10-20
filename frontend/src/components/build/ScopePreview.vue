@@ -2,15 +2,19 @@
 // What a build of the selected scope would contain, from the current approved decisions (read-only; nothing
 // is built). Subtitle counts come from the same planner the build uses, so a draft, a decision marked Needs
 // rework, a conflict between takes or a line without a subtitle entry is shown here as excluded before you
-// build.
+// build. Conflicts are listed take by take (with links to Matching) and not repeated among the excluded rows.
 
 import { Captions, FileAudio } from "lucide-vue-next";
+import { computed } from "vue";
 import type { BuildPreview } from "../../api/types";
 import StatusBadge from "../StatusBadge.vue";
+import SubtitleConflicts from "./SubtitleConflicts.vue";
 
-defineProps<{ preview: BuildPreview | null; loading: boolean; error: string }>();
+const props = defineProps<{ preview: BuildPreview | null; loading: boolean; error: string }>();
 
 const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "no subtitle entry" } as const;
+// The takes of a conflict are listed under Conflicts; the rest of the excluded rows here.
+const excludedOnly = computed(() => props.preview?.subtitles.excluded_rows.filter((r) => r.category !== "conflict") ?? []);
 </script>
 
 <template>
@@ -34,8 +38,8 @@ const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "
           <span class="muted">({{ preview.subtitles.variable_length.SU ?? 0 }} SU / {{ preview.subtitles.variable_length.SP ?? 0 }} SP change length)</span>
           <span class="badges">
             <StatusBadge
-              :label="`${preview.subtitles.excluded} excluded`"
-              :tone="preview.subtitles.excluded ? 'warn' : 'ok'"
+              :label="`${excludedOnly.length} excluded`"
+              :tone="excludedOnly.length ? 'warn' : 'ok'"
             />
             <StatusBadge
               :label="`${preview.subtitles.conflicts} conflict${preview.subtitles.conflicts === 1 ? '' : 's'}`"
@@ -44,10 +48,14 @@ const CATEGORY = { excluded: "not applied", conflict: "conflict", missing_key: "
           </span>
         </dd>
       </dl>
-      <details v-if="preview.subtitles.excluded_rows.length" class="excluded">
-        <summary>Excluded subtitle decisions ({{ preview.subtitles.excluded_rows.length }}): these lines keep MCC's text</summary>
+      <details v-if="preview.subtitles.conflict_list.length" class="conflicts" data-testid="preview-conflicts" open>
+        <summary>Conflicts ({{ preview.subtitles.conflict_list.length }}): the takes of these lines disagree, so they keep MCC's text</summary>
+        <SubtitleConflicts :conflicts="preview.subtitles.conflict_list" />
+      </details>
+      <details v-if="excludedOnly.length" class="excluded" data-testid="preview-excluded">
+        <summary>Excluded subtitle decisions ({{ excludedOnly.length }}): these lines keep MCC's text</summary>
         <ul class="small plain">
-          <li v-for="r in preview.subtitles.excluded_rows" :key="r.slot_id">
+          <li v-for="r in excludedOnly" :key="r.slot_id">
             <code>{{ r.slot_id }}</code> · {{ CATEGORY[r.category] }}: {{ r.result }}
           </li>
         </ul>

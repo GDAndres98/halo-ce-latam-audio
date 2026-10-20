@@ -1,4 +1,4 @@
-import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit } from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit, SetSubtitleChoice } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -152,10 +152,17 @@ export const api = {
     request<TakeResponse>("/api/takes/add_many", postJson(body)),
   /** Turns a sound's own take set on (clearing the listed line decisions) or off. */
   ownSetOn: (body: { mcc_tag: string; loaded_takes_sha256: string; loaded_sound_sha256: string;
-                     clear_mapping_ids: string[]; audio_list?: { ce_line_ref: string; language: string }[] }) =>
+                     clear_mapping_ids: string[]; audio_list?: { ce_line_ref: string; language: string }[];
+                     /** Subtitled sounds: the set's one subtitle, saved as a draft. */
+                     subtitle?: SetSubtitleChoice }) =>
     request<TakeResponse>("/api/takes/own_set_on", postJson(body)),
   ownSetOff: (body: { mcc_tag: string; loaded_takes_sha256: string }) =>
     request<TakeResponse>("/api/takes/own_set_off", postJson(body)),
+  /** The ONE subtitle of a subtitled sound's own set (owner 2026-10-19): save (draft), approve, Needs rework; null
+   * clears an unapproved one. Never approves without the owner's explicit action. */
+  setSubtitle: (body: { mcc_tag: string; loaded_takes_sha256: string; subtitle?: SetSubtitleChoice | null;
+                        actions?: { action: "approve" | "needs_rework" }[] }) =>
+    request<TakeResponse>("/api/takes/set_subtitle", postJson(body)),
 
   /** Replacement sets (docs/replacement-set-conversion.md). Previews are read-only; every action names what the
    * page showed (the preview token or the sound's version) and is refused when it changed. */

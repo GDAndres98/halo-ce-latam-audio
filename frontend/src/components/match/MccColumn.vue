@@ -134,7 +134,9 @@ function decisionOf(row: SlotRow) {
   if (own) {
     // Every take of the sound is replaced: the line shows the sound's takes (its own decision no longer exists).
     const audio = own.takes && own.approved === own.takes ? "approved" : own.needs_rework ? "needs_rework" : "draft";
-    return { match: "matched", audio, subtitle: "no_subtitle_entry" };
+    // A sound with a subtitle entry has ONE subtitle per set (owner, 2026-10-19): its state; undecided reads as draft.
+    const subtitle = own.subtitle ? (own.subtitle === "undecided" ? "draft" : own.subtitle) : "no_subtitle_entry";
+    return { match: "matched", audio, subtitle };
   }
   return row.decision ?? UNDECIDED;
 }

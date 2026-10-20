@@ -3,7 +3,9 @@
 **For:** the owner. **Status:** steps 1–3 built (offline, tested); step 4, the in-game check, is the owner's.
 Requested on 2026-10-18 ("create my own set of permutations"). The owner chose **replace Spain's takes entirely**,
 **clear the sound's line decisions** when the set is turned on, **barks only** (no subtitle entry), and **build
-everything, then test in game**.
+everything, then test in game**. **2026-10-19 (owner): barks only is lifted**: mono sounds with a SU/SP subtitle entry
+may have an own set too, with **one subtitle per set** (§2.1). Added takes on scripted story lines are not yet proven
+in game.
 
 ## 1. What it does
 
@@ -40,8 +42,40 @@ and Needs rework work exactly as for added takes. The new part is a per-sound sw
 - **Turning it off** (*Back to Spain's takes*, in the same panel): the sound plays Spain's takes + added takes again; its lines start
   undecided. **Undo the replacement set** (under *Takes of this sound*, sets with a record) instead restores the
   recorded line decisions, each approval as Needs rework (`docs/replacement-set-conversion.md` §8).
-- **Rules (validator):** mono sounds without a subtitle entry only; no line decisions left on the sound (error);
-  a warning while no take is approved.
+- **Rules (validator):** mono sounds only (with or without a subtitle entry since 2026-10-19); no line decisions left
+  on the sound (error); a warning while no take is approved; for a subtitled sound in force, a warning while the set's
+  subtitle is not approved (`own_set_subtitle_not_approved`); a set subtitle on a sound without an entry is an error
+  (`own_set_subtitle_without_entry`), as are an unknown CE line / custom ref.
+
+### 2.1 One subtitle per set (owner, 2026-10-19)
+
+A sound with a SU/SP entry shows ONE text for every take (the key is the tag path). Turning a set on (or switching a
+conversion) clears the line decisions, their subtitles included, so the set carries the sound's subtitle itself:
+
+```json
+{"mcc_tag": "sound\\dialog\\d40\\d40_monitor_player", "set_at": "2026-10-19",
+ "subtitle": {"status": "draft", "source": "custom", "ce_locres": null, "custom_ref": "c-000031",
+              "fingerprint": null, "approved_at": null, "revision": 1}}
+```
+
+- **Shape:** a line's subtitle object without `mcc_key_hash`/`mcc_key_verification` (schema `own_set_subtitle`).
+  Sources: `keep_original` (MCC text stays), `ce_locres` (a CE line's text in es-MX / en / es-ES), `custom` (owner
+  text; the text lives only in the git-ignored `manual_mappings.local.json`), `none` (an empty entry). Optional;
+  absent = undecided. Only on sounds with an entry.
+- **Lifecycle:** exactly a line subtitle's. Saved as a draft; approved only by the owner's explicit action
+  (`UserAction("approve", <mcc_tag>, "subtitle")`, fingerprint `own_set_subtitle_fingerprint`: the sound, the
+  source, the CE subtitle identity or the custom text hash); approved = immutable except `needs_rework` (revision + 1),
+  enforced by `mapping_store.check_transition`. A set holding an approved subtitle cannot be removed until it is
+  reworked: *Back to Spain's takes*, *Cancel* and *Undo* add that step to their one save. Tools never approve.
+- **Studio:** *Takes of this sound* → **Subtitle of this sound** (`SetSubtitle.vue`) for a staged or active set:
+  choose, *Save subtitle*, *Approve subtitle*, *Needs rework*, *Clear* (`POST /api/takes/set_subtitle`). The 4th audio
+  option (`WholeSoundReplace.vue`) offers it in the same flow (decide later / keep MCC's text / no subtitle / my own
+  text), saved as a draft with the set (`own_set_on` body `subtitle`). Without an own set, added takes on a subtitled
+  sound show a warning that every take shows the same text.
+- **Build:** only while the set is in force: approved → write the text / write empty / keep; not approved or undecided
+  → the key is excluded and listed (MCC text stays). Keys are never added. Staged sets change nothing.
+- **Switch:** a staged conversion of a subtitled sound switches only when its set subtitle is approved and drift-free.
+- **Public view:** the set's text is shown like a line's custom subtitle text; nothing else is exposed.
 
 ## 3. The build (M6)
 
@@ -51,6 +85,9 @@ holds only its inserted takes. A sound in own-set mode with no approved take kee
 sound; `insert_takes` refuses one). Checks added: exactly the own-set sounds' samples are removed, each holds only
 its takes, every other sample is byte-identical at its new place, the index stays contiguous. `dropped` counts as a
 bank change, so `m6_install.py` refuses a build if the set was turned off (or changed) since.
+
+Subtitles (`subtitle_plan`): for a sound whose set is in force, the set's approved subtitle is the key's only outcome
+(row `slot_id` = `own set <tag_name>`, `own_set: true`); line rows of such a sound never apply.
 
 ## 4. What is known
 

@@ -4,6 +4,14 @@
 sounds only; independent of Spain's places; no hard limit, warning above 12). **Steps 1–4 built** (commits
 `be4582b`, `abf21a1`, `e55f389`); step 5, the in-game check of a real build, is the owner's.
 
+**Owner decision 2026-10-19: the barks-only rule (§3 question 1) is lifted.** Added takes, own take sets and
+replacement sets are allowed on mono sounds **with or without** a SU/SP subtitle entry (e.g. `d40_monitor_player`,
+14 Spain takes). Every take of a sound still shows the same text, so: without an own set, the sound's line subtitle
+decisions decide it (the conflict rule of the build still applies) and the takes panel warns that every take shows the
+same text; with an own set, the set has **one subtitle** of its own (`own_sets[].subtitle`,
+`docs/custom-take-set-design.md` §2.1). Stereo sounds stay refused. **Not yet proven in game:** added takes on
+scripted story lines (only combat chatter was tested, `v-000020`/`v-000021`).
+
 **Built, and how to use it:** Matching → open a line of a sound without subtitles (e.g. a Grunt bark) → focus a
 Campaign Evolved recording on the right → **Takes of this sound** → *Add as extra take* → *Approve*. To add
 several at once (owner request, 2026-10-18): *Add several takes…* opens a picker with its own search (it starts
@@ -34,8 +42,9 @@ Anniversary mode (graphics mode was not reported).
 
 ## 3. Questions for you (my recommendation first)
 
-1. **Which sounds may get added takes?**
-   *Recommended:* only sounds with **no subtitle entry** (AI chatter: Grunt deaths, Marine barks, Johnson's
+1. **Which sounds may get added takes?** *(Decided 2026-10-17: unsubtitled only. Changed 2026-10-19: any mono
+   sound; one subtitle per set, see the note at the top.)*
+   *Recommended then:* only sounds with **no subtitle entry** (AI chatter: Grunt deaths, Marine barks, Johnson's
    combat lines). Scripted story lines play once at a fixed moment, and their subtitle is shared by every take:
    an added take that says something else would show the wrong text. If you want story lines too, I'd allow them
    only when the added take says the same sentence, and mark them clearly.
@@ -70,7 +79,8 @@ existing changes):
 - **`audio`**: the same object as a line's audio today, with the same rules: tools never approve; an approved
   take changes only through Needs rework (revision + 1); edits, radio and echo work the same way; the approval
   fingerprint covers the CE recording and the sound's Spain takes, so drift is detected.
-- **No subtitle**: the sound's subtitle belongs to the sound (shared by all takes), as today.
+- **No subtitle**: the sound's subtitle belongs to the sound (shared by all takes), as today. On a subtitled sound
+  with an own set, that subtitle is the set's one subtitle (2026-10-19).
 - **Removing** a take is allowed while it is not approved (approved: Needs rework first), like other decisions.
 - Storage: the database gets an `added_takes` table and its history (database schema v5, additive, upgraded
   on open); the JSON export and the import/export checks cover it.

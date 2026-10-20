@@ -115,6 +115,37 @@ def _is_mcc(folder):
     return folder is not None and (Path(folder) / BANK_REL).is_file()
 
 
+def conflict_details(conflicts, rows, slot_level=None):
+    """Subtitle conflicts with what each take would write, for the page (read-only; taken from the planner's own
+    rows, never recomputed). Each take: slot_id, level, outcome ("text", "empty" = no subtitle, "keep" = keep
+    MCC text, "not_approved" = a take with no approved "none" when "no subtitle" needs every take, or "unknown"
+    when the planner's row is missing, e.g. an older manifest), the text for "text", the decision's source and
+    status, and the planner's result line."""
+    by_slot = {r.get("slot_id"): r for r in rows}
+
+    def take(slot, outcome=None):
+        r = by_slot.get(slot) or {}
+        if outcome is None:
+            if r.get("source") == "keep_original":
+                outcome = "keep"
+            elif "text" in r:
+                outcome = "empty" if r["text"] == "" else "text"
+            else:
+                outcome = "unknown"
+        level = r.get("level") or (slot_level(slot) if slot_level else None)
+        return {"slot_id": slot, "level": level, "outcome": outcome,
+                "text": r.get("text") if outcome == "text" else None,
+                "source": r.get("source"), "status": r.get("status"), "result": r.get("result")}
+
+    out = []
+    for c in conflicts:
+        takes = [take(s) for s in c.get("slots", [])]
+        takes += [take(s, "not_approved") for s in c.get("takes_without_approved_none", [])]
+        level = next((t["level"] for t in takes if t["level"]), None)
+        out.append(dict(c, level=level, takes=takes))
+    return out
+
+
 class BuildBoard:
     def __init__(self, root, known_levels, runner=None, mcc_root=None, deploy_state=None, app=None):
         self.root = Path(root)
@@ -199,7 +230,8 @@ class BuildBoard:
         return {"name": name, "kind": m.get("kind", "audio"), "levels": m.get("levels", []),
                 "subtitles_enabled": bool(sub.get("enabled")), "summary": sub.get("summary"),
                 "tables": sub.get("tables"), "written": written, "excluded": excluded,
-                "conflicts": sub.get("conflicts", []), "warnings": sub.get("warnings", []),
+                "conflicts": conflict_details(sub.get("conflicts", []), sub.get("rows", [])),
+                "warnings": sub.get("warnings", []),
                 "checks": report.get("checks", {}), "ok": report.get("ok"),
                 "install_files": m.get("install_files", []), "not_written": m.get("not_written", [])}
 
@@ -251,13 +283,15 @@ class BuildBoard:
             acts[e["action"]] = acts.get(e["action"], 0) + 1
         excluded = [{k: r.get(k) for k in ("slot_id", "status", "category", "result")}
                     for r in subs["rows"] if r["category"] in ("excluded", "conflict", "missing_key")]
+        slot_level = lambda slot: (app.slot_index.get(slot) or (None,))[0]  # noqa: E731
         return {"levels": levels, "scope": label,
                 "audio": {"replace": acts.get("replace", 0), "keep_original": acts.get("keep_original", 0),
                           "mute": acts.get("mute", 0), "dropped": acts.get("dropped", 0),
                           "insert": sum(1 for e in ins if e["action"] == "insert"),
                           "insert_not_eligible": sum(1 for e in ins if e["action"] == "not_eligible"),
                           "not_eligible": acts.get("not_eligible", 0), "conflicts": len(audio["conflicts"])},
-                "subtitles": {**subs["summary"], "excluded_rows": excluded, "conflict_list": subs["conflicts"]}}
+                "subtitles": {**subs["summary"], "excluded_rows": excluded,
+                              "conflict_list": conflict_details(subs["conflicts"], subs["rows"], slot_level)}}
 
     def missions(self):
         """Playable maps that have a folder association (a mission build = its folder + its cinematics)."""

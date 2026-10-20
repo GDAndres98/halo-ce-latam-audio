@@ -91,6 +91,15 @@ def added_take_fingerprint(take, ce, mcc, local=None):
     return out
 
 
+def own_set_subtitle_fingerprint(own_set, ce, mcc=None, local=None):
+    """What the approval of an own set's ONE subtitle pins (owner, 2026-10-19): the sound, the source, the CE
+    subtitle's identity or the custom text's hash. Same shape as a line's subtitle fingerprint, with the sound in
+    place of the slot."""
+    out = subtitle_fingerprint({"slot_id": None, "subtitle": own_set["subtitle"]}, ce, mcc or {"slots": {}}, local)
+    out["mcc"] = {"mcc_tag": own_set["mcc_tag"]}
+    return out
+
+
 def subtitle_fingerprint(slot, ce, mcc, local=None):
     sub = slot["subtitle"]
     out = {"mcc": mcc_fingerprint(slot["slot_id"], mcc), "source": sub["source"]}
@@ -349,7 +358,18 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
                               "slot_id": s["slot_id"], "approved": obj["fingerprint"], "current": cur})
 
     out += added_take_findings(doc, ce=ce, mcc=mcc, local=local, file=file, subtitle_keys=subtitle_keys)
-    out += own_set_findings(doc, mcc=mcc, file=file, subtitle_keys=subtitle_keys)
+    out += own_set_findings(doc, mcc=mcc, file=file, subtitle_keys=subtitle_keys, ce=ce, local=local)
+    for o in doc.get("own_sets", []):  # the set's one subtitle (owner, 2026-10-19): drift like a line's subtitle
+        sub = o.get("subtitle")
+        if not sub or sub["status"] != "approved" or not have_mcc or (sub["source"] == "ce_locres" and not have_ce):
+            continue
+        cur = own_set_subtitle_fingerprint(o, ce, mcc, local)
+        if sub["fingerprint"] != cur:
+            out.append(finding("warning", "approved_fingerprint_drift", file,
+                               f"/own_sets ({o['mcc_tag'].rsplit(chr(92), 1)[-1]})/subtitle",
+                               "approved set subtitle no longer matches current catalogs; see drift report"))
+            drift.append({"kind": "approved_own_set_subtitle", "mcc_tag": o["mcc_tag"], "field": "subtitle",
+                          "approved": sub["fingerprint"], "current": cur})
     for t in doc.get("added_takes", []):
         if t["audio"]["status"] == "approved" and have_mcc and have_ce:
             cur = added_take_fingerprint(t, ce, mcc, local)
@@ -360,7 +380,8 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
                               "mcc_tag": t["mcc_tag"], "approved": t["audio"]["fingerprint"], "current": cur})
 
     if local is not None:
-        used_c = {s["subtitle"]["custom_ref"] for s in doc["slots"] if s["subtitle"]["custom_ref"]}
+        used_c = {s["subtitle"]["custom_ref"] for s in doc["slots"] if s["subtitle"]["custom_ref"]} \
+            | ({(o.get("subtitle") or {}).get("custom_ref") for o in doc.get("own_sets", [])} - {None})
         used_r = {x["ref"] for s in doc["slots"] for x in s["audio"]["sources"] if x["kind"] == "user_recording"}
         for c in sorted(set(local["custom_subtitles"]) - used_c):
             out.append(finding("info", "unused_custom_subtitle", "manual_mappings.local.json", c, "not referenced"))
@@ -372,9 +393,12 @@ def validate_mappings(doc, schema, *, ce, mcc, local, verifications, current_pin
 TAKE_WARN_COUNT = 12  # owner, 2026-10-17: no hard limit; a warning above 12 takes per sound
 
 
-def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=None):
+def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=None, ce=None, local=None):
     """Rules for own take sets (docs/custom-take-set-design.md): the sound plays only its added takes. Same sound
-    rules as added takes; turning a set on clears the sound's line decisions, so any left are an error."""
+    rules as added takes (mono; since 2026-10-19 with or without a subtitle entry); turning a set on clears the
+    sound's line decisions, so any left are an error. A sound with a subtitle entry has ONE subtitle per set
+    (`subtitle`, owner 2026-10-19): checked like a line's subtitle; a set in force without an approved one keeps
+    MCC's text (warning). ce / local: the CE index and the local file, to check that subtitle's source."""
     from .mcc_loc import loc_key
     out, seen = [], set()
     have_mcc = bool(mcc["slots"])
@@ -389,6 +413,7 @@ def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=Non
     for o in doc.get("own_sets", []):
         tag_path = o["mcc_tag"]
         w = f"/own_sets ({tag_path.rsplit(chr(92), 1)[-1]})"
+        out += _set_subtitle_findings(o, w, file, subtitle_keys, ce, local)
         prov = o.get("provenance")
         if prov and any(m["mcc_tag"] != tag_path for m in prov["slots"]):
             out.append(finding("error", "own_set_provenance_other_sound", file, w,
@@ -416,9 +441,11 @@ def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=Non
             out.append(finding("error" if have_mcc else "warning", "unknown_mcc_tag", file, w, tag_path))
         elif tag.get("spanish_channels") and tag["spanish_channels"] != [1]:
             out.append(finding("error", "own_set_stereo_sound", file, w, "own take sets are for mono sounds only"))
-        if subtitle_keys is not None and loc_key(tag_path) in subtitle_keys:
-            out.append(finding("error", "own_set_on_subtitled_sound", file, w,
-                               "own take sets are only for sounds without a subtitle entry"))
+        if subtitle_keys is not None and loc_key(tag_path) in subtitle_keys \
+                and (o.get("subtitle") or {}).get("status") != "approved":
+            out.append(finding("warning", "own_set_subtitle_not_approved", file, w,
+                               "the sound has a subtitle entry and its set's subtitle is not approved yet: the build "
+                               "keeps MCC's text for it"))
         if lines.get(tag_path):
             out.append(finding("error", "own_set_with_line_decisions", file, w,
                                "the sound's Spain takes are dropped, yet it has line decisions: "
@@ -429,10 +456,38 @@ def own_set_findings(doc, *, mcc, file="manual_mappings.json", subtitle_keys=Non
     return out
 
 
-def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", subtitle_keys=None):
-    """Rules for added takes (docs/added-takes-design.md). subtitle_keys: the SU/SP keys (set) when the tables
-    are loaded; added takes are allowed only on sounds without a subtitle entry (owner, 2026-10-17)."""
+def _set_subtitle_findings(o, w, file, subtitle_keys, ce, local):
+    """The one subtitle of an own set (owner, 2026-10-19): only on a sound with a subtitle entry; its source must
+    resolve (as a line's subtitle)."""
     from .mcc_loc import loc_key
+    sub = o.get("subtitle")
+    if not sub:
+        return []
+    out = []
+    w += "/subtitle"
+    if subtitle_keys is not None and loc_key(o["mcc_tag"]) not in subtitle_keys:
+        out.append(finding("error", "own_set_subtitle_without_entry", file, w,
+                           "the sound has no subtitle entry in SU or SP (keys are never added)"))
+    if sub["source"] == "ce_locres" and ce is not None:
+        ref, cul = sub["ce_locres"]["ce_line_ref"], sub["ce_locres"]["culture"]
+        if ref not in ce:
+            out.append(finding("error" if ce else "warning", "unknown_ce_line_ref", file, w, ref))
+        elif ce[ref]["subtitles"].get(cul, {}).get("evidence") != "explicit":
+            out.append(finding("error" if sub["status"] == "approved" else "warning", "subtitle_unresolved", file, w,
+                               f"{ref} has no resolved {cul} subtitle"))
+    if sub["source"] == "custom":
+        if local is None:
+            out.append(finding("error", "local_file_missing", file, w,
+                               f"{sub['custom_ref']} needs manual_mappings.local.json"))
+        elif sub["custom_ref"] not in local["custom_subtitles"]:
+            out.append(finding("error", "unknown_custom_ref", file, w, sub["custom_ref"]))
+    return out
+
+
+def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", subtitle_keys=None):
+    """Rules for added takes (docs/added-takes-design.md). Since 2026-10-19 (owner) added takes are allowed on
+    mono sounds with or without a subtitle entry; on a sound with one, every take shows the same text (the line
+    subtitle decisions, or the set's one subtitle, decide it). subtitle_keys is kept for callers; unused here."""
     out, seen, positions = [], set(), {}
     have_ce, have_mcc = bool(ce), bool(mcc["slots"])
     tags = mcc.get("tags") or {}
@@ -452,10 +507,6 @@ def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", sub
         elif tag.get("spanish_channels") and tag["spanish_channels"] != [1]:
             out.append(finding("error", "added_take_stereo_sound", file, w,
                                "added takes are for mono sounds only (stereo replacement is deferred)"))
-        if subtitle_keys is not None and loc_key(t["mcc_tag"]) in subtitle_keys:
-            out.append(finding("error", "added_take_on_subtitled_sound", file, w,
-                               "added takes are only for sounds without a subtitle entry (the subtitle is shared by "
-                               "every take)"))
         a = t["audio"]
         if len(a["sources"]) != 1:
             out.append(finding("error", "added_take_source", file, w + "/audio", "an added take has exactly one CE line"))
@@ -547,6 +598,17 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
             if s[f]["status"] in ("needs_rework", "approved") and s[f]["revision"] > hs[f]["revision"]:
                 continue
             out.append(finding("error", "approved_object_modified", file, f"{hs['mapping_id']}/{f}",
+                               "approved decisions are immutable; only a user move to needs_rework "
+                               "(revision + 1) is allowed"))
+    cur_o = {o["mcc_tag"]: o for o in doc.get("own_sets", [])}
+    for ho in head_doc.get("own_sets", []):  # a set's one subtitle (owner, 2026-10-19): the same rule while the set stays
+        hs = ho.get("subtitle")
+        o = cur_o.get(ho["mcc_tag"])
+        if not hs or hs["status"] != "approved" or o is None:
+            continue  # removing the set itself goes through the store (Needs rework first, in the same save)
+        s = o.get("subtitle")
+        if s != hs and not (s and s["status"] in ("needs_rework", "approved") and s["revision"] > hs["revision"]):
+            out.append(finding("error", "approved_object_modified", file, f"own set {ho['mcc_tag']}/subtitle",
                                "approved decisions are immutable; only a user move to needs_rework "
                                "(revision + 1) is allowed"))
     cur_t = {t["take_id"]: t for t in doc.get("added_takes", [])}

@@ -4,8 +4,10 @@
 //
 // On a disposable copy of the mapping data (scripts/ui/e2e_fixture.py): opens Grunt death_violent, focuses a
 // Campaign Evolved Grunt death, adds it as a take, approves it, checks the list badge and the reload, marks it
-// Needs rework, removes it; and checks that a subtitled line refuses added takes. The real mappings are hashed
-// before and after.
+// Needs rework, removes it. A subtitled multi-take sound (d40_monitor_player, owner 2026-10-19: allowed, one subtitle
+// per set): "Replace every take" with the set's subtitle chosen in the same flow, then "Subtitle of this sound":
+// approve, the row's S pill, a reload, Needs rework, back to Spain's takes. The real mappings are hashed before and
+// after.
 
 import { mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +18,8 @@ import { HERE, WEB_PORT, Services, runFixture, sha256File, handleConfirms } from
 const OUT = join(HERE, "out");
 const SLOT = "es:deathviolent%2001#1";
 const CE_REF = "vo_sys_default_11involuntary_die_ass_grunt#0";
-const SUBTITLED = "es:A10_010_cryotech#0";
+const SUBTITLED = "es:D40_monitor_player_01#0";  // 14 Spain takes, with a subtitle entry
+const SET_TEXT = "Prueba e2e: un subtítulo para todo el sonido";
 const results = [];
 const pageErrors = [];
 let page = null;
@@ -75,11 +78,6 @@ async function main() {
     handleConfirms(page);
     page.on("pageerror", (err) => pageErrors.push(err.message));
     page.on("console", (msg) => msg.type() === "error" && pageErrors.push(msg.text()));
-
-    await step("a subtitled line refuses added takes", async () => {
-      await openLine("a10", SUBTITLED);
-      await takes().getByTestId("takes-not-allowed").waitFor({ timeout: 10000 });
-    });
 
     await step("Grunt death_violent: the focused recording is added as a draft take", async () => {
       await openLine("grunt", SLOT, "die_ass_grunt");
@@ -213,6 +211,46 @@ async function main() {
       check((await takes().locator("li.take.spain.removed").count()) === 0, "still marked removed");
       check(!(await page.getByTestId("whole-sound-option").isChecked()), "4th option still checked");
       return `${k} recordings added, ${n + k} takes`;
+    });
+
+    await step("a subtitled sound: replace every take with ONE set subtitle, approve it, rework, back", async () => {
+      await openLine("d40", SUBTITLED, "die_ass_grunt");
+      check((await takes().getByTestId("takes-not-allowed").count()) === 0, "a subtitled mono sound refuses takes");
+      if (await page.getByTestId("whole-sound-option").isChecked()) {  // the copied data may already have it on
+        await page.getByTestId("whole-sound").getByTestId("own-set-off").click();
+        await page.getByTestId("whole-sound").waitFor({ state: "detached", timeout: 15000 });
+      }
+      await page.getByTestId("whole-sound-option").check();
+      const panel = page.getByTestId("whole-sound");
+      await panel.getByTestId("whole-sound-subtitle").waitFor({ timeout: 15000 });
+      await panel.getByTestId("whole-sound-subtitle-custom").check();
+      await panel.getByTestId("whole-sound-subtitle-text").fill(SET_TEXT);
+      await panel.getByTestId("take-picker-search").fill("die_ass_grunt");
+      await pickerShows("whole-sound", "die_ass_grunt");
+      await panel.locator('[data-testid="take-pick"]:not([disabled])').first().check();
+      await panel.getByTestId("take-picker-add").click();
+      await panel.getByText(/Every take replaced/).waitFor({ timeout: 20000 });
+      const sub = takes().getByTestId("set-subtitle");
+      await sub.waitFor({ timeout: 15000 });
+      check(/draft/.test(await sub.getByTestId("set-subtitle-status").innerText()), "the set subtitle is not a draft");
+      check((await sub.getByTestId("set-subtitle-current").innerText()).includes(SET_TEXT), "the custom text is not shown");
+      await sub.getByTestId("set-subtitle-approve").click();
+      await sub.getByText(/Subtitle approved/).waitFor({ timeout: 15000 });
+      check(/approved/.test(await sub.getByTestId("set-subtitle-status").innerText()), "not approved");
+      await page.locator(`[id="mcc-${SUBTITLED}"] [data-testid=own-set-pill]`).waitFor({ timeout: 15000 });
+      await openLine("d40", SUBTITLED, "die_ass_grunt");
+      const badges = (await page.locator(`[id="mcc-${SUBTITLED}"] .badges`).innerText()).replace(/\s+/g, "");
+      check(badges.includes("S✓"), `row pills ${badges}`);
+      check(/approved/.test(await takes().getByTestId("set-subtitle-status").innerText()), "not approved after a reload");
+      await takes().getByTestId("set-subtitle").screenshot({ path: join(OUT, "takes-set-subtitle.png") });
+      await takes().getByTestId("set-subtitle-rework").click();
+      await takes().getByText(/Subtitle marked Needs rework/).waitFor({ timeout: 15000 });
+      check(/needs rework/.test(await takes().getByTestId("set-subtitle-status").innerText()), "not Needs rework");
+      await page.getByTestId("whole-sound").getByTestId("own-set-off").click();
+      await page.getByTestId("whole-sound").waitFor({ state: "detached", timeout: 15000 });
+      check((await takes().getByTestId("set-subtitle").count()) === 0, "the set subtitle panel stayed");
+      await takes().getByTestId("takes-shared-subtitle").waitFor({ timeout: 15000 });  // takes kept, shared text
+      return badges;
     });
   } finally {
     await browser?.close().catch(() => {});

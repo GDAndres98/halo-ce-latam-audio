@@ -235,8 +235,34 @@
         "mcc_tag": {"type": "string", "pattern": "^sound\\\\dialog\\\\"},
         "set_at": {"$ref": "#/$defs/date"},
         "state": {"const": "staged", "description": "Optional (docs/replacement-set-conversion.md). Absent = active. 'staged': a conversion of the sound's per-take decisions is prepared but not switched on; the line decisions stay in force and the takes it created are not built."},
-        "provenance": {"$ref": "#/$defs/own_set_provenance"}
+        "provenance": {"$ref": "#/$defs/own_set_provenance"},
+        "subtitle": {"$ref": "#/$defs/own_set_subtitle"}
       }
+    },
+    "own_set_subtitle": {
+      "type": "object",
+      "description": "Optional (owner, 2026-10-19; docs/custom-take-set-design.md §2.1): the ONE subtitle of a sound that has a SU/SP entry and plays its own take set (every take shows the same text). Same lifecycle as a line's subtitle: tools never approve; approved = immutable except a user needs_rework (revision + 1). Sources: keep_original (MCC text stays), ce_locres (a CE line's text), custom (owner text; the text stays in the git-ignored manual_mappings.local.json), none (an empty entry). Applied by M6 only while the set is in force and the subtitle is approved.",
+      "required": ["status", "source", "ce_locres", "custom_ref", "fingerprint", "approved_at", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"$ref": "#/$defs/decision_status"},
+        "source": {"enum": ["keep_original", "ce_locres", "custom", "none"]},
+        "ce_locres": {"anyOf": [{"type": "null"}, {"type": "object", "required": ["ce_line_ref", "culture"], "additionalProperties": false,
+                                                    "properties": {"ce_line_ref": {"$ref": "#/$defs/ce_line_ref"}, "culture": {"enum": ["es-MX", "en", "es-ES"]}}}]},
+        "custom_ref": {"type": ["string", "null"], "pattern": "^c-[0-9]{6}$"},
+        "fingerprint": {"type": ["object", "null"]},
+        "approved_at": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/date"}]},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"$ref": "#/$defs/approval"},
+        {"if": {"properties": {"source": {"const": "ce_locres"}}},
+         "then": {"properties": {"ce_locres": {"type": "object"}, "custom_ref": {"type": "null"}}},
+         "else": {"properties": {"ce_locres": {"type": "null"}}}},
+        {"if": {"properties": {"source": {"const": "custom"}}},
+         "then": {"properties": {"custom_ref": {"type": "string"}}},
+         "else": {"properties": {"custom_ref": {"type": "null"}}}}
+      ]
     },
     "own_set_provenance": {
       "type": "object",

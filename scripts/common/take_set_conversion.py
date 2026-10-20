@@ -20,6 +20,9 @@ Rules (owner, 2026-10-18):
   set, which requires every take of the set to be approved and buildable. The switch, a cancel and an undo are each
   ONE store save (mapping_store.save_sequence), checked step by step against the store's rules.
 - The own set's `provenance` keeps the exact decisions it replaced (and the custom subtitle text hashes), read-only.
+- Sounds WITH a SU/SP subtitle entry (owner, 2026-10-19): one subtitle per set (`own_sets[].subtitle`). Staging
+  prefills it as a DRAFT only when every Spain take's current subtitle decision says the same thing; otherwise it is
+  left undecided and reported (`set_subtitle_undecided`). Approvals are never copied. The switch needs it approved.
 
 Pure: no file or database access. The Studio (scripts/ui/m4_app.py) and the read-only inventory
 (scripts/validate/take_set_inventory.py) pass the documents and catalogs in.
@@ -31,7 +34,7 @@ import json
 from . import audio_edit
 from .m6_build import edit_problems, plan_audio, plan_inserts
 from .own_set_state import is_active
-from .project_validation import audio_fingerprint, sha256_text, subtitle_fingerprint
+from .project_validation import audio_fingerprint, own_set_subtitle_fingerprint, sha256_text, subtitle_fingerprint
 
 PREVIEW_SCHEMA = "take-set-preview/1"
 MX = "Spanish(Mexico)"
@@ -76,6 +79,12 @@ CODES = {
                               "approval)."),
     "different_but_fits": ("info", "Marked 'different dialogue, fits the scene': kept in the record."),
     "subtitle_keep": ("info", "Subtitle decision on a sound without a subtitle entry: no effect; kept in the record."),
+    "set_subtitle_prefilled": ("info", "Every Spain take has the same subtitle decision: the set's one subtitle starts "
+                                       "as that choice, as a draft (approve it under Takes of this sound; approvals are "
+                                       "never copied)."),
+    "set_subtitle_undecided": ("review", "The Spain takes' subtitle decisions differ, or some takes have none: the "
+                                         "set's one subtitle is left undecided. Choose and approve it under Takes of "
+                                         "this sound before the switch."),
     "notes_carried": ("info", "The decision's notes are copied to the take."),
 }
 SEVERITY_ORDER = {"blocked": 0, "review": 1, "info": 2}
@@ -151,8 +160,9 @@ def custom_refs(slots, local):
     return sorted(out, key=lambda c: c["custom_ref"])
 
 
-def _classify(m, sample, ce_lines, ce_idx, mcc_idx, local, dup):
-    """-> (selected audio object or None, [issues]) for one Spain take."""
+def _classify(m, sample, ce_lines, ce_idx, mcc_idx, local, dup, has_subtitle_entry=False):
+    """-> (selected audio object or None, [issues]) for one Spain take. On a sound with a subtitle entry the line
+    subtitle decisions are weighed for the whole sound instead (set_subtitle_proposal)."""
     sid = sample["slot_id"]
     if dup:
         return None, [_issue("duplicate_decision", sid)]
@@ -161,11 +171,13 @@ def _classify(m, sample, ce_lines, ce_idx, mcc_idx, local, dup):
     issues = []
     a = m["audio"]
     sub = m["subtitle"]
-    if sub["source"] in ("ce_locres", "custom"):
-        issues.append(_issue("subtitle_text", sid, sub["source"]))
-        if sub["source"] == "custom" and sub.get("custom_ref") and sub["custom_ref"] not in \
-                ((local or {}).get("custom_subtitles") or {}):
-            issues.append(_issue("custom_subtitle_missing", sid, sub["custom_ref"]))
+    if sub["source"] == "custom" and sub.get("custom_ref") and sub["custom_ref"] not in \
+            ((local or {}).get("custom_subtitles") or {}):
+        issues.append(_issue("custom_subtitle_missing", sid, sub["custom_ref"]))
+    if has_subtitle_entry:
+        pass  # weighed for the whole sound: set_subtitle_proposal
+    elif sub["source"] in ("ce_locres", "custom"):
+        issues.insert(0, _issue("subtitle_text", sid, sub["source"]))
     elif sub["status"] != "draft" or sub["source"] != "keep_original":
         issues.append(_issue("subtitle_keep", sid, f"{sub['source']} ({sub['status']})"))
     if (m.get("needs_recording") or {}).get("marked"):
@@ -227,6 +239,74 @@ def _build_view(doc, rec, level, *, ce_lines, ce_idx, mcc_idx, local, subtitle_k
             "inserted": sum(x["action"] == "insert" for x in inserts)}
 
 
+def _subtitle_content(m, local):
+    """What a line's subtitle decision shows, for comparing takes: (source, ce_locres, custom text). None when a
+    custom text is missing from the local file (it cannot be carried)."""
+    sub = m["subtitle"]
+    text = None
+    if sub["source"] == "custom":
+        text = (((local or {}).get("custom_subtitles") or {}).get(sub.get("custom_ref")) or {}).get("text")
+        if text is None:
+            return None
+    return (sub["source"], json.dumps(sub.get("ce_locres"), sort_keys=True), text)
+
+
+def set_subtitle_proposal(doc, tag, rec, local):
+    """The set's one subtitle for a sound with a subtitle entry (owner, 2026-10-19): a proposal only when EVERY
+    Spain take has exactly one decision and all of them show the same thing (same source, same CE subtitle, same
+    custom text; status does not matter: the proposal is a draft). -> {"prefill": {source, ce_locres, custom_text}
+    or None, "reason": text, "from_mapping_ids": [...]}."""
+    by_slot = {}
+    for m in doc["slots"]:
+        if m["mcc_tag"] == tag:
+            by_slot.setdefault(m["slot_id"], []).append(m)
+    contents, mids, missing = set(), [], []
+    for smp in rec["samples"]["spanish"]:
+        ms = by_slot.get(smp["slot_id"], [])
+        if len(ms) != 1:
+            missing.append(smp["slot_id"])
+            continue
+        mids.append(ms[0]["mapping_id"])
+        contents.add(_subtitle_content(ms[0], local))
+    if missing:
+        return {"prefill": None, "from_mapping_ids": [],
+                "reason": f"{len(missing)} Spain take(s) without one decision: " + ", ".join(missing)}
+    if None in contents:
+        return {"prefill": None, "from_mapping_ids": [], "reason": "a custom subtitle text is missing locally"}
+    if len(contents) != 1:
+        return {"prefill": None, "from_mapping_ids": [],
+                "reason": f"the takes' subtitle decisions differ ({len(contents)} different choices)"}
+    source, ce_locres, text = next(iter(contents))
+    return {"prefill": {"source": source, "ce_locres": json.loads(ce_locres), "custom_text": text},
+            "from_mapping_ids": sorted(mids), "reason": "every Spain take has the same subtitle decision"}
+
+
+def new_set_subtitle(prefill, custom_ref=None):
+    """A DRAFT set subtitle object from a proposal (never approved; revision 1). A custom text needs its new
+    custom_ref (the caller writes the text to the local file); without one, None."""
+    if prefill["source"] == "custom" and not custom_ref:
+        return None
+    return {"status": "draft", "source": prefill["source"],
+            "ce_locres": prefill["ce_locres"] if prefill["source"] == "ce_locres" else None,
+            "custom_ref": custom_ref if prefill["source"] == "custom" else None,
+            "fingerprint": None, "approved_at": None, "revision": 1}
+
+
+def set_subtitle_problem(doc, tag, *, has_subtitle_entry, ce_idx, mcc_idx, local):
+    """None when the set's subtitle is ready for the switch (or the sound has no subtitle entry); else why not."""
+    if not has_subtitle_entry:
+        return None
+    o = next((x for x in doc.get("own_sets", []) if x["mcc_tag"] == tag), None)
+    sub = (o or {}).get("subtitle")
+    if not sub:
+        return "the sound has a subtitle entry: choose and approve the set's subtitle first"
+    if sub["status"] != "approved":
+        return f"the set's subtitle is {sub['status'].replace('_', ' ')}: approve it first"
+    if sub["fingerprint"] != own_set_subtitle_fingerprint(o, ce_idx, mcc_idx, local):
+        return "the set's subtitle changed since its approval (drift): rework it"
+    return None
+
+
 def mode_of(doc, tag):
     own = next((o for o in doc.get("own_sets", []) if o["mcc_tag"] == tag), None)
     if own is not None:
@@ -245,13 +325,20 @@ def sound_inputs(doc, tag, rec, *, has_subtitle_entry, ce_idx, local):
     refs = sorted({x.get("ce_line_ref") for m in slots for x in m["audio"]["sources"] if x.get("ce_line_ref")}
                   | {r for m in slots for r in m["match"]["ce_line_refs"]}
                   | {x.get("ce_line_ref") for t in takes for x in t["audio"]["sources"] if x.get("ce_line_ref")})
-    return {"preview_schema": PREVIEW_SCHEMA, "mcc_tag": tag, "slots": slots, "added_takes": takes,
-            "own_set": next((o for o in doc.get("own_sets", []) if o["mcc_tag"] == tag), None),
-            "custom_subtitles": custom_refs(slots, local),
-            "catalog": [[s["slot_id"], s["index"], s["data_sha256"], s["channels"], s["ordinal_in_tag"]]
-                        for s in rec["samples"]["spanish"]],
-            "has_subtitle_entry": bool(has_subtitle_entry),
-            "ce": {r: ce_idx.get(r) for r in refs}}
+    own = next((o for o in doc.get("own_sets", []) if o["mcc_tag"] == tag), None)
+    sub = (own or {}).get("subtitle") or {}
+    if sub.get("ce_locres"):
+        refs = sorted(set(refs) | {sub["ce_locres"]["ce_line_ref"]})
+    out = {"preview_schema": PREVIEW_SCHEMA, "mcc_tag": tag, "slots": slots, "added_takes": takes,
+           "own_set": own,
+           "custom_subtitles": custom_refs(slots, local),
+           "catalog": [[s["slot_id"], s["index"], s["data_sha256"], s["channels"], s["ordinal_in_tag"]]
+                       for s in rec["samples"]["spanish"]],
+           "has_subtitle_entry": bool(has_subtitle_entry),
+           "ce": {r: ce_idx.get(r) for r in refs}}
+    if sub.get("custom_ref"):  # the set's own custom text (only present for such sets: other tokens are unchanged)
+        out["set_custom_subtitle"] = custom_refs([{"subtitle": sub}], local)
+    return out
 
 
 def sound_doc(doc, tag):
@@ -279,9 +366,8 @@ def plan_sound(doc, tag, rec, level, *, has_subtitle_entry, ce_lines, ce_idx, mc
             "first_slot_id": spain[0]["slot_id"],
             "mode": mode_of(doc, tag), "token": token, "eligible": True, "reason": "", "status": None,
             "sources": [], "existing_takes": [], "proposed": [], "issues": [], "summary": ""}
-    if has_subtitle_entry:
-        item.update(eligible=False, reason="the sound has a subtitle entry (every take would show the same text)")
-    elif any(s["channels"] != 1 for s in spain):
+    item["has_subtitle_entry"] = bool(has_subtitle_entry)  # owner 2026-10-19: allowed, one subtitle per set
+    if any(s["channels"] != 1 for s in spain):
         item.update(eligible=False, reason="stereo sound (stereo replacement is deferred)")
     by_slot = {}
     for m in doc["slots"]:
@@ -326,7 +412,8 @@ def plan_sound(doc, tag, rec, level, *, has_subtitle_entry, ce_lines, ce_idx, mc
     for s in sorted(spain, key=lambda s: s["index"]):
         ms = by_slot.get(s["slot_id"], [])
         m = ms[0] if len(ms) == 1 else None
-        audio, issues = _classify(m, s, ce_lines, ce_idx, mcc_idx, local, dup=len(ms) > 1)
+        audio, issues = _classify(m, s, ce_lines, ce_idx, mcc_idx, local, dup=len(ms) > 1,
+                                  has_subtitle_entry=has_subtitle_entry)
         item["issues"] += issues
         src = {"slot_id": s["slot_id"], "ordinal": s["ordinal_in_tag"], "spanish_index": s["index"],
                "duration_s": s["duration_s"], "decision": _summary(m), "take": None,
@@ -370,6 +457,11 @@ def plan_sound(doc, tag, rec, level, *, has_subtitle_entry, ce_lines, ce_idx, mc
         elif len(notes) > 1:
             item["issues"].append(_issue("notes_differ", ms[0]["slot_id"], ", ".join(p["from_slots"])))
     item["proposed"] = proposed
+    if has_subtitle_entry:  # the set's ONE subtitle (owner, 2026-10-19): a draft only when every take agrees
+        prop = set_subtitle_proposal(doc, tag, rec, local)
+        item["set_subtitle"] = prop
+        item["issues"].append(_issue("set_subtitle_prefilled" if prop["prefill"] else "set_subtitle_undecided", None,
+                                     prop["reason"]))
     if not any(p["from_slots"] for p in proposed) and not existing:
         item["issues"].append(_issue("nothing_selected"))
     if not any(_decided(m) for ms in by_slot.values() for m in ms) and not existing:
@@ -428,10 +520,12 @@ def recovery_record(tag, slots, local, today):
             "missing": [c for c in customs if c not in cs] + [r for r in recordings if r not in rs]}
 
 
-def stage(doc, item, *, today, used_take_ids, acknowledged, local=None):
+def stage(doc, item, *, today, used_take_ids, acknowledged, local=None, set_subtitle_custom_ref=None):
     """-> (new doc, own-set entry). Creates the set's new takes as drafts and a staged own set holding the
     provenance; the line decisions are not touched. acknowledged: the review codes the owner confirmed (None: the
-    caller already checked; the preview itself uses that)."""
+    caller already checked; the preview itself uses that). A sound with a subtitle entry whose takes all agree gets
+    the set's one subtitle as a DRAFT (item["set_subtitle"]); a custom text needs set_subtitle_custom_ref (the caller
+    writes the text to the local file under that new ref), otherwise it stays undecided."""
     if item["status"] not in ("ready", "review"):
         raise ConversionError(409, f"this sound cannot be converted ({item['status']})",
                               [f"{i['code']}: {i['message']}" for i in item["issues"] if i["severity"] == "blocked"])
@@ -473,6 +567,10 @@ def stage(doc, item, *, today, used_take_ids, acknowledged, local=None):
                             "activated_at": None, "source_version": item["token"], "slots": slots,
                             "added_takes": existing, "custom_subtitles": custom_refs(slots, local),
                             "takes": prov_takes, "acknowledged": sorted(acknowledged or [])}}
+    prefill = (item.get("set_subtitle") or {}).get("prefill")
+    sub = new_set_subtitle(prefill, set_subtitle_custom_ref) if prefill else None
+    if sub:
+        entry["subtitle"] = sub
     new.setdefault("own_sets", []).append(entry)
     return new, entry
 
@@ -488,7 +586,8 @@ def _staged(doc, tag):
     return o, o["provenance"]
 
 
-def approvable(doc, tag, rec, level, *, ce_lines, ce_idx, mcc_idx, local=None, eligible=(True, "")):
+def approvable(doc, tag, rec, level, *, ce_lines, ce_idx, mcc_idx, local=None, eligible=(True, ""),
+               has_subtitle_entry=False):
     """Which created takes of a staged conversion "Approve unchanged converted takes" may approve, and why the others
     may not. Read-only. A take is included only when ALL of these hold:
       - it still exists and was not touched since staging (draft, revision 1, same specification as recorded);
@@ -497,7 +596,7 @@ def approvable(doc, tag, rec, level, *, ce_lines, ce_idx, mcc_idx, local=None, e
         replace that line with it (resolved media, valid recipe made for that recording, mono);
       - each of those decisions selects exactly the take's specification (recording, language, recipe, binding);
       - no review point is attached to any of those decisions, and they agree on 'needs radio effect' and notes;
-      - the sound is still eligible (mono, no subtitle entry).
+      - the sound is still eligible (mono).
     One approved contributor never stands in for another: a take merged from an approved and a draft decision is
     excluded. -> {"record_id", "included": [...], "excluded": [...]} (each with its source decisions)."""
     o, prov = _staged(doc, tag)
@@ -555,7 +654,7 @@ def approvable(doc, tag, rec, level, *, ce_lines, ce_idx, mcc_idx, local=None, e
             if t is not None and spec_key(m["audio"]) != spec_key(t["audio"]):
                 reasons.append(f"{where}: selects different audio than the take")
             _sel, issues = _classify(m, samples.get(m["slot_id"], {"slot_id": m["slot_id"]}), ce_lines, ce_idx,
-                                     mcc_idx, local, dup=False)
+                                     mcc_idx, local, dup=False, has_subtitle_entry=has_subtitle_entry)
             open_points = sorted({i["code"] for i in issues if i["severity"] in ("review", "blocked")})
             if open_points:
                 reasons.append(f"{where}: review points {', '.join(open_points)}")
@@ -588,15 +687,18 @@ def approve_unchanged(doc, tag, take_ids, *, today, fingerprint):
     return [(new, [UserAction("approve", tid, "audio") for tid in sorted(wanted)])]
 
 
-def switch_problems(doc, tag, *, insert_plan, eligible=(True, "")):
+def switch_problems(doc, tag, *, insert_plan, eligible=(True, ""), subtitle_problem=None):
     """Everything that stops a staged sound from being switched (empty = ready). The record is checked against now:
     the line decisions must equal the recorded ones; the set must hold exactly the recorded takes, each with the
     specification recorded at staging; and every take must be approved AND buildable now (insert_plan: plan_inserts
-    of the sound as if switched: resolved media, valid recipe for its recording, no drift, mono, no subtitle entry)."""
+    of the sound as if switched: resolved media, valid recipe for its recording, no drift, mono). A sound with a
+    subtitle entry also needs the set's one subtitle approved and drift-free (subtitle_problem: set_subtitle_problem)."""
     o, prov = _staged(doc, tag)
     out = []
     if not eligible[0]:
         out.append(f"the sound is not eligible: {eligible[1]}")
+    if subtitle_problem:
+        out.append(subtitle_problem)
     now = {m["mapping_id"]: m for m in doc["slots"] if m["mcc_tag"] == tag}
     rec = {m["mapping_id"]: m for m in prov["slots"]}
     for mid in sorted(now.keys() | rec.keys()):
@@ -621,13 +723,14 @@ def switch_problems(doc, tag, *, insert_plan, eligible=(True, "")):
     return out
 
 
-def activate(doc, tag, *, today, insert_plan, eligible=(True, "")):
+def activate(doc, tag, *, today, insert_plan, eligible=(True, ""), subtitle_problem=None):
     """Switch a staged sound to its replacement set. -> steps [(doc, user_actions)] for mapping_store.save_sequence.
     Refused (ConversionError, nothing changes) on any switch_problems(). Approved line decisions are first marked
     Needs rework (the only allowed change to an approved object), then removed: they live on in the provenance. It
     changes the decisions only; installed game files are never touched (a build and an install are separate)."""
     from .mapping_store import UserAction
-    problems = switch_problems(doc, tag, insert_plan=insert_plan, eligible=eligible)
+    problems = switch_problems(doc, tag, insert_plan=insert_plan, eligible=eligible,
+                               subtitle_problem=subtitle_problem)
     if problems:
         raise ConversionError(409, "the sound cannot be switched yet; nothing changed", problems)
     now = sorted((m for m in doc["slots"] if m["mcc_tag"] == tag), key=lambda m: m["mapping_id"])
@@ -677,6 +780,20 @@ def _remove_takes_steps(doc, take_ids):
     return steps, final
 
 
+def rework_set_subtitle_steps(doc, tag):
+    """Before a set is removed (cancel, undo, back to Spain's takes): its approved subtitle is first marked Needs
+    rework, a user action (revision + 1), as the store requires. -> (steps, last doc)."""
+    from .mapping_store import UserAction
+    o = _own(doc, tag)
+    sub = (o or {}).get("subtitle")
+    if not sub or sub["status"] != "approved":
+        return [], doc
+    new = copy.deepcopy(doc)
+    _own(new, tag)["subtitle"].update(status="needs_rework", revision=sub["revision"] + 1, approved_at=None,
+                                      fingerprint=None)
+    return [(new, [UserAction("needs_rework", tag, "subtitle")])], new
+
+
 def _drop_own(doc, tag):
     doc["own_sets"] = [o for o in doc.get("own_sets", []) if o["mcc_tag"] != tag]
     if not doc["own_sets"]:
@@ -688,8 +805,10 @@ def cancel(doc, tag):
     in the same save) and the staged set goes; the line decisions were never touched. -> steps."""
     o, prov = _staged(doc, tag)
     created = [t["take_id"] for t in prov["takes"] if t["origin"] == "created"]
-    steps, final = _remove_takes_steps(doc, created)
+    first, cur = rework_set_subtitle_steps(doc, tag)
+    steps, final = _remove_takes_steps(cur, created)
     _drop_own(final, tag)
+    steps = first + steps
     steps.append((final, []))
     return steps
 
@@ -800,7 +919,9 @@ def revert_plan(doc, tag, *, local, recovery, slot_ids, ce_idx, mcc_idx, rework_
     if conflicts:
         return plan
     from .mapping_store import UserAction
-    steps, final = _remove_takes_steps(doc, created)
+    first, cur = rework_set_subtitle_steps(doc, tag)  # the set's own subtitle goes with the set
+    steps, final = _remove_takes_steps(cur, created)
+    steps = first + steps
     actions = []
     for m in prov["slots"]:
         body = copy.deepcopy(m)

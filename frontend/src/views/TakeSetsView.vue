@@ -34,7 +34,7 @@ const STATUS: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "mut
   blocked: { label: "blocked", tone: "bad", help: "Something cannot become a take (unsupported source, missing media, a bad recipe)." },
   staged: { label: "staged", tone: "warn", help: "Prepared; the line decisions still apply until you switch." },
   active: { label: "replacement set", tone: "ok", help: "In force: the sound plays only its takes." },
-  ineligible: { label: "per take only", tone: "muted", help: "Has a subtitle entry, or is stereo." },
+  ineligible: { label: "per take only", tone: "muted", help: "Stereo (stereo replacement is deferred)." },
   nothing_to_convert: { label: "nothing selected", tone: "muted", help: "No audio selected yet." },
   single_take: { label: "sets on single-take sounds", tone: "ok", help: "Own sets on sounds that have one Spain take (counted apart from the multi-take sounds)." },
 };
@@ -142,9 +142,10 @@ onMounted(refresh);
       </button>
     </PageHeader>
     <p class="note">
-      Sounds with several Spain takes. For sounds without a subtitle entry, the takes you already matched can become
+      Sounds with several Spain takes. For mono sounds, the takes you already matched can become
       one <strong>replacement set</strong>: the sound plays the set's takes instead of Spain's, and equal selections
-      (same recording, language and recipe) become one take. This list is a preview: nothing changes until you stage,
+      (same recording, language and recipe) become one take. A sound with a subtitle entry gets one subtitle for the
+      whole set, approved on its own before the switch. This list is a preview: nothing changes until you stage,
       approve and switch.
     </p>
 

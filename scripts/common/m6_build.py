@@ -35,7 +35,8 @@ from .fsb5_lib import parse_header
 from .fsb5_writer import ALIGN, build, decompose, replace_sample, sample_spans
 from .mcc_loc import loc_key, parse_mcc_loc
 from .own_set_state import active_own_tags, staged_take_ids
-from .project_validation import added_take_fingerprint, audio_fingerprint, subtitle_fingerprint
+from .project_validation import (added_take_fingerprint, audio_fingerprint, own_set_subtitle_fingerprint,
+                                 subtitle_fingerprint)
 
 PLAN_SCHEMA = "m6-build-plan/1"
 
@@ -194,8 +195,9 @@ def _plan_combined(m, sample, ce_lines, ce_idx, mcc_idx, local):
 
 def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=None, subtitle_keys=None):
     """Approved added takes of the sounds in `levels` -> one entry each (docs/added-takes-design.md):
-      insert        approved, its sound mono and without a subtitle entry, one resolved CE line, no drift, a valid
-                    recipe made for that line -> inserted after the sound's Spain takes, in position order
+      insert        approved, its sound mono (with or without a subtitle entry, owner 2026-10-19), one resolved CE
+                    line, no drift, a valid recipe made for that line -> inserted after the sound's Spain takes, in
+                    position order. subtitle_keys is kept for callers; a subtitle entry no longer refuses a take.
       skip          draft / needs_rework, or created by a staged conversion that is not switched on yet
                     (docs/replacement-set-conversion.md): left out (reported)
       not_eligible  invalid (reason reported). Nothing is approved or changed here."""
@@ -227,8 +229,6 @@ def plan_inserts(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local=No
             e.update(action="skip", reason=f"audio {a['status']} (not approved): not inserted")
         elif any(x["channels"] != 1 for x in sp):
             e.update(reason="unsupported: stereo sound (stereo replacement deferred)")
-        elif subtitle_keys is not None and loc_key(t["mcc_tag"]) in subtitle_keys:
-            e.update(reason="invalid: the sound has a subtitle entry (added takes are for sounds without one)")
         elif len(a["sources"]) != 1 or src.get("kind") != "ce":
             e.update(reason="invalid: an added take needs exactly one CE line")
         elif not line:
@@ -507,30 +507,26 @@ def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, 
     is written only when EVERY Spanish take of the tag has an approved "none"; otherwise the key is left
     unchanged and reported (a take that still plays keeps its subtitle). Keys are looked up in each table
     independently; a key a table lacks is never added.
+    A sound whose own take set is in force (owner, 2026-10-19) has ONE subtitle, the set's (`own_sets[].subtitle`):
+    its row (slot_id "own set <tag_name>", own_set: true) is the key's only outcome; not approved (or undecided) =
+    excluded, MCC's text stays. A staged set changes nothing here.
     Nothing is approved, changed or chosen here."""
     from .mcc_loc_writer import normalize_text, text_problems
     rows, conflicts = [], []
     by_key = defaultdict(list)
     takes_of = {}  # key -> every Spanish slot (take) of the tag, mapped or not
-    for m in sorted(doc["slots"], key=lambda m: m["slot_id"]):
-        hit = slot_index.get(m["slot_id"])
-        if not hit or hit[0] not in levels:
-            continue
-        s = m["subtitle"]
-        tag = hit[1]["mcc_tag"]
-        key = loc_key(tag)
-        takes_of.setdefault(key, set()).update(hit[1].get("slot_ids") or [m["slot_id"]])
-        row = {"slot_id": m["slot_id"], "mapping_id": m["mapping_id"], "level": hit[0], "mcc_tag": tag,
-               "key": key, "key_evidence": "derived:mcc_loc_key_crc32_tag_path", "status": s["status"],
-               "source": s["source"], "change": False, "category": "excluded"}
+    own = active_own_tags(doc)  # sounds playing their own take set: their ONE set subtitle decides the key
+
+    def outcome(row, s, drifted, raw_text):
+        """Fills one row from an approved-or-not subtitle object (a line's or a set's)."""
         if s["status"] != "approved":
             row["result"] = f"not applied: subtitle {s['status']}"
         elif s["source"] == "keep_original":
             row.update(category="keep", result="approved: keep MCC text (no change)")
-        elif s["fingerprint"] != subtitle_fingerprint(m, ce_idx, mcc_idx, local):
+        elif drifted():
             row["result"] = "invalid: approved fingerprint drift; rework it"
         else:
-            raw = _approved_text(m, ce_lines, local)
+            raw = raw_text()
             if raw is None:
                 row["result"] = "invalid: approved text not found"
             else:
@@ -542,6 +538,52 @@ def subtitle_plan(doc, levels, *, slot_index, ce_lines, ce_idx, mcc_idx, local, 
                     row.update(category="write", change=True, text=text, normalised=notes,
                                new_utf8_bytes=len(text.encode("utf-8")),
                                result="no subtitle (approved empty entry)" if text == "" else "approved text")
+
+    for m in sorted(doc["slots"], key=lambda m: m["slot_id"]):
+        hit = slot_index.get(m["slot_id"])
+        if not hit or hit[0] not in levels:
+            continue
+        s = m["subtitle"]
+        tag = hit[1]["mcc_tag"]
+        key = loc_key(tag)
+        takes_of.setdefault(key, set()).update(hit[1].get("slot_ids") or [m["slot_id"]])
+        row = {"slot_id": m["slot_id"], "mapping_id": m["mapping_id"], "level": hit[0], "mcc_tag": tag,
+               "key": key, "key_evidence": "derived:mcc_loc_key_crc32_tag_path", "status": s["status"],
+               "source": s["source"], "change": False, "category": "excluded"}
+        if tag in own:  # never left after a set is turned on (validator error); never applied if it were
+            row["result"] = "not applied: the sound plays its own take set (its set subtitle decides the key)"
+        else:
+            outcome(row, s, lambda: s["fingerprint"] != subtitle_fingerprint(m, ce_idx, mcc_idx, local),
+                    lambda: _approved_text(m, ce_lines, local))
+        if row["category"] in ("keep", "write"):
+            by_key[key].append(row)
+        rows.append(row)
+
+    # Own take sets in force (owner, 2026-10-19): ONE subtitle per set, approved separately. A staged set is not in
+    # force (its lines above decide). A set in force without an approved subtitle keeps MCC's text (listed).
+    tag_level = {}
+    for _sid, (lv, rec, _smp) in slot_index.items():
+        tag_level.setdefault(rec["mcc_tag"], (lv, rec))
+    for o in sorted(doc.get("own_sets", []), key=lambda o: o["mcc_tag"]):
+        hit = tag_level.get(o["mcc_tag"])
+        if o["mcc_tag"] not in own or not hit or hit[0] not in levels:
+            continue
+        tag, key = o["mcc_tag"], loc_key(o["mcc_tag"])
+        if not any(tbl is not None and key in tbl for tbl in tables.values()):
+            continue  # no subtitle entry: the set has no subtitle to apply (keys are never added)
+        label = "own set " + hit[1]["tag_name"]  # the sound, not a slot: its Spain takes are dropped
+        takes_of[key] = {label}
+        s = o.get("subtitle")
+        row = {"slot_id": label, "mapping_id": None, "own_set": True, "level": hit[0], "mcc_tag": tag, "key": key,
+               "key_evidence": "derived:mcc_loc_key_crc32_tag_path", "status": (s or {}).get("status", "undecided"),
+               "source": (s or {}).get("source"), "change": False, "category": "excluded"}
+        if s is None:
+            row["result"] = "not applied: the replacement set's subtitle is not decided (MCC text stays)"
+        else:
+            outcome(row, s, lambda: s["fingerprint"] != own_set_subtitle_fingerprint(o, ce_idx, mcc_idx, local),
+                    lambda: _approved_text({"subtitle": s}, ce_lines, local))
+            if s["status"] != "approved":
+                row["result"] = f"not applied: the replacement set's subtitle is {s['status']} (MCC text stays)"
         if row["category"] in ("keep", "write"):
             by_key[key].append(row)
         rows.append(row)
