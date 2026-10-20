@@ -593,7 +593,12 @@ def build_audio(out, targets, original, args, cfg, pins, app, mutes=(), inserts=
         sorted(k for k in range(count) if index_map[k] is None) == sorted(
             e["spanish_index"] for e in app_drop_entries(app, drops))
     checks["vgm_all_subsongs_decode"] = None not in full_o and None not in full_c and len(full_c) == new_count
-    checks["vgm_only_targets_differ"] = differ == sorted(results)
+    # A mute of a sample that is already silent (retail x70\cor_19) decodes the same as the original; the mute
+    # checks below prove the candidate is digital silence, so equal hashes mean the original was silence too.
+    silent_mutes = sorted(e["spanish_index"] for e in mutes
+                          if index_map[e["spanish_index"]] is not None
+                          and full_o[e["spanish_index"]] == full_c[index_map[e["spanish_index"]]])
+    checks["vgm_only_targets_differ"] = differ == sorted(k for k in results if k not in silent_mutes)
     per_target, all_target_ok = {}, True
     for e in targets:
         k = e["spanish_index"]
@@ -602,7 +607,8 @@ def build_audio(out, targets, original, args, cfg, pins, app, mutes=(), inserts=
         all_target_ok &= all(c.values())
     for e in mutes:
         c = mute_checks(exe, cand_path, e, results[e["spanish_index"]], index_map[e["spanish_index"]])
-        per_target[e["slot_id"]] = {"checks": c, "muted": True}
+        per_target[e["slot_id"]] = {"checks": c, "muted": True,
+                                    "original_already_silent": e["spanish_index"] in silent_mutes}
         all_target_ok &= all(c.values())
     for e in inserts:
         c, extra = content_checks(exe, cand_path, new_index[e["take_id"]], ins_results[e["take_id"]])
