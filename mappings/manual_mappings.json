@@ -1173,11 +1173,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -5588,11 +5584,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -7226,11 +7218,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -8105,11 +8093,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -9017,11 +9001,7 @@
           "silences": [],
           "fade_in_ms": 10,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -9404,11 +9384,7 @@
           "silences": [],
           "fade_in_ms": 10,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -9539,11 +9515,7 @@
           "silences": [],
           "fade_in_ms": 10,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -9997,11 +9969,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -10280,11 +10248,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -10749,11 +10713,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -10957,11 +10917,7 @@
           ],
           "fade_in_ms": 10,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -11259,11 +11215,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -11632,11 +11584,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -12776,11 +12724,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -13598,11 +13542,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -14067,11 +14007,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -14351,11 +14287,7 @@
           "silences": [],
           "fade_in_ms": 10,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -14634,11 +14566,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -14833,11 +14761,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -14942,11 +14866,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -15438,11 +15358,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -15637,11 +15553,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -17453,11 +17365,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -27448,11 +27356,7 @@
           "silences": [],
           "fade_in_ms": 10,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -33929,11 +33833,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -34038,11 +33938,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -35567,11 +35463,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -35676,11 +35568,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -35785,11 +35673,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -35978,11 +35862,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -36200,11 +36080,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -36393,11 +36269,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -36596,11 +36468,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -36699,11 +36567,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -36898,11 +36762,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -37817,11 +37677,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -38190,11 +38046,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -38389,11 +38241,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -38952,11 +38800,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39061,11 +38905,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39170,11 +39010,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39283,11 +39119,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39752,11 +39584,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39856,11 +39684,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 10,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -39969,11 +39793,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -40949,11 +40769,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -41148,11 +40964,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -42115,11 +41927,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -42584,11 +42392,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -42693,11 +42497,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -43777,11 +43577,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 20,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -43886,11 +43682,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44175,11 +43967,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44284,11 +44072,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44483,11 +44267,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44592,11 +44372,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44701,11 +44477,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -44810,11 +44582,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -45009,11 +44777,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -45118,11 +44882,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -45317,11 +45077,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -45610,11 +45366,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -46177,11 +45929,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -46529,11 +46277,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -47023,11 +46767,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -48687,11 +48427,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -48910,11 +48646,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -50913,11 +50645,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -51030,11 +50758,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -51139,11 +50863,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -53719,11 +53439,7 @@
           "silences": [],
           "fade_in_ms": 100,
           "fade_out_ms": 100,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -53918,11 +53634,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -54027,11 +53739,7 @@
           ],
           "fade_in_ms": 0,
           "fade_out_ms": 20,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -54136,11 +53844,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -54335,11 +54039,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -54444,11 +54144,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -54733,11 +54429,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -55106,11 +54798,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -55749,11 +55437,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -56508,11 +56192,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -56709,11 +56389,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -56998,11 +56674,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -57317,11 +56989,7 @@
           "silences": [],
           "fade_in_ms": 0,
           "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "loudness": {
-            "mode": "off",
-            "offset_db": 0
-          }
+          "crossfade_ms": 20
         },
         "fingerprint": {
           "mcc": {
@@ -89338,52 +89006,19 @@
       "slot_id": "es:B30_270_captkeyes#0",
       "mcc_tag": "sound\\dialog\\b30\\b30_270_captkeyes",
       "match": {
-        "status": "matched",
-        "ce_line_refs": [
-          "vo_scr_m04_00640_keyes#0"
-        ],
-        "decided_at": "2026-10-15",
-        "revision": 1
+        "status": "no_equivalent",
+        "ce_line_refs": [],
+        "decided_at": "2026-10-24",
+        "revision": 2
       },
       "audio": {
         "status": "approved",
-        "source": "ce",
-        "sources": [
-          {
-            "kind": "ce",
-            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
-            "language": "Spanish(Mexico)"
-          }
-        ],
+        "source": "mute",
+        "sources": [],
         "edit": {
           "trim_start_s": 0,
           "trim_end_s": 0,
-          "gap_s": 0,
-          "engine": "audio-edit/1",
-          "for_source": {
-            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
-            "language": "Spanish(Mexico)"
-          },
-          "cuts": [],
-          "silences": [
-            {
-              "at_s": 0,
-              "dur_s": 0.3
-            }
-          ],
-          "fade_in_ms": 0,
-          "fade_out_ms": 0,
-          "crossfade_ms": 20,
-          "radio": {
-            "preset": "custom",
-            "low_hz": 700,
-            "high_hz": 3300,
-            "slope_db_oct": 12,
-            "presence_db": 0,
-            "drive_db": 0,
-            "noise_dbfs": null,
-            "clicks": true
-          }
+          "gap_s": 0
         },
         "fingerprint": {
           "mcc": {
@@ -89391,30 +89026,16 @@
             "index": 412,
             "data_sha256": "afb5ccd73e9005b4d9f7781123ca09a8e1d25a2a9e4c929a4cef9ddb41dfd2f0"
           },
-          "sources": [
-            {
-              "kind": "ce",
-              "ce_line_ref": "vo_scr_m04_00640_keyes#0",
-              "language": "Spanish(Mexico)",
-              "media": [
-                {
-                  "media_id": 261784342,
-                  "wem_sha256": "504766284053dd7d98e176278540946537719f7d8eef77bf3ea04c163b9cfbbb"
-                }
-              ]
-            }
-          ]
+          "sources": []
         },
-        "approved_at": "2026-10-15",
-        "revision": 1
+        "approved_at": "2026-10-24",
+        "revision": 2,
+        "mute_reason": "No equivalent"
       },
       "subtitle": {
         "status": "approved",
-        "source": "ce_locres",
-        "ce_locres": {
-          "ce_line_ref": "vo_scr_m04_00640_keyes#0",
-          "culture": "es-MX"
-        },
+        "source": "none",
+        "ce_locres": null,
         "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
@@ -89424,17 +89045,10 @@
             "index": 412,
             "data_sha256": "afb5ccd73e9005b4d9f7781123ca09a8e1d25a2a9e4c929a4cef9ddb41dfd2f0"
           },
-          "source": "ce_locres",
-          "ce_locres": {
-            "ce_line_ref": "vo_scr_m04_00640_keyes#0",
-            "culture": "es-MX",
-            "namespace": "VO_SCR_M04CARTOGRAPHER",
-            "key": "VO_SCR_M04_00640_Keyes",
-            "source_hash": 933567447
-          }
+          "source": "none"
         },
-        "approved_at": "2026-10-15",
-        "revision": 1
+        "approved_at": "2026-10-24",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -103971,9 +103585,9 @@
         "revision": 1
       },
       "radio_effect": {
-        "needed": false,
-        "set_at": null,
-        "revision": 1
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 2
       },
       "different_but_fits": {
         "marked": false,
@@ -104086,9 +103700,9 @@
         "revision": 1
       },
       "radio_effect": {
-        "needed": false,
-        "set_at": null,
-        "revision": 1
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 2
       },
       "different_but_fits": {
         "marked": false,
@@ -104732,9 +104346,9 @@
         "revision": 1
       },
       "radio_effect": {
-        "needed": false,
-        "set_at": null,
-        "revision": 1
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 2
       },
       "different_but_fits": {
         "marked": false,
@@ -117301,9 +116915,9 @@
       },
       "subtitle": {
         "status": "approved",
-        "source": "custom",
+        "source": "none",
         "ce_locres": null,
-        "custom_ref": "c-000117",
+        "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
         "fingerprint": {
@@ -117312,14 +116926,10 @@
             "index": 406,
             "data_sha256": "75d98ce19c3dbf785a19c3be7b01ce71dd6ec071de257dfbbd417b1cfb841589"
           },
-          "source": "custom",
-          "custom": {
-            "custom_ref": "c-000117",
-            "text_sha256": "20a250d23a9517e70cecd308997b4ae83fabbb82e387eeac698095c8df9ddf0d"
-          }
+          "source": "none"
         },
-        "approved_at": "2026-10-23",
-        "revision": 1
+        "approved_at": "2026-10-24",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -117366,9 +116976,9 @@
       },
       "subtitle": {
         "status": "approved",
-        "source": "custom",
+        "source": "none",
         "ce_locres": null,
-        "custom_ref": "c-000118",
+        "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
         "fingerprint": {
@@ -117377,14 +116987,10 @@
             "index": 409,
             "data_sha256": "50aa78c4cf893f459c7427286401f9d6dc6e29eabe13c46ab6df668eb63878ba"
           },
-          "source": "custom",
-          "custom": {
-            "custom_ref": "c-000118",
-            "text_sha256": "a1203e3a26c3faa48aaea7e56bf11fabfd1cf0573e83a69009858a22117bbe8d"
-          }
+          "source": "none"
         },
-        "approved_at": "2026-10-23",
-        "revision": 1
+        "approved_at": "2026-10-24",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -117431,9 +117037,9 @@
       },
       "subtitle": {
         "status": "approved",
-        "source": "custom",
+        "source": "none",
         "ce_locres": null,
-        "custom_ref": "c-000119",
+        "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
         "fingerprint": {
@@ -117442,14 +117048,10 @@
             "index": 410,
             "data_sha256": "9c4f5a401a7b8d72ff9442e9d80d4bcbf594be8f3df70904cf1acd342e84632d"
           },
-          "source": "custom",
-          "custom": {
-            "custom_ref": "c-000119",
-            "text_sha256": "292663f021626aa93620ed0c3aa27a04df08d09c255598c912a7712335b11d5c"
-          }
+          "source": "none"
         },
-        "approved_at": "2026-10-23",
-        "revision": 1
+        "approved_at": "2026-10-24",
+        "revision": 2
       },
       "radio_effect": {
         "needed": false,
@@ -117657,7 +117259,7 @@
         "revision": 1
       },
       "audio": {
-        "status": "draft",
+        "status": "approved",
         "source": "mute",
         "sources": [],
         "edit": {
@@ -117665,20 +117267,34 @@
           "trim_end_s": 0,
           "gap_s": 0
         },
-        "fingerprint": null,
-        "approved_at": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_410_cortana#0",
+            "index": 422,
+            "data_sha256": "037955b65dee4913f0e3bac3043d57cb4c7a080670247385c268e743225850cc"
+          },
+          "sources": []
+        },
+        "approved_at": "2026-10-24",
         "revision": 1,
         "mute_reason": "No equivalent"
       },
       "subtitle": {
-        "status": "draft",
+        "status": "approved",
         "source": "none",
         "ce_locres": null,
         "custom_ref": null,
         "mcc_key_hash": null,
         "mcc_key_verification": null,
-        "fingerprint": null,
-        "approved_at": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B30_410_cortana#0",
+            "index": 422,
+            "data_sha256": "037955b65dee4913f0e3bac3043d57cb4c7a080670247385c268e743225850cc"
+          },
+          "source": "none"
+        },
+        "approved_at": "2026-10-24",
         "revision": 1
       },
       "radio_effect": {
@@ -123323,6 +122939,1645 @@
             "namespace": "VO_CIN_M03RECONCILIATION",
             "key": "VO_CIN_M03_cin04_outro_01100_Cortana",
             "source_hash": 472085949
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001559",
+      "slot_id": "es:B40_580_cortana#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_580_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00550_cortana#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00550_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_580_cortana#0",
+            "index": 531,
+            "data_sha256": "f0c4963667ad0bb1e2c5c48c8473d583d1e3a786d0726528c9e009f61b70301e"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00550_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 969089732,
+                  "wem_sha256": "6591834c0287e7f5cd22ca3416a4af071bc6c8c6c6f5065c70aaeb423e0f8958"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00550_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_580_cortana#0",
+            "index": 531,
+            "data_sha256": "f0c4963667ad0bb1e2c5c48c8473d583d1e3a786d0726528c9e009f61b70301e"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00550_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00550_Cortana",
+            "source_hash": 3550338052
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001560",
+      "slot_id": "es:B40_510_cortana#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_510_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00460_cortana#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00460_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_510_cortana#0",
+            "index": 521,
+            "data_sha256": "cfce2a3c9aae7597fa015798e2151b7300339241e5ab0080d55f408cb516d0bc"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00460_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 480509351,
+                  "wem_sha256": "eaa5a433f7aedbd52711c4b00caecc3bdb8878bc0a11e8ad280bd245883fc96f"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00460_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_510_cortana#0",
+            "index": 521,
+            "data_sha256": "cfce2a3c9aae7597fa015798e2151b7300339241e5ab0080d55f408cb516d0bc"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00460_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00460_Cortana",
+            "source_hash": 1884729816
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001561",
+      "slot_id": "es:B40_480_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_480_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00440_bisenti#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00440_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00440_bisenti#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_480_bisenti#0",
+            "index": 517,
+            "data_sha256": "9946c3830226b57ab63666346f29ead7a15522e07bce7037aae1f3d1f582a781"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00440_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 31856970,
+                  "wem_sha256": "894085459c90bfa150b74200f9f685a884b4a88b5740533f7661c4bf072ab278"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00440_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_480_bisenti#0",
+            "index": 517,
+            "data_sha256": "9946c3830226b57ab63666346f29ead7a15522e07bce7037aae1f3d1f582a781"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00440_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00440_Bisenti",
+            "source_hash": 2570983368
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001562",
+      "slot_id": "es:B40_180_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_180_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00230_bisenti#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00230_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.159,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00230_bisenti#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [
+            {
+              "start_s": 1.708,
+              "end_s": 1.895
+            }
+          ],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_180_bisenti#0",
+            "index": 473,
+            "data_sha256": "bbc82bfabe18e09df9dbd83a4b9f7db5b00045380d3bb3b6c6b24af010fedd89"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00230_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 222492530,
+                  "wem_sha256": "f0ecaac75c351fde7587991f91d287fd1cd5bb48daf9c71bebe709d7e3ceff3d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00230_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_180_bisenti#0",
+            "index": 473,
+            "data_sha256": "bbc82bfabe18e09df9dbd83a4b9f7db5b00045380d3bb3b6c6b24af010fedd89"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00230_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00230_Bisenti",
+            "source_hash": 147432518
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001563",
+      "slot_id": "es:B40_430_aussie#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_430_aussie",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00390_dubbo#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00390_dubbo#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.044,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00390_dubbo#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_430_aussie#0",
+            "index": 506,
+            "data_sha256": "3f282831da9095428f8199da4853e12ade893c2ba28b83cad1d4415a47542b23"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00390_dubbo#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 635214272,
+                  "wem_sha256": "0dc2c81651a47c143ed9bdcb4369929f20b9d7f74d7f46b781a258fca71b5de8"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 2
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00390_dubbo#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_430_aussie#0",
+            "index": 506,
+            "data_sha256": "3f282831da9095428f8199da4853e12ade893c2ba28b83cad1d4415a47542b23"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00390_dubbo#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00390_Dubbo",
+            "source_hash": 1751920756
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 2
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001564",
+      "slot_id": "es:B40_450_aussie#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_450_aussie",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00410_dubbo#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00410_dubbo#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.084,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00410_dubbo#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_450_aussie#0",
+            "index": 510,
+            "data_sha256": "c2ffc675ff6f90faadd9d51b487e98c8a30bebab772f132369552b24d6ca23d4"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00410_dubbo#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 723259751,
+                  "wem_sha256": "4599341410ebba7ec99f524e2a09185490d3b4bb57f6f59daf33d2cbe7c7335f"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00410_dubbo#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_450_aussie#0",
+            "index": 510,
+            "data_sha256": "c2ffc675ff6f90faadd9d51b487e98c8a30bebab772f132369552b24d6ca23d4"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00410_dubbo#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00410_Dubbo",
+            "source_hash": 1226279361
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001565",
+      "slot_id": "es:B40_350_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_350_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00200_bisenti#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00200_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.136,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00200_bisenti#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_350_bisenti#0",
+            "index": 495,
+            "data_sha256": "dac6b202b1b52feae66a97e46a35810fa22a9281e631ac6c65fc036d2c994350"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00200_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 760991861,
+                  "wem_sha256": "6914049ac7ea2538af0f2132d9e54122addcb3193041d0d2b678d3d909a3bd4c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00200_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_350_bisenti#0",
+            "index": 495,
+            "data_sha256": "dac6b202b1b52feae66a97e46a35810fa22a9281e631ac6c65fc036d2c994350"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00200_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00200_Bisenti",
+            "source_hash": 3005699181
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": true,
+        "set_at": "2026-10-24",
+        "revision": 2
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001566",
+      "slot_id": "es:B40_410_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_410_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00880_bisenti#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00880_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00880_bisenti#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_410_bisenti#0",
+            "index": 502,
+            "data_sha256": "7940cd44ab58d9aff25f34b0f9a0926c96f2a222487420fa99dfb8c2667470c4"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00880_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 1018877478,
+                  "wem_sha256": "70fcfbc01eb1112765b46824c9f8b931a86825c7c717c8088295213ef584da7c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00880_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_410_bisenti#0",
+            "index": 502,
+            "data_sha256": "7940cd44ab58d9aff25f34b0f9a0926c96f2a222487420fa99dfb8c2667470c4"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00880_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00880_Bisenti",
+            "source_hash": 451130009
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001567",
+      "slot_id": "es:B40_520_bisenti#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_520_bisenti",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00470_bisenti#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00470_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.045,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00470_bisenti#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_520_bisenti#0",
+            "index": 523,
+            "data_sha256": "35ae3f4ec81503e8fada59464a5523f284f9e3833a4ecba6bdfbefb8e5cdcbca"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00470_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 795983468,
+                  "wem_sha256": "02f41a9c2c94b2d9b3dad92ad39d4d7dc8c46866e8fd2aaf88ab29a01fb1847a"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00470_bisenti#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_520_bisenti#0",
+            "index": 523,
+            "data_sha256": "35ae3f4ec81503e8fada59464a5523f284f9e3833a4ecba6bdfbefb8e5cdcbca"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00470_bisenti#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00470_Bisenti",
+            "source_hash": 3582758360
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001568",
+      "slot_id": "es:B40_160_sarge#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_160_sarge",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m12_01430_johnson#0",
+          "vo_sys_default_09order_end_combat_clr_johnson#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce_concat",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_end_combat_clr_johnson#0",
+            "language": "Spanish(Mexico)"
+          },
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m12_01430_johnson#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "engine": "audio-combine/1",
+          "mode": "concat",
+          "for_sources": [
+            {
+              "ce_line_ref": "vo_sys_default_09order_end_combat_clr_johnson#0",
+              "language": "Spanish(Mexico)"
+            },
+            {
+              "ce_line_ref": "vo_scr_m12_01430_johnson#0",
+              "language": "Spanish(Mexico)"
+            }
+          ],
+          "parts": [
+            {
+              "trim_start_s": 0,
+              "trim_end_s": 0,
+              "gap_s": 0
+            },
+            {
+              "trim_start_s": 0,
+              "trim_end_s": 0,
+              "gap_s": 0
+            }
+          ],
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_160_sarge#0",
+            "index": 471,
+            "data_sha256": "16c5a0f4ee59f1ea0810a0d35f20c01361efe688d53fc1cf1346fb1912663afa"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_end_combat_clr_johnson#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 792995406,
+                  "wem_sha256": "a075e5971518781fcb00e68f473303dab719b1156087727596651e1ce1f349d7"
+                }
+              ]
+            },
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m12_01430_johnson#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 291692300,
+                  "wem_sha256": "967ffadea989b536ac2b4c03bfc1df5ae04f0182a53693eb476059d1f355db7c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "custom",
+        "ce_locres": null,
+        "custom_ref": "c-000148",
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_160_sarge#0",
+            "index": 471,
+            "data_sha256": "16c5a0f4ee59f1ea0810a0d35f20c01361efe688d53fc1cf1346fb1912663afa"
+          },
+          "source": "custom",
+          "custom": {
+            "custom_ref": "c-000148",
+            "text_sha256": "a6d6949d36da3c1a85b0e16b8970ebd2dc575146e244299c170228ad4438741e"
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001569",
+      "slot_id": "es:B40_240_mendoza#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_240_mendoza",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00260_mendoza#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00260_mendoza#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00260_mendoza#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [
+            {
+              "start_s": 0.81,
+              "end_s": 0.871
+            },
+            {
+              "start_s": 2.385,
+              "end_s": 2.49
+            }
+          ],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_240_mendoza#0",
+            "index": 480,
+            "data_sha256": "cdb7c88059fcbd062b2a9b42027fc4867e2bdc92872df8f2111f02bdf376f4cf"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00260_mendoza#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 138422575,
+                  "wem_sha256": "24c1360b95265a0419eda9849a72e6b92552d7a977b4a59c44874354286e3da9"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00260_mendoza#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_240_mendoza#0",
+            "index": 480,
+            "data_sha256": "cdb7c88059fcbd062b2a9b42027fc4867e2bdc92872df8f2111f02bdf376f4cf"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00260_mendoza#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00260_Mendoza",
+            "source_hash": 1578560930
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001570",
+      "slot_id": "es:B40_260_mendoza#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_260_mendoza",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00280_mendoza#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00280_mendoza#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_260_mendoza#0",
+            "index": 483,
+            "data_sha256": "a9d1a4900c5a2e9b1e411f298cf88181a9cbaea36454df0a468b0dbd7be024f5"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00280_mendoza#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 219126266,
+                  "wem_sha256": "15cd704b945ad69806671c01ee1d7473db99f3e8f119be692eab9473788ca6aa"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00280_mendoza#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_260_mendoza#0",
+            "index": 483,
+            "data_sha256": "a9d1a4900c5a2e9b1e411f298cf88181a9cbaea36454df0a468b0dbd7be024f5"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00280_mendoza#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00280_Mendoza",
+            "source_hash": 4164975547
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001571",
+      "slot_id": "es:B40_310_aussie#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_310_aussie",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00330_dubbo#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00330_dubbo#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00330_dubbo#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "custom",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 12,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_310_aussie#0",
+            "index": 485,
+            "data_sha256": "2cc03393ec76d9e0c68a82e54933fc10b4649a31dcc73934678d78b5afacd67c"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00330_dubbo#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 863159606,
+                  "wem_sha256": "861852cd4d162b9cc5d5e005a248e4689a64dcf6e6acbe7254f1d227195ae6a6"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00330_dubbo#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_310_aussie#0",
+            "index": 485,
+            "data_sha256": "2cc03393ec76d9e0c68a82e54933fc10b4649a31dcc73934678d78b5afacd67c"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00330_dubbo#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00330_Dubbo",
+            "source_hash": 1697228023
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001572",
+      "slot_id": "es:B40_380_aussie#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_380_aussie",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00850_dubbo#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "draft",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00850_dubbo#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "draft",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00850_dubbo#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": null,
+        "approved_at": null,
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001573",
+      "slot_id": "es:B40_430_fitzgerald#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_430_fitzgerald",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00400_fitzgerald#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00400_fitzgerald#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0.137,
+          "gap_s": 0,
+          "engine": "audio-edit/1",
+          "for_source": {
+            "ce_line_ref": "vo_scr_m05_00400_fitzgerald#0",
+            "language": "Spanish(Mexico)"
+          },
+          "cuts": [],
+          "silences": [
+            {
+              "at_s": 0,
+              "dur_s": 0.222
+            }
+          ],
+          "fade_in_ms": 0,
+          "fade_out_ms": 0,
+          "crossfade_ms": 20,
+          "radio": {
+            "preset": "soldier",
+            "low_hz": 1000,
+            "high_hz": 5000,
+            "slope_db_oct": 24,
+            "presence_db": 0,
+            "drive_db": 1,
+            "noise_dbfs": -70,
+            "clicks": true
+          }
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_430_fitzgerald#0",
+            "index": 508,
+            "data_sha256": "2ab92644ea179dcef8f8ee5441daea784bc6c32c9ce469cd8ac16f115bc5e214"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00400_fitzgerald#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 40138138,
+                  "wem_sha256": "4b845a335904793734467219de7d3241c644eff558a1fbd5c81a131c733d7d04"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00400_fitzgerald#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_430_fitzgerald#0",
+            "index": 508,
+            "data_sha256": "2ab92644ea179dcef8f8ee5441daea784bc6c32c9ce469cd8ac16f115bc5e214"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00400_fitzgerald#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00400_Fitzgerald",
+            "source_hash": 816858069
+          }
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "mapping_id": "m-001574",
+      "slot_id": "es:B40_250_cortana#0",
+      "mcc_tag": "sound\\dialog\\b40\\b40_250_cortana",
+      "match": {
+        "status": "matched",
+        "ce_line_refs": [
+          "vo_scr_m05_00270_cortana#0"
+        ],
+        "decided_at": "2026-10-24",
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_scr_m05_00270_cortana#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_250_cortana#0",
+            "index": 482,
+            "data_sha256": "c358e7cf62c2251f4aebb7e77040b6c3959a52a066483dd502f8214c2fafce3f"
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_scr_m05_00270_cortana#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 411029827,
+                  "wem_sha256": "86927d0b53b4646585b38962bfdc02fbc9c8ce26962a41c00ae5120e810132f5"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "ce_locres",
+        "ce_locres": {
+          "ce_line_ref": "vo_scr_m05_00270_cortana#0",
+          "culture": "es-MX"
+        },
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:B40_250_cortana#0",
+            "index": 482,
+            "data_sha256": "c358e7cf62c2251f4aebb7e77040b6c3959a52a066483dd502f8214c2fafce3f"
+          },
+          "source": "ce_locres",
+          "ce_locres": {
+            "ce_line_ref": "vo_scr_m05_00270_cortana#0",
+            "culture": "es-MX",
+            "namespace": "VO_SCR_M05CONTROLROOM",
+            "key": "VO_SCR_M05_00270_Cortana",
+            "source_hash": 2048154625
           }
         },
         "approved_at": "2026-10-24",
