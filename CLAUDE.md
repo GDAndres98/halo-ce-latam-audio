@@ -512,7 +512,17 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
 
 - Two separate catalogs (CE, MCC) under git-ignored `work/`; cross-game
   links exist **only** in the user-owned `mappings/manual_mappings.json`.
-- Never auto-match, rank, or pre-fill CE↔MCC pairs.
+- Never auto-match or pre-fill CE↔MCC pairs. **Suggestions tab (owner, 2026-10-23):**
+  `docs/suggested-matching.md`.
+  - The read-only `/#/suggest` page (`common/suggest.py`) scores MCC EN vs CE EN subtitles. Barks with no
+    subtitle (generic folders vs CE `SYS`) are scored by name, MCC tag vs CE record name with abbreviations spelled
+    out, in the character's `vo_sys_<name>` folder. **Ask Claude to match all barks** is `POST /api/suggest/folder`.
+  - Barks are compared **by sound** first: `python scripts/catalog/build_audio_matches.py --level grunt` matches MCC
+    English takes with CE English variations (`common/audio_match.py`, volume-independent; cached in
+    `work/suggest/audio/`). Grunt: the top record is the owner's for 22 of 25 matched sounds.
+  - **Ask Claude** (`common/suggest_ai.py`, `POST /api/suggest/rerank`, admin remotely, cached in
+    `work/m4/suggest/ai/`) re-ranks a shortlist. It needs `pip install anthropic` (not installed yet) and a key.
+  - Neither ever writes `mappings/`; never turn a suggestion into a save yourself.
 - Every in-catalog association records evidence: `explicit`,
   `derived:<rule>`, or `unresolved`. Never invent one.
 - Tools never create or modify `approved` mapping entries. `audio` and

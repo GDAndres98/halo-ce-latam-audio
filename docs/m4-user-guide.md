@@ -72,7 +72,8 @@ Both search boxes work the same way:
   matching subtitle line.
 - **Highlighting:** matches are highlighted.
 - **A search only filters.** Nothing is scored, ranked, selected or approved. A search with no hits
-  shows nothing, never a "closest" result.
+  shows nothing, never a "closest" result. Scored suggestions are on the separate **Suggestions** page
+  (§3.1).
 - **Lines without subtitles** stay reachable through their ID, speaker and folder, or through the
   **no es-MX subtitle** filter.
 
@@ -92,6 +93,17 @@ Slot filters (left):
 - **different but fits**;
 - **audio edited** (badge **E**);
 - **stereo**.
+
+### 3.1 Suggestions page (read-only)
+
+**Suggestions** (top menu) lists, for each MCC sound of a level, the Campaign Evolved lines whose English
+subtitle reads most like MCC's English subtitle, best first, with a score, shared words highlighted, the es-MX
+text and a player. *Open* on a row opens that MCC line in Matching with the CE list filtered to the suggested
+line; you decide there as usual. Nothing on this page saves anything.
+
+**Ask Claude** (admin, needs the `anthropic` package and an API key on the host) asks Claude to judge one
+sound's shortlist: same line / reworded / related / different, with a confidence and a reason. Answers are cached.
+Details: `docs/suggested-matching.md`.
 
 ## 4. Deciding one slot
 
@@ -371,7 +383,7 @@ infer one. "All missions" stays available for every level.
   Every write checks the loaded hash, validates the schema, backs up to `mappings/.history/` and
   replaces the file atomically.
 - **It never:**
-  - suggests, ranks or pre-fills a match;
+  - pre-fills or saves a match (the Suggestions page only ranks, read-only);
   - approves anything without your click;
   - changes an approved decision;
   - writes `verifications.json`, `mission_map.json` or the catalogs;

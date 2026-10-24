@@ -19,8 +19,10 @@ each slot you:
 5. **approve audio and subtitle separately**;
 6. **save** without being able to overwrite anything already approved.
 
-The UI never suggests, ranks or pre-fills a match. A text search you
-type yourself is a filter, not a suggestion.
+The matching page never suggests, ranks or pre-fills a match. A text search
+you type yourself is a filter, not a suggestion. Suggestions live only in the
+separate, read-only Suggestions tab (owner, 2026-10-23,
+`docs/suggested-matching.md`).
 
 ## 2. Shape: one local page, one small server
 

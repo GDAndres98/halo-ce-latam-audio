@@ -25,8 +25,9 @@ Inputs: [`feasibility.md`](feasibility.md),
 1. **Two independent catalogs, one user-owned mapping.** The CE and MCC
    catalogs are built only from their own game's data. Cross-game links
    exist **only** in `mappings/manual_mappings.json`.
-2. **No automatic matching.** No tool proposes, scores, ranks, or
-   pre-fills CE↔MCC pairs.
+2. **No automatic matching.** No tool saves, selects or pre-fills CE↔MCC
+   pairs. (Owner, 2026-10-23: the read-only Suggestions tab may score and
+   rank candidates, `docs/suggested-matching.md`; it never writes.)
 3. **Every in-catalog association carries evidence:** `explicit`,
    `explicit:index`, `derived:<rule>`, or `unresolved` (§7). Never
    invent one.

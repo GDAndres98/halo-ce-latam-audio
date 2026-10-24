@@ -134,7 +134,7 @@ export type ApprovalField = "audio" | "subtitle";
 export type ObjectStatus = "draft" | "approved" | "needs_rework";
 
 /** An audio recipe. Speed and per-line gain were removed on 2026-10-09, loudness matching and its limiter
- * on 2026-10-11: the global export gain is the only level setting. None of them must come back. */
+ * on 2026-10-11, the leftover off `loudness` on 2026-10-23: the build's level mode is the only level setting. None of them must come back. */
 export interface AudioEdit {
   trim_start_s: number;
   trim_end_s: number;
@@ -923,4 +923,114 @@ export interface ImportPreview {
   }[];
   approvals_added: string[];
   approvals_removed: string[];
+}
+
+// ---- Suggestions tab (docs/suggested-matching.md): read-only, never a decision.
+
+export interface SuggestCandidate {
+  ce_line_ref: string;
+  /** 0..1: 0.5 word cosine + 0.3 character trigrams + 0.2 sequence ratio (+0.05 same speaker). */
+  score: number;
+  parts: { words: number; chars: number; sequence: number | null; same_speaker: boolean };
+  shared_words: string[];
+  /** Name mode: the CE record name with abbreviations spelled out ("contact surprise"). */
+  expanded?: string;
+  mission: string;
+  display_key: string;
+  /** CE folder (Systemic: the character, e.g. vo_sys_grunt) and the record name without prefix/character. */
+  folder: string | null;
+  name: string;
+  /** Variations (takes) of the CE record, and each one's line ref with the languages it has audio in. */
+  variations: number;
+  variation_refs: { ce_line_ref: string; en: boolean; mx: boolean }[];
+  /** Audio mode: how many of the MCC sound's English takes sound like this record's English variations, and which. */
+  audio?: { takes_matched: number; takes: number;
+            pairs: { english_index: number; ce_line_ref: string; score: number; gain_db: number | null }[] };
+  english: string | null;
+  es_mx: string | null;
+  has_es_mx_audio: boolean;
+  /** Slot or take ids whose decisions already use this CE line. */
+  used_by: string[];
+}
+
+export interface SuggestSound {
+  mcc_tag: string;
+  tag_name: string;
+  level: string;
+  kind: string;
+  /** text = MCC EN vs CE EN subtitle; audio = no subtitle: MCC English takes vs CE English variations, by sound;
+   *  name = no subtitle and no audio comparison: MCC tag name vs CE record name. */
+  mode: "text" | "audio" | "name";
+  /** The tag's last part and its category below the level folder ("surprise", "conditional › combat2 › …"). */
+  name: string;
+  category: string;
+  speaker: string | null;
+  english: string | null;
+  english_speaker: string | null;
+  su: string | null;
+  sp: string | null;
+  slots: { slot_id: string; decision: SlotRow["decision"] }[];
+  first_slot_id: string | null;
+  english_index: number | null;
+  spanish_index: number | null;
+  /** Bank indexes of every English / Spain take of the sound (what /audio/mcc plays). */
+  english_takes: number[];
+  spanish_takes: number[];
+  decided: boolean;
+  own_set: boolean;
+  candidates: SuggestCandidate[];
+}
+
+export interface SuggestAiStatus {
+  sdk_installed: boolean;
+  credential: string;
+  model: string;
+  prompt_version: string;
+}
+
+export interface SuggestResponse {
+  level: string;
+  scope: string[];
+  scope_note: string;
+  name_scope_note: string;
+  /** The offline English audio comparison for this level and CE folder (built_at null = not run yet). */
+  audio_match: { folder: string; built_at: string | null; method: string | null; command: string } | null;
+  /** The CE Systemic folder barks are compared with (null = every folder in scope); the folders to choose from. */
+  character: string | null;
+  characters: string[];
+  show: "undecided" | "all";
+  limit: number;
+  counts: { sounds: number; by_text: number; by_audio: number; by_name: number; decided: number; listed: number;
+            ce_lines_in_scope: number; ce_records_in_name_scope: number };
+  sounds: SuggestSound[];
+  method: string;
+  name_method: string;
+  ai: SuggestAiStatus;
+  read_only: true;
+}
+
+export type AiVerdict = "same_line" | "reworded" | "related" | "different";
+
+export type AiPick = SuggestCandidate & { verdict: AiVerdict; confidence: number; reason: string };
+
+export interface FolderMatchResponse {
+  level: string;
+  character: string | null;
+  scope_note: string;
+  mcc_sounds: number;
+  ce_records: number;
+  model: string;
+  cached: boolean;
+  usage: { input_tokens: number | null; output_tokens: number | null } | null;
+  /** Picks (up to 3, best first) per MCC sound tag. */
+  sounds: Record<string, AiPick[]>;
+}
+
+export interface RerankResponse {
+  mcc_tag: string;
+  mode?: "text" | "name";
+  model: string;
+  cached: boolean;
+  usage: { input_tokens: number | null; output_tokens: number | null } | null;
+  ranking: AiPick[];
 }

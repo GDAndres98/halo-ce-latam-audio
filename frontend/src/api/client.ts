@@ -1,4 +1,4 @@
-import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit, SetSubtitleChoice } from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit, SetSubtitleChoice, SuggestResponse, RerankResponse, FolderMatchResponse } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -74,6 +74,16 @@ export const api = {
     request<SlotsResponse>(`/api/slots${query(params)}`),
 
   slot: (id: string) => request<SlotDetail>(`/api/slot${query({ id })}`),
+
+  /** Suggestions tab: scored CE lines per MCC sound of a level (read-only; never a decision). */
+  suggest: (params: { level: string; scope?: string; show?: "undecided" | "all"; limit?: number; character?: string }) =>
+    request<SuggestResponse>(`/api/suggest${query(params)}`),
+  /** Claude's re-rank of one sound's shortlist (paid API call; cached by the server). */
+  suggestRerank: (mcc_tag: string, scope?: string, character?: string) =>
+    request<RerankResponse>("/api/suggest/rerank", postJson({ mcc_tag, scope, character })),
+  /** Barks: Claude matches every unsubtitled sound of a level with the CE records in scope, one request (cached). */
+  suggestFolder: (level: string, scope?: string, character?: string) =>
+    request<FolderMatchResponse>("/api/suggest/folder", postJson({ level, scope, character })),
 
   /** One Campaign Evolved line with its subtitles (for a recording chosen but not saved yet). */
   ceLine: (ref: string) => request<CeLine>(`/api/ce_line${query({ ref })}`),

@@ -13,7 +13,8 @@ There are two read-only **catalogs**: MCC (what the game plays: Spanish/Spain ba
 Evolved has: es-MX recordings and subtitles). They never reference each other. The **only** place they meet is the
 owner's decision file `mappings/manual_mappings.json`. For each MCC **slot** (one Spanish bank sample) the owner
 records a **match** (which CE lines correspond), an **audio** decision (what plays) and a **subtitle** decision (what
-text shows), each approved separately. Tools never create matches, never rank or suggest pairs, and never approve.
+text shows), each approved separately. Tools never create matches and never approve. The read-only Suggestions tab
+(owner, 2026-10-23, `docs/suggested-matching.md`) scores and ranks candidates; it never writes or pre-fills.
 The build (M6) reads only **approved** decisions and writes candidate game files; untouched data stays
 byte-identical.
 
@@ -317,6 +318,8 @@ Vue Studio (frontend/src)  ──HTTP──►  scripts/ui/m4_server.py  ──�
 | `GET /api/slots?level=&status=&q=` | | MCC list rows (decision summary, `added_takes` count, `own_set` status) |
 | `GET /api/slot?id=` | | One slot: MCC texts, decision, the sound's takes (`sound`) |
 | `GET /api/ce?mission=&q=&subs=&hide_used=` | | CE candidates (catalog order; search filters only, never ranks) |
+| `GET /api/suggest?level=&scope=&show=` | | Suggestions tab: scored CE lines per sound (MCC EN vs CE EN); read-only |
+| `POST /api/suggest/rerank` | `{mcc_tag, scope}` | Claude re-ranks that sound's shortlist (admin remotely; cached); read-only |
 | `POST /api/save` | `{slot_id, loaded_slot_sha256, match?, audio?, subtitle?, radio_effect?, different_but_fits?, needs_recording?, notes?, actions?}` | Saves one slot; `actions` = `[{action: approve\|needs_rework, field: audio\|subtitle}]` |
 | `POST /api/takes/save` | `{mcc_tag, loaded_takes_sha256, take_id?, audio?, actions?}` | New take (no `take_id`) or change/approve/rework one |
 | `POST /api/takes/add_many` | `{mcc_tag, loaded_takes_sha256, audio_list}` | Several new draft takes in one save |
@@ -389,7 +392,8 @@ Every CE replacement goes through the same render as the Studio preview: ffmpeg 
 ## 9. Rules for agents (do not violate)
 
 - **Never** create, change, approve or rework decisions in `mappings/` yourself; never pick CE↔MCC pairs, never
-  rank, pre-fill or auto-match. Matching is manual only. Never turn own sets on, add takes or mute lines yourself;
+  pre-fill or auto-match. Matching is manual only. The Suggestions tab's scores and Claude rankings are the owner's
+  reading aid, never a decision: don't turn them into saves. Never turn own sets on, add takes or mute lines yourself;
   never stage, switch, cancel or undo a replacement set on the real mappings (the read-only
   `scripts/validate/take_set_inventory.py` is fine).
 - Write `manual_mappings.json` only through `mapping_store` (and only from code paths driven by an owner action).
@@ -421,5 +425,6 @@ Every CE replacement goes through the same render as the Studio preview: ffmpeg 
 | Mute | | `docs/mute-language-permutations.md` |
 | Added takes / own sets | `AddedTakes.vue`, `TakePicker.vue`, `WholeSoundReplace.vue` | `docs/added-takes-design.md`, `docs/custom-take-set-design.md` |
 | Replacement-set conversion | `scripts/common/take_set_conversion.py`, `own_set_state.py`, `ReplacementSet.vue`, `TakeSetsView.vue`, `scripts/validate/take_set_inventory.py` | `docs/replacement-set-conversion.md` |
+| Suggestions (read-only) | `scripts/common/suggest.py`, `suggest_ai.py`, `SuggestView.vue` | `docs/suggested-matching.md` |
 | Build / install | `scripts/common/m6_build.py`, `scripts/build/m6_build.py`, `m6_install.py` | `docs/m6-build.md` |
 | Tests | `tests/test_m4.py`, `test_added_takes.py`, `test_take_set_conversion.py`, `test_mute.py`, `test_mapping_*`; `npm run test:workflow`, `test:takes`, `test:take-sets`, `test:mute` | |

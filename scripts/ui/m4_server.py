@@ -40,6 +40,12 @@ API (all JSON unless noted):
     GET  /api/ce?mission=all|mapped|M01&level=&q=&subs=missing|present&hide_used=1&keep_slot=&offset=&limit=
                                                   CE lines in catalog order, filtered by q only
     GET  /api/ce_line?ref=<ce_line_ref>
+    GET  /api/suggest?level=&scope=mapped|all|M01&show=undecided|all&limit=5&character=vo_sys_grunt|all
+                                                  read-only Suggestions tab: MCC EN vs CE EN text scores
+                                                  (docs/suggested-matching.md); never writes or pre-fills
+    POST /api/suggest/rerank                      {mcc_tag, scope, character}: Claude re-ranks that sound's shortlist
+    POST /api/suggest/folder                      {level, scope, character}: Claude matches a folder's barks at once
+                                                  (admin on the remote listener: it calls a paid API)
     GET  /audio/mcc?level=&lang=spanish|english&index=     WAV (decoded on demand; Range requests)
     GET  /audio/ce?ref=&lang=Spanish(Mexico)|English(US)|Spanish(Spain)&k=0
     GET  /audio/preview?key=&kind=edited|encoded  a rendered editor preview (WAV, immutable)
@@ -120,7 +126,8 @@ CHUNK = 64 * 1024
 # What each kind of request needs. Everything not listed needs a signed-in account (any role) on the remote
 # listener. "local" = only the host computer's own listener, whatever the account.
 ADMIN_POSTS = {"/api/settings/export", "/api/builds/start", "/api/builds/dry-run", "/api/data/import/preview",
-               "/api/data/import", "/api/data/export"}
+               "/api/data/import", "/api/data/export", "/api/suggest/rerank",
+               "/api/suggest/folder"}
 LOCAL_ONLY_POSTS = {"/api/deploy/install", "/api/deploy/restore", "/api/settings/mcc"}
 PUBLIC_GETS = {"/api/session"}
 PUBLIC_POSTS = {"/api/login", "/api/logout"}
@@ -692,6 +699,10 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, app.interference_reference(q.get("slot", ""), q.get("lang", "spanish")))
             if path == "/api/ce_line":
                 return self._json(200, app.ce_line(q.get("ref", "")))
+            if path == "/api/suggest":
+                return self._json(200, app.suggestions(q.get("level", ""), q.get("scope") or "mapped",
+                                                       q.get("show") or "undecided", q.get("limit") or 5,
+                                                       q.get("character") or None))
             if path == "/api/takes/convert/preview":
                 return self._json(200, app.convert_preview(q.get("mcc_tag", "")))
             if path == "/api/takes/convert/inventory":
@@ -777,6 +788,10 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return 202, builds.start_dry_run(body.get("levels") or [], body.get("name")), None
             if path == "/api/data/import/preview":
                 return 200, app.data_preview_import(), None
+            if path == "/api/suggest/rerank":
+                return 200, app.suggest_rerank(body), None
+            if path == "/api/suggest/folder":
+                return 200, app.suggest_folder(body), None
             if path == "/api/data/import":
                 return 200, app.data_import(body), None
             if path == "/api/data/export":

@@ -2,9 +2,12 @@
 
 Design: docs/m4-matching-ui-design.md. What this module guarantees:
 
-- **No suggestions.** CE lines are listed in catalog order (mission, then
-  catalog file order, then entry index). A search is a filter the owner
-  types; nothing is scored, ranked or pre-filled.
+- **Matching never suggests.** CE lines are listed in catalog order (mission,
+  then catalog file order, then entry index). A search is a filter the owner
+  types; nothing is scored, ranked or pre-filled there. Suggestions live only
+  in the separate, read-only Suggestions tab (owner, 2026-10-23;
+  docs/suggested-matching.md): scores and an optional Claude re-rank, never a
+  write.
 - **Reads** the generated catalogs under work/ (every MCC level and CE
   mission found), the MCC SU/SP subtitle copies, and the user files in
   mappings/. verifications.json and mission_map.json are read-only here.
@@ -38,6 +41,7 @@ from common import audio_combine, audio_edit, interference, radio_clicks, radio_
 from common.export_config import ConfigError, load_export_config  # noqa: E402
 from common.jsonschema_lite import load_schema  # noqa: E402
 from common import mapping_store  # noqa: E402
+from common import suggest, suggest_ai  # noqa: E402
 from common import take_set_conversion as tsc  # noqa: E402
 from common.own_set_state import active_own_tags, is_active  # noqa: E402
 from common.mapping_store import (  # noqa: E402
@@ -194,6 +198,7 @@ class M4App:
         self._static = None  # MCC's radio static (Victor 933's interference), likewise
         self.today = today or (lambda: dt.date.today().isoformat())
         self.run_validator = run_validator
+        self.ai_client = None  # the Suggestions tab's Claude client; None = created on demand (tests set a stub)
         self._save_lock = threading.Lock()
         self.last_validation = None
         # The project validator after a save runs in the background (validate_soon): it re-checks every
@@ -243,6 +248,9 @@ class M4App:
         self._ce_hay = {ref: fold(" ".join([ref, r["display_key"], r.get("folder", "")] +
                                            [(e["subtitles"].get(c) or {}).get("text") or "" for c in CULTURES]))
                         for ref, (_m, r, e) in self.ce_lines.items()}
+        self._suggest_index = None  # built on the first Suggestions request (docs/suggested-matching.md)
+        self._suggest_names = None  # CE records by name (barks), likewise
+        self._audio_cache = {}      # the last audio-match file read (scripts/catalog/build_audio_matches.py)
 
     def _read_user(self, rel, default=None):
         p = self.root / rel
@@ -476,6 +484,19 @@ class M4App:
             out["verifications"] = [v["id"] for v in self._verifs_for(f"ce:{ref}")]
         return out
 
+    @staticmethod
+    def _ce_used(doc):
+        """{ce_line_ref: [slot_id or take_id, ...]}: the lines some slot's match lists or an added take uses."""
+        used = {}
+        for m in doc["slots"]:
+            for ref in m["match"]["ce_line_refs"]:
+                used.setdefault(ref, []).append(m["slot_id"])
+        for t in doc.get("added_takes", []):     # a sound's added takes use their CE lines too (listed by take id)
+            for src in t["audio"]["sources"]:
+                if src.get("ce_line_ref") and t["take_id"] not in used.get(src["ce_line_ref"], []):
+                    used.setdefault(src["ce_line_ref"], []).append(t["take_id"])
+        return used
+
     def ce(self, mission="all", q=None, offset=0, limit=100, level=None, subs=None, hide_used=False,
            keep_slot=None):
         """CE lines in catalog order, filtered only by the owner's scope, query and subtitle filter
@@ -495,15 +516,7 @@ class M4App:
 
         def has_mx(ref):
             return bool((self.ce_lines[ref][2]["subtitles"].get("es-MX") or {}).get("text"))
-        used = {}
-        doc = self._mappings()[0]
-        for m in doc["slots"]:
-            for ref in m["match"]["ce_line_refs"]:
-                used.setdefault(ref, []).append(m["slot_id"])
-        for t in doc.get("added_takes", []):     # a sound's added takes use their CE lines too (listed by take id)
-            for src in t["audio"]["sources"]:
-                if src.get("ce_line_ref") and t["take_id"] not in used.get(src["ce_line_ref"], []):
-                    used.setdefault(src["ce_line_ref"], []).append(t["take_id"])
+        used = self._ce_used(self._mappings()[0])
         hidden ={ref for ref, sids in used.items() if any(x != keep_slot for x in sids)} if hide_used else set()
         hidden -= {ref for ref, sids in used.items() if keep_slot in sids}
         refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in scope
@@ -564,6 +577,303 @@ class M4App:
                 "ce_missions": self._mission_scope(level),
                 "sound": self.sound(r["mcc_tag"], mappings, local),
                 "sha256": {"mappings": msha, "local": lsha, "slot": slot_version(m, local)}}
+
+    # ------------------------------------------------------------------ suggestions (read-only)
+    SUGGEST_SHORTLIST = 8  # what the Claude re-rank looks at
+    NAME_MIN_SCORE = 0.1   # name mode: weaker matches are not listed (Claude's folder request still sees every record)
+
+    def _suggest_idx(self):
+        if self._suggest_index is None:
+            items = []
+            for ref in self.ce_order:
+                _m, r, e = self.ce_lines[ref]
+                text = (e["subtitles"].get("en") or {}).get("text")
+                if text:
+                    items.append((ref, text, suggest.ce_speaker(r["display_key"])))
+            self._suggest_index = suggest.SuggestIndex(items)
+        return self._suggest_index
+
+    @staticmethod
+    def _ce_character(r):
+        """The CE character folder's speaker part: 'vo_sys_grunt' -> 'grunt', 'VO_SYS_Keyes' -> 'Keyes' ('' if none)."""
+        m = re.match(r"vo_sys_(.+)$", r.get("folder") or "", flags=re.I)
+        return m.group(1) if m else ""
+
+    def _name_idx(self):
+        """CE records by name (barks): ref = the record's first line, group = its folder (or mission)."""
+        if self._suggest_names is None:
+            items = []
+            for mission, recs in self.missions.items():
+                for r in recs:
+                    if r["entries"]:
+                        items.append((r["entries"][0]["ce_line_ref"],
+                                      suggest.ce_record_name(r["display_key"], self._ce_character(r)),
+                                      r.get("folder") or mission))
+            self._suggest_names = suggest.NameIndex(items)
+        return self._suggest_names
+
+    def _sys_folders(self):
+        return sorted({r["folder"] for r in self.missions.get("SYS", []) if r.get("folder")}, key=str.lower)
+
+    def _character_folder(self, level, character):
+        """The CE Systemic folder the name mode compares a level with: the one named like the level (grunt ->
+        vo_sys_grunt), unless the owner chose one; None = no restriction."""
+        folders = self._sys_folders()
+        if character == "all":
+            return None
+        if character:
+            if character not in folders:
+                raise ApiError(404, f"unknown CE folder {character}")
+            return character
+        key = suggest.speaker_key(level)
+        hits = [f for f in folders if suggest.same_speaker(key, suggest.speaker_key(f[len("vo_sys_"):]))]
+        return hits[0] if len(hits) == 1 else None
+
+    def _suggest_scope(self, level, scope):
+        """-> (missions, note). 'mapped' = the level's CE missions (mission_map.json), or every mission when the
+        level has none; 'all' = every mission; else one mission."""
+        if scope in (None, "", "mapped"):
+            mapped = self._mission_scope(level)
+            if mapped:
+                return set(mapped), f"{level}'s missions: {', '.join(mapped)}"
+            return set(self.missions), f"{level} has no CE missions in mission_map.json: every mission"
+        if scope == "all":
+            return set(self.missions), "every mission"
+        if scope.upper() in self.missions:
+            return {scope.upper()}, scope.upper()
+        raise ApiError(404, f"unknown mission {scope}")
+
+    def _name_groups(self, level, scope, character):
+        """(groups for NameIndex.score or None, folder, note). The default ('mapped') compares barks with CE's
+        Systemic chatter, limited to the level's character folder when one is named like it."""
+        folder = self._character_folder(level, character)
+        if scope in (None, "", "mapped"):
+            missions = {"SYS"} if "SYS" in self.missions else set(self.missions)
+        else:
+            missions = self._suggest_scope(level, scope)[0]
+        groups = {r.get("folder") or m for m in missions for r in self.missions[m]}
+        if folder:
+            groups &= {folder}
+        note = f"CE {'/'.join(sorted(missions)) if len(missions) < 4 else 'every mission'}" + \
+               (f", folder {folder}" if folder else ", every folder")
+        return groups, folder, note
+
+    AUDIO_MIN_SCORE = 0.5   # a take's best CE variation under this does not vote
+    AUDIO_STRONG = 0.8      # what counts as "the same recording" in the summary
+
+    def _audio_doc(self, level, folder):
+        """work/suggest/audio/<level>__<folder>.json from scripts/catalog/build_audio_matches.py, or None."""
+        if not folder:
+            return None
+        p = self.root / "work" / "suggest" / "audio" / f"{level}__{folder}.json"
+        if not p.is_file():
+            return None
+        key = (str(p), p.stat().st_mtime_ns)
+        if self._audio_cache.get("key") != key:
+            self._audio_cache = {"key": key, "doc": json.loads(p.read_text(encoding="utf-8"))}
+        return self._audio_cache["doc"]
+
+    def _audio_candidates(self, r, doc, limit):
+        """CE records whose English variations sound like this sound's English takes: each take votes for the record
+        of its best variation (score >= AUDIO_MIN_SCORE). Most votes first, then the best score."""
+        takes = [s["index"] for s in r["samples"]["english"]]
+        per = {}
+        for idx in takes:
+            pairs = doc["pairs"].get(str(idx)) or []
+            if not pairs or pairs[0]["score"] < self.AUDIO_MIN_SCORE:
+                continue
+            top = pairs[0]
+            c = per.setdefault(top["record_id"], {"votes": 0, "best": 0.0, "pairs": []})
+            c["votes"] += 1
+            c["best"] = max(c["best"], top["score"])
+            c["pairs"].append({"english_index": idx, "ce_line_ref": top["ce_line_ref"], "score": top["score"],
+                               "gain_db": top["gain_db"]})
+        ranked = sorted(per.items(), key=lambda kv: (-kv[1]["votes"], -kv[1]["best"], kv[0]))[:limit]
+        out = []
+        for rid, c in ranked:
+            first = next((e["ce_line_ref"] for e in self._record_entries(rid)), None)
+            if first:
+                out.append({"ce_line_ref": first, "score": round(c["best"], 4),
+                            "parts": {"words": 0.0, "chars": 0.0, "sequence": None, "same_speaker": False},
+                            "shared_words": [],
+                            "audio": {"takes_matched": c["votes"], "takes": len(takes), "pairs": c["pairs"]}})
+        return out
+
+    def _record_entries(self, record_id):
+        for recs in self.missions.values():
+            for r in recs:
+                if r["record_id"] == record_id:
+                    return r["entries"]
+        return []
+
+    def _suggest_candidate(self, c, used):
+        mission, r, e = self.ce_lines[c["ce_line_ref"]]
+        mx = e["media"].get("Spanish(Mexico)") or {}
+
+        def has(entry, lang):
+            m = entry["media"].get(lang) or {}
+            return m.get("evidence") == "explicit" and bool(m.get("media"))
+        return {**c, "mission": mission, "display_key": r["display_key"], "folder": r.get("folder"),
+                "name": suggest.ce_record_name(r["display_key"], self._ce_character(r)),
+                "variations": len(r["entries"]),
+                "variation_refs": [{"ce_line_ref": x["ce_line_ref"], "en": has(x, "English(US)"),
+                                    "mx": has(x, "Spanish(Mexico)")} for x in r["entries"]],
+                "english": (e["subtitles"].get("en") or {}).get("text"),
+                "es_mx": (e["subtitles"].get("es-MX") or {}).get("text"),
+                "has_es_mx_audio": mx.get("evidence") == "explicit" and bool(mx.get("media")),
+                "used_by": used.get(c["ce_line_ref"], [])}
+
+    def suggestions(self, level, scope="mapped", show="undecided", limit=5, character=None):
+        """Suggested CE lines for every sound of a level (common/suggest.py). Read-only: nothing is saved, selected or
+        pre-filled. A sound with an English subtitle is scored by text (MCC EN vs CE EN, in `scope`); one without
+        (barks) by name (MCC tag vs CE record name, in CE's Systemic folder for the level's character, or
+        `character`). show='undecided' hides sounds with a match decision on any take (or a replacement set in
+        force); 'all' lists them too."""
+        if level not in self.levels:
+            raise ApiError(404, f"unknown level {level}")
+        if show not in ("undecided", "all"):
+            raise ApiError(400, f"unknown filter {show!r}")
+        limit = max(1, min(10, int(limit)))
+        missions, note = self._suggest_scope(level, scope)
+        refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in missions]
+        idx = self._suggest_idx()
+        names = self._name_idx()
+        groups, folder, name_note = self._name_groups(level, scope, character)
+        doc, msha = self._mappings()
+        by_slot = {m["slot_id"]: m for m in doc["slots"]}
+        own = self._own_tags(doc)
+        used = self._ce_used(doc)
+        audio = self._audio_doc(level, folder)
+        counts = {"sounds": len(self.levels[level]), "by_text": 0, "by_audio": 0, "by_name": 0, "decided": 0,
+                  "listed": 0, "ce_lines_in_scope": sum(1 for ref in refs if ref in idx.by_ref),
+                  "ce_records_in_name_scope": sum(1 for it in names.items if groups is None or it["group"] in groups)}
+        sounds = []
+        for r in self.levels[level]:
+            texts = self._mcc_text(r["mcc_tag"])
+            slots = [{"slot_id": s["slot_id"], "decision": self._decision_summary(by_slot.get(s["slot_id"]))}
+                     for s in r["samples"]["spanish"]]
+            decided = r["mcc_tag"] in own or any(
+                x["decision"] and x["decision"]["match"] != "unreviewed" for x in slots)
+            en = texts["EN"]["text"]
+            leaf, category = suggest.mcc_name_parts(r["mcc_tag"], level)
+            # Text when there is an English subtitle; else by sound (the English audio compared offline, when that
+            # level and folder were compared and some take found a match); else by name.
+            cands = self._audio_candidates(r, audio, limit) if not en and audio else []
+            mode = "text" if en else "audio" if cands else "name"
+            counts["by_" + mode] += 1
+            counts["decided"] += decided
+            if decided and show == "undecided":
+                continue
+            counts["listed"] += 1
+            if mode == "text":
+                cands = idx.score(en, r["speaker_from_name"], refs, limit)
+            elif mode == "name":  # below 10% a name match is noise (one weak shared word); the card says nothing fits
+                cands = [c for c in names.score(leaf, category, groups, limit) if c["score"] >= self.NAME_MIN_SCORE]
+            sounds.append({"mcc_tag": r["mcc_tag"], "tag_name": r["tag_name"], "level": level, "kind": r["kind"],
+                           "mode": mode, "name": leaf, "category": category.replace(" ", " › "),
+                           "speaker": r["speaker_from_name"], "english": en,
+                           "english_speaker": texts["EN"]["speaker_label"],
+                           "su": texts["SU"]["text"], "sp": texts["SP"]["text"],
+                           "slots": slots, "first_slot_id": slots[0]["slot_id"] if slots else None,
+                           "english_index": (r["samples"]["english"][0]["index"]
+                                             if r["samples"]["english"] else None),
+                           "spanish_index": r["samples"]["spanish"][0]["index"] if r["samples"]["spanish"] else None,
+                           "english_takes": [s["index"] for s in r["samples"]["english"]],
+                           "spanish_takes": [s["index"] for s in r["samples"]["spanish"]],
+                           "decided": decided, "own_set": r["mcc_tag"] in own,
+                           "candidates": [self._suggest_candidate(c, used) for c in cands]})
+        audio_info = None
+        if folder:
+            audio_info = {"folder": folder, "built_at": audio and audio["built_at"], "method": audio and audio["method"],
+                          "command": f"python scripts/catalog/build_audio_matches.py --level {level} "
+                                     f"--ce-folder {folder}"}
+        return {"level": level, "scope": sorted(missions), "scope_note": note, "name_scope_note": name_note,
+                "audio_match": audio_info,
+                "character": folder, "characters": self._sys_folders(), "show": show, "limit": limit,
+                "counts": counts, "sounds": sounds, "method": suggest.METHOD, "name_method": suggest.NAME_METHOD,
+                "ai": suggest_ai.status(self.root), "sha256": msha, "read_only": True}
+
+    def _name_payload(self, ref):
+        """What the bark prompts get about one CE record (names only; no text, no paths)."""
+        _m, rec, _e = self.ce_lines[ref]
+        name = suggest.ce_record_name(rec["display_key"], self._ce_character(rec))
+        return {"id": ref, "name": name, "expanded": " ".join(suggest.name_tokens(name)),
+                "folder": rec.get("folder"), "variations": len(rec["entries"])}
+
+    def suggest_rerank(self, body):
+        """The owner's request for Claude's opinion on one sound's shortlist (common/suggest_ai.py). The shortlist
+        is recomputed here from the catalogs (the page's copy is never trusted). Read-only: returns an ordering."""
+        tag = body.get("mcc_tag") or ""
+        level, r = self._tag_record(tag)
+        en = self._mcc_text(tag)["EN"]["text"]
+        leaf, category = suggest.mcc_name_parts(tag, level)
+        if en:
+            missions, _note = self._suggest_scope(level, body.get("scope"))
+            refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in missions]
+            shortlist = self._suggest_idx().score(en, r["speaker_from_name"], refs, self.SUGGEST_SHORTLIST)
+            recs = self.levels[level]
+            i = recs.index(r)
+            context = []
+            for pos, j in (("before", i - 1), ("after", i + 1)):
+                if 0 <= j < len(recs):
+                    t = self._mcc_text(recs[j]["mcc_tag"])["EN"]["text"]
+                    if t:
+                        context.append({"position": pos, "speaker": recs[j]["speaker_from_name"], "english": t})
+            mcc = {"tag_name": r["tag_name"], "level": level, "speaker": r["speaker_from_name"], "english": en,
+                   "context": context}
+            cands = []
+            for c in shortlist:
+                mission, rec, e = self.ce_lines[c["ce_line_ref"]]
+                cands.append({"id": c["ce_line_ref"], "speaker": suggest.ce_speaker(rec["display_key"]),
+                              "mission": mission, "english": (e["subtitles"].get("en") or {}).get("text")})
+            mode = "text"
+        else:
+            groups, _folder, _note = self._name_groups(level, body.get("scope"), body.get("character"))
+            shortlist = self._name_idx().score(leaf, category, groups, self.SUGGEST_SHORTLIST)
+            mcc = {"level": level, "sound": f"{category.replace(' ', '/')}/{leaf}".lstrip("/"),
+                   "takes": len(r["samples"]["spanish"])}
+            cands = [self._name_payload(c["ce_line_ref"]) for c in shortlist]
+            mode = "name"
+        try:
+            out = suggest_ai.rerank(self.root, mcc, cands, client=self.ai_client, mode=mode)
+        except suggest_ai.AiUnavailable as e:
+            raise ApiError(503, str(e))
+        used = self._ce_used(self._mappings()[0])
+        scored = {c["ce_line_ref"]: c for c in shortlist}
+        out["ranking"] = [{**self._suggest_candidate(scored[x["ce_line_ref"]], used), **x} for x in out["ranking"]]
+        out.update(mcc_tag=tag, mode=mode, read_only=True)
+        return out
+
+    def suggest_folder(self, body):
+        """Barks: Claude matches every unsubtitled sound of a level with the CE records in its name scope, in one
+        request (common/suggest_ai.match_folder). Read-only: returns picks per sound."""
+        level = body.get("level") or ""
+        if level not in self.levels:
+            raise ApiError(404, f"unknown level {level}")
+        groups, folder, note = self._name_groups(level, body.get("scope"), body.get("character"))
+        sounds, tag_of = [], {}
+        for r in self.levels[level]:
+            if self._mcc_text(r["mcc_tag"])["EN"]["text"]:
+                continue  # subtitled lines are compared by text, one at a time
+            leaf, category = suggest.mcc_name_parts(r["mcc_tag"], level)
+            sid = f"{category.replace(' ', '/')}/{leaf}".lstrip("/")
+            tag_of[sid] = r["mcc_tag"]
+            sounds.append({"id": sid, "takes": len(r["samples"]["spanish"])})
+        names = self._name_idx()
+        records = [self._name_payload(it["ref"]) for it in names.items if groups is None or it["group"] in groups]
+        if len(records) > 400:
+            raise ApiError(400, f"{len(records)} CE records in scope; choose one CE folder (at most 400 per request)")
+        try:
+            out = suggest_ai.match_folder(self.root, level, sounds, records, client=self.ai_client)
+        except suggest_ai.AiUnavailable as e:
+            raise ApiError(503, str(e))
+        used = self._ce_used(self._mappings()[0])
+        out["sounds"] = {tag_of[sid]: [{**self._suggest_candidate({"ce_line_ref": p["ce_line_ref"]}, used), **p}
+                                       for p in picks]
+                         for sid, picks in out["sounds"].items()}
+        out.update(level=level, character=folder, scope_note=note, mcc_sounds=len(sounds), ce_records=len(records),
+                   read_only=True)
+        return out
 
     # ------------------------------------------------------------------ audio
     def mcc_wav(self, level, lang, index):

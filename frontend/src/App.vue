@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AudioLines, Database, ExternalLink, Eye, Hammer, Layers, LayoutDashboard, LogIn, LogOut, Menu, Network, UserRound, X } from "lucide-vue-next";
+import { AudioLines, Database, ExternalLink, Eye, Hammer, Layers, LayoutDashboard, LogIn, LogOut, Menu, Network, Sparkles, UserRound, X } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { canListen, loadSession, session, signedIn, signOut, visitor } from "./auth/session";
@@ -22,7 +22,7 @@ const classicUrl = import.meta.env.DEV ? "http://127.0.0.1:8765/classic" : "/cla
 // Phones: the menu folds behind a button, with the current screen's name beside it; it closes on navigation.
 const navOpen = ref(false);
 const PAGE_NAMES: Record<string, string> = {
-  dashboard: "Dashboard", match: "Matching", builds: "Build & Test", data: "Data", network: "Network",
+  dashboard: "Dashboard", match: "Matching", suggest: "Suggestions", builds: "Build & Test", data: "Data", network: "Network",
 };
 const pageName = computed(() => PAGE_NAMES[String(route.name ?? "")] ?? "");
 watch(() => route.path, () => (navOpen.value = false));
@@ -32,8 +32,8 @@ onMounted(loadSession);
 const live = computed(() => signedIn.value && !visitor.value);
 watch(live, (yes) => (yes ? startLiveUpdates() : stopLiveUpdates()), { immediate: true });
 
-// The public read-only view (docs/public-access.md) has no Data or Network page: both are the owner's.
-const OWNER_PAGES = new Set(["data", "network"]);
+// The public read-only view (docs/public-access.md) has no Suggestions, Data or Network page: they are the owner's.
+const OWNER_PAGES = new Set(["suggest", "data", "network"]);
 // Never mounted for a visitor (they would only ask for what the server refuses), even for a moment.
 const ownerPageForVisitor = computed(() => visitor.value && OWNER_PAGES.has(String(route.name)));
 watch(
@@ -66,6 +66,7 @@ watch(
     <nav v-if="signedIn" id="main-nav" aria-label="Main" :class="{ open: navOpen }">
       <RouterLink to="/"><LayoutDashboard :size="15" aria-hidden="true" /> Dashboard</RouterLink>
       <RouterLink to="/match"><AudioLines :size="15" aria-hidden="true" /> Matching</RouterLink>
+      <RouterLink v-if="!visitor" to="/suggest"><Sparkles :size="15" aria-hidden="true" /> Suggestions</RouterLink>
       <RouterLink to="/builds"><Hammer :size="15" aria-hidden="true" /> Build &amp; Test</RouterLink>
       <RouterLink v-if="!visitor" to="/take-sets"><Layers :size="15" aria-hidden="true" /> Take sets</RouterLink>
       <RouterLink v-if="!visitor" to="/data"><Database :size="15" aria-hidden="true" /> Data</RouterLink>
