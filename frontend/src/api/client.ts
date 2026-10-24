@@ -150,6 +150,9 @@ export const api = {
   /** Adds several recordings as new draft takes in one save; recordings already a take are skipped. */
   takeAddMany: (body: { mcc_tag: string; loaded_takes_sha256: string; audio_list: { ce_line_ref: string; language: string }[] }) =>
     request<TakeResponse>("/api/takes/add_many", postJson(body)),
+  /** Approves exactly the listed takes of a sound in one save (all or nothing); the owner's confirmed action. */
+  takeApproveMany: (body: { mcc_tag: string; loaded_takes_sha256: string; take_ids: string[]; confirm: true }) =>
+    request<TakeResponse>("/api/takes/approve_many", postJson(body)),
   /** Turns a sound's own take set on (clearing the listed line decisions) or off. */
   ownSetOn: (body: { mcc_tag: string; loaded_takes_sha256: string; loaded_sound_sha256: string;
                      clear_mapping_ids: string[]; audio_list?: { ce_line_ref: string; language: string }[];

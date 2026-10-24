@@ -1834,6 +1834,13 @@ class M4App:
         with self._save_lock:
             return self._take_write(body, "add_many")
 
+    def take_approve_many(self, body):
+        """body: {mcc_tag, loaded_takes_sha256, take_ids: [...], confirm: true}: approves exactly the listed takes
+        of the sound (each a draft or needs rework, with a recording), in one save (all or nothing). The owner's
+        confirmed action; the page lists the take IDs in its confirmation."""
+        with self._save_lock:
+            return self._take_write(body, "approve_many")
+
     def _new_take(self, tag, takes, position, ab):
         """A new draft take of `tag` for the recording ab = {ce_line_ref, language, edit?}; appended to `takes`."""
         ref, lang = ab.get("ce_line_ref"), ab.get("language", "Spanish(Mexico)")
@@ -1886,6 +1893,27 @@ class M4App:
                     continue
                 have.add(key)
                 added.append(self._new_take(tag, takes, len(mine) + len(added) + 1, ab)["take_id"])
+        elif op == "approve_many":
+            ids = body.get("take_ids")
+            if body.get("confirm") is not True:
+                raise ApiError(400, "approving several takes needs confirm: true")
+            if not isinstance(ids, list) or not ids or len(set(ids)) != len(ids):
+                raise ApiError(400, "take_ids must list at least one take, each once")
+            by_id = {t["take_id"]: t for t in mine}
+            for i in ids:
+                t = by_id.get(i)
+                if t is None:
+                    raise ApiError(404, f"unknown added take {i} for this sound")
+                if t["audio"]["status"] == "approved":
+                    raise ApiError(409, f"{i} is already approved")
+                if not t["audio"]["sources"]:
+                    raise ApiError(400, f"{i} has no recording yet")
+            for i in ids:  # in list order, after every check passed
+                t = by_id[i]
+                user_actions.append(UserAction("approve", i, "audio"))
+                t["audio"].update(status="approved", approved_at=today,
+                                  fingerprint=added_take_fingerprint(t, self.ce_idx, self.mcc_idx, local))
+            added = list(ids)
         elif op == "remove":
             if take["audio"]["status"] == "approved":
                 raise ApiError(409, "the take is approved; mark it Needs rework before removing it")
@@ -1985,6 +2013,8 @@ class M4App:
         self.validate_soon()
         if op == "add_many":
             return {"saved": True, "sha256": new_sha, "sound": self.sound(tag), "added": added, "skipped": skipped}
+        if op == "approve_many":
+            return {"saved": True, "sha256": new_sha, "sound": self.sound(tag), "approved": added}
         return {"saved": True, "sha256": new_sha, "sound": self.sound(tag),
                 "take_id": None if op == "remove" else take["take_id"]}
 

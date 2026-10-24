@@ -585,6 +585,8 @@ export interface TakeResponse {
   /** add_many only: the new take IDs and the recordings skipped (already a take, or listed twice). */
   added?: string[];
   skipped?: string[];
+  /** approve_many only: the take IDs approved. */
+  approved?: string[];
 }
 
 export interface CeLine {

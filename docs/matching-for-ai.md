@@ -320,6 +320,7 @@ Vue Studio (frontend/src)  ──HTTP──►  scripts/ui/m4_server.py  ──�
 | `POST /api/save` | `{slot_id, loaded_slot_sha256, match?, audio?, subtitle?, radio_effect?, different_but_fits?, needs_recording?, notes?, actions?}` | Saves one slot; `actions` = `[{action: approve\|needs_rework, field: audio\|subtitle}]` |
 | `POST /api/takes/save` | `{mcc_tag, loaded_takes_sha256, take_id?, audio?, actions?}` | New take (no `take_id`) or change/approve/rework one |
 | `POST /api/takes/add_many` | `{mcc_tag, loaded_takes_sha256, audio_list}` | Several new draft takes in one save |
+| `POST /api/takes/approve_many` | `{mcc_tag, loaded_takes_sha256, take_ids, confirm: true}` | The owner's confirmed approval of exactly the listed takes, one save (all or nothing); never called by agents |
 | `POST /api/takes/move` / `remove` | | Reorder / remove (not while approved) |
 | `POST /api/takes/own_set_on` | `{mcc_tag, loaded_takes_sha256, loaded_sound_sha256, clear_mapping_ids, audio_list?, subtitle?}` | Replace every take: clear the listed slot decisions (recorded), turn the set on, add drafts |
 | `POST /api/takes/own_set_off` | `{mcc_tag, loaded_takes_sha256}` | Back to Spain's takes (lines undecided; use undo to restore; an approved set subtitle is reworked in the same save) |

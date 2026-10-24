@@ -158,6 +158,38 @@ class AddedTakeTests(unittest.TestCase):
                                     "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})
         self.assertTrue(r["saved"])  # a subtitled sound may get added takes since 2026-10-19
 
+    def test_approve_several_in_one_save(self):
+        for ref in ("line_a#0", "line_b#0", "aa_early#0"):
+            self.add(ref)
+        self.act("t-000003", "approve")
+        self.act("t-000003", "needs_rework")
+        before = self.path.read_bytes()
+        for bad, status in (({"take_ids": ["t-000001"]}, 400),                              # no confirm
+                            ({"take_ids": [], "confirm": True}, 400),
+                            ({"take_ids": ["t-000001", "t-000001"], "confirm": True}, 400),
+                            ({"take_ids": ["t-000001", "t-000009"], "confirm": True}, 404)):
+            with self.assertRaises(ApiError) as e:
+                self.app.take_approve_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(), **bad})
+            self.assertEqual(e.exception.status, status)
+        self.assertEqual(self.path.read_bytes(), before)  # all or nothing
+        r = self.app.take_approve_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(),
+                                        "take_ids": ["t-000001", "t-000003"], "confirm": True})
+        self.assertEqual((r["saved"], r["approved"]), (True, ["t-000001", "t-000003"]))
+        status = {t["take_id"]: (t["audio"]["status"], t["audio"]["revision"]) for t in self.doc()["added_takes"]}
+        self.assertEqual(status, {"t-000001": ("approved", 1), "t-000002": ("draft", 1),
+                                  "t-000003": ("approved", 2)})  # only the listed takes
+        self.assertTrue(all(t["audio"]["fingerprint"] for t in self.doc()["added_takes"]
+                            if t["audio"]["status"] == "approved"))
+        with self.assertRaises(ApiError) as e:  # already approved: refused, nothing saved
+            self.app.take_approve_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(),
+                                        "take_ids": ["t-000002", "t-000001"], "confirm": True})
+        self.assertEqual(e.exception.status, 409)
+        self.assertEqual(self.doc()["added_takes"][1]["audio"]["status"], "draft")
+        with self.assertRaises(ApiError) as e:  # an old version is refused
+            self.app.take_approve_many({"mcc_tag": DEATH, "loaded_takes_sha256": "0" * 64,
+                                        "take_ids": ["t-000002"], "confirm": True})
+        self.assertEqual(e.exception.status, 409)
+
     # ------------------------------------------------------------------ own take sets (docs/custom-take-set-design.md)
     def line_save(self, **body):
         return self.app.save({"slot_id": "es:Z10_030_death#0", "loaded_sha256": mapping_store.load(self.path)[1],

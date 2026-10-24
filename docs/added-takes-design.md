@@ -16,7 +16,9 @@ scripted story lines (only combat chatter was tested, `v-000020`/`v-000021`).
 Campaign Evolved recording on the right → **Takes of this sound** → *Add as extra take* → *Approve*. To add
 several at once (owner request, 2026-10-18): *Add several takes…* opens a picker with its own search (it starts
 from the focused recording's ID without `#n`, so its variations are listed); tick any number and *Add N as extra
-takes*: one save (`POST /api/takes/add_many`), all drafts, recordings already a take are skipped. Build audio
+takes*: one save (`POST /api/takes/add_many`), all drafts, recordings already a take are skipped. To approve several at once (owner request, 2026-10-23): *Approve all drafts (N)*
+lists every take that is a draft or needs rework, with its recording, in one confirmation, and approves exactly
+those in one save (`POST /api/takes/approve_many`, all or nothing). Build audio
 as usual: a build with approved added takes writes the bank **and** the Spanish `.lst.bin`, and Build & Test
 installs and restores both together. **Not in the page yet:** the audio editor for an added take (trims, radio,
 echo). The data, the validator and the build already support a recipe; for now added takes play unedited.

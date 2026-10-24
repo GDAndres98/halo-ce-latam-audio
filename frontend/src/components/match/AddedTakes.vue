@@ -7,6 +7,8 @@
 // Two ways to add: "Add as extra take" adds the recording focused on the right; "Add several takes" opens a picker
 // where the user ticks any number of recordings and adds them in one save (/api/takes/add_many). Nothing is
 // pre-ticked: the search only fills the list.
+// "Approve all drafts" approves every take still a draft or needing rework (with a recording) in one save
+// (/api/takes/approve_many); the confirmation lists the exact take IDs, and only those are approved.
 // Own take set (docs/custom-take-set-design.md): turned on and off from the line's audio choices ("Replace every
 // take of this sound", WholeSoundReplace.vue). Here it only changes how the list reads: Spain's takes show removed.
 // Replacement set from the owner's selections (docs/replacement-set-conversion.md): ReplacementSet.vue, at the end.
@@ -14,7 +16,7 @@
 // Sounds with a SU/SP subtitle entry (owner, 2026-10-19): allowed too. Every take shows the same text: without an own
 // set the line subtitle decisions decide it (a warning says so); with one, "Subtitle of this sound" (SetSubtitle.vue).
 
-import { ArrowDown, ArrowUp, Layers, ListPlus, Plus, Trash2 } from "lucide-vue-next";
+import { ArrowDown, ArrowUp, CheckCheck, Layers, ListPlus, Plus, Trash2 } from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 import { api, ApiError, audioUrl } from "../../api/client";
 import type { AddedTake, SoundTakes } from "../../api/types";
@@ -52,7 +54,7 @@ const canAdd = computed(() => Boolean(current.value?.allowed && props.focusedRef
 const alreadyAdded = computed(() => current.value?.added_takes.some((t) => refOf(t) === props.focusedRef) ?? false);
 
 type TakeResult = {
-  sound: SoundTakes; saved: boolean; message?: string; added?: string[]; skipped?: string[]; cleared?: string[];
+  sound: SoundTakes; saved: boolean; message?: string; added?: string[]; skipped?: string[]; cleared?: string[]; approved?: string[];
 };
 async function run(label: string | ((r: TakeResult) => string), op: () => Promise<TakeResult>) {
   busy.value = true;
@@ -116,6 +118,29 @@ async function rework(t: AddedTake) {
     await run(`${t.take_id} marked Needs rework.`, () =>
       api.takeSave({ mcc_tag: s.mcc_tag, take_id: t.take_id, loaded_takes_sha256: s.version,
                      actions: [{ action: "needs_rework", field: "audio" }] }));
+  }
+}
+
+// ---- Approve all drafts: exactly the takes listed in the confirmation, one save.
+const approvable = computed(() =>
+  (current.value?.added_takes ?? []).filter((t) => t.audio.status !== "approved" && refOf(t)));
+
+async function approveAll() {
+  const s = current.value;
+  const list = approvable.value;
+  if (!s || !list.length) return;
+  const n = list.length;
+  const ok = await confirmAction({
+    title: `Approve ${n} take${n === 1 ? "" : "s"}`,
+    message: `Approve these ${n} added take${n === 1 ? "" : "s"} of ${s.tag_name}?\n\n` +
+      list.map((t) => `${t.take_id}  ${refOf(t)}  (${word(t.audio.status)})`).join("\n") +
+      "\n\nApproved takes are read-only. To change one later, mark it Needs rework first.",
+    confirmLabel: `Yes, approve ${n}`,
+  });
+  if (ok) {
+    const ids = list.map((t) => t.take_id);
+    await run((r) => `Approved ${r.approved?.length ?? ids.length} take${ids.length === 1 ? "" : "s"}.`, () =>
+      api.takeApproveMany({ mcc_tag: s.mcc_tag, loaded_takes_sha256: s.version, take_ids: ids, confirm: true }));
   }
 }
 
@@ -289,6 +314,10 @@ function spainUses(take: SoundTakes["spain_takes"][number]) {
         <button type="button" class="icon-label" :disabled="busy" :aria-expanded="picking" data-testid="take-add-several"
                 @click="picking = !picking">
           <ListPlus :size="15" aria-hidden="true" /> Add several takes…
+        </button>
+        <button v-if="approvable.length" type="button" class="icon-label" :disabled="busy" data-testid="take-approve-all"
+                @click="approveAll">
+          <CheckCheck :size="15" aria-hidden="true" /> Approve all drafts ({{ approvable.length }})
         </button>
         <span class="small muted">
           <template v-if="current.has_subtitle_entry && !current.added_takes.length">Every take shares this sound's one subtitle. </template>
