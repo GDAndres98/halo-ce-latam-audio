@@ -110,7 +110,7 @@ class MigrationTests(AppTestBase):
         base = {"trim_start_s": 0.1, "trim_end_s": 0, "gap_s": 0, "engine": "audio-edit/1",
                 "for_source": SRC, "cuts": [{"start_s": 0.5, "end_s": 0.6}],
                 "silences": [{"at_s": 0.3, "dur_s": 0.2}], "fade_in_ms": 10, "fade_out_ms": 0,
-                "crossfade_ms": 20, "loudness": {"mode": "off", "offset_db": 0}}
+                "crossfade_ms": 20}
         self.save(match={"status": "matched", "ce_line_refs": ["line_a#0"]},
                   audio={"source": "ce", "sources": [{"ce_line_ref": "line_a#0"}]},
                   radio_effect={"needed": True}, subtitle={"source": "custom", "custom_text": "Hola"},

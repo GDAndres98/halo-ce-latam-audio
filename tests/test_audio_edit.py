@@ -118,8 +118,9 @@ class RecipeTests(unittest.TestCase):
                           "silences": [{"at_s": 0.8, "dur_s": 0.4}]}, SRC)
         self.assertEqual(validate(r, {**edit_schema, "$defs": schema["$defs"]}), [])
         full = {**edit_schema, "$defs": schema["$defs"]}
-        self.assertEqual(validate(dict(r, loudness={"mode": "off", "offset_db": 0}), full), [])  # older recipes
+        self.assertTrue(validate(dict(r, loudness={"mode": "off", "offset_db": 0}), full))  # removed 2026-10-23
         self.assertTrue(validate(dict(r, loudness={"mode": "match_mcc", "offset_db": 0}), full))  # matching gone
+        self.assertEqual(ae.normalize(dict(r, loudness={"mode": "off", "offset_db": 0}), SRC), r)  # old input: dropped
         self.assertTrue(validate(dict(r, limiter=True), full))
         self.assertEqual(validate(dict(ae.EDIT_ZERO), {**edit_schema, "$defs": schema["$defs"]}), [])
         for gone in ({"speed": 1.0}, {"gain_db": 0}):  # removed fields are no longer in the schema

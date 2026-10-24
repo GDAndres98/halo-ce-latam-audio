@@ -928,6 +928,65 @@ def remove_limiter(path, loaded_sha256, *, history_dir=None, now=None):
                   changed_ids=changed_mapping_ids(old, new)), changes
 
 
+# --------------------------------------------------------------------------- legacy loudness field (2026-10-23)
+def strip_loudness_field(doc):
+    """Pure. -> (new_doc, changes). Removes the legacy `loudness` setting from every recipe where it is off
+    (the only value left since 2026-10-11; the build's level mode is the only level setting, owner 2026-10-23).
+    It changes no audio: an off setting did nothing. A loudness that is not off is left for the proof to refuse.
+    changes: [{mapping_id, slot_id, audio_status, audio_revision, previous}]."""
+    new = json.loads(json.dumps(doc))
+    changes = []
+    for s in new.get("slots", []):
+        edit = s["audio"].get("edit") or {}
+        if edit.get("loudness") == LOUDNESS_OFF:
+            changes.append({"mapping_id": s["mapping_id"], "slot_id": s["slot_id"],
+                            "audio_status": s["audio"]["status"], "audio_revision": s["audio"]["revision"],
+                            "previous": edit["loudness"]})
+            del edit["loudness"]
+    return new, changes
+
+
+def proof_only_loudness_removed(old_doc, new_doc):
+    """Problems if new_doc differs from old_doc in anything but the removal of an off audio.edit.loudness."""
+    problems = []
+    if {k: v for k, v in old_doc.items() if k != "slots"} != {k: v for k, v in new_doc.items() if k != "slots"}:
+        problems.append("top-level fields changed")
+    if [s["mapping_id"] for s in old_doc["slots"]] != [s["mapping_id"] for s in new_doc["slots"]]:
+        return problems + ["mapping ids or order changed"]
+    for o, n in zip(old_doc["slots"], new_doc["slots"]):
+        strip = lambda s: {**s, "audio": {**s["audio"], "edit": {k: v for k, v in s["audio"]["edit"].items() if k != "loudness"}}}
+        if strip(o) != strip(n):
+            problems.append(f"{o['mapping_id']}: something besides audio.edit.loudness changed")
+        if "loudness" in n["audio"]["edit"]:
+            problems.append(f"{o['mapping_id']}: loudness is still there")
+        elif o["audio"]["edit"].get("loudness") not in (None, LOUDNESS_OFF):
+            problems.append(f"{o['mapping_id']}: a loudness that was not off was removed")
+    return problems
+
+
+def remove_loudness_field(path, loaded_sha256, *, history_dir=None, now=None):
+    """One-time, owner-authorized (2026-10-23) removal of the legacy, always-off `loudness` setting from every
+    recipe, approved ones included, WITHOUT touching approvals (status, revision, approved_at, fingerprint stay;
+    nothing becomes needs_rework). Same stale check, .history/ backup and database-first write as every save.
+    Refuses unless the result provably differs only by the removed field. -> (new sha256 or None, changes)."""
+    path = Path(path)
+    current = _current(path)
+    if hashlib.sha256(current).hexdigest() != loaded_sha256:
+        raise StaleError(f"{path.name} changed since it was loaded")
+    old = json.loads(current.decode("utf-8"))
+    new, changes = strip_loudness_field(old)
+    if not changes:
+        return None, []
+    bad = proof_only_loudness_removed(old, new)
+    if bad:
+        raise ProtectedError("; ".join(bad))
+    errs = schema_errors(new, load_schema(SCHEMA_NAME), changed_mapping_ids(old, new))
+    if errs:
+        raise StoreError("schema: " + "; ".join(errs[:5]))
+    return _write(path, current, new, loaded_sha256, history_dir, now,
+                  changed_ids=changed_mapping_ids(old, new)), changes
+
+
 # --------------------------------------------------------------------------- radio preset retune (2026-10-15)
 def retune_radio_preset(doc, preset, values):
     """Pure. -> (new_doc, changes). Every recipe whose radio filter is labelled `preset` gets `values` (the

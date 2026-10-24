@@ -56,7 +56,7 @@
     },
     "edit_recipe": {
       "type": "object",
-      "description": "Non-destructive edit recipe (common/audio_edit.py). {trim_start_s, trim_end_s, gap_s} all 0 = no edits (the original pipeline). speed and gain_db were removed on 2026-10-09 (owner decision; one-time migration scripts/validate/migrate_reset_speed_gain.py; volume is the global export gain in config/audio_export.json). The optional fields (added 2026-10-09, no migration needed) are written together by the M4 editor; their rules (ranges, timeline, for_source = the audio source) are checked by the validator and the builder. Part of the audio decision: immutable once approved.",
+      "description": "Non-destructive edit recipe (common/audio_edit.py). {trim_start_s, trim_end_s, gap_s} all 0 = no edits (the original pipeline). speed and gain_db were removed on 2026-10-09 (owner decision; one-time migration scripts/validate/migrate_reset_speed_gain.py; volume is the global export gain in config/audio_export.json). The legacy, always-off loudness setting was removed on 2026-10-23 (owner; migrate_remove_loudness_field.py): a recipe holds no level setting, the build's level_mode sets every line's level. The optional fields (added 2026-10-09, no migration needed) are written together by the M4 editor; their rules (ranges, timeline, for_source = the audio source) are checked by the validator and the builder. Part of the audio decision: immutable once approved.",
       "required": ["trim_start_s", "trim_end_s", "gap_s"],
       "additionalProperties": false,
       "properties": {
@@ -105,13 +105,7 @@
                          "texture": {"enum": ["synthetic", "mcc"], "description": "The static: made from scratch, or MCC Spain's sample (absent = mcc)."}}
         },
         "radio": {"$ref": "#/$defs/radio"},
-        "echo": {"$ref": "#/$defs/echo"},
-        "loudness": {
-          "type": "object", "required": ["mode", "offset_db"], "additionalProperties": false,
-          "description": "Legacy (loudness matching removed 2026-10-11): only 'off' remains in older recipes.",
-          "properties": {"mode": {"enum": ["off"]},
-                         "offset_db": {"type": "number", "minimum": 0, "maximum": 0}}
-        }
+        "echo": {"$ref": "#/$defs/echo"}
       }
     },
     "edit_combine": {

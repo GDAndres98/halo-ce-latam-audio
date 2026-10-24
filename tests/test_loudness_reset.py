@@ -84,5 +84,45 @@ class LoudnessResetTests(unittest.TestCase):
         self.assertEqual([f["code"] for f in check_approved_protected(self.doc, other)], ["approved_object_modified"])
 
 
+class LoudnessFieldRemovalTests(unittest.TestCase):
+    """2026-10-23: the legacy, always-off `loudness` setting is removed from every recipe; nothing else changes."""
+
+    def setUp(self):
+        self.doc = {"schema": "manual-mappings/3", "pins": {}, "slots": [slot("m-1", "off"), slot("m-2", "off", "draft"),
+                                                                          slot("m-3", "off")]}
+        del self.doc["slots"][2]["audio"]["edit"]["loudness"]  # already without it
+
+    def test_only_the_field_goes_and_approvals_stay(self):
+        new, changes = mapping_store.strip_loudness_field(self.doc)
+        self.assertEqual([c["mapping_id"] for c in changes], ["m-1", "m-2"])
+        self.assertTrue(all("loudness" not in s["audio"]["edit"] for s in new["slots"]))
+        self.assertEqual((new["slots"][0]["audio"]["status"], new["slots"][0]["audio"]["revision"]), ("approved", 2))
+        self.assertEqual(mapping_store.proof_only_loudness_removed(self.doc, new), [])
+        self.assertEqual(mapping_store.strip_loudness_field(new)[1], [])  # idempotent
+
+    def test_a_loudness_that_is_not_off_is_never_removed(self):
+        self.doc["slots"][0]["audio"]["edit"]["loudness"] = {"mode": "match_mcc", "offset_db": 0}
+        new, changes = mapping_store.strip_loudness_field(self.doc)
+        self.assertEqual([c["mapping_id"] for c in changes], ["m-2"])
+        forced = copy.deepcopy(new)
+        del forced["slots"][0]["audio"]["edit"]["loudness"]
+        self.assertTrue(mapping_store.proof_only_loudness_removed(self.doc, forced))
+
+    def test_the_proof_catches_any_other_change(self):
+        new, _ = mapping_store.strip_loudness_field(self.doc)
+        new["slots"][0]["audio"]["edit"]["fade_out_ms"] = 10
+        self.assertTrue(mapping_store.proof_only_loudness_removed(self.doc, new))
+
+    def test_validator_accepts_the_removal_one_way_only(self):
+        removed, _ = mapping_store.strip_loudness_field(self.doc)
+        self.assertEqual(check_approved_protected(self.doc, removed), [])
+        other = copy.deepcopy(removed)
+        other["slots"][0]["audio"]["edit"]["fade_out_ms"] = 50  # removed AND another change
+        self.assertEqual([f["code"] for f in check_approved_protected(self.doc, other)], ["approved_object_modified"])
+        matching = copy.deepcopy(removed)
+        matching["slots"][0]["audio"]["edit"]["loudness"] = {"mode": "match_mcc", "offset_db": 0}
+        self.assertTrue(check_approved_protected(removed, matching))  # matching back on an approved recipe
+
+
 if __name__ == "__main__":
     unittest.main()

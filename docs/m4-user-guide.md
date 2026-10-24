@@ -210,6 +210,8 @@ applies when it builds the bank.
 **Removed (owner, 2026-10-11):** loudness matching to Spain's recording (with its offset) and its
 limiter. They gave a line its own level; the global export gain is now the only level setting. See
 `docs/migrations/2026-10-11-reset-loudness-match.md` and `docs/migrations/2026-10-11-remove-limiter.md`.
+The leftover, always-off `loudness` setting was removed from the recipes on 2026-10-23
+(`docs/migrations/2026-10-23-remove-loudness-field.md`): a recipe holds no level setting at all.
 
 **Order of operations** (always the same, in M4 and M6): original es-MX WAV → trims, cuts, fades,
 inserted silences → **radio filter** (if set) → **echo** (if set) → **global export gain** → **MCC radio clicks** (if set) → 16-bit → CELT. Recipe

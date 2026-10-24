@@ -547,15 +547,16 @@ def added_take_findings(doc, *, ce, mcc, local, file="manual_mappings.json", sub
 
 def _only_level_settings_reset(head_audio, audio):
     """True when the only differences are the owner-authorized level resets of 2026-10-11, one way only:
-    audio.edit.loudness switched off (migrate_reset_loudness_match.py) and/or the audio.edit.limiter setting
-    removed (migrate_remove_limiter.py). The global export gain is the only level setting. Switching matching
-    on, adding a limiter back, or any other change is still a change to an approved decision."""
+    audio.edit.loudness switched off (migrate_reset_loudness_match.py) or removed (2026-10-23,
+    migrate_remove_loudness_field.py) and/or the audio.edit.limiter setting removed (migrate_remove_limiter.py).
+    The build's level mode is the only level setting. Switching matching on, adding a limiter back, or any other
+    change is still a change to an approved decision."""
     from .mapping_store import LOUDNESS_OFF
     edit = audio.get("edit") or {}
     head_edit = head_audio.get("edit") or {}
     if "limiter" in edit and edit.get("limiter") != head_edit.get("limiter"):
         return False  # a limiter added back or changed
-    if edit.get("loudness") != head_edit.get("loudness") and edit.get("loudness") != LOUDNESS_OFF:
+    if edit.get("loudness") != head_edit.get("loudness") and edit.get("loudness") not in (None, LOUDNESS_OFF):
         return False
     def without(a):
         a = comparable(a, "audio")

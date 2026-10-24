@@ -191,6 +191,10 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
           the peak rule cut the gain. Replacements played a median 5.1 dB below Spain; match Spain gives
           −1.7 dB (`docs/m6-build.md` §2.3, `scripts/discovery/level_survey.py`).
         - Don't raise the global gain as a fix; it can't get past the peak rule.
+      - **No level attribute in recipes (owner, 2026-10-23):** the legacy, always-off `audio.edit.loudness` was
+        removed from 83 approved recipes (`scripts/validate/migrate_remove_loudness_field.py`, approvals kept;
+        `docs/migrations/2026-10-23-remove-loudness-field.md`). Level is only the build's `level_mode`; never
+        add a per-line dB setting.
       - **Speed and per-line gain were removed (owner, 2026-10-09).** A one-time, owner-authorized
         migration (`scripts/validate/migrate_reset_speed_gain.py`) removed them from 9 approved
         recipes without touching approvals. See `docs/migrations/2026-10-09-reset-speed-gain.md`.
