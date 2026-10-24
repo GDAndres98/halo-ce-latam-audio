@@ -20,6 +20,7 @@ import StatusBadge from "../components/StatusBadge.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
 import PanelHeader from "../components/ui/PanelHeader.vue";
 import StateMessage from "../components/ui/StateMessage.vue";
+import { buildJob } from "../composables/useBuildJob";
 import { confirmAction } from "../composables/useConfirm";
 import type { BuildJob, BuildKind, BuildLevel, BuildPreview, BuildScope, BuildsResponse, DeployEvent, DeployStatus } from "../api/types";
 
@@ -31,7 +32,7 @@ const scope = ref<BuildScope>("mission");
 const mission = ref("a10");
 const chosen = ref<string[]>(["a10"]);
 const name = ref("");
-const job = ref<BuildJob | null>(null);
+const job = buildJob;
 const error = ref("");
 const folderInput = ref("");
 const preview = ref<BuildPreview | null>(null);
@@ -114,7 +115,29 @@ watch([scope, mission, chosen], () => {
   previewTimer = setTimeout(loadPreview, 200);
 });
 
+// A job started before leaving the page, or from another tab or device: show the server's latest job and keep
+// checking it while it runs.
+async function resumeJob() {
+  if (visitor.value) return;
+  try {
+    const current = await api.currentJob();
+    const wasRunning = running.value;
+    job.value = current;
+    if (current?.state === "running") poll();
+    else if (wasRunning) await Promise.all([refresh(), loadPreview()]);
+  } catch {
+    // keep what is shown; the next check tries again
+  }
+}
+
+function onVisible() {
+  if (document.visibilityState === "visible") void resumeJob();
+}
+
 onMounted(async () => {
+  void resumeJob();
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", onVisible);
   try {
     levels.value = (await api.state()).levels.map((l) => l.level);
     await refresh();
@@ -128,6 +151,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   clearTimeout(timer);
   clearTimeout(previewTimer);
+  document.removeEventListener("visibilitychange", onVisible);
+  window.removeEventListener("focus", onVisible);
 });
 
 function toggleLevel(level: string) {

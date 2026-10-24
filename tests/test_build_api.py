@@ -128,6 +128,24 @@ class BuildBoardTests(unittest.TestCase):
         self.assertEqual(job["state"], "failed")
         self.assertIn("validation failed", job["log_tail"])
 
+    def test_current_job_is_the_latest_started_running_or_finished(self):
+        # Any tab asks for it to show a job another tab started.
+        release = threading.Event()
+
+        def slow_runner(levels, name):
+            release.wait(5)
+            return 0, ""
+        board = self.board(runner=slow_runner)
+        self.assertIsNone(board.current_job())
+        first = board.start_dry_run(["a10"], "first")
+        self.assertEqual((board.current_job()["id"], board.current_job()["state"]), (first["id"], "running"))
+        release.set()
+        self.wait_for(board, first["id"])
+        self.assertEqual(board.current_job()["state"], "done")
+        second = board.start_dry_run(["x10"], "second")
+        self.assertEqual(board.current_job()["id"], second["id"])
+        self.wait_for(board, second["id"])
+
     def test_unknown_job_is_404(self):
         with self.assertRaises(ApiError) as cm:
             self.board().job("nope")

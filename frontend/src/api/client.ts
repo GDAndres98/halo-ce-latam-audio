@@ -127,6 +127,8 @@ export const api = {
     }),
 
   job: (id: string) => request<BuildJob>(`/api/job${query({ id })}`),
+  /** The most recently started build/install/restore job, from any tab or device; null when none. */
+  currentJob: () => request<BuildJob | null>("/api/job/current"),
 
   ce: (params: { mission?: string; q?: string; offset?: number; limit?: number; subs?: string; hide_used?: boolean; level?: string; keep_slot?: string }) =>
     request<CeResponse>(`/api/ce${query({ ...params, hide_used: params.hide_used ? "1" : undefined })}`),

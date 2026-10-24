@@ -65,7 +65,7 @@ API (all JSON unless noted):
     GET  /api/data/status                         manual_mappings.json vs the database
     POST /api/data/import/preview | /api/data/import | /api/data/export          (admin)
     POST /api/builds/start | /api/builds/preview  (start: admin)
-    GET  /api/builds, /api/builds/detail?name=, /api/builds/log?name=, /api/job?id=
+    GET  /api/builds, /api/builds/detail?name=, /api/builds/log?name=, /api/job?id=, /api/job/current
     GET  /api/deploy/status | /api/deploy/plan?build= | /api/deploy/history
     POST /api/deploy/install | /api/deploy/restore | /api/settings/mcc          (local listener only)
     GET|POST /api/settings/export                 the build level setting (POST: admin)
@@ -713,6 +713,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, builds.list_builds())
             if path == "/api/job":
                 return self._json(200, builds.job(q.get("id", "")))
+            if path == "/api/job/current":
+                return self._json(200, builds.current_job())
             if path == "/api/deploy/status":
                 return self._json(200, builds.deploy_status())
             if path == "/api/deploy/plan":

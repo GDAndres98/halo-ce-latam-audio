@@ -587,6 +587,12 @@ class BuildBoard:
             raise ApiError(404, "unknown build job")
         return self.public(job)
 
+    def current_job(self):
+        """The most recently started job (running or finished), or None: lets any tab show it."""
+        with self._lock:
+            jobs = list(self._jobs.values())
+        return self.public(jobs[-1]) if jobs else None
+
     @staticmethod
     def public(job):
         return dict(job)
