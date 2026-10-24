@@ -576,11 +576,12 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
         if not approved:
             continue
         s = cur.get(hs["mapping_id"])
-        if s is None:
-            if kept.get(hs["mapping_id"]) == hs:
-                out.append(finding("info", "approved_mapping_in_replacement_set", file, hs["mapping_id"],
-                                   "replaced by its sound's replacement set; recorded unchanged in the set's provenance"))
-                continue
+        in_set = s is None and hs["mapping_id"] in kept
+        if in_set:
+            # The provenance keeps the decision as it was at the switch: HEAD's, or the owner's later rework of it
+            # (Needs rework, revision + 1) saved before the switch. Checked by the same rules as a live mapping.
+            s, before = kept[hs["mapping_id"]], len(out)
+        elif s is None:
             out.append(finding("error", "approved_mapping_removed", file, hs["mapping_id"],
                                "a mapping with an approved decision was deleted"))
             continue
@@ -600,6 +601,9 @@ def check_approved_protected(head_doc, doc, file="manual_mappings.json"):
             out.append(finding("error", "approved_object_modified", file, f"{hs['mapping_id']}/{f}",
                                "approved decisions are immutable; only a user move to needs_rework "
                                "(revision + 1) is allowed"))
+        if in_set and len(out) == before:
+            out.append(finding("info", "approved_mapping_in_replacement_set", file, hs["mapping_id"],
+                               "replaced by its sound's replacement set; recorded in the set's provenance"))
     cur_o = {o["mcc_tag"]: o for o in doc.get("own_sets", [])}
     for ho in head_doc.get("own_sets", []):  # a set's one subtitle (owner, 2026-10-19): the same rule while the set stays
         hs = ho.get("subtitle")

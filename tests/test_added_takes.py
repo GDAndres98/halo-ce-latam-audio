@@ -93,6 +93,14 @@ class AddedTakeTests(unittest.TestCase):
         self.assertEqual((sound["total_takes"], len(sound["spain_takes"]), sound["added_takes"][0]["take_id"]),
                          (2, 1, "t-000001"))
 
+    def test_lines_used_by_added_takes_are_hidden_as_used(self):
+        self.add("line_b#0")
+        r = self.app.ce("M99", hide_used=True, keep_slot="es:Z10_010_keyes#0")
+        self.assertNotIn("line_b#0", [x["ce_line_ref"] for x in r["lines"]])
+        self.assertEqual(r["hidden_used"], 1)
+        used = {x["ce_line_ref"]: x["used_by"] for x in self.app.ce("M99")["lines"]}
+        self.assertEqual(used["line_b#0"], ["t-000001"])
+
     def test_approve_lock_rework_and_change(self):
         self.add()
         self.act("t-000001", "approve")

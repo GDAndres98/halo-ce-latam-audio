@@ -328,6 +328,17 @@ class StageActivateTests(Base):
         # against the committed version, the approved decisions are not "deleted": they are in the record
         protected = check_approved_protected(before_doc, doc)
         self.assertEqual({f["code"] for f in protected}, {"approved_mapping_in_replacement_set"})
+        # reworked by the owner after that commit, before the switch: the record holds revision 2, still fine
+        reworked = copy.deepcopy(doc)
+        for m in reworked["own_sets"][0]["provenance"]["slots"]:
+            for f in ("audio", "subtitle"):
+                m[f].update(status="needs_rework", revision=m[f]["revision"] + 1, approved_at=None, fingerprint=None)
+        self.assertEqual({f["code"] for f in check_approved_protected(before_doc, reworked)},
+                         {"approved_mapping_in_replacement_set"})
+        # a silent edit in the record (no higher revision) is still an error
+        silent = copy.deepcopy(doc)
+        silent["own_sets"][0]["provenance"]["slots"][0]["audio"]["notes_edit"] = "x"
+        self.assertIn("approved_object_modified", {f["code"] for f in check_approved_protected(before_doc, silent)})
         conn = sqlite3.connect(self.root / "mappings/manual_mappings.db")
         reasons = {r for (r,) in conn.execute("SELECT reason FROM slot_history WHERE after_body IS NULL")}
         conn.close()

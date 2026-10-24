@@ -480,7 +480,7 @@ class M4App:
            keep_slot=None):
         """CE lines in catalog order, filtered only by the owner's scope, query and subtitle filter
         (subs: 'missing' = no es-MX subtitle text, 'present' = has one). hide_used drops lines already
-        listed in some slot's match, except those of keep_slot (the slot being edited)."""
+        listed in some slot's match or used by an added take, except those of keep_slot (the slot being edited)."""
         if mission == "mapped":
             scope = set(self._mission_scope(level)) if level else set()
         elif mission in (None, "", "all"):
@@ -496,10 +496,15 @@ class M4App:
         def has_mx(ref):
             return bool((self.ce_lines[ref][2]["subtitles"].get("es-MX") or {}).get("text"))
         used = {}
-        for m in self._mappings()[0]["slots"]:
+        doc = self._mappings()[0]
+        for m in doc["slots"]:
             for ref in m["match"]["ce_line_refs"]:
                 used.setdefault(ref, []).append(m["slot_id"])
-        hidden = {ref for ref, sids in used.items() if any(x != keep_slot for x in sids)} if hide_used else set()
+        for t in doc.get("added_takes", []):     # a sound's added takes use their CE lines too (listed by take id)
+            for src in t["audio"]["sources"]:
+                if src.get("ce_line_ref") and t["take_id"] not in used.get(src["ce_line_ref"], []):
+                    used.setdefault(src["ce_line_ref"], []).append(t["take_id"])
+        hidden ={ref for ref, sids in used.items() if any(x != keep_slot for x in sids)} if hide_used else set()
         hidden -= {ref for ref, sids in used.items() if keep_slot in sids}
         refs = [ref for ref in self.ce_order if self.ce_lines[ref][0] in scope
                 and (not terms or matches(terms, self._ce_hay[ref]))
