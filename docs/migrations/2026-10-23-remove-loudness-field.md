@@ -19,7 +19,7 @@ has a `slot_history` row, and the previous JSON is in `mappings/.history/`.
 - `--write` backs up, migrates and verifies;
 - `--rollback work/migrations/<id>` undoes it (only while the file is still exactly what the migration wrote).
 
-Run: RUN_PENDING.
+Run: `work/migrations/20261024T042445_remove_loudness_field/` (verified backup of the JSON, the local file and the database, plus `report.md`). All checks true; validator 0 errors, 0 fingerprint drift. The Studio was running (restarted on the new code); no save landed during the write (the verification compares against the file read at the start).
 
 It was rehearsed first on a disposable copy of the real mappings (with a git baseline so the validator compared
 against the pre-migration file): write, rollback (byte-identical to the original), write, and a second run that
