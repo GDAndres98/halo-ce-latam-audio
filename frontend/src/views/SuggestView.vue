@@ -66,6 +66,15 @@ const VERDICT_NAME: Record<string, string> = {
   same_line: "same situation", reworded: "close situation", related: "related", different: "different",
 };
 const verdictLabel = (s: SuggestSound, v: string) => (s.mode === "name" ? VERDICT_NAME[v] : VERDICT[v]?.label) ?? v;
+const ASSESSMENT: Record<string, { label: string; tone: "ok" | "warn" | "bad" | "muted" }> = {
+  same_recordings: { label: "same recordings", tone: "ok" },
+  split: { label: "split over several CE records", tone: "warn" },
+  partial: { label: "partly matched", tone: "warn" },
+  no_counterpart: { label: "no CE recording", tone: "muted" },
+};
+const REVIEW_VERDICT: Record<string, string> = {
+  same_line: "same recordings", reworded: "close", related: "situation only", different: "different",
+};
 
 const describe = (e: unknown) =>
   e instanceof ApiError ? `${e.message}${e.details.length ? `: ${e.details.join("; ")}` : ""}` : String(e);
@@ -197,7 +206,11 @@ onMounted(async () => {
           <option value="all">every sound</option>
         </select>
       </label>
-      <label v-if="hasBarks" title="Barks are compared with one CE Systemic folder (a character)">CE folder for barks
+      <span v-if="data?.character_map" class="small" data-testid="character-map"
+            title="config/suggest_characters.json: this MCC folder is compared only with these CE folders">
+        CE folders (your character map): <strong>{{ data.character_map.join(", ") }}</strong>
+      </span>
+      <label v-else-if="hasBarks" title="Barks are compared with one CE Systemic folder (a character)">CE folder for barks
         <select v-model="character" data-testid="suggest-character">
           <option value="">{{ data?.character ? `${data.character} (named like ${level})` : "every folder (none named like this level)" }}</option>
           <option value="all">every folder</option>
@@ -220,6 +233,12 @@ onMounted(async () => {
         <span :title="data.name_method">{{ data.counts.by_name }} by name ({{ data.counts.ce_records_in_name_scope }} CE
           records, {{ data.name_scope_note }})</span>.
       </p>
+      <details v-if="data.review" class="review-notes small" data-testid="review-notes">
+        <summary>Reviewed by {{ data.review.reviewer }} on {{ data.review.reviewed_at }}
+          <template v-if="data.review.stale"> (made with an older audio comparison)</template></summary>
+        <p class="muted">{{ data.review.basis }}</p>
+        <ul><li v-for="(n, i) in data.review.notes" :key="i">{{ n }}</li></ul>
+      </details>
       <p v-if="hasBarks && data.audio_match && !data.audio_match.built_at" class="small muted" data-testid="audio-hint">
         Barks can also be compared by their English audio with {{ data.audio_match.folder }}: on the host, run
         <code>{{ data.audio_match.command }}</code>, then Check again.
@@ -276,6 +295,52 @@ onMounted(async () => {
             <span class="lang">SU</span><span class="text">{{ s.su ?? "—" }}</span>
             <AudioButton v-if="canListen && s.spanish_index !== null"
                          :url="audioUrl.mcc(s.level, 'spanish', s.spanish_index)" label="ES" title="MCC Spain" />
+          </div>
+        </div>
+
+        <div v-if="s.review" class="review" data-testid="sound-review">
+          <div class="review-head">
+            <strong>Claude's review</strong>
+            <StatusBadge :label="ASSESSMENT[s.review.assessment]?.label ?? s.review.assessment"
+                         :tone="ASSESSMENT[s.review.assessment]?.tone ?? 'muted'" />
+            <span class="small">{{ s.review.summary }}</span>
+          </div>
+          <div v-for="p in s.review.picks" :key="p.ce_line_ref" class="review-pick small" :data-ref="p.ce_line_ref">
+            <StatusBadge :label="REVIEW_VERDICT[p.verdict] ?? p.verdict" :tone="p.verdict === 'same_line' ? 'ok' : 'muted'" />
+            <span class="mono">{{ p.name }}</span>
+            <span class="muted">{{ pct(p.confidence) }}</span>
+            <template v-if="canListen && p.english_takes.length">
+              <span class="muted">MCC takes</span>
+              <AudioButton v-for="idx in p.english_takes" :key="idx" :url="audioUrl.mcc(s.level, 'english', idx)"
+                           :label="String(takeNo(s, idx))" :title="`MCC English take ${takeNo(s, idx)}`" />
+            </template>
+            <span>{{ p.reason }}</span>
+            <RouterLink :to="matchLink(s, p)" class="icon-label small" title="Open in Matching, with the CE list filtered to this record">
+              <ExternalLink :size="12" aria-hidden="true" /> Open
+            </RouterLink>
+          </div>
+          <div v-if="!s.review.picks.length" class="small muted">No pick.</div>
+        </div>
+
+        <div v-if="s.audio_candidates?.length" class="review" data-testid="same-recording">
+          <div class="review-head"><strong>Same English recording in CE</strong>
+            <span class="small muted">compared by sound, not by text</span></div>
+          <div v-for="c in s.audio_candidates" :key="c.ce_line_ref" class="review-pick small" :data-ref="c.ce_line_ref">
+            <span class="mono">{{ c.display_key }}</span>
+            <span class="muted">{{ c.mission }} · {{ c.audio?.takes_matched }} of {{ c.audio?.takes }} take(s) · {{ pct(c.score) }}</span>
+            <template v-for="p in c.audio?.pairs ?? []" :key="p.english_index">
+              <AudioButton v-if="canListen" :url="audioUrl.mcc(s.level, 'english', p.english_index)"
+                           :label="`MCC ${takeNo(s, p.english_index)}`" :title="`MCC English take ${takeNo(s, p.english_index)}`" />
+              ≈
+              <AudioButton v-if="canListen" :url="audioUrl.ce(p.ce_line_ref, 'English(US)')"
+                           :label="`CE ${variationNo(p.ce_line_ref)}`" :title="`CE English variation ${variationNo(p.ce_line_ref)}`" />
+              <span class="muted">{{ gain(p.gain_db).replace(' · ', '') }}</span>
+            </template>
+            <AudioButton v-if="canListen && c.has_es_mx_audio" :url="audioUrl.ce(c.ce_line_ref, 'Spanish(Mexico)')"
+                         label="MX" title="Campaign Evolved es-MX" />
+            <RouterLink :to="matchLink(s, c)" class="icon-label small" title="Open in Matching, with the CE list filtered to this line">
+              <ExternalLink :size="12" aria-hidden="true" /> Open
+            </RouterLink>
           </div>
         </div>
 
@@ -453,6 +518,23 @@ onMounted(async () => {
   flex-wrap: wrap;
   margin-top: 0.2rem;
 }
+.review {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--frame-dim, currentColor);
+  border-radius: var(--radius, 4px);
+}
+.review-head,
+.review-pick {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.review-pick {
+  margin-top: 0.3rem;
+}
+.review-notes summary,
 .variations summary {
   cursor: pointer;
 }

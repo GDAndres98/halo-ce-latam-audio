@@ -643,9 +643,19 @@ class M4App:
             return {scope.upper()}, scope.upper()
         raise ApiError(404, f"unknown mission {scope}")
 
+    def _character_map(self):
+        """config/suggest_characters.json: the owner's MCC level -> CE Systemic folders ({} when there is none)."""
+        p = self.root / "config" / "suggest_characters.json"
+        return json.loads(p.read_text(encoding="utf-8"))["levels"] if p.is_file() else {}
+
     def _name_groups(self, level, scope, character):
-        """(groups for NameIndex.score or None, folder, note). The default ('mapped') compares barks with CE's
+        """(groups for NameIndex.score or None, folder, note). A level in the owner's character map is compared only
+        with its own CE folders, whatever else is chosen. Otherwise the default ('mapped') compares barks with CE's
         Systemic chatter, limited to the level's character folder when one is named like it."""
+        own = self._character_map().get(level)
+        if own:
+            folder = own[0] if len(own) == 1 else None
+            return set(own), folder, f"only {', '.join(own)} (owner's character map)"
         folder = self._character_folder(level, character)
         if scope in (None, "", "mapped"):
             missions = {"SYS"} if "SYS" in self.missions else set(self.missions)
@@ -662,15 +672,29 @@ class M4App:
     AUDIO_STRONG = 0.8      # what counts as "the same recording" in the summary
 
     def _audio_doc(self, level, folder):
-        """work/suggest/audio/<level>__<folder>.json from scripts/catalog/build_audio_matches.py, or None."""
-        if not folder:
+        """The English audio comparison for a level (scripts/catalog/build_audio_matches.py), or None. Two sources,
+        merged per MCC take (the stronger best match wins): <level>__<folder>.json (every take of the level vs one CE
+        folder) and <level>__ALL.json (the level's unmatched sounds vs every CE recording). A level in the owner's
+        character map uses only <level>__MAP.json (its own CE folders)."""
+        base = self.root / "work" / "suggest" / "audio"
+        if level in self._character_map():
+            paths = [p for p in [base / f"{level}__MAP.json"] if p.is_file()]
+        else:
+            paths = [p for p in ([base / f"{level}__{folder}.json"] if folder else []) + [base / f"{level}__ALL.json"]
+                     if p.is_file()]
+        if not paths:
             return None
-        p = self.root / "work" / "suggest" / "audio" / f"{level}__{folder}.json"
-        if not p.is_file():
-            return None
-        key = (str(p), p.stat().st_mtime_ns)
+        key = tuple((str(p), p.stat().st_mtime_ns) for p in paths)
         if self._audio_cache.get("key") != key:
-            self._audio_cache = {"key": key, "doc": json.loads(p.read_text(encoding="utf-8"))}
+            docs = [json.loads(p.read_text(encoding="utf-8")) for p in paths]
+            pairs = {}
+            for d in docs:
+                for idx, top in d["pairs"].items():
+                    if top and (idx not in pairs or not pairs[idx] or top[0]["score"] > pairs[idx][0]["score"]):
+                        pairs[idx] = top
+            merged = {"built_at": max(d["built_at"] for d in docs), "method": docs[0]["method"], "pairs": pairs,
+                      "sources": [{"ce_folder": d["ce_folder"], "built_at": d["built_at"]} for d in docs]}
+            self._audio_cache = {"key": key, "doc": merged}
         return self._audio_cache["doc"]
 
     def _audio_candidates(self, r, doc, limit):
@@ -698,6 +722,35 @@ class M4App:
                             "shared_words": [],
                             "audio": {"takes_matched": c["votes"], "takes": len(takes), "pairs": c["pairs"]}})
         return out
+
+    def _review_doc(self, level, folder):
+        """work/suggest/review/<level>__<folder>.json: a written review of the suggestions (e.g. by Claude in a Claude
+        Code session; docs/suggested-matching.md §2d), or None. Read-only, like everything on the tab."""
+        base = self.root / "work" / "suggest" / "review"
+        for name in ([folder] if folder else []) + (["MAP"] if level in self._character_map() else []):
+            p = base / f"{level}__{name}.json"
+            if p.is_file():
+                return json.loads(p.read_text(encoding="utf-8"))
+        return None
+
+    def _review_for(self, r, review, used):
+        """One sound's review with each pick enriched like a candidate, and its English take numbers mapped to the
+        bank indexes the players use."""
+        item = (review or {}).get("sounds", {}).get(r["mcc_tag"])
+        if not item:
+            return None
+        en = [s["index"] for s in r["samples"]["english"]]
+        picks = []
+        for p in item["picks"]:
+            if p["ce_line_ref"] not in self.ce_lines:
+                continue  # the catalog changed since the review: drop what no longer exists
+            takes = [en[t - 1] for t in (p.get("english_takes") or []) if 0 < t <= len(en)]
+            picks.append({**self._suggest_candidate({"ce_line_ref": p["ce_line_ref"], "score": p["confidence"],
+                                                     "parts": {"words": 0.0, "chars": 0.0, "sequence": None,
+                                                               "same_speaker": False}, "shared_words": []}, used),
+                          "verdict": p["verdict"], "confidence": p["confidence"], "reason": p["reason"],
+                          "english_takes": takes})
+        return {"assessment": item["assessment"], "summary": item["summary"], "picks": picks}
 
     def _record_entries(self, record_id):
         for recs in self.missions.values():
@@ -744,6 +797,7 @@ class M4App:
         own = self._own_tags(doc)
         used = self._ce_used(doc)
         audio = self._audio_doc(level, folder)
+        review = self._review_doc(level, folder)
         counts = {"sounds": len(self.levels[level]), "by_text": 0, "by_audio": 0, "by_name": 0, "decided": 0,
                   "listed": 0, "ce_lines_in_scope": sum(1 for ref in refs if ref in idx.by_ref),
                   "ce_records_in_name_scope": sum(1 for it in names.items if groups is None or it["group"] in groups)}
@@ -758,7 +812,12 @@ class M4App:
             leaf, category = suggest.mcc_name_parts(r["mcc_tag"], level)
             # Text when there is an English subtitle; else by sound (the English audio compared offline, when that
             # level and folder were compared and some take found a match); else by name.
-            cands = self._audio_candidates(r, audio, limit) if not en and audio else []
+            heard = self._audio_candidates(r, audio, limit) if audio else []
+            # By sound only when some take really is a CE recording (>= AUDIO_STRONG); weaker votes are noise, and
+            # the name comparison does better (e.g. sargeant vs vo_sys_johnson: CE re-recorded Johnson).
+            if not any(c["score"] >= self.AUDIO_STRONG for c in heard):
+                heard = []
+            cands = heard if not en else []
             mode = "text" if en else "audio" if cands else "name"
             counts["by_" + mode] += 1
             counts["decided"] += decided
@@ -781,14 +840,27 @@ class M4App:
                            "english_takes": [s["index"] for s in r["samples"]["english"]],
                            "spanish_takes": [s["index"] for s in r["samples"]["spanish"]],
                            "decided": decided, "own_set": r["mcc_tag"] in own,
+                           "review": self._review_for(r, review, used),
+                           # A subtitled line can also have its English recording in CE (CE kept many originals):
+                           # shown beside the text suggestions.
+                           "audio_candidates": ([self._suggest_candidate(c, used) for c in heard]
+                                                if mode == "text" else []),
                            "candidates": [self._suggest_candidate(c, used) for c in cands]})
+        own = self._character_map().get(level)
         audio_info = None
-        if folder:
-            audio_info = {"folder": folder, "built_at": audio and audio["built_at"], "method": audio and audio["method"],
-                          "command": f"python scripts/catalog/build_audio_matches.py --level {level} "
-                                     f"--ce-folder {folder}"}
+        if own or folder or audio:
+            cmd = "python scripts/catalog/build_audio_matches.py "
+            audio_info = {"folder": "+".join(own) if own else folder or "ALL", "built_at": audio and audio["built_at"],
+                          "method": audio and audio["method"], "sources": audio and audio["sources"],
+                          "command": cmd + ("--mapped" if own else f"--level {level} --ce-folder {folder}" if folder
+                                            else "--unmatched-all")}
+        review_info = None
+        if review:
+            review_info = {k: review.get(k) for k in ("reviewer", "reviewed_at", "basis", "notes")}
+            # Reviewed against an older audio comparison: shown, but flagged.
+            review_info["stale"] = bool(audio) and review.get("audio_match_built_at") != audio["built_at"]
         return {"level": level, "scope": sorted(missions), "scope_note": note, "name_scope_note": name_note,
-                "audio_match": audio_info,
+                "audio_match": audio_info, "review": review_info, "character_map": own,
                 "character": folder, "characters": self._sys_folders(), "show": show, "limit": limit,
                 "counts": counts, "sounds": sounds, "method": suggest.METHOD, "name_method": suggest.NAME_METHOD,
                 "ai": suggest_ai.status(self.root), "sha256": msha, "read_only": True}

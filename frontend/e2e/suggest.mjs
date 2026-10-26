@@ -116,6 +116,13 @@ async function main() {
         await pairs.locator('button[title^="Stop"]').first().waitFor({ timeout: 30000 });  // it is playing
         await button.click();
       }
+      // A written review (work/suggest/review/), when there is one, is shown on the card.
+      const review = card.getByTestId("sound-review");
+      if (await page.getByTestId("review-notes").count()) {
+        check(/same recordings/.test(await text(review)), `review: ${await text(review)}`);
+        check((await review.locator(".review-pick").first().getAttribute("data-ref")) ===
+              "vo_sys_default_01contact_heardfoe_grunt#0", "review pick");
+      }
       await page.screenshot({ path: join(OUT, "suggest-grunt.png"), fullPage: false });
       return summary;
     });

@@ -164,6 +164,37 @@ CANON = {
 }
 NAME_STOP = {"conditional", "combat", "vo", "sys", "default", "scripted", "script", "actions", "the", "a", "of"}
 
+# MCC's human folders write names run together ('hurtfriendplayer', 'unexpectedenemy', 'fleere'). These words split
+# them (segment()): the bark vocabulary of both games' names plus the expansions above.
+VOCAB = set("""
+hurt friend friends player enemy enemies killed kill kills by flee re nothing there partially sighted unexpected
+death agonizing flying quiet violent instant pain major minor body scream screaming falling shooting traitor vehicle
+scared blocked block blocking cover uncover group search query new near far old grenade danger self startle throwing
+throw celebration taunt idle combat non sleeping sleep alert leader died run away panic dive surprise damaged damage
+melee needler plasma sentinel flood mounted weapon retreat stunned stun lost contact found foe charge advance hold order
+berserk cower threaten warn incoming shoot shot lament dead ally thank respond response assassinated grabbed thrown
+fall down pinned under fire strike good more see heard ambush last standing enter gunner searching betrayed betray
+scold me crazy hail bump kamikaze help cm involuntary exclamation exclamations shouting postcombat actions
+hurting people killing dying being arms flailing sighting manned ride riding driver passenger turret overheat
+reload empty check investigate curse cheer comment acknowledge
+""".split()) | {w for v in ABBREV.values() for w in v.split()} | set(CANON) | set(CANON.values())
+
+
+def segment(word):
+    """'hurtfriendplayer' -> ['hurt', 'friend', 'player'] when the whole word splits into VOCAB words (the split with
+    the longest words wins); otherwise [word]."""
+    if word in VOCAB or len(word) < 6:
+        return [word]
+    best = {0: (0, [])}  # end -> (score, words): score = sum of squared word lengths
+    for end in range(1, len(word) + 1):
+        for start in range(max(0, end - 16), end):
+            piece = word[start:end]
+            if start in best and piece in VOCAB and (len(piece) >= 2 or piece in ("a",)):
+                score = best[start][0] + len(piece) ** 2
+                if end not in best or score > best[end][0]:
+                    best[end] = (score, best[start][1] + [piece])
+    return best[len(word)][1] if len(word) in best else [word]
+
 
 def _stem(w):
     for suf in ("ing", "ed", "es", "s"):
@@ -177,7 +208,8 @@ def name_tokens(text):
     ('combat2', CE's '01' ordering prefixes)."""
     out = []
     for raw in re.findall(r"[a-z]+", fold(text).replace(" ", "_")):
-        for w in ABBREV.get(raw, raw).split():
+        words = ABBREV[raw].split() if raw in ABBREV else segment(raw)
+        for w in (x for part in words for x in ABBREV.get(part, part).split()):
             w = CANON.get(w, w)
             w = CANON.get(_stem(w), _stem(w))
             if w not in NAME_STOP:

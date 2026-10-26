@@ -1,0 +1,11 @@
+{
+ "schema": "suggest-characters/1",
+ "decided_at": "2026-10-24",
+ "note": "Owner's character map for the Suggestions tab: these MCC folders are compared ONLY with these CE Systemic folders (audio, name and Claude suggestions). docs/suggested-matching.md §2e.",
+ "levels": {
+  "sargeant": ["vo_sys_johnson"],
+  "sarge2": ["vo_sys_stacker"],
+  "grunt": ["vo_sys_grunt"],
+  "marines": ["vo_sys_dubbo", "VO_SYS_Bisenti", "vo_sys_fitzgerald", "vo_sys_mendoza"]
+ }
+}

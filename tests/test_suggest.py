@@ -145,6 +145,12 @@ class NameTests(unittest.TestCase):
                          ("taunt", "conditional combat2 shouting"))
         self.assertEqual(suggest.ce_record_name("vo_sys_default_02combat_rtrt_grunt", "grunt"), "02combat_rtrt")
 
+    def test_run_together_mcc_names_are_split_into_words(self):
+        self.assertEqual(suggest.segment("hurtfriendplayer"), ["hurt", "friend", "player"])
+        self.assertEqual(suggest.name_tokens("fleere"), ["flee", "response"])
+        self.assertEqual(suggest.name_tokens("lostcontact"), suggest.name_tokens("05search_lst_cntct")[1:])
+        self.assertEqual(suggest.segment("qwzxv"), ["qwzxv"])  # nothing to split: kept as it is
+
     def test_name_index_scores_within_groups(self):
         idx = suggest.NameIndex([("a#0", "01contact_srprs", "g"), ("b#0", "02combat_rtrt", "g"),
                                  ("c#0", "02combat_rtrt", "j")])
@@ -290,6 +296,45 @@ class AppTests(unittest.TestCase):
         self.assertEqual(by["retreat"]["mode"], "name")
         self.assertEqual(surprise["english_takes"], [10])
         self.assertEqual(r["audio_match"]["built_at"], "2026-10-23")
+
+    def test_a_written_review_is_attached_to_its_sounds(self):
+        surprise = GRUNT + "exclamations\\surprise"
+        doc = {"schema": "suggest-review/1", "level": "grunt", "ce_folder": "vo_sys_grunt", "reviewer": "Claude",
+               "reviewed_at": "2026-10-23", "audio_match_built_at": None, "basis": "b", "notes": ["n"],
+               "sounds": {surprise: {"assessment": "same_recordings", "summary": "s", "picks": [
+                   {"ce_line_ref": "vo_sys_default_01contact_srprs_grunt#0", "record_id": "x", "verdict": "same_line",
+                    "confidence": 0.9, "english_takes": [1, 7], "reason": "r"},
+                   {"ce_line_ref": "gone_from_the_catalog#0", "record_id": "y", "verdict": "related",
+                    "confidence": 0.1, "english_takes": None, "reason": "r"}]}}}
+        p = self.root / "work/suggest/review/grunt__vo_sys_grunt.json"
+        p.parent.mkdir(parents=True)
+        p.write_text(json.dumps(doc), encoding="utf-8")
+        before = snapshot(self.root)
+        r = self.app.suggestions("grunt", show="all")
+        self.assertEqual((r["review"]["reviewer"], r["review"]["stale"]), ("Claude", False))
+        by = {s["name"]: s for s in r["sounds"]}
+        rev = by["surprise"]["review"]
+        self.assertEqual(rev["assessment"], "same_recordings")
+        self.assertEqual([(x["name"], x["english_takes"]) for x in rev["picks"]], [("01contact_srprs", [10])])  # take 7: none
+        self.assertIsNone(by["retreat"]["review"])
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_the_owners_character_map_limits_a_level_to_its_folders(self):
+        (self.root / "config").mkdir()
+        (self.root / "config/suggest_characters.json").write_text(json.dumps(
+            {"schema": "suggest-characters/1", "levels": {"grunt": ["vo_sys_jackal"]}}), encoding="utf-8")
+        audio = self.root / "work/suggest/audio"
+        audio.mkdir(parents=True)
+        other = {"schema": "audio-match/1", "built_at": "2026-10-23", "method": "m", "ce_folder": "ALL", "pairs": {
+            "10": [{"ce_line_ref": "vo_sys_default_01contact_srprs_grunt#0",
+                    "record_id": "vo_sys_default_01contact_srprs_grunt", "score": 0.99, "gain_db": 0, "lag_ms": 0}]}}
+        (audio / "grunt__ALL.json").write_text(json.dumps(other), encoding="utf-8")
+        r = self.app.suggestions("grunt", show="all")
+        self.assertEqual(r["character_map"], ["vo_sys_jackal"])
+        self.assertEqual(r["counts"]["by_audio"], 0)  # the ALL comparison (another character) is not used
+        folders = {c["folder"] for s in r["sounds"] for c in s["candidates"]}
+        self.assertEqual(folders, {"vo_sys_jackal"})
+        self.assertIn("--mapped", r["audio_match"]["command"])
 
     def test_bark_rerank_and_folder_request_send_names_only(self):
         client = FakeClient({"ranking": [{"id": "vo_sys_default_01contact_srprs_grunt#0", "verdict": "same_line",

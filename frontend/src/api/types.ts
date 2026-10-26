@@ -978,6 +978,10 @@ export interface SuggestSound {
   spanish_takes: number[];
   decided: boolean;
   own_set: boolean;
+  /** A written review of this sound (e.g. Claude in a Claude Code session), or null when none was written. */
+  review: SoundReview | null;
+  /** Text mode: CE recordings whose English sounds the same as this line's English takes (empty otherwise). */
+  audio_candidates: SuggestCandidate[];
   candidates: SuggestCandidate[];
 }
 
@@ -994,10 +998,16 @@ export interface SuggestResponse {
   scope_note: string;
   name_scope_note: string;
   /** The offline English audio comparison for this level and CE folder (built_at null = not run yet). */
-  audio_match: { folder: string; built_at: string | null; method: string | null; command: string } | null;
+  audio_match: { folder: string; built_at: string | null; method: string | null; command: string;
+                 /** The comparisons merged: one CE folder, and/or "ALL" (unmatched sounds vs every CE recording). */
+                 sources: { ce_folder: string; built_at: string }[] | null } | null;
+  /** Who reviewed this level's suggestions, when, on what basis; stale = made against an older audio comparison. */
+  review: { reviewer: string; reviewed_at: string; basis: string; notes: string[]; stale: boolean } | null;
   /** The CE Systemic folder barks are compared with (null = every folder in scope); the folders to choose from. */
   character: string | null;
   characters: string[];
+  /** The owner's character map for this level (config/suggest_characters.json): its only CE folders, or null. */
+  character_map: string[] | null;
   show: "undecided" | "all";
   limit: number;
   counts: { sounds: number; by_text: number; by_audio: number; by_name: number; decided: number; listed: number;
@@ -1010,6 +1020,14 @@ export interface SuggestResponse {
 }
 
 export type AiVerdict = "same_line" | "reworded" | "related" | "different";
+
+export interface SoundReview {
+  /** same_recordings | split (over several CE records) | partial | no_counterpart */
+  assessment: "same_recordings" | "split" | "partial" | "no_counterpart";
+  summary: string;
+  /** Each pick: the CE record, the verdict, a confidence, a reason and the MCC English takes (bank indexes) it covers. */
+  picks: (SuggestCandidate & { verdict: AiVerdict; confidence: number; reason: string; english_takes: number[] })[];
+}
 
 export type AiPick = SuggestCandidate & { verdict: AiVerdict; confidence: number; reason: string };
 

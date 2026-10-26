@@ -113,6 +113,87 @@ noises). The name mode is the fallback.
   - The 3 misses: `group_uncover` (the owner chose `charge`/`cower`, the audio says `newordr_advance`),
     `death_quiet` (a weak 1-take vote) and `grunty_thirst` (the owner's line is scripted M10, outside the folder).
 
+## 2c-bis. Every unmatched sound vs every CE recording (owner request, 2026-10-23)
+
+`python scripts/catalog/build_audio_matches.py --unmatched-all` compares every MCC sound with no match decision (838
+sounds, 4,100 English takes) with every CE English(US) recording of every mission (15,811). It writes
+`work/suggest/audio/<level>__ALL.json` per level.
+- **Speed:** length windows (bisect) and one process per CPU core. Each recording is measured once, even when several
+  CE lines share it.
+- **Disk:** WAVs that the run decodes are deleted after measuring (`--keep-wavs` keeps them). The features take about
+  124 MB.
+- **Time:** about 10 minutes the first time, about 2.5 minutes after that (only the comparison runs again).
+
+The tab merges `<level>__ALL.json` with a folder comparison (`<level>__<folder>.json`) per take; the stronger match
+wins. Subtitled lines also show **Same English recording in CE** beside their text suggestions.
+
+Result, 2026-10-23:
+- Of the 4,100 takes, 1,904 have a CE recording at ≥ 0.8 and 946 at ≥ 0.9. For 334 of the 838 sounds, at least half
+  of the takes agree on one CE record.
+- **Strongest:** `marines` (1,221 of 1,844 takes ≥ 0.8, 237 sounds), spread over the CE squad (fitzgerald, mendoza,
+  bisenti, dubbo…), and `sarge2` (423 of 685, almost all in `vo_sys_stacker`).
+- **Checked against text:** every a50/b40 scripted match whose CE line has an English subtitle says the same words,
+  e.g. `b40_410_bisenti` ↔ `vo_scr_m05_00880_bisenti`, 94%.
+- **Weak:** the aliens (elite, jackal, hunter, flood) and `sargeant`. Growls and short noises match each other easily
+  across characters, so treat them as hints and listen first.
+
+## 2e. The owner's character map (2026-10-24)
+
+`config/suggest_characters.json` (committed) lists which CE Systemic folders an MCC folder may match:
+
+| MCC folder | CE folders |
+|---|---|
+| `sargeant` | `vo_sys_johnson` |
+| `sarge2` | `vo_sys_stacker` |
+| `grunt` | `vo_sys_grunt` |
+| `marines` | `vo_sys_dubbo`, `VO_SYS_Bisenti`, `vo_sys_fitzgerald`, `vo_sys_mendoza` |
+
+A mapped folder is compared **only** with its CE folders, everywhere on the tab: by sound, by name, and in the
+Claude requests. The folder menu is replaced by the map.
+
+`python scripts/catalog/build_audio_matches.py --mapped`:
+- compares every English take of each mapped folder (matched or not) with its CE folders;
+- writes `<level>__MAP.json` and deletes that level's other comparisons;
+- leaves the mapped folders out of `--unmatched-all`.
+
+A sound is listed *by sound* only when some take really is a CE recording (≥ 0.8); weaker votes are noise. Below that
+it is listed *by name*. Run-together MCC names (`hurtfriendplayer`, `fleere`) are split into words first
+(`suggest.segment`).
+
+Result, 2026-10-24 (takes ≥ 0.8 / all; owner-matched sounds whose top audio record is the owner's):
+
+| MCC folder | Takes ≥ 0.8 | Unmatched sounds with a clear match | Agrees with owner |
+|---|---|---|---|
+| `sarge2` → stacker | 568 / 873 | 58 of 93 | 17 of 18 |
+| `marines` → 4 marines | 1,453 / 2,201 | 237 of 385 | 22 of 33 |
+| `grunt` → grunt | 278 / 385 | 0 of 7 (no CE recording) | 20 of 23 |
+| `sargeant` → johnson | 15 / 664 | 0 of 103 | 0 of 6 |
+
+- **`sargeant` vs Johnson:** almost nothing sounds the same. CE seems to have re-recorded Johnson, so only the name
+  comparison helps there.
+- **Marines misses:** most are death and pain sounds the owner matched by situation, with no same recording. One
+  pattern repeats: for `unexpectedenemy` the audio points every marine to `01contact_ambush` (3 to 5 takes), where
+  the owner chose `01contact_srprs`.
+
+## 2d. Written reviews (no API key)
+
+The owner can't create API keys, and the Claude API can't listen to audio anyway. So a Claude Code session reviews a
+level's suggestions instead. It reads the audio comparison (per-take scores, ties, volume), the CE record names and
+the MCC categories, and writes `work/suggest/review/<level>__<folder>.json` (`suggest-review/1`, git-ignored). Per
+sound the file holds:
+- an assessment: `same_recordings`, `split` over several CE records, `partial` or `no_counterpart`;
+- a one-line summary;
+- picks: each a CE record with a verdict, a confidence, the MCC English takes it covers and a reason.
+
+The tab shows the review on each card. The MCC takes it names are playable, and the review's notes are on the page
+under *Reviewed by…*. A review made against an older audio comparison is flagged as stale. It is read-only like the
+rest of the tab: a reading aid, never a decision.
+
+`grunt` vs `vo_sys_grunt`, reviewed 2026-10-23:
+- 38 sounds are the same recordings and 6 are split over several CE records (taunt, retreat, group_uncover,
+  celebration, hurt_friend, friend_killed_by_friend). 2 are partial and 9 have no CE recording.
+- 12 recordings exist twice in CE, under two records.
+
 **Ask Claude to match all barks of a level** sends one request (`POST /api/suggest/folder`, admin remotely, cached).
 - **Sent:** every unsubtitled sound name of the level with its take count, and every CE record in scope with its
   raw and spelled-out name, folder and variation count. At most 400 records per request: choose a folder.
