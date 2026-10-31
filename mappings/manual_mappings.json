@@ -124594,6 +124594,66 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "mapping_id": "m-001575",
+      "slot_id": "es:checkbodyfriend%2001#5",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "match": {
+        "status": "unreviewed",
+        "ce_line_refs": [],
+        "decided_at": null,
+        "revision": 1
+      },
+      "audio": {
+        "status": "approved",
+        "source": "keep_original",
+        "sources": [],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:checkbodyfriend%2001#5",
+            "index": 5451,
+            "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+          },
+          "sources": []
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "subtitle": {
+        "status": "approved",
+        "source": "keep_original",
+        "ce_locres": null,
+        "custom_ref": null,
+        "mcc_key_hash": null,
+        "mcc_key_verification": null,
+        "fingerprint": {
+          "mcc": {
+            "slot_id": "es:checkbodyfriend%2001#5",
+            "index": 5451,
+            "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+          },
+          "source": "keep_original"
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "different_but_fits": {
+        "marked": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "added_takes": [
@@ -166052,6 +166112,630 @@
           ]
         },
         "approved_at": "2026-10-24",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000598",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 881365461,
+                  "wem_sha256": "12986d924e596789a87d0125e4a67a3e460fde921f8808e73a2305a07c748352"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000599",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 198017467,
+                  "wem_sha256": "00912dba9d051f8d8dce5883a8221c889f10893bc054177e9712d7693c58f418"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000600",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 398203405,
+                  "wem_sha256": "228850d9220f831a817a50cb99e2b8d7f8c834f9b63577421ab5e5c6359960f8"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000601",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 254176916,
+                  "wem_sha256": "9d7f180bf8baa6e793c2b9b9b1eb6ae59cf69402384341c67593578e2f3e10f9"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000602",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 905825502,
+                  "wem_sha256": "ba363f6ab975f88f0bd5658d13d45e8809b0ab670001284f4835f4a08ebbdc7a"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000603",
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#5",
+                "index": 5451,
+                "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#5",
+                "index": 5452,
+                "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#5",
+                "index": 5453,
+                "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#5",
+                "index": 5454,
+                "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#5",
+                "index": 5455,
+                "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2006#1",
+                "index": 5456,
+                "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2007#1",
+                "index": 5457,
+                "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2008#1",
+                "index": 5458,
+                "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2009#1",
+                "index": 5459,
+                "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2010#1",
+                "index": 5460,
+                "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2011#1",
+                "index": 5461,
+                "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 460137654,
+                  "wem_sha256": "6216922c7522048c69a68cb0dbc5b25bce7e8034536253f98eb5f1a4a99db55b"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-10-31",
         "revision": 1
       },
       "radio_effect": {
@@ -217602,6 +218286,749 @@
           }
         ],
         "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "set_at": "2026-10-31",
+      "state": "staged",
+      "provenance": {
+        "kind": "conversion",
+        "record_id": "cv-bdfb058fa2e2",
+        "created_at": "2026-10-31",
+        "activated_at": null,
+        "source_version": "bdfb058fa2e2f93218e59305552c7692bcc5e2b7a847c9785922d351a152123b",
+        "slots": [
+          {
+            "mapping_id": "m-001575",
+            "slot_id": "es:checkbodyfriend%2001#5",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "match": {
+              "status": "unreviewed",
+              "ce_line_refs": [],
+              "decided_at": null,
+              "revision": 1
+            },
+            "audio": {
+              "status": "approved",
+              "source": "keep_original",
+              "sources": [],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "slot_id": "es:checkbodyfriend%2001#5",
+                  "index": 5451,
+                  "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                },
+                "sources": []
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "subtitle": {
+              "status": "approved",
+              "source": "keep_original",
+              "ce_locres": null,
+              "custom_ref": null,
+              "mcc_key_hash": null,
+              "mcc_key_verification": null,
+              "fingerprint": {
+                "mcc": {
+                  "slot_id": "es:checkbodyfriend%2001#5",
+                  "index": 5451,
+                  "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                },
+                "source": "keep_original"
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "different_but_fits": {
+              "marked": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          }
+        ],
+        "added_takes": [
+          {
+            "take_id": "t-000598",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 1,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#0",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#0",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 881365461,
+                        "wem_sha256": "12986d924e596789a87d0125e4a67a3e460fde921f8808e73a2305a07c748352"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000599",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 2,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#1",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#1",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 198017467,
+                        "wem_sha256": "00912dba9d051f8d8dce5883a8221c889f10893bc054177e9712d7693c58f418"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000600",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 3,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#2",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#2",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 398203405,
+                        "wem_sha256": "228850d9220f831a817a50cb99e2b8d7f8c834f9b63577421ab5e5c6359960f8"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000601",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 4,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#3",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#3",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 254176916,
+                        "wem_sha256": "9d7f180bf8baa6e793c2b9b9b1eb6ae59cf69402384341c67593578e2f3e10f9"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000602",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 5,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#4",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#4",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 905825502,
+                        "wem_sha256": "ba363f6ab975f88f0bd5658d13d45e8809b0ab670001284f4835f4a08ebbdc7a"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000603",
+            "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 6,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#5",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#5",
+                      "index": 5451,
+                      "data_sha256": "0cdf749a31f63661104195269b5cb44853c0f741cc32bf094da4b218354308ce"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#5",
+                      "index": 5452,
+                      "data_sha256": "bc9f1be4fab02d01825fb67ddfbd34ca26c7d8e53d63e053266d428ad75c9826"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#5",
+                      "index": 5453,
+                      "data_sha256": "a66b9aebe02ee2ffceb4386214f3b1a6df84d7d4009586b82ddd48438f1802f0"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#5",
+                      "index": 5454,
+                      "data_sha256": "fb7e2958d0b534a3b98c0cfbe5529148aaeb650f708b7305be63fce9d173ea42"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#5",
+                      "index": 5455,
+                      "data_sha256": "f0756a3065f2eddf95109f776d3bef5247d255ceb55b77f9be5940f84334db7f"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2006#1",
+                      "index": 5456,
+                      "data_sha256": "9eaa7972e1ddd68dcd38d23ecef6da15c781788a7282d5240c3f224310232f69"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2007#1",
+                      "index": 5457,
+                      "data_sha256": "46c72b06ad274dfbda260937b6a430124c92283eb6831e2fe4029b079ee4f684"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2008#1",
+                      "index": 5458,
+                      "data_sha256": "64b88910b58b27f01e22053703b64669492e21468d9004ad4b92fb2d2100f97c"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2009#1",
+                      "index": 5459,
+                      "data_sha256": "86beeea2db09153d225fc835bf9b3218019f58504141b34c9186f1fae7c63ffe"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2010#1",
+                      "index": 5460,
+                      "data_sha256": "551f46cbb93caf548d200687f1187e1c818afe20740f7027066db9c7a5cea27a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2011#1",
+                      "index": 5461,
+                      "data_sha256": "4080d01ae3c2294341ca9f5448137e0d8c98256c09516281323b52619177edeb"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_johnson#5",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 460137654,
+                        "wem_sha256": "6216922c7522048c69a68cb0dbc5b25bce7e8034536253f98eb5f1a4a99db55b"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-10-31",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          }
+        ],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-000598",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "e3ad61a53ff7c360f7e278310bffa737b4085cb6501803239f1c6a4a11680841"
+          },
+          {
+            "take_id": "t-000599",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "ffca2b0fab9dc2d940c988042b1eb3b8c69d1f04dfc7c50235fbc06cfe54e556"
+          },
+          {
+            "take_id": "t-000600",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "93e03b0983698d65a7d18f5f1f3d5517145376c1c8b5cbf09c9d66e8b5d97f86"
+          },
+          {
+            "take_id": "t-000601",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "8347c5c1956b8c16fc77d438555dc1b6e47382131ebfc3f0bd0d8b6ff3ed7e81"
+          },
+          {
+            "take_id": "t-000602",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "2f8f34042ca0d8a237274451423c523264ff570ab701777aa5d9bd2e83e1a95f"
+          },
+          {
+            "take_id": "t-000603",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "26216d8f3047e4dc4a39093572423a2ba84c3d3c87578343eae07d0fbcdafc60"
+          }
+        ],
+        "acknowledged": [
+          "keep_original",
+          "undecided_take"
+        ]
       }
     }
   ]
