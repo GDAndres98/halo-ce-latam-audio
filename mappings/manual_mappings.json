@@ -166744,6 +166744,450 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "take_id": "t-000604",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 389995578,
+                  "wem_sha256": "89ff23f39d760a8da0a26d2e8a5cdaaeac0d81446236a7bb7e8393c12c10f00d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000605",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 292900895,
+                  "wem_sha256": "eea9a42cef5859fde44ac4ec9a393a26b281c49f5a4c478eafb614be46fc26e0"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000606",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 379863008,
+                  "wem_sha256": "488efeabc8ac1029472daedb864897837f367353b0d8ef79a34c094a36459879"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000607",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 342252154,
+                  "wem_sha256": "2482577498fe1f8c50a208f4376e4926bb46aedbcc3ecc681dcf9694cf742839"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000608",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 1050924907,
+                  "wem_sha256": "f3d0633b709b4be3029b41fb87eb8f234751ef44bdd5281697f92a341bd5adec"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-000609",
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "spanish": [
+              {
+                "slot_id": "es:checkbodyfriend%2001#0",
+                "index": 2415,
+                "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2002#0",
+                "index": 2416,
+                "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2003#0",
+                "index": 2417,
+                "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2004#0",
+                "index": 2418,
+                "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+              },
+              {
+                "slot_id": "es:checkbodyfriend%2005#0",
+                "index": 2419,
+                "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 1014550195,
+                  "wem_sha256": "602897e0505d1ebe25dc57015807ede466d35a2759cd33fe7e3941d5262d6187"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-03",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "own_sets": [
@@ -219023,6 +219467,568 @@
             "origin": "existing",
             "from_mapping_ids": [],
             "spec_sha256": "26216d8f3047e4dc4a39093572423a2ba84c3d3c87578343eae07d0fbcdafc60"
+          }
+        ],
+        "acknowledged": [
+          "keep_original",
+          "undecided_take"
+        ]
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+      "set_at": "2026-11-03",
+      "provenance": {
+        "kind": "conversion",
+        "record_id": "cv-f5090d1555be",
+        "created_at": "2026-11-03",
+        "activated_at": "2026-11-03",
+        "source_version": "f5090d1555be0cd3b1ab1b6375926bac256c4e0ff274360d856d3031b68d3e54",
+        "slots": [
+          {
+            "mapping_id": "m-001576",
+            "slot_id": "es:checkbodyfriend%2001#0",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "match": {
+              "status": "unreviewed",
+              "ce_line_refs": [],
+              "decided_at": null,
+              "revision": 1
+            },
+            "audio": {
+              "status": "approved",
+              "source": "keep_original",
+              "sources": [],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "slot_id": "es:checkbodyfriend%2001#0",
+                  "index": 2415,
+                  "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                },
+                "sources": []
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "subtitle": {
+              "status": "approved",
+              "source": "keep_original",
+              "ce_locres": null,
+              "custom_ref": null,
+              "mcc_key_hash": null,
+              "mcc_key_verification": null,
+              "fingerprint": {
+                "mcc": {
+                  "slot_id": "es:checkbodyfriend%2001#0",
+                  "index": 2415,
+                  "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                },
+                "source": "keep_original"
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "different_but_fits": {
+              "marked": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          }
+        ],
+        "added_takes": [
+          {
+            "take_id": "t-000604",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 1,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#0",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#0",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 389995578,
+                        "wem_sha256": "89ff23f39d760a8da0a26d2e8a5cdaaeac0d81446236a7bb7e8393c12c10f00d"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000605",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 2,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#1",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#1",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 292900895,
+                        "wem_sha256": "eea9a42cef5859fde44ac4ec9a393a26b281c49f5a4c478eafb614be46fc26e0"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000606",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 3,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#2",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#2",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 379863008,
+                        "wem_sha256": "488efeabc8ac1029472daedb864897837f367353b0d8ef79a34c094a36459879"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000607",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 4,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#3",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#3",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 342252154,
+                        "wem_sha256": "2482577498fe1f8c50a208f4376e4926bb46aedbcc3ecc681dcf9694cf742839"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000608",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 5,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#4",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#4",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 1050924907,
+                        "wem_sha256": "f3d0633b709b4be3029b41fb87eb8f234751ef44bdd5281697f92a341bd5adec"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          },
+          {
+            "take_id": "t-000609",
+            "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+            "position": 6,
+            "audio": {
+              "status": "approved",
+              "source": "ce",
+              "sources": [
+                {
+                  "kind": "ce",
+                  "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#5",
+                  "language": "Spanish(Mexico)"
+                }
+              ],
+              "edit": {
+                "trim_start_s": 0,
+                "trim_end_s": 0,
+                "gap_s": 0
+              },
+              "fingerprint": {
+                "mcc": {
+                  "mcc_tag": "sound\\dialog\\marines\\aussie\\conditional\\combat2\\postcombatcomments\\checkbodyfriend",
+                  "spanish": [
+                    {
+                      "slot_id": "es:checkbodyfriend%2001#0",
+                      "index": 2415,
+                      "data_sha256": "57a4572fb21ac0105ed85b97b3582c39ecb0435323a87473d57beeb080b2180a"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2002#0",
+                      "index": 2416,
+                      "data_sha256": "2fc44ad001ce7f9ab544b4470827e73e0ddcf26d2cbbc997807b98f68fa78807"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2003#0",
+                      "index": 2417,
+                      "data_sha256": "bcafcbfbf9d339a4cf50f4e0eb14760c9175c053182c15b1fd7c79cc0f703633"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2004#0",
+                      "index": 2418,
+                      "data_sha256": "f5e7ae9c00206e8bcad5100d89d13646811d54d2329b2f135ba05787dfd152e2"
+                    },
+                    {
+                      "slot_id": "es:checkbodyfriend%2005#0",
+                      "index": 2419,
+                      "data_sha256": "b6aa0639ad65252a00c44d7231684f14da78ed2a959154ecc254d7d4529f30a7"
+                    }
+                  ]
+                },
+                "sources": [
+                  {
+                    "kind": "ce",
+                    "ce_line_ref": "vo_sys_default_03postcombat_chckallybdy_dubbo#5",
+                    "language": "Spanish(Mexico)",
+                    "media": [
+                      {
+                        "media_id": 1014550195,
+                        "wem_sha256": "602897e0505d1ebe25dc57015807ede466d35a2759cd33fe7e3941d5262d6187"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "approved_at": "2026-11-03",
+              "revision": 1
+            },
+            "radio_effect": {
+              "needed": false,
+              "set_at": null,
+              "revision": 1
+            },
+            "notes": ""
+          }
+        ],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-000604",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "f27ce94965e483ebf82929f7e1cbfc2485739012e1c5270f0244730b7a1e3db2"
+          },
+          {
+            "take_id": "t-000605",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "6249d41dcc42bb87b790a899786f1e2ebe14f9f6cd572cc212dffbc03054cc6d"
+          },
+          {
+            "take_id": "t-000606",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "8b39321d0c089b6c3060ba2f1ab24238e47c1c8c944d4bfa962800f7999105ed"
+          },
+          {
+            "take_id": "t-000607",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "089b5fa24032d7f3630997c9bd9604c9ee2e623022b5cf406c1bafca7cdbc84c"
+          },
+          {
+            "take_id": "t-000608",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "8fdbc76fb31f9810fadbe5d8aa6fdad9d35ab9c8a21dd92d5880f736f00ff985"
+          },
+          {
+            "take_id": "t-000609",
+            "origin": "existing",
+            "from_mapping_ids": [],
+            "spec_sha256": "46c1a919e88afe032c6865d55ee90bf1742b3b5dc6194d78543d47177e02f051"
           }
         ],
         "acknowledged": [
