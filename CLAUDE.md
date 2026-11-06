@@ -479,7 +479,9 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
     (`SP_` = Spain, `SU_` = Latin America). *Superseded by the B1
     research below:* key↔string and the key hash are now solved.
   - User's tools: FModel portable at
-    `%USERPROFILE%\Downloads\858461d19e29803479555059acb59a03a0986de8\`
+    the project's git-ignored `.fmodel\` (moved from
+    `%USERPROFILE%\Downloads\858461d19e29803479555059acb59a03a0986de8\` on 2026-11-05;
+    `asset_metadata.py` falls back to the old path)
     (exports under `Output\Exports`, audio only, no JSON yet; `.usmap`
     not loaded in FModel per its log). UE4SS v3.0.1 is installed by the
     user inside the CE install (`Binaries\Win64\ue4ss\`, `Paks\LogicMods\`)

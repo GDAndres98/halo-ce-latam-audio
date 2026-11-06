@@ -14,6 +14,9 @@
 *.wem
 *.7z
 
+# FModel portable (bundled Oodle DLL, .usmap, exports, logs), kept in the project, never committed
+.fmodel/
+
 # Scratch space for any local extraction/inspection work
 /scratch/
 /reference-audio/

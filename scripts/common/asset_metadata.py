@@ -21,7 +21,10 @@ UNRESOLVED = "unresolved"
 # Wwise language -> UE culture used by the Subtitles localization target.
 WWISE_TO_CULTURE = {"English(US)": "en", "Spanish(Mexico)": "es-MX", "Spanish(Spain)": "es-ES"}
 
-DEFAULT_FMODEL_DIR = Path.home() / "Downloads" / "858461d19e29803479555059acb59a03a0986de8"
+_PROJECT_FMODEL_DIR = Path(__file__).resolve().parents[2] / ".fmodel"
+_LEGACY_FMODEL_DIR = Path.home() / "Downloads" / "858461d19e29803479555059acb59a03a0986de8"
+# FModel portable now lives in the project's git-ignored .fmodel/; the old Downloads folder is the fallback.
+DEFAULT_FMODEL_DIR = _PROJECT_FMODEL_DIR if _PROJECT_FMODEL_DIR.is_dir() else _LEGACY_FMODEL_DIR
 
 
 def derived(rule):
