@@ -529,6 +529,10 @@ are in [`docs/dialogue-catalog-design.md`](docs/dialogue-catalog-design.md) (v2)
   - **Ask Claude** (`common/suggest_ai.py`, `POST /api/suggest/rerank`, admin remotely, cached in
     `work/m4/suggest/ai/`) re-ranks a shortlist. It needs `pip install anthropic` (not installed yet) and a key.
   - Neither ever writes `mappings/`; never turn a suggestion into a save yourself.
+  - **Replace and approve (owner, 2026-11-07, `docs/suggested-matching.md` §2f):** on a by-sound card the owner ticks
+    CE variations and presses *Submit and approve selected replacement*. After the owner confirms, `own_set_on` with
+    `approve` + `confirm` replaces every take of that per-take sound with the ticked es-MX recordings, approved, in one
+    save. Never tick, submit or call it yourself.
 - Every in-catalog association records evidence: `explicit`,
   `derived:<rule>`, or `unresolved`. Never invent one.
 - Tools never create or modify `approved` mapping entries. `audio` and

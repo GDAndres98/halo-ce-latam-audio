@@ -59,6 +59,8 @@ API (all JSON unless noted):
     POST /api/takes/add_many                      several recordings as new draft takes, one save (M4App.take_add_many)
     POST /api/takes/approve_many                  approves the listed takes of a sound, one save (M4App.take_approve_many)
     POST /api/takes/own_set_on | own_set_off      own take set of a sound (M4App.own_set_on / own_set_off)
+                                                  (own_set_on approve+confirm: the new takes approved, same save)
+    GET  /api/takes/sound?mcc_tag=                one sound's takes, decisions and versions (M4App.sound)
     POST /api/takes/set_subtitle                  the ONE subtitle of a sound's own set (M4App.set_subtitle)
     GET  /api/takes/convert/preview?mcc_tag=      read-only: converting a sound's per-take decisions into a
                                                   replacement set (docs/replacement-set-conversion.md)
@@ -703,6 +705,8 @@ def make_handler(app, quiet=False, builds=None, listener=None, shared=None):
                 return self._json(200, app.suggestions(q.get("level", ""), q.get("scope") or "mapped",
                                                        q.get("show") or "undecided", q.get("limit") or 5,
                                                        q.get("character") or None))
+            if path == "/api/takes/sound":  # one sound's takes and versions (Suggestions: replace and approve)
+                return self._json(200, app.sound(q.get("mcc_tag", "")))
             if path == "/api/takes/convert/preview":
                 return self._json(200, app.convert_preview(q.get("mcc_tag", "")))
             if path == "/api/takes/convert/inventory":

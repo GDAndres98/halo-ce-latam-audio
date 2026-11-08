@@ -5,15 +5,19 @@
 // Systemic folder for the same character. Optionally, Claude re-ranks one sound's shortlist, or matches a whole bark
 // folder in one request, with a verdict and a reason.
 //
-// Read-only. Nothing here saves, selects or approves anything: "Open in Matching" opens the MCC line, with the CE
-// list filtered to the suggested line, and the owner decides there as always.
+// The suggestions themselves are read-only: "Open in Matching" opens the MCC line with the CE list filtered to the
+// suggested line. One exception (owner, 2026-11-07, docs/suggested-matching.md §2f): on a sound compared BY SOUND,
+// the owner may tick CE variations and press "Submit and approve selected replacement". After the owner confirms in
+// the dialog, that replaces every take of the sound with the ticked es-MX variations and approves them, in one save
+// (POST /api/takes/own_set_on with approve + confirm). Nothing is ever ticked or submitted for the owner.
 
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ExternalLink, RefreshCw, Sparkles } from "lucide-vue-next";
+import { CheckCheck, ExternalLink, RefreshCw, Sparkles } from "lucide-vue-next";
 import { api, ApiError, audioUrl } from "../api/client";
 import type { AiPick, SuggestCandidate, SuggestResponse, SuggestSound } from "../api/types";
-import { canListen, permissions } from "../auth/session";
+import { canListen, permissions, readOnly } from "../auth/session";
+import { confirmAction } from "../composables/useConfirm";
 import AudioButton from "../components/AudioButton.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import PageHeader from "../components/ui/PageHeader.vue";
@@ -155,6 +159,112 @@ const takeNo = (s: SuggestSound, index: number) => s.english_takes.indexOf(index
 const gain = (db: number | null) => (db === null ? "" : ` · ${db > 0 ? "+" : ""}${db} dB`);
 const usedLabel = (c: SuggestCandidate) => `already used by ${c.used_by.join(", ")}`;
 
+// ---- Replace and approve (by-sound cards only; owner, 2026-11-07)
+const MX = "Spanish(Mexico)";
+/** The owner's ticked CE variations per MCC sound (refs). Never ticked by the page itself. */
+const picked = ref<Record<string, string[]>>({});
+const replaceBusy = ref<string | null>(null);
+const replaceMessage = ref<Record<string, string>>({});
+const replaceError = ref<Record<string, string>>({});
+
+const canReplace = (s: SuggestSound) => s.mode === "audio" && !readOnly.value && canListen.value && !s.own_set;
+const isPicked = (s: SuggestSound, ref: string) => (picked.value[s.mcc_tag] ?? []).includes(ref);
+function togglePick(s: SuggestSound, ref: string, on: boolean) {
+  const cur = (picked.value[s.mcc_tag] ?? []).filter((r) => r !== ref);
+  picked.value = { ...picked.value, [s.mcc_tag]: on ? [...cur, ref] : cur };
+  replaceMessage.value = { ...replaceMessage.value, [s.mcc_tag]: "" };
+}
+/** Every es-MX variation of one record is ticked. */
+const mxRefs = (c: SuggestCandidate) => c.variation_refs.filter((v) => v.mx).map((v) => v.ce_line_ref);
+const allPicked = (s: SuggestSound, c: SuggestCandidate) => mxRefs(c).length > 0 && mxRefs(c).every((r) => isPicked(s, r));
+function togglePickAll(s: SuggestSound, c: SuggestCandidate, on: boolean) {
+  const mine = new Set(mxRefs(c));
+  const rest = (picked.value[s.mcc_tag] ?? []).filter((r) => !mine.has(r));
+  picked.value = { ...picked.value, [s.mcc_tag]: on ? [...rest, ...mine] : rest };
+  replaceMessage.value = { ...replaceMessage.value, [s.mcc_tag]: "" };
+}
+/** Ticked refs in the card's order (record by record, variation by variation): that is the new takes' order. */
+const pickedInOrder = (s: SuggestSound) => {
+  const set = new Set(picked.value[s.mcc_tag] ?? []);
+  return s.candidates.flatMap((c) => c.variation_refs.map((v) => v.ce_line_ref)).filter((r) => set.has(r));
+};
+const pickedLabel = (s: SuggestSound) => {
+  const by = new Map<string, number[]>();
+  for (const r of pickedInOrder(s)) {
+    const c = s.candidates.find((x) => x.variation_refs.some((v) => v.ce_line_ref === r));
+    const key = c?.display_key ?? r.split("#")[0];
+    by.set(key, [...(by.get(key) ?? []), variationNo(r)]);
+  }
+  return [...by].map(([k, ns]) => `${k}: variation${ns.length > 1 ? "s" : ""} ${ns.join(", ")}`);
+};
+
+async function submitReplacement(s: SuggestSound) {
+  const refs = pickedInOrder(s);
+  if (!refs.length) return;
+  replaceBusy.value = s.mcc_tag;
+  replaceError.value = { ...replaceError.value, [s.mcc_tag]: "" };
+  replaceMessage.value = { ...replaceMessage.value, [s.mcc_tag]: "" };
+  try {
+    // The sound's current state, read now: the request names these versions, so a change made elsewhere since
+    // (another tab, another editor) is refused instead of overwritten.
+    const snd = await api.sound(s.mcc_tag);
+    if (!snd.allowed) throw new Error(`This sound can't be replaced: ${snd.reason}.`);
+    if (snd.mode !== "per_take") {
+      throw new Error(snd.mode === "spain_plus_added"
+        ? "This sound already has added takes. Open it in Matching to decide its takes there."
+        : "This sound already has a replacement set (in force or staged). Open it in Matching to change it.");
+    }
+    const decided = snd.spain_takes.filter((t) => t.mapping_id);
+    const approvedDecisions = decided.filter((t) => t.decision?.audio === "approved" || t.decision?.subtitle === "approved");
+    const used = s.candidates.flatMap((c) => c.used_by.length && c.variation_refs.some((v) => refs.includes(v.ce_line_ref))
+      ? [`${c.display_key} (${c.used_by.join(", ")})`] : []);
+    const lines = [
+      `${s.tag_name} will play ONLY these ${refs.length} Campaign Evolved es-MX recording(s), unedited, each approved now:`,
+      ...pickedLabel(s).map((l) => `  • ${l}`),
+      "",
+      `Spain's ${snd.spain_takes.length} take(s) of this sound are removed from the game build.`,
+    ];
+    if (decided.length) {
+      lines.push(`${decided.length} line decision(s) of this sound are cleared` +
+        (approvedDecisions.length ? ` (${approvedDecisions.length} approved: marked Needs rework first)` : "") +
+        ". They are kept in the set's record; \"Undo the replacement set\" in Matching brings them back.");
+    }
+    if (snd.has_subtitle_entry) {
+      lines.push("This sound has a subtitle entry: its set subtitle stays undecided (MCC's text stays). Choose it " +
+        "under Takes of this sound in Matching.");
+    }
+    if (used.length) lines.push(`Already used by other decisions: ${used.join("; ")}.`);
+    lines.push("", "To change a take later: Needs rework under Takes of this sound in Matching.");
+    const ok = await confirmAction({
+      title: "Replace and approve",
+      message: lines.join("\n"),
+      confirmLabel: `Replace and approve ${refs.length} take(s)`,
+      tone: "warning",
+    });
+    if (!ok) return;
+    const r = await api.ownSetOn({
+      mcc_tag: s.mcc_tag, loaded_takes_sha256: snd.version, loaded_sound_sha256: snd.sound_version,
+      clear_mapping_ids: decided.map((t) => t.mapping_id as string),
+      audio_list: refs.map((ce_line_ref) => ({ ce_line_ref, language: MX })),
+      approve: true, confirm: true,
+    });
+    if (!r.saved) throw new Error(r.message ?? "Nothing was saved.");
+    picked.value = { ...picked.value, [s.mcc_tag]: [] };
+    replaceMessage.value = { ...replaceMessage.value, [s.mcc_tag]:
+      `Replaced: ${s.tag_name} now plays ${r.approved?.length ?? 0} approved es-MX take(s)` +
+      (r.skipped?.length ? ` (${r.skipped.length} skipped: already a take)` : "") +
+      (r.cleared?.length ? `; ${r.cleared.length} line decision(s) cleared` : "") + "." };
+    await load();
+  } catch (e) {
+    replaceError.value = { ...replaceError.value, [s.mcc_tag]: describe(e) };
+  } finally {
+    replaceBusy.value = null;
+  }
+}
+/** Messages of sounds that left the list after their replacement (show = undecided). */
+const doneElsewhere = computed(() => Object.entries(replaceMessage.value)
+  .filter(([tag, m]) => m && !(data.value?.sounds ?? []).some((s) => s.mcc_tag === tag)).map(([, m]) => m));
+
 watch(() => [route.query.level, route.query.scope, route.query.show, route.query.character], () => {
   if (route.name === "suggest") void load();
 });
@@ -183,8 +293,10 @@ onMounted(async () => {
       English subtitle. Sounds with no English subtitle (AI barks) are compared <strong>by sound</strong>: each MCC
       English take against Campaign Evolved's English variations, ignoring volume (many are the same recording). Barks
       that were not compared by sound are compared <strong>by name</strong>, with CE's abbreviations spelled out.
-      Every take and variation can be played. This page only reads: nothing is saved, selected or approved here. Open
-      a line in Matching and decide there as usual.
+      Every take and variation can be played. Suggestions are only a reading aid: open a line in Matching and decide
+      there as usual. On a sound compared by sound you can also tick Campaign Evolved variations and
+      <strong>Submit and approve selected replacement</strong>: after you confirm, the sound plays only those es-MX
+      recordings, approved.
     </p>
 
     <div class="row filters">
@@ -251,6 +363,8 @@ onMounted(async () => {
         </button>
         <span class="small muted">One request: every bark of the level against the CE records in scope.</span>
       </div>
+      <StateMessage v-for="(m, i) in doneElsewhere" :key="`done${i}`" kind="success" class="small"
+                    data-testid="replace-done">{{ m }}</StateMessage>
       <StateMessage v-if="folderMessage" kind="success" class="small">{{ folderMessage }}</StateMessage>
       <StateMessage v-if="folderError" kind="error" class="small">{{ folderError }}</StateMessage>
       <StateMessage v-if="!data.sounds.length" kind="empty">
@@ -381,9 +495,21 @@ onMounted(async () => {
                 <div class="muted">{{ c.es_mx ?? "(no es-MX subtitle)" }}</div>
               </td>
               <td class="actions">
-                <details v-if="canListen && c.variations > 1 && s.mode !== 'text'" class="variations">
+                <details v-if="canListen && c.variations > 1 && s.mode !== 'text'" class="variations"
+                         :open="canReplace(s) || undefined">
                   <summary>{{ c.variations }} variations</summary>
+                  <label v-if="canReplace(s) && mxRefs(c).length" class="variation pick-all small"
+                         title="Tick every es-MX variation of this record">
+                    <input type="checkbox" :checked="allPicked(s, c)" data-testid="pick-all"
+                           @change="togglePickAll(s, c, ($event.target as HTMLInputElement).checked)" />
+                    all
+                  </label>
                   <div v-for="v in c.variation_refs" :key="v.ce_line_ref" class="variation">
+                    <input v-if="canReplace(s)" type="checkbox" :checked="isPicked(s, v.ce_line_ref)" :disabled="!v.mx"
+                           :aria-label="`Use es-MX variation ${variationNo(v.ce_line_ref)} of ${c.display_key}`"
+                           :title="v.mx ? 'Use this es-MX variation as a take' : 'No es-MX recording'"
+                           data-testid="pick-variation" :data-ref="v.ce_line_ref"
+                           @change="togglePick(s, v.ce_line_ref, ($event.target as HTMLInputElement).checked)" />
                     <span class="muted">{{ variationNo(v.ce_line_ref) }}</span>
                     <AudioButton v-if="v.en" :url="audioUrl.ce(v.ce_line_ref, 'English(US)')" label="EN"
                                  :title="`CE English variation ${variationNo(v.ce_line_ref)}`" />
@@ -392,6 +518,11 @@ onMounted(async () => {
                   </div>
                 </details>
                 <template v-else>
+                  <input v-if="canReplace(s)" type="checkbox" :checked="isPicked(s, c.ce_line_ref)"
+                         :disabled="!c.has_es_mx_audio" :aria-label="`Use the es-MX recording of ${c.display_key}`"
+                         :title="c.has_es_mx_audio ? 'Use this es-MX recording as a take' : 'No es-MX recording'"
+                         data-testid="pick-variation" :data-ref="c.ce_line_ref"
+                         @change="togglePick(s, c.ce_line_ref, ($event.target as HTMLInputElement).checked)" />
                   <AudioButton v-if="canListen && c.variation_refs[0]?.en" :url="audioUrl.ce(c.ce_line_ref, 'English(US)')"
                                label="EN" title="Campaign Evolved English" />
                   <AudioButton v-if="canListen && c.has_es_mx_audio" :url="audioUrl.ce(c.ce_line_ref, 'Spanish(Mexico)')"
@@ -408,6 +539,25 @@ onMounted(async () => {
         <StateMessage v-if="!s.candidates.length" kind="empty">
           No CE {{ s.mode === "name" ? "record in scope shares a word with this name" : "line in scope shares anything with this text" }}.
         </StateMessage>
+
+        <div v-if="canReplace(s) && s.candidates.length" class="row replace" data-testid="replace-bar">
+          <button type="button" class="icon-label small primary"
+                  :disabled="!(picked[s.mcc_tag]?.length) || replaceBusy !== null" data-testid="replace-approve"
+                  :title="`Replace all ${s.spanish_takes.length} Spain take(s) of this sound with the ticked es-MX variations, approved (asks first)`"
+                  @click="submitReplacement(s)">
+            <CheckCheck :size="14" aria-hidden="true" />
+            {{ replaceBusy === s.mcc_tag ? "Saving…" : "Submit and approve selected replacement" }}
+          </button>
+          <span class="small muted">
+            <template v-if="picked[s.mcc_tag]?.length">{{ picked[s.mcc_tag].length }} es-MX variation(s) ticked →
+              replaces Spain's {{ s.spanish_takes.length }} take(s).
+              <button type="button" class="link small" @click="picked = { ...picked, [s.mcc_tag]: [] }">Clear</button>
+            </template>
+            <template v-else>Tick the variations that should replace Spain's {{ s.spanish_takes.length }} take(s).</template>
+          </span>
+        </div>
+        <StateMessage v-if="replaceError[s.mcc_tag]" kind="error" class="small">{{ replaceError[s.mcc_tag] }}</StateMessage>
+        <StateMessage v-if="replaceMessage[s.mcc_tag]" kind="success" class="small">{{ replaceMessage[s.mcc_tag] }}</StateMessage>
 
         <div class="row ai">
           <button type="button" class="icon-label small" :disabled="!canAskAi || aiBusy !== null || !s.candidates.length"
@@ -547,8 +697,17 @@ mark {
   font-weight: 700;
   text-decoration: underline;
 }
-.ai {
+.ai,
+.replace {
   margin-top: 0.5rem;
+}
+.replace {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pick-all {
+  cursor: pointer;
 }
 .ai-ranking li {
   margin: 0.2rem 0;

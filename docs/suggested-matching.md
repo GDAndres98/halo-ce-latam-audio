@@ -12,8 +12,9 @@ This lifts the earlier "no tool proposes, scores, ranks or pre-fills CE↔MCC pa
 Everything else still holds:
 - The Matching page lists CE lines in catalog order, filtered only.
 - Tools never write `mappings/`.
-- No pair is ever saved without the owner's click in Matching.
-- Agents never pick pairs.
+- No pair is ever saved without the owner's own click and confirmation: in Matching, or on this tab with *Submit
+  and approve selected replacement* (§2f, owner 2026-11-07).
+- Agents never pick pairs, never tick variations and never press that button.
 
 ## 1. What the tab shows
 
@@ -175,6 +176,32 @@ Result, 2026-10-24 (takes ≥ 0.8 / all; owner-matched sounds whose top audio re
   pattern repeats: for `unexpectedenemy` the audio points every marine to `01contact_ambush` (3 to 5 takes), where
   the owner chose `01contact_srprs`.
 
+## 2f. Replace and approve from the tab (owner request, 2026-11-07)
+
+On a sound compared **by sound** (§2c), the owner can turn the suggestion straight into a decision, "when the audios
+were successfully compared":
+
+- Each CE variation in the card's *variations* list (and a one-variation record's row) has a checkbox; *all* ticks
+  every es-MX variation of that record. Variations of several records can be combined. Nothing is ever ticked by the
+  page. A variation without es-MX audio can't be ticked.
+- **Submit and approve selected replacement** reads the sound's current state (`GET /api/takes/sound`) and asks first.
+  The dialog lists the ticked variations, Spain's takes that leave the build, the line decisions it clears (approved
+  ones are marked Needs rework first, in the same save) and recordings already used elsewhere.
+- On confirm, it is mode C, "Replace every take of this sound" (`docs/custom-take-set-design.md`): the sound plays
+  **only** the ticked es-MX recordings, unedited, in the card's order. It runs as `POST /api/takes/own_set_on` with
+  `approve: true, confirm: true`, so the set, its takes and their approvals are **one save**: a third checked step of
+  explicit user `approve` actions, after the existing rework and replace steps. The set's provenance (`kind
+  replace`) keeps the cleared decisions; *Undo the replacement set* in Matching restores them.
+- **Only for sounds in per-take mode.** A sound with added takes, or with a replacement set (staged or in force), is
+  refused with "Open it in Matching". Stereo sounds are refused (`take_rule`). The 409 version checks are the same as
+  in Matching, so a change made elsewhere meanwhile is never overwritten.
+- A sound with a SU/SP entry keeps its set subtitle undecided (MCC's text stays). The owner chooses it under *Takes of
+  this sound*.
+- To change a take later: *Needs rework* under *Takes of this sound* in Matching. The read-only listener and visitors
+  don't see the checkboxes; the server refuses the POST for them anyway.
+- Test: the replace step of `npm run test:suggest` (disposable data; `marines`). Cancel writes nothing; confirm changes
+  only that sound.
+
 ## 2d. Written reviews (no API key)
 
 The owner can't create API keys, and the Claude API can't listen to audio anyway. So a Claude Code session reviews a
@@ -237,8 +264,10 @@ The server modules themselves stay stdlib only: `anthropic` is imported only ins
 | `GET /api/suggest?level=&scope=mapped\|all\|M01&show=undecided\|all&limit=5&character=vo_sys_grunt\|all` | Scores for every sound of the level; `ai` = SDK/credential status |
 | `POST /api/suggest/rerank` `{mcc_tag, scope, character}` | Claude's ranking of that sound's shortlist (cached) |
 | `POST /api/suggest/folder` `{level, scope, character}` | Barks: Claude's picks for every unsubtitled sound of a level, one request (cached) |
+| `GET /api/takes/sound?mcc_tag=` | One sound's takes, line decisions and versions (read-only; §2f reads it before asking) |
+| `POST /api/takes/own_set_on` `{…, approve: true, confirm: true}` | §2f: replace every take with the ticked recordings, approved, one save (owner-confirmed only) |
 
-Both are read-only for `mappings/`. Neither is in `public_view.PUBLIC_GETS`.
+The `/api/suggest*` endpoints are read-only for `mappings/`. None of these are in `public_view.PUBLIC_GETS`.
 
 ## 5. Tests
 

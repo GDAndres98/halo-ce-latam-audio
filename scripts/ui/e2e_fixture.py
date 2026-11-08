@@ -78,6 +78,9 @@ def main():
     if (REPO_ROOT / "config" / "audio_export.json").exists():
         (dest / "config").mkdir(exist_ok=True)
         shutil.copy2(REPO_ROOT / "config" / "audio_export.json", dest / "config" / "audio_export.json")
+    if (REPO_ROOT / "config" / "suggest_characters.json").exists():  # the owner's character map (Suggestions)
+        (dest / "config").mkdir(exist_ok=True)
+        shutil.copy2(REPO_ROOT / "config" / "suggest_characters.json", dest / "config" / "suggest_characters.json")
     if (REPO_ROOT / "config" / "interference").is_dir():  # the one-off interference defaults (text only)
         shutil.copytree(REPO_ROOT / "config" / "interference", dest / "config" / "interference", dirs_exist_ok=True)
     link = link_work(dest)

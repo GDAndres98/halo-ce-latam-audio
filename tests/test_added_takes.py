@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import mapping_db, mapping_store  # noqa: E402
 from common.mapping_store import ProtectedError, UserAction  # noqa: E402
+from common.own_set_state import is_active  # noqa: E402
 from common.project_validation import added_take_findings, level_progress, own_set_findings  # noqa: E402
 from m4_app import ApiError, M4App  # noqa: E402
 from test_m3_validation import mcc_record  # noqa: E402
@@ -242,6 +243,35 @@ class AddedTakeTests(unittest.TestCase):
         self.assertIn("es:Z10_030_death#0", ids("draft"))
         self.act("t-000001", "approve")
         self.assertIn("es:Z10_030_death#0", ids("approved"))
+
+    def test_own_set_on_with_approve_approves_only_the_new_takes_in_one_save(self):
+        """Suggestions tab, "Submit and approve selected replacement" (owner, 2026-11-07): the set, its takes and
+        their approvals are one save; existing takes are never approved; confirm is required."""
+        self.app.take_add_many({"mcc_tag": DEATH, "loaded_takes_sha256": self.version(),
+                                "audio_list": [{"ce_line_ref": "line_a#0", "language": MX}]})  # t-000001, a draft
+        body = {"mcc_tag": DEATH, "clear_mapping_ids": [], "approve": True,
+                "audio_list": [{"ce_line_ref": "line_b#0", "language": MX}, {"ce_line_ref": "line_a#0", "language": MX}]}
+        before = self.path.read_bytes()
+        with self.assertRaises(ApiError) as e:  # approve without the owner's confirmation
+            self.app.own_set_on({**body, "loaded_takes_sha256": self.version(), "loaded_sound_sha256": self.sv(DEATH)})
+        self.assertEqual(e.exception.status, 400)
+        self.assertEqual(self.path.read_bytes(), before)
+        r = self.app.own_set_on({**body, "confirm": True, "loaded_takes_sha256": self.version(),
+                                 "loaded_sound_sha256": self.sv(DEATH)})
+        self.assertEqual((r["saved"], r["added"], r["skipped"], r["approved"]),
+                         (True, ["t-000002"], ["line_a#0"], ["t-000002"]))
+        doc = self.doc()
+        self.assertEqual([(t["take_id"], t["audio"]["status"], bool(t["audio"]["fingerprint"]))
+                          for t in doc["added_takes"]], [("t-000001", "draft", False), ("t-000002", "approved", True)])
+        own = doc["own_sets"][0]
+        self.assertTrue(is_active(own))
+        self.assertEqual([(t["take_id"], t["origin"]) for t in own["provenance"]["takes"]],
+                         [("t-000001", "existing"), ("t-000002", "created")])
+        conn = sqlite3.connect(self.root / "mappings/manual_mappings.db")  # one save, recorded as the replace action
+        reasons = [x[0] for x in conn.execute("SELECT reason FROM added_take_history WHERE take_id = 't-000002'")]
+        conn.close()
+        self.assertEqual(len(reasons), 1)
+        self.assertTrue(reasons[0].startswith("take-set:replace:"))
 
     def test_own_set_rules_progress_and_off(self):
         with self.assertRaises(ApiError) as e:  # nothing to replace the takes with

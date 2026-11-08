@@ -1,4 +1,4 @@
-import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit, SetSubtitleChoice, SuggestResponse, RerankResponse, FolderMatchResponse } from "./types";
+import type { AudioEdit, BuildDetail, BuildJob, BuildKind, BuildPreview, BuildScope, DeployEvent, DeployStatus, InstallPlan, ExportSettings, LevelMode, BuildsResponse, CeLine, CeResponse, DataStatus, ImportPreview, EditPreviewResponse, SaveBody, SaveResponse, SlotDetail, SlotsResponse, StateResponse, SessionInfo, NetworkInfo, InterferenceReference, TakeResponse, ConversionPreview, ConversionInventory, ConversionResponse, ApprovableTakes, RevertPreview, CombineEdit, SetSubtitleChoice, SuggestResponse, RerankResponse, FolderMatchResponse, SoundTakes } from "./types";
 
 /** An error the API reported, with the HTTP status (409 = stale or conflicting, 400 = refused). */
 export class ApiError extends Error {
@@ -169,8 +169,13 @@ export const api = {
   ownSetOn: (body: { mcc_tag: string; loaded_takes_sha256: string; loaded_sound_sha256: string;
                      clear_mapping_ids: string[]; audio_list?: { ce_line_ref: string; language: string }[];
                      /** Subtitled sounds: the set's one subtitle, saved as a draft. */
-                     subtitle?: SetSubtitleChoice }) =>
+                     subtitle?: SetSubtitleChoice;
+                     /** Suggestions tab (owner 2026-11-07): the new takes are approved in the same save. Only after
+                      * the owner confirmed it in the dialog. */
+                     approve?: true; confirm?: true }) =>
     request<TakeResponse>("/api/takes/own_set_on", postJson(body)),
+  /** One sound's takes, line decisions and versions (read-only). */
+  sound: (mcc_tag: string) => request<SoundTakes>(`/api/takes/sound${query({ mcc_tag })}`),
   ownSetOff: (body: { mcc_tag: string; loaded_takes_sha256: string }) =>
     request<TakeResponse>("/api/takes/own_set_off", postJson(body)),
   /** The ONE subtitle of a subtitled sound's own set (owner 2026-10-19): save (draft), approve, Needs rework; null

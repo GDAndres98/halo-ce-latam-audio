@@ -1706,10 +1706,18 @@ class M4App:
         plus the recordings in audio_list, added as drafts in the same save (already a take: skipped). At least one
         take must result. An explicit user action that clears the sound's line decisions:
         approved ones are first marked Needs rework (a user action, revision + 1), then every decision of the sound
-        is removed. clear_mapping_ids must list exactly the decisions the page showed, or nothing is done."""
+        is removed. clear_mapping_ids must list exactly the decisions the page showed, or nothing is done.
+
+        approve: true (with confirm: true): the owner's confirmed "Submit and approve selected replacement" on the
+        Suggestions tab (owner request, 2026-11-07, docs/suggested-matching.md §2f). The takes this request creates
+        are approved in the same save (a third checked step of explicit user 'approve' actions), so the set is never
+        left half done. Takes that already existed are never approved here."""
         with self._save_lock:
             tag = body.get("mcc_tag")
             self._tag_record(tag)
+            approve = body.get("approve") is True
+            if approve and body.get("confirm") is not True:
+                raise ApiError(400, "approving the new takes needs confirm: true")
             doc, sha = self._mappings()
             local, lsha = self._local()
             if body.get("loaded_takes_sha256") != self.takes_version(doc, tag, local):
@@ -1788,6 +1796,19 @@ class M4App:
             if not takes:
                 new_doc.pop("added_takes")
             steps.append((new_doc, []))
+            if approve and added:
+                # The provenance records each take's specification (recording, language, recipe), not its status:
+                # approving in a later step leaves the set's record unchanged, as check_transition requires.
+                final = copy.deepcopy(new_doc)
+                final_by_id = {t["take_id"]: t for t in final["added_takes"]}
+                approvals = []
+                for tid in added:
+                    t = final_by_id[tid]
+                    t["audio"].update(status="approved", approved_at=self.today(),
+                                      fingerprint=added_take_fingerprint(t, self.ce_idx, self.mcc_idx, new_local))
+                    approvals.append(UserAction("approve", tid, "audio"))
+                steps.append((final, approvals))
+                new_doc = final
             errors = self._conversion_errors(new_doc, new_local, {tag})
             if errors:
                 raise ApiError(422, "the result would not be valid; nothing was saved", errors)
@@ -1807,7 +1828,8 @@ class M4App:
             self.validate_soon()
             return {"saved": True, "sha256": new_sha, "sound": self.sound(tag),
                     "cleared": [s["mapping_id"] for s in mine], "added": added, "skipped": skipped,
-                    "reworked": [f"{a.mapping_id}/{a.field}" for a in actions]}
+                    "reworked": [f"{a.mapping_id}/{a.field}" for a in actions],
+                    "approved": list(added) if approve else []}
 
     def own_set_off(self, body):
         """body: {mcc_tag, loaded_takes_sha256}. Back to Spain's takes + added takes. Cleared decisions do not come

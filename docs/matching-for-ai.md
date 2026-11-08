@@ -13,8 +13,9 @@ There are two read-only **catalogs**: MCC (what the game plays: Spanish/Spain ba
 Evolved has: es-MX recordings and subtitles). They never reference each other. The **only** place they meet is the
 owner's decision file `mappings/manual_mappings.json`. For each MCC **slot** (one Spanish bank sample) the owner
 records a **match** (which CE lines correspond), an **audio** decision (what plays) and a **subtitle** decision (what
-text shows), each approved separately. Tools never create matches and never approve. The read-only Suggestions tab
-(owner, 2026-10-23, `docs/suggested-matching.md`) scores and ranks candidates; it never writes or pre-fills.
+text shows), each approved separately. Tools never create matches and never approve. The Suggestions tab
+(owner, 2026-10-23, `docs/suggested-matching.md`) scores and ranks candidates; it never pre-fills. Its one write is
+the owner's confirmed *Submit and approve selected replacement* on a by-sound card (2026-11-07, §2f there).
 The build (M6) reads only **approved** decisions and writes candidate game files; untouched data stays
 byte-identical.
 
@@ -325,7 +326,8 @@ Vue Studio (frontend/src)  ──HTTP──►  scripts/ui/m4_server.py  ──�
 | `POST /api/takes/add_many` | `{mcc_tag, loaded_takes_sha256, audio_list}` | Several new draft takes in one save |
 | `POST /api/takes/approve_many` | `{mcc_tag, loaded_takes_sha256, take_ids, confirm: true}` | The owner's confirmed approval of exactly the listed takes, one save (all or nothing); never called by agents |
 | `POST /api/takes/move` / `remove` | | Reorder / remove (not while approved) |
-| `POST /api/takes/own_set_on` | `{mcc_tag, loaded_takes_sha256, loaded_sound_sha256, clear_mapping_ids, audio_list?, subtitle?}` | Replace every take: clear the listed slot decisions (recorded), turn the set on, add drafts |
+| `POST /api/takes/own_set_on` | `{mcc_tag, loaded_takes_sha256, loaded_sound_sha256, clear_mapping_ids, audio_list?, subtitle?, approve?, confirm?}` | Replace every take: clear the listed slot decisions (recorded), turn the set on, add drafts. `approve: true` + `confirm: true` (Suggestions tab, owner-confirmed only) also approves the takes it creates, same save |
+| `GET /api/takes/sound?mcc_tag=` | | Read-only: one sound's takes, decisions and versions |
 | `POST /api/takes/own_set_off` | `{mcc_tag, loaded_takes_sha256}` | Back to Spain's takes (lines undecided; use undo to restore; an approved set subtitle is reworked in the same save) |
 | `POST /api/takes/set_subtitle` | `{mcc_tag, loaded_takes_sha256, subtitle?: {source, ce_locres?, custom_text?} \| null, actions?: [{action: approve\|needs_rework}]}` | The set's one subtitle (subtitled sound with a staged or active set) |
 | `GET /api/takes/convert/preview?mcc_tag=` / `inventory?level=` | | Read-only conversion preview of one sound / every multi-take sound |
@@ -393,7 +395,8 @@ Every CE replacement goes through the same render as the Studio preview: ffmpeg 
 
 - **Never** create, change, approve or rework decisions in `mappings/` yourself; never pick CE↔MCC pairs, never
   pre-fill or auto-match. Matching is manual only. The Suggestions tab's scores and Claude rankings are the owner's
-  reading aid, never a decision: don't turn them into saves. Never turn own sets on, add takes or mute lines yourself;
+  reading aid, never a decision: don't turn them into saves, and never tick variations or press *Submit and approve
+  selected replacement* (or call `own_set_on` with `approve`) yourself. Never turn own sets on, add takes or mute lines yourself;
   never stage, switch, cancel or undo a replacement set on the real mappings (the read-only
   `scripts/validate/take_set_inventory.py` is fine).
 - Write `manual_mappings.json` only through `mapping_store` (and only from code paths driven by an owner action).

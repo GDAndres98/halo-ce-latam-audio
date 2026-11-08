@@ -6,8 +6,13 @@
 // (a10_010_cryotech's best is VO_SCR_M01_00460_CryoTech, its identical English line), "Open" goes to Matching with the
 // MCC line open and the CE list filtered to the suggested line, and nothing is written: the disposable mappings and
 // the real ones hash the same before and after. Also a phone-width screenshot.
+//
+// Replace and approve (owner, 2026-11-07, docs/suggested-matching.md §2f): on a grunt bark compared by sound, ticking
+// variations and pressing "Submit and approve selected replacement" asks first; Cancel writes nothing; confirming
+// turns the sound's replacement set on with exactly the ticked es-MX variations, approved, in the DISPOSABLE copy.
+// The disposable mappings then differ only by that sound; the real ones never change.
 
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
@@ -43,7 +48,9 @@ async function main() {
   const realBefore = fixture.real_mappings_sha256;
   const copyFile = join(fixture.root, "mappings", "manual_mappings.json");
   const copyBefore = await sha256File(copyFile);
+  const copyBeforeDoc = JSON.parse(await readFile(copyFile, "utf-8"));
   const services = new Services(fixture.root);
+  let replaced = null;  // {tag, refs}: the one sound the replace step changed in the disposable copy
   let browser;
   try {
     await step("start the API and the Studio on disposable data", async () => {
@@ -127,6 +134,60 @@ async function main() {
       return summary;
     });
 
+    await step("by-sound card: tick variations, Cancel writes nothing, confirm saves an approved replacement set", async () => {
+      await page.goto(`http://localhost:${WEB_PORT}/#/`);  // leave the page: the summary below is marines' own
+      await page.getByTestId("suggest-summary").waitFor({ state: "detached", timeout: 15000 });
+      await page.goto(`http://localhost:${WEB_PORT}/#/suggest?level=marines&show=all`);
+      await page.getByTestId("suggest-summary").waitFor({ timeout: 60000 });
+      await page.locator("section.sound").first().waitFor({ timeout: 60000 });
+      const bars = page.getByTestId("replace-bar");
+      if (!(await bars.count())) return "no by-sound card without a replacement set in this data: skipped";
+      // A sound with per-take decisions only (no added takes, no set): the flow refuses the others, by design.
+      let card = null, tag = null;
+      for (const sec of await page.locator("section.sound").all()) {
+        if (!(await sec.getByTestId("replace-bar").count())) continue;
+        const t = await sec.getAttribute("data-sound");
+        const snd = await (await page.request.get(
+          `http://localhost:${WEB_PORT}/api/takes/sound?mcc_tag=${encodeURIComponent(t)}`)).json();
+        if (snd.mode === "per_take" && snd.allowed) { tag = t; break; }
+      }
+      if (tag) card = page.locator(`section[data-sound="${tag.replace(/\\/g, "\\\\")}"]`);
+      if (!card) return "no per-take by-sound card: skipped";
+      const button = card.getByTestId("replace-approve");
+      check(await button.isDisabled(), "the button is enabled before anything is ticked");
+      const row = card.locator("tbody tr").first();
+      const all = row.getByTestId("pick-all");
+      if (await all.count()) await all.check(); else await row.getByTestId("pick-variation").first().check();
+      const refs = [];
+      for (const box of await row.getByTestId("pick-variation").all()) {
+        if (await box.isChecked()) refs.push(await box.getAttribute("data-ref"));
+      }
+      check(refs.length > 0 && !(await button.isDisabled()), `ticked ${refs.length}`);
+      const before = await sha256File(copyFile);
+      await card.screenshot({ path: join(OUT, "suggest-replace-card.png") });
+      await button.click();
+      const dialog = page.locator("dialog.confirm-dialog");
+      await dialog.waitFor({ timeout: 15000 });
+      check(/ONLY these/.test(await text(dialog)), `dialog: ${await text(dialog)}`);
+      await page.screenshot({ path: join(OUT, "suggest-replace-dialog.png"), fullPage: false });
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      check((await sha256File(copyFile)) === before, "Cancel wrote something");
+      await button.click();
+      await dialog.getByRole("button", { name: /^Replace and approve/ }).click();
+      await page.getByText(/^Replaced: /).first().waitFor({ timeout: 30000 });
+      const doc = JSON.parse(await readFile(copyFile, "utf-8"));
+      const own = (doc.own_sets ?? []).find((o) => o.mcc_tag === tag);
+      check(own && !own.state, "the replacement set is not in force");
+      const takes = (doc.added_takes ?? []).filter((t) => t.mcc_tag === tag);
+      check(JSON.stringify(takes.map((t) => t.audio.sources[0].ce_line_ref)) === JSON.stringify(refs),
+            `takes ${takes.map((t) => t.audio.sources[0].ce_line_ref)} vs ticked ${refs}`);
+      check(takes.every((t) => t.audio.status === "approved" && t.audio.sources[0].language === "Spanish(Mexico)"),
+            "every new take approved, es-MX");
+      check(!doc.slots.some((x) => x.mcc_tag === tag), "the sound's line decisions are still there");
+      replaced = { tag, refs };
+      return `${tag.split("\\").pop()}: ${refs.length} take(s) approved`;
+    });
+
     await step("the take and variation audio URLs answer with WAV", async () => {
       const api = (u) => page.request.get(`http://localhost:${WEB_PORT}${u}`);
       const mcc = await api("/audio/mcc?level=grunt&lang=english&index=1213");
@@ -149,7 +210,16 @@ async function main() {
     await services.down();
   }
   const copyAfter = await sha256File(copyFile);
-  record("the page wrote nothing (disposable mappings unchanged)", copyAfter === copyBefore, copyAfter.slice(0, 16));
+  if (!replaced) {
+    record("the page wrote nothing (disposable mappings unchanged)", copyAfter === copyBefore, copyAfter.slice(0, 16));
+  } else {  // only the replaced sound changed: its decisions, takes and set; every other sound as before
+    const strip = (doc) => JSON.stringify({ ...doc, slots: doc.slots.filter((x) => x.mcc_tag !== replaced.tag),
+      added_takes: (doc.added_takes ?? []).filter((t) => t.mcc_tag !== replaced.tag),
+      own_sets: (doc.own_sets ?? []).filter((o) => o.mcc_tag !== replaced.tag) });
+    const after = JSON.parse(await readFile(copyFile, "utf-8"));
+    record("only the replaced sound changed in the disposable mappings", strip(after) === strip(copyBeforeDoc),
+           replaced.tag.split("\\").pop());
+  }
   const realAfter = await sha256File(join(HERE, "..", "..", "mappings", "manual_mappings.json"));
   record("the real mappings are unchanged by this test", realAfter === realBefore,
          realAfter === realBefore ? realAfter.slice(0, 16) : "changed: check whether the Studio saved meanwhile");
