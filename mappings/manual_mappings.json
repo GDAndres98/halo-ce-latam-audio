@@ -229429,6 +229429,2410 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "take_id": "t-001418",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+            "spanish": [
+              {
+                "slot_id": "es:blockedre%2001#2",
+                "index": 2674,
+                "data_sha256": "559e327ebfcad6b3f68defff8fb3ac350f478303a7b8489c7e605072317bffca"
+              },
+              {
+                "slot_id": "es:blockedre%2002#1",
+                "index": 2675,
+                "data_sha256": "6933aa746c403d4aac0fc173369b62240f17b112d072159a2b605a4398a67709"
+              },
+              {
+                "slot_id": "es:blockedre%2003#1",
+                "index": 2676,
+                "data_sha256": "8d7b8d01e7a8702fd19d9732ec529ff8177035b1e3c57bd913a5d76464434ecd"
+              },
+              {
+                "slot_id": "es:blockedre%2004#1",
+                "index": 2677,
+                "data_sha256": "a94825b67cbd5a57e8e8f9ebe00210e2fe2f8ada8f766d1c71a7a61147afc54c"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 977589218,
+                  "wem_sha256": "7dccdcfef018711bb258640840dfbdb20324f36b6c01e190c14b8aae96ee5f75"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001419",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+            "spanish": [
+              {
+                "slot_id": "es:blockedre%2001#2",
+                "index": 2674,
+                "data_sha256": "559e327ebfcad6b3f68defff8fb3ac350f478303a7b8489c7e605072317bffca"
+              },
+              {
+                "slot_id": "es:blockedre%2002#1",
+                "index": 2675,
+                "data_sha256": "6933aa746c403d4aac0fc173369b62240f17b112d072159a2b605a4398a67709"
+              },
+              {
+                "slot_id": "es:blockedre%2003#1",
+                "index": 2676,
+                "data_sha256": "8d7b8d01e7a8702fd19d9732ec529ff8177035b1e3c57bd913a5d76464434ecd"
+              },
+              {
+                "slot_id": "es:blockedre%2004#1",
+                "index": 2677,
+                "data_sha256": "a94825b67cbd5a57e8e8f9ebe00210e2fe2f8ada8f766d1c71a7a61147afc54c"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 375410246,
+                  "wem_sha256": "1c7b8d86cfeffbaa4a59ed5815a1b89d0eba518e63852107f15821ca792b0150"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001420",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+            "spanish": [
+              {
+                "slot_id": "es:blockedre%2001#2",
+                "index": 2674,
+                "data_sha256": "559e327ebfcad6b3f68defff8fb3ac350f478303a7b8489c7e605072317bffca"
+              },
+              {
+                "slot_id": "es:blockedre%2002#1",
+                "index": 2675,
+                "data_sha256": "6933aa746c403d4aac0fc173369b62240f17b112d072159a2b605a4398a67709"
+              },
+              {
+                "slot_id": "es:blockedre%2003#1",
+                "index": 2676,
+                "data_sha256": "8d7b8d01e7a8702fd19d9732ec529ff8177035b1e3c57bd913a5d76464434ecd"
+              },
+              {
+                "slot_id": "es:blockedre%2004#1",
+                "index": 2677,
+                "data_sha256": "a94825b67cbd5a57e8e8f9ebe00210e2fe2f8ada8f766d1c71a7a61147afc54c"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_11involuntary_bump_bisenti#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 478582209,
+                  "wem_sha256": "8984127da0951495a1d369e19ea5e43046a41268e4136b8c93c9263fb5715554"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001421",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 1069190804,
+                  "wem_sha256": "dfb7357d91b02c80c5ecfc7d26b51cc986479dab659f7a2958989e918adee504"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001422",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 23917643,
+                  "wem_sha256": "65df95ea2bd24e050c378b65a790ea29139235ae087c2cd133ed189d3b99ec4c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001423",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 687141853,
+                  "wem_sha256": "330425de76d6071c8caa3aa0e5955a8831f624fca05a1ca5f14205e801905d24"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001424",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_move_cvr_bisenti#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 843107677,
+                  "wem_sha256": "23d9f96fe520631a7f7d9775fd8290234708e0ffa9d506665e732a37a182bab3"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001425",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_newordr_arrival_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_newordr_arrival_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 696300472,
+                  "wem_sha256": "681f5236160052faab998c5096fda2d4cd5a32c406a162f52487ff532ce355e6"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001426",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_find_cvr_bisenti#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+            "spanish": [
+              {
+                "slot_id": "es:cover%2001#3",
+                "index": 2678,
+                "data_sha256": "e88153c153816a18ca0f6cc6cbb4c6eabb1121fefe94f2b0ec7ca659cedbce0f"
+              },
+              {
+                "slot_id": "es:cover%2002#3",
+                "index": 2679,
+                "data_sha256": "9866a25959d7938469a265f6d2888c54ba06a1f9858d264b21733400206b8fe2"
+              },
+              {
+                "slot_id": "es:cover%2003#2",
+                "index": 2680,
+                "data_sha256": "9625df4d0a9882303a660e957d7a6a8fc8163161d08bda781a50cb8b6f6ad5a0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_find_cvr_bisenti#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 672361576,
+                  "wem_sha256": "1f9b72ad1663619536c5099ff3692a619005baf1558795bbf0c33b4197172ec3"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001427",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 114379326,
+                  "wem_sha256": "dd33ad222fc85f1a0b229f33239f83f03f84b246fe2b8ce4112ed0b1df0e0d84"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001428",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 855412117,
+                  "wem_sha256": "ddefa5a52325e1bcd80d57e8976590375035eb1a8f170d6faa633c826815893f"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001429",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 399646436,
+                  "wem_sha256": "f5cd1a349139c8e96209a971f6cba5c9f0702a531f48e83c8c78e2822139b47d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001430",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 919529199,
+                  "wem_sha256": "01d5e86224d638dab1c1cabd8d3b8ee907f97b5797afca562cbbd2262387f68c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001431",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 754356045,
+                  "wem_sha256": "5d559784b4e5b4d300d81a80adce90aa66bbae776145cd6aa3faca43a0e42257"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001432",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 559459136,
+                  "wem_sha256": "6558318c9b645793a186b26ed3d8470949c391763cfc702ef5ae4e6e8c86d7db"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001433",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "position": 7,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncover%2001#2",
+                "index": 2681,
+                "data_sha256": "a77248ecb2aa22272256ecbe5af0d85bd2b0f2dbc2200ea3bc51f85cd724a08b"
+              },
+              {
+                "slot_id": "es:groupuncover%2002#2",
+                "index": 2682,
+                "data_sha256": "eb6b768a3de58376ec717fc564e17b5fe4cb4823fe7b01613f307d320d66eb7e"
+              },
+              {
+                "slot_id": "es:groupuncover%2003#2",
+                "index": 2683,
+                "data_sha256": "7fd3e4a1b0bf81122455d722f3ee4df713276dee9b8652913e34964667d566f4"
+              },
+              {
+                "slot_id": "es:groupuncover%2004#1",
+                "index": 2684,
+                "data_sha256": "0c40404e5f36c76973514a95f9dd92d90b880965032b74f67905568d36b09d91"
+              },
+              {
+                "slot_id": "es:groupuncover%2005#1",
+                "index": 2685,
+                "data_sha256": "6ef7219512db883ed8f7b7e2034b549554a1e02b845aa675d69e45094d32020c"
+              },
+              {
+                "slot_id": "es:groupuncover%2006#1",
+                "index": 2686,
+                "data_sha256": "b0c2c0dae3b5ac5fe811a0460d8dfe15a7eda7bfab810702964fafcadb4034f0"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_order_cover_fire_bisenti#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 133323910,
+                  "wem_sha256": "c3ba3128ac0681f7de1dbf730f17abd49ef368eae4e497151549082611e21e09"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001434",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 443987306,
+                  "wem_sha256": "440a8725ccf426362a7b09bac8675dad9b80e9f1a1c525e7903e105181c85c57"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001435",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 701022181,
+                  "wem_sha256": "0041b15df0d8f83fb36dae09cde0b2d12379f52b36ce3e7f5df6de71a014835d"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001436",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 364215720,
+                  "wem_sha256": "4ce38ef5e07e0bc68bafe3aec153cccc3f3424523c3bce337beea7acb558b3d2"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001437",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 239297972,
+                  "wem_sha256": "d604df0fa7c5d40b0c9a73067428b79840b69dbb1ac5e433c74f1c0819f68e85"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001438",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 206777940,
+                  "wem_sha256": "1bbae66bac992ecae7683e4ffde7c7491d6585ed8d5bf364a4b1e138e37a85c6"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001439",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 714833628,
+                  "wem_sha256": "f530f3d39fc0705dcd4087e839265d034cc7f5a610a272be5e021bd30fd2310b"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001440",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 7,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_cvr_re_bisenti#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 365775302,
+                  "wem_sha256": "6dfea423c87e983f6b2e404059179141f8507253196536b1c597de9780ad6bba"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001441",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 8,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_newordr_fllwplr_bisenti#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_newordr_fllwplr_bisenti#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 345835199,
+                  "wem_sha256": "80997836fb016ac061069188e6cb89ed3c5ef58119c858b4bb918206b2eceb5a"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001442",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 9,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_newordr_fllwplr_bisenti#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_newordr_fllwplr_bisenti#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 23736608,
+                  "wem_sha256": "9043eee81dc23dd05bdd25b30e295a8c2399d80527a1719d72d14ad9ebaa83e5"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001443",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "position": 10,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_09order_foeordr_fallback_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+            "spanish": [
+              {
+                "slot_id": "es:groupuncoverre%2001#2",
+                "index": 2687,
+                "data_sha256": "6a2b8a7811d9883540b9dd9a2c816a44cf51763f4721ef70ed1513d521691138"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2002#2",
+                "index": 2688,
+                "data_sha256": "8cbe01856aae10eb6db38de58f6fb16b6895ba349d9284039406e978d929655f"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2003#1",
+                "index": 2689,
+                "data_sha256": "6f966935287ec31f55b79e835acfa143ee806dd8a464deacb1cf4d32e9911f84"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2004#1",
+                "index": 2690,
+                "data_sha256": "efc9da9d6fbe7c8351ff020fd9b828e36923a30f54dc76876689b5b909c8df34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2005#1",
+                "index": 2691,
+                "data_sha256": "049b275ea22e978598ee0586c059f9bc123234e35e8077ee75211bac728c8c20"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2006#1",
+                "index": 2692,
+                "data_sha256": "8b0454d2e4e85f9f62bfc68ec3f5609c7414e92f256e91b5b1233d0a692f8d34"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2007#1",
+                "index": 2693,
+                "data_sha256": "7f5491d38e85dc2693efe5f03b855bf2f50b499a003c0078b606e24bc9803511"
+              },
+              {
+                "slot_id": "es:groupuncoverre%2008#1",
+                "index": 2694,
+                "data_sha256": "ece9c086d2d7ab8bcd29660a68c6c54c5b46230d0c22578da9f70acadd0ce4ce"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_09order_foeordr_fallback_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 78937477,
+                  "wem_sha256": "54a941c1ad848b8c7b76b0ecc5002a2619b98372d869815fc2e92fc31c4d8e56"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001444",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatgroupre%2001#2",
+                "index": 2695,
+                "data_sha256": "9f8b9bef15711d9ae372f83b67f8804bf1bb53aac40445a2696dc27d46071554"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2002#2",
+                "index": 2696,
+                "data_sha256": "2773e824aa73be877b3b80c1150692ef70104b9f28d666b84dd4ac983e2f9954"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2003#1",
+                "index": 2697,
+                "data_sha256": "80e73fdf2c22d10ff8924877f15f5f674faa4e3809c22be67de98f12e2947251"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2004#1",
+                "index": 2698,
+                "data_sha256": "02888d8493c90c64dabcf208f4c8d2a9a5eaecb3819db0ae74112db182d65120"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2005#1",
+                "index": 2699,
+                "data_sha256": "6a4ba95f97eeac98fbe4e26c3457263bf42c4d0b6621ebb5cd337f8848eab59b"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 766915328,
+                  "wem_sha256": "07461a5871014ced0cb62ea8ae3cdcbe07cb3e57258b94338c96ad0bf952ee14"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001445",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatgroupre%2001#2",
+                "index": 2695,
+                "data_sha256": "9f8b9bef15711d9ae372f83b67f8804bf1bb53aac40445a2696dc27d46071554"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2002#2",
+                "index": 2696,
+                "data_sha256": "2773e824aa73be877b3b80c1150692ef70104b9f28d666b84dd4ac983e2f9954"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2003#1",
+                "index": 2697,
+                "data_sha256": "80e73fdf2c22d10ff8924877f15f5f674faa4e3809c22be67de98f12e2947251"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2004#1",
+                "index": 2698,
+                "data_sha256": "02888d8493c90c64dabcf208f4c8d2a9a5eaecb3819db0ae74112db182d65120"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2005#1",
+                "index": 2699,
+                "data_sha256": "6a4ba95f97eeac98fbe4e26c3457263bf42c4d0b6621ebb5cd337f8848eab59b"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 276324617,
+                  "wem_sha256": "8c11fc19524280316ec353c044ab8fc9ef357d2f9824137911a4628326f0e45f"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001446",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatgroupre%2001#2",
+                "index": 2695,
+                "data_sha256": "9f8b9bef15711d9ae372f83b67f8804bf1bb53aac40445a2696dc27d46071554"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2002#2",
+                "index": 2696,
+                "data_sha256": "2773e824aa73be877b3b80c1150692ef70104b9f28d666b84dd4ac983e2f9954"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2003#1",
+                "index": 2697,
+                "data_sha256": "80e73fdf2c22d10ff8924877f15f5f674faa4e3809c22be67de98f12e2947251"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2004#1",
+                "index": 2698,
+                "data_sha256": "02888d8493c90c64dabcf208f4c8d2a9a5eaecb3819db0ae74112db182d65120"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2005#1",
+                "index": 2699,
+                "data_sha256": "6a4ba95f97eeac98fbe4e26c3457263bf42c4d0b6621ebb5cd337f8848eab59b"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 261172018,
+                  "wem_sha256": "ae8be1b4649f6ae0f2d63d982532b6826366c73db95e5b20c2955ac7322c2baf"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001447",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatgroupre%2001#2",
+                "index": 2695,
+                "data_sha256": "9f8b9bef15711d9ae372f83b67f8804bf1bb53aac40445a2696dc27d46071554"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2002#2",
+                "index": 2696,
+                "data_sha256": "2773e824aa73be877b3b80c1150692ef70104b9f28d666b84dd4ac983e2f9954"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2003#1",
+                "index": 2697,
+                "data_sha256": "80e73fdf2c22d10ff8924877f15f5f674faa4e3809c22be67de98f12e2947251"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2004#1",
+                "index": 2698,
+                "data_sha256": "02888d8493c90c64dabcf208f4c8d2a9a5eaecb3819db0ae74112db182d65120"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2005#1",
+                "index": 2699,
+                "data_sha256": "6a4ba95f97eeac98fbe4e26c3457263bf42c4d0b6621ebb5cd337f8848eab59b"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 801333087,
+                  "wem_sha256": "e0211694c4bac3aceeeb24c9f1558dcc9b4232c7b5e6ff173998751cfe5672e7"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001448",
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatgroupre%2001#2",
+                "index": 2695,
+                "data_sha256": "9f8b9bef15711d9ae372f83b67f8804bf1bb53aac40445a2696dc27d46071554"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2002#2",
+                "index": 2696,
+                "data_sha256": "2773e824aa73be877b3b80c1150692ef70104b9f28d666b84dd4ac983e2f9954"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2003#1",
+                "index": 2697,
+                "data_sha256": "80e73fdf2c22d10ff8924877f15f5f674faa4e3809c22be67de98f12e2947251"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2004#1",
+                "index": 2698,
+                "data_sha256": "02888d8493c90c64dabcf208f4c8d2a9a5eaecb3819db0ae74112db182d65120"
+              },
+              {
+                "slot_id": "es:newcombatgroupre%2005#1",
+                "index": 2699,
+                "data_sha256": "6a4ba95f97eeac98fbe4e26c3457263bf42c4d0b6621ebb5cd337f8848eab59b"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_ack_bisenti#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 2915157,
+                  "wem_sha256": "b8589f1dc82190881c239d630491b0bf5474499625c6d5b7861e5ff88b4bfa41"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-09",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "own_sets": [
@@ -300359,6 +302763,277 @@
             "origin": "created",
             "from_mapping_ids": [],
             "spec_sha256": "b1836c8920b9fd21ba6b733664217a5b9829eb4c21e338c14f900b2e175f903b"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\blockedre",
+      "set_at": "2026-11-09",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-485c0330ec11",
+        "created_at": "2026-11-09",
+        "activated_at": "2026-11-09",
+        "source_version": "485c0330ec114f42fcee70bf0046c57db229f27a448e17bebace3f93fad0c9c3",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001418",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "bde21833834b784bd731987a359ae42accc73a5171e19d0b95c46ea9d4fd1140"
+          },
+          {
+            "take_id": "t-001419",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "0fe1a5dde03ac7ddd8d8a0b4a0aa2786a6e8183ceed53f2641975d5d490d8c0b"
+          },
+          {
+            "take_id": "t-001420",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "8af1cfc2dd69cecec98b629e8b2d2a82e97be048d9f2c82a6ac859078109ea98"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\cover",
+      "set_at": "2026-11-09",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-98c6414c232e",
+        "created_at": "2026-11-09",
+        "activated_at": "2026-11-09",
+        "source_version": "98c6414c232ea5ce81c354572c23a146fa06aaf216cef3030ee13db036aefb3c",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001421",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "32e8f48cab5b65738ce7058384e77a40e6b7fc432c1df0687eaa934768ee02f0"
+          },
+          {
+            "take_id": "t-001422",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "3d2f4a7c2ab035672225768b853b38bd93407e25280071201370efcfa997df79"
+          },
+          {
+            "take_id": "t-001423",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "3144b626b30808c91c25fcdb2395bcd42de7d4a3847b962096bf8cb2dd35110e"
+          },
+          {
+            "take_id": "t-001424",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "fb5c892c76e1eaa38b78bd09aa52dbd5d46dd10f977295dc48f23cc2a3ebbe6f"
+          },
+          {
+            "take_id": "t-001425",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "9049fe5685461ad3dc037107506e0d45e13814eece0f98a0b777f2857de58ad5"
+          },
+          {
+            "take_id": "t-001426",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "3bda06aa7f161fc3595a4b29d959c0d522542a22903a8a7090ae4f0c3005aa15"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncover",
+      "set_at": "2026-11-09",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-862c9e5b5640",
+        "created_at": "2026-11-09",
+        "activated_at": "2026-11-09",
+        "source_version": "862c9e5b56403a0c6af53097b2ddd61323977920cb62acf19748a0656f1e26f8",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001427",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "fc95ae19a3d665930b21b0888c68f9391f0df18d727b360148d80c5a9f68292d"
+          },
+          {
+            "take_id": "t-001428",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "2bb2ed56a7780856a3ca5858663a8b4aa0f37170c4503010bfe82aa44fb02cf3"
+          },
+          {
+            "take_id": "t-001429",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "8e61cfa988bc381f352a5aa294a4369f0e22dd2352c564cceab782ddc4f90e3f"
+          },
+          {
+            "take_id": "t-001430",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "15e16cefcc7fed4627ce26fbd3692a14fa0fd0e073723367b45e3ef0b15067e3"
+          },
+          {
+            "take_id": "t-001431",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "7d87d059a982616a3d73b7843a93cba391c8f5fccfc4b99d5243e5f18a95a783"
+          },
+          {
+            "take_id": "t-001432",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "4473149915c237a24eb452bcdd43db839bb538e39694765df681bfdecc24dd66"
+          },
+          {
+            "take_id": "t-001433",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "30cfd14a910b2ff037fd9efed45979ca11263fe39180dd012823a77a4e75a274"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\groupuncoverre",
+      "set_at": "2026-11-09",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-d30579de658c",
+        "created_at": "2026-11-09",
+        "activated_at": "2026-11-09",
+        "source_version": "d30579de658c6ba2920a5e7f182b2684d5018304e286e1b055851c031dcfb4d1",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001434",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "ee3b727ea154f2dcc064ecc0670dc937d32525e87a679c22bd477bae2d8788ea"
+          },
+          {
+            "take_id": "t-001435",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "414ff2393c18315987d5ea1ad0267dfe25a79597842d96ca2d855343192e43b9"
+          },
+          {
+            "take_id": "t-001436",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "c49096cc81c1a71dca4fad2dba6dd6db814446ed09adbd649dc1e52ec47c1eda"
+          },
+          {
+            "take_id": "t-001437",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "b921e884febfd0fd4d3bc5150827c2242dfa1baf8e7814726a2c1d822a48bdae"
+          },
+          {
+            "take_id": "t-001438",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "bb349a7d8a434b29c40be00d3091775e19c75dcc2ff616e5c1ab5fea05c6355a"
+          },
+          {
+            "take_id": "t-001439",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "dd2b75fbda47223236367558ea88740a0116459169544e35416ae00142a43706"
+          },
+          {
+            "take_id": "t-001440",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "9d71b1366e5122d300f4a70b530d7e5eb0b402b4f16b9fd40aab143462bee92e"
+          },
+          {
+            "take_id": "t-001441",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "7361c651b574767421dff2868dcf951eb155da6eb6c791968a85ba6bfec4cf69"
+          },
+          {
+            "take_id": "t-001442",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "7efaf2ee43f692b63bfeb9abdc70dd2fb8301d9ddde0979a472b2198f384c290"
+          },
+          {
+            "take_id": "t-001443",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "69b0971a12ca282efe13f6bc90c6175df79cc2abb6f74a70273a7b84dfeb8830"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\bisenti\\conditional\\combat2\\groupcomm\\newcombatgroupre",
+      "set_at": "2026-11-09",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-4d0f36f3e256",
+        "created_at": "2026-11-09",
+        "activated_at": "2026-11-09",
+        "source_version": "4d0f36f3e2565ef11ad8f8820ee750004867182ea4ab9de9bffb9cd0672fa9fb",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001444",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "0315b3febb809eaa51ff7c7416afd85df7b2a0baa80948384a8f2a9a7329b892"
+          },
+          {
+            "take_id": "t-001445",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "e2db6fa93e627b5477f0a79f81e6dfc6eac336a25691f3daee924dd862a1cb42"
+          },
+          {
+            "take_id": "t-001446",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "63225353c99c44002916e8a1557d2dd00a0e1aa7a911399306c77169793a1bb7"
+          },
+          {
+            "take_id": "t-001447",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "6c0b13b4952202c445bee1ebeb81478ef2dd2f06f790f1ac854df187e92f6013"
+          },
+          {
+            "take_id": "t-001448",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "4dd32b4b183f98916effcc52bd1c515bdba8f0067260472983df303d4582afa9"
           }
         ],
         "acknowledged": []
