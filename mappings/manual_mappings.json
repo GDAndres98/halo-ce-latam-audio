@@ -231833,6 +231833,629 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "take_id": "t-001449",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 933178125,
+                  "wem_sha256": "83cbc819174b3cc7694abee8f1d33d1bd4ac899c190ad183aa393256554d6e08"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001450",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 48948989,
+                  "wem_sha256": "3f3b7e870b47d9c31070936280b1fe6deaacf59d620ae935bf0b1e2a35a6c930"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001451",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 288011780,
+                  "wem_sha256": "60e67a6af7118b15dbd3d4832afcd954f9b169b9002fe3b7d6105128497730bb"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001452",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 277824889,
+                  "wem_sha256": "695898fd2c541b1e0c13f56f5c5fbbdcc9d5912a560e5178d1c4730e84ce2980"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001453",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 193204845,
+                  "wem_sha256": "248b62666f4a3b89bc817f6ac185cdf5427de9813a7bf3b7a3f5524cc8d7af1f"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001454",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 446673615,
+                  "wem_sha256": "f29c56aaf6fd78c20f94321dbbe405e215c79efcfce18f5fb505763cc829a33c"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-001455",
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "position": 7,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemyfloodcombat%2001#4",
+                "index": 4606,
+                "data_sha256": "7e36776af5994c44a1fb7b326f5c7efb27dfd71aecd40b95329c0e4a28eeb142"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2002#4",
+                "index": 4607,
+                "data_sha256": "09c6c8c654eaa08fe537c3dbe70a6f73ce602a0ab1341d598e25298ca9a07175"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2003#4",
+                "index": 4608,
+                "data_sha256": "0c5f304d4c612272cd3c04f2c8cfd63d103c031597689e07720e3bee855479fe"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2004#4",
+                "index": 4609,
+                "data_sha256": "88d60567736001a43c5838b1f14b570a89be3f2fa308726620a84770074d2c3c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2005#4",
+                "index": 4610,
+                "data_sha256": "dc83a6188b6bfc8624314efe6fe8008d0c8f3d1117f0f1a45087713ec55b6bd6"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2006#4",
+                "index": 4611,
+                "data_sha256": "69d20d66633cf45bc73d2507fa9623d75f85ae213bf43f2c76137f6f890b4073"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2007#4",
+                "index": 4612,
+                "data_sha256": "dfae4153b3f457c98bf5413c7eb0ba97147d2252ad90970fada715892c5cc26c"
+              },
+              {
+                "slot_id": "es:killedenemyfloodcombat%2008#4",
+                "index": 4613,
+                "data_sha256": "76f815816ff96c37dba572ee19d24ac27dbe3d77a6356735eabc11cc1d1f18e6"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_warn_pureforms_stacker#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 389647995,
+                  "wem_sha256": "c1c1ca9f53c10218f18ee369ad3610d05ef8ccbda741442805ede14fc2cc874a"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-10",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "own_sets": [
@@ -303034,6 +303657,65 @@
             "origin": "created",
             "from_mapping_ids": [],
             "spec_sha256": "4dd32b4b183f98916effcc52bd1c515bdba8f0067260472983df303d4582afa9"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\sarge2\\conditional\\combat2\\killingpeople\\killedenemyfloodcombat",
+      "set_at": "2026-11-10",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-9488cff1e157",
+        "created_at": "2026-11-10",
+        "activated_at": "2026-11-10",
+        "source_version": "9488cff1e157a09a3a3c4be8c2caee05b3e85e0854fbae9e9bfbb866d0ffdd12",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-001449",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "8e1b403e034c47ab304bc11f515eeeac854cc6274511e619958de2f254e1d462"
+          },
+          {
+            "take_id": "t-001450",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "728aa7f377fc46438d51480257dc1e2a22269c7adca00fcd82e9ce2f90bca4ef"
+          },
+          {
+            "take_id": "t-001451",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "af2a34ab24103ab093cf73d36b643fe8e2ba2c091a86d727ea6c1c7fc48748be"
+          },
+          {
+            "take_id": "t-001452",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "f0cee241306d336a156c33e6cc4e7b0a2e49a4e2cae32a2c85f0873f8043d584"
+          },
+          {
+            "take_id": "t-001453",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "6cabec2e3268a3a860b53b6009e9575cfeaecc5f340e69fa2e2dea0a34fdd460"
+          },
+          {
+            "take_id": "t-001454",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "29d00aa268ecaa5df0c4eb9df95be3ee70f3461a3138c354fae273bd894401a7"
+          },
+          {
+            "take_id": "t-001455",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "cc55aeb39783fff0c8cb070a16b9fdbb86384a136d6ebf2dc5380b46eb217539"
           }
         ],
         "acknowledged": []
