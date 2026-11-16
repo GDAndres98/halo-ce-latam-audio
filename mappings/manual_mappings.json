@@ -281420,6 +281420,401 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "take_id": "t-002074",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatalone%2001#3",
+                "index": 4122,
+                "data_sha256": "6f0fe2ef04ec04891ea3b5cb7d68b78289893f844258e4dfa95e67fd00ad2acd"
+              },
+              {
+                "slot_id": "es:newcombatalone%2002#3",
+                "index": 4123,
+                "data_sha256": "aa47ec43dd332d808febfee6a948947c835296fb19f0f451b4c2b114f3f4548f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2003#3",
+                "index": 4124,
+                "data_sha256": "bbe7140d32a06fd10b16f9b95b808e26c70a2e8e85a5f13f564965c4da432e7e"
+              },
+              {
+                "slot_id": "es:newcombatalone%2004#3",
+                "index": 4125,
+                "data_sha256": "310434bc2e27de9f19356ab860679aae2d93f12dc641ca84f1111949a6d778d4"
+              },
+              {
+                "slot_id": "es:newcombatalone%2005#3",
+                "index": 4126,
+                "data_sha256": "f8750739ce97e2659646e52fadf8ced19ae57f2ced12963762d1461fa37f2f8f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2006#3",
+                "index": 4127,
+                "data_sha256": "f985197e7c5648cbde9c490109f88fa353eaef2d244f9ebe1d419a5240bd44bf"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 870112299,
+                  "wem_sha256": "910040f95b4abb5f3a45e4ae4e4b17c4a30ea13767c840235f65d7a9492ca573"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002075",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatalone%2001#3",
+                "index": 4122,
+                "data_sha256": "6f0fe2ef04ec04891ea3b5cb7d68b78289893f844258e4dfa95e67fd00ad2acd"
+              },
+              {
+                "slot_id": "es:newcombatalone%2002#3",
+                "index": 4123,
+                "data_sha256": "aa47ec43dd332d808febfee6a948947c835296fb19f0f451b4c2b114f3f4548f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2003#3",
+                "index": 4124,
+                "data_sha256": "bbe7140d32a06fd10b16f9b95b808e26c70a2e8e85a5f13f564965c4da432e7e"
+              },
+              {
+                "slot_id": "es:newcombatalone%2004#3",
+                "index": 4125,
+                "data_sha256": "310434bc2e27de9f19356ab860679aae2d93f12dc641ca84f1111949a6d778d4"
+              },
+              {
+                "slot_id": "es:newcombatalone%2005#3",
+                "index": 4126,
+                "data_sha256": "f8750739ce97e2659646e52fadf8ced19ae57f2ced12963762d1461fa37f2f8f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2006#3",
+                "index": 4127,
+                "data_sha256": "f985197e7c5648cbde9c490109f88fa353eaef2d244f9ebe1d419a5240bd44bf"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 797953552,
+                  "wem_sha256": "b5df9707c9a636ad2bbae9dc8a6360c8a38de7d4ecb2bd67f66e0a7d12951e52"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002076",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatalone%2001#3",
+                "index": 4122,
+                "data_sha256": "6f0fe2ef04ec04891ea3b5cb7d68b78289893f844258e4dfa95e67fd00ad2acd"
+              },
+              {
+                "slot_id": "es:newcombatalone%2002#3",
+                "index": 4123,
+                "data_sha256": "aa47ec43dd332d808febfee6a948947c835296fb19f0f451b4c2b114f3f4548f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2003#3",
+                "index": 4124,
+                "data_sha256": "bbe7140d32a06fd10b16f9b95b808e26c70a2e8e85a5f13f564965c4da432e7e"
+              },
+              {
+                "slot_id": "es:newcombatalone%2004#3",
+                "index": 4125,
+                "data_sha256": "310434bc2e27de9f19356ab860679aae2d93f12dc641ca84f1111949a6d778d4"
+              },
+              {
+                "slot_id": "es:newcombatalone%2005#3",
+                "index": 4126,
+                "data_sha256": "f8750739ce97e2659646e52fadf8ced19ae57f2ced12963762d1461fa37f2f8f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2006#3",
+                "index": 4127,
+                "data_sha256": "f985197e7c5648cbde9c490109f88fa353eaef2d244f9ebe1d419a5240bd44bf"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 931510031,
+                  "wem_sha256": "ba83b41cf15a6c2ec6aa96c0cbca28913fbfc36424ad8e8dbd74b1dc082256e0"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002077",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatalone%2001#3",
+                "index": 4122,
+                "data_sha256": "6f0fe2ef04ec04891ea3b5cb7d68b78289893f844258e4dfa95e67fd00ad2acd"
+              },
+              {
+                "slot_id": "es:newcombatalone%2002#3",
+                "index": 4123,
+                "data_sha256": "aa47ec43dd332d808febfee6a948947c835296fb19f0f451b4c2b114f3f4548f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2003#3",
+                "index": 4124,
+                "data_sha256": "bbe7140d32a06fd10b16f9b95b808e26c70a2e8e85a5f13f564965c4da432e7e"
+              },
+              {
+                "slot_id": "es:newcombatalone%2004#3",
+                "index": 4125,
+                "data_sha256": "310434bc2e27de9f19356ab860679aae2d93f12dc641ca84f1111949a6d778d4"
+              },
+              {
+                "slot_id": "es:newcombatalone%2005#3",
+                "index": 4126,
+                "data_sha256": "f8750739ce97e2659646e52fadf8ced19ae57f2ced12963762d1461fa37f2f8f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2006#3",
+                "index": 4127,
+                "data_sha256": "f985197e7c5648cbde9c490109f88fa353eaef2d244f9ebe1d419a5240bd44bf"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 915337321,
+                  "wem_sha256": "27ea915b9cf149635b1873af45b73f6a667d6ac79df7c839b65dda4cb788e874"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002078",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+            "spanish": [
+              {
+                "slot_id": "es:newcombatalone%2001#3",
+                "index": 4122,
+                "data_sha256": "6f0fe2ef04ec04891ea3b5cb7d68b78289893f844258e4dfa95e67fd00ad2acd"
+              },
+              {
+                "slot_id": "es:newcombatalone%2002#3",
+                "index": 4123,
+                "data_sha256": "aa47ec43dd332d808febfee6a948947c835296fb19f0f451b4c2b114f3f4548f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2003#3",
+                "index": 4124,
+                "data_sha256": "bbe7140d32a06fd10b16f9b95b808e26c70a2e8e85a5f13f564965c4da432e7e"
+              },
+              {
+                "slot_id": "es:newcombatalone%2004#3",
+                "index": 4125,
+                "data_sha256": "310434bc2e27de9f19356ab860679aae2d93f12dc641ca84f1111949a6d778d4"
+              },
+              {
+                "slot_id": "es:newcombatalone%2005#3",
+                "index": 4126,
+                "data_sha256": "f8750739ce97e2659646e52fadf8ced19ae57f2ced12963762d1461fa37f2f8f"
+              },
+              {
+                "slot_id": "es:newcombatalone%2006#3",
+                "index": 4127,
+                "data_sha256": "f985197e7c5648cbde9c490109f88fa353eaef2d244f9ebe1d419a5240bd44bf"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_01contact_seefoe_mendoza#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 336784102,
+                  "wem_sha256": "6911318db4447bb35d125a19b8cc8177f0d71eb6b88036834b36ccc2805df7ab"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "own_sets": [
@@ -358721,6 +359116,53 @@
             "origin": "created",
             "from_mapping_ids": [],
             "spec_sha256": "5d570fd5bc31f17cadc5d0bfd3d7ea11c1b0d47cb64cb3f7aff11dc919193d98"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\shouting\\newcombatalone",
+      "set_at": "2026-11-16",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-0a93b63ae10a",
+        "created_at": "2026-11-16",
+        "activated_at": "2026-11-16",
+        "source_version": "0a93b63ae10a8a13c9a13cbf1054e50d0fbd5ce539c1e964a8a58995b9a57958",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-002074",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "0ec05eb36ab3d51f85b4aa6d063028e24caff4c3096123472a0aa98a1471b799"
+          },
+          {
+            "take_id": "t-002075",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "541a2c63ec0ce9c335c9b20d05e237caa331363e2281312e34ccd2539e3f9b99"
+          },
+          {
+            "take_id": "t-002076",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "a9cc1d1be4ea0340fc9ea54d2fb1d586a1d707376703687de79afdbec8dc4f9e"
+          },
+          {
+            "take_id": "t-002077",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "d4ecd9870992682147e7da2dd72f9d959138d901df5a0daf69b9dcd679c93eba"
+          },
+          {
+            "take_id": "t-002078",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "9ee4c7305bbcb20d3f06e316a7d8424de72f31b571113ba31b083f03a8fd88bc"
           }
         ],
         "acknowledged": []
