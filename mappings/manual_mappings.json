@@ -280249,6 +280249,1177 @@
         "revision": 1
       },
       "notes": ""
+    },
+    {
+      "take_id": "t-002060",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#0",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#0",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 722879429,
+                  "wem_sha256": "691c7064222e6de0495faee19dc92742782816b654e75a707abd007f4f776c8b"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002061",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 1063052499,
+                  "wem_sha256": "1e09080053978ad21fc70988c0d248d052ad4d845a7564c213eb0ecad44bf110"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002062",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 154076500,
+                  "wem_sha256": "e69c3417c93b1c6d5e12811568191c9003235fc010513ee4c6436a93914403f2"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002063",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 4,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#3",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#3",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 981405766,
+                  "wem_sha256": "d2b36259ab13b7157823eb1d35392a66ed96ffb78568ceef50bd0e608ad48506"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002064",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 5,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 955649491,
+                  "wem_sha256": "79753a1b247a4f9f2cd6012143aaab59f1e1da8d665a1e2831b36f123d7421fc"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002065",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 6,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#5",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#5",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 842551585,
+                  "wem_sha256": "2c4b2d147c5cf532f53bd2182dd9c3a43c48075a1928a5651617e40b455a5926"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002066",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 7,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#6",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#6",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 800840014,
+                  "wem_sha256": "dc2b6c25286a54238f5424615301b250d94fa5d0968e1cae0e8c77ae83800cbc"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002067",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 8,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#7",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#7",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 780270309,
+                  "wem_sha256": "a65575ae2894feec36f6ca39e1b74884a58231a7011357a65f1ada866b868fbd"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002068",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 9,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#8",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#8",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 581752666,
+                  "wem_sha256": "d976f94cf1eef2b9fdc254f11b440fd6fad992af31916135ab87fdcd30f33e46"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002069",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 10,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#9",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#9",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 716301106,
+                  "wem_sha256": "3962140762d3ae595e60368af40e3c882cd4aeb19d5db078e94dbc4e4362d4b0"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002070",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "position": 11,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#10",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemy%2001#5",
+                "index": 3876,
+                "data_sha256": "6f4d23ba289eb7cdf04a767fcebd7c61487eeaf2dfb8e3f968bbf6bca957834e"
+              },
+              {
+                "slot_id": "es:killedenemy%2002#5",
+                "index": 3877,
+                "data_sha256": "c882eaeccd33896f03d62875ebbc1b1a936922516f3439d844477576c8f26e4a"
+              },
+              {
+                "slot_id": "es:killedenemy%2003#5",
+                "index": 3878,
+                "data_sha256": "1706b9fd83fe9a99721404ba14331062b9f120d022880848223b10d99de2af11"
+              },
+              {
+                "slot_id": "es:killedenemy%2004#5",
+                "index": 3879,
+                "data_sha256": "68f63a8ead404fb15710e27c8f1cc8bdfd69f56c312afbede0b0511a3f51c1ce"
+              },
+              {
+                "slot_id": "es:killedenemy%2005#4",
+                "index": 3880,
+                "data_sha256": "6ee28f9717561d2e6d328939654da302b86bd826a3da2dc898f45df58e7adb80"
+              },
+              {
+                "slot_id": "es:killedenemy%2006#3",
+                "index": 3881,
+                "data_sha256": "bdfcbb490cd572271d8dd5d66e82eda566f2b382a97ed5d2b40e50f1f7372c14"
+              },
+              {
+                "slot_id": "es:killedenemy%2007#3",
+                "index": 3882,
+                "data_sha256": "60aacb46ef7b5c731e0359305e3860a250b85c08247765bdb6768f18a2dd7579"
+              },
+              {
+                "slot_id": "es:killedenemy%2008#3",
+                "index": 3883,
+                "data_sha256": "c62ec8a4d4f445c3c34380245336d248fc26dfc0a2484d8042ff7f7cbfad09eb"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_dwn_mendoza#10",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 774885394,
+                  "wem_sha256": "abf39fe4f209d8470ce9a08c41b4d50fea9991e3a78bc9915d4677015927ac55"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002071",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+      "position": 1,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#1",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemybullet%2001#3",
+                "index": 3884,
+                "data_sha256": "aa3498b2223656aeda5c24348ea1ed8021c47677a1b36cde4e9de11b24625849"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2002#3",
+                "index": 3885,
+                "data_sha256": "dfbcd19958b9c71fe592eb0a73d49c42a19376f313bfe74075b39558bd928773"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2003#3",
+                "index": 3886,
+                "data_sha256": "732a962b606790b4326081d062104706a8d61ebf8d0fae924ed690636cad2498"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#1",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 882862829,
+                  "wem_sha256": "4e1d9a56cdf0d283ab233c40e6619ea029be8d19c3e3ad0b04b85cad9e9bcdd4"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002072",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+      "position": 2,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#2",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemybullet%2001#3",
+                "index": 3884,
+                "data_sha256": "aa3498b2223656aeda5c24348ea1ed8021c47677a1b36cde4e9de11b24625849"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2002#3",
+                "index": 3885,
+                "data_sha256": "dfbcd19958b9c71fe592eb0a73d49c42a19376f313bfe74075b39558bd928773"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2003#3",
+                "index": 3886,
+                "data_sha256": "732a962b606790b4326081d062104706a8d61ebf8d0fae924ed690636cad2498"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#2",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 901602853,
+                  "wem_sha256": "5c46fa3b2a8b33a06e65e82e348f4ee912bf3ce87efc41bb743294e0cd6276a1"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
+    },
+    {
+      "take_id": "t-002073",
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+      "position": 3,
+      "audio": {
+        "status": "approved",
+        "source": "ce",
+        "sources": [
+          {
+            "kind": "ce",
+            "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#4",
+            "language": "Spanish(Mexico)"
+          }
+        ],
+        "edit": {
+          "trim_start_s": 0,
+          "trim_end_s": 0,
+          "gap_s": 0
+        },
+        "fingerprint": {
+          "mcc": {
+            "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+            "spanish": [
+              {
+                "slot_id": "es:killedenemybullet%2001#3",
+                "index": 3884,
+                "data_sha256": "aa3498b2223656aeda5c24348ea1ed8021c47677a1b36cde4e9de11b24625849"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2002#3",
+                "index": 3885,
+                "data_sha256": "dfbcd19958b9c71fe592eb0a73d49c42a19376f313bfe74075b39558bd928773"
+              },
+              {
+                "slot_id": "es:killedenemybullet%2003#3",
+                "index": 3886,
+                "data_sha256": "732a962b606790b4326081d062104706a8d61ebf8d0fae924ed690636cad2498"
+              }
+            ]
+          },
+          "sources": [
+            {
+              "kind": "ce",
+              "ce_line_ref": "vo_sys_default_02combat_strk_mendoza#4",
+              "language": "Spanish(Mexico)",
+              "media": [
+                {
+                  "media_id": 491491205,
+                  "wem_sha256": "e3dc578494ed661e3b601415fc078f59c3e5486bdb03194c5d4e44dc46475700"
+                }
+              ]
+            }
+          ]
+        },
+        "approved_at": "2026-11-16",
+        "revision": 1
+      },
+      "radio_effect": {
+        "needed": false,
+        "set_at": null,
+        "revision": 1
+      },
+      "notes": ""
     }
   ],
   "own_sets": [
@@ -357432,6 +358603,124 @@
             "origin": "created",
             "from_mapping_ids": [],
             "spec_sha256": "bb31528974e704d80c6b60908e1b3ed0291cc0cb4bf404c7eb7d8b146ebb8fda"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemy",
+      "set_at": "2026-11-16",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-23bb3cbd60bf",
+        "created_at": "2026-11-16",
+        "activated_at": "2026-11-16",
+        "source_version": "23bb3cbd60bf1c6746a16e93d4eac9412c4c9c7f64c401dc3be685e40e5781d6",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-002060",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "b2d0f640d71a81324e1c6bdce7e52ee52b9ab760f37e91dcd8a81b935dc0ca7e"
+          },
+          {
+            "take_id": "t-002061",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "4d5145fc1cca43cead44718321b2f6f3aa04c5d7d1e087055225be81a3312bf3"
+          },
+          {
+            "take_id": "t-002062",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "5737c01b58fd158eff0b56545c9e749cb2e7643d7f58b0fb2b90363e583eb25d"
+          },
+          {
+            "take_id": "t-002063",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "bfbbb7d631feed1c4370421fd37cb8defbd7751e89ccb71c398a08d8508372c6"
+          },
+          {
+            "take_id": "t-002064",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "7bd734bd9213a21d6fe6a8f0b33770e5c87ef3cd31c2412cd784be58b870cdc5"
+          },
+          {
+            "take_id": "t-002065",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "35082259f2ed5f24da1ed68fd6ae59ebead7832dc6f6090e5d934f585a5524e8"
+          },
+          {
+            "take_id": "t-002066",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "a463c329a900dec475ca113a4e4814f10a3a496b41a0aa4c64e499fb97c2b8ed"
+          },
+          {
+            "take_id": "t-002067",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "0e91ede1f631d76fb912721cb12f20f6bc49cfd658764e4c2d7b431bcdee018b"
+          },
+          {
+            "take_id": "t-002068",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "ceccbe49c635413114908c75210742648101cf37c384a7a4d7fabe27fb119189"
+          },
+          {
+            "take_id": "t-002069",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "ef93791635617b4fead7c2a6ab878016cdb4034f44e1f2d5259a64eae0ce9d80"
+          },
+          {
+            "take_id": "t-002070",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "ab6bec881b91366739b2801e418b46ac1f6b2560e303bc9a3ec51c4641ee2407"
+          }
+        ],
+        "acknowledged": []
+      }
+    },
+    {
+      "mcc_tag": "sound\\dialog\\marines\\mendoza\\conditional\\combat2\\killingpeople\\killedenemybullet",
+      "set_at": "2026-11-16",
+      "provenance": {
+        "kind": "replace",
+        "record_id": "rs-a071b4367374",
+        "created_at": "2026-11-16",
+        "activated_at": "2026-11-16",
+        "source_version": "a071b4367374c4e2603c5143c61c96227a7484d8592cb77209327fde492d022c",
+        "slots": [],
+        "added_takes": [],
+        "custom_subtitles": [],
+        "takes": [
+          {
+            "take_id": "t-002071",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "5bebd198dba58f5b69bec60d9ef3ef546ce8d11d59e61b16a78ad15eb911c7c5"
+          },
+          {
+            "take_id": "t-002072",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "c2a44a5724f87f99ba739e9d8b660f67f31515dd8eca5d0b42deea70aba68506"
+          },
+          {
+            "take_id": "t-002073",
+            "origin": "created",
+            "from_mapping_ids": [],
+            "spec_sha256": "5d570fd5bc31f17cadc5d0bfd3d7ea11c1b0d47cb64cb3f7aff11dc919193d98"
           }
         ],
         "acknowledged": []
